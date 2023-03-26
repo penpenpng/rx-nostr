@@ -4,9 +4,10 @@ import path from "path";
 export default defineConfig({
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/main.ts"),
-      fileName: "main",
-      formats: ["es", "cjs"],
+      name: "rx-nostr",
+      fileName: (format) => `index.${format}.js`,
+      entry: path.resolve(__dirname, "src/index.ts"),
+      formats: ["es", "cjs", "umd"],
     },
   },
 });
