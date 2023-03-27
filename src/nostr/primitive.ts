@@ -1,5 +1,5 @@
 export namespace Nostr {
-  export interface Event<K = Kind> {
+  export interface Event<K = number> {
     id: string;
     sig: string;
     kind: K;
@@ -9,7 +9,7 @@ export namespace Nostr {
     created_at: number;
   }
 
-  export interface UnsignedEvent<K = Kind> {
+  export interface UnsignedEvent<K = number> {
     kind: K;
     tags: string[][];
     pubkey: string;
@@ -17,9 +17,9 @@ export namespace Nostr {
     created_at: number;
   }
 
-  export interface EventParameters<K = Kind> {
+  export interface EventParameters<K = number> {
     kind: K;
-    tags: string[][];
+    tags?: string[][];
     pubkey: string;
     content: string;
   }
@@ -40,6 +40,8 @@ export namespace Nostr {
     Auth = 22242,
   }
 
+  export type TagName = `#${string}`;
+
   export interface Filter {
     ids?: string[];
     kinds?: number[];
@@ -47,7 +49,7 @@ export namespace Nostr {
     since?: number;
     until?: number;
     limit?: number;
-    [key: `#${string}`]: string[];
+    [key: TagName]: string[];
   }
 
   export namespace OutgoingMessage {

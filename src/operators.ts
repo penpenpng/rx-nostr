@@ -2,6 +2,7 @@ import {
   distinct,
   distinctUntilChanged,
   filter,
+  map,
   Observable,
   ObservableInput,
   partition,
@@ -21,7 +22,7 @@ export function extractRelayError<T extends RelayMessageEvent>(
 ): [Observable<RelayError>, Observable<T>] {
   return partition<T | RelayError, RelayError>(
     source,
-    (event, _): event is RelayError => event.kind === "error"
+    (event): event is RelayError => event.kind === "error"
   );
 }
 
@@ -45,7 +46,7 @@ export function latest() {
     ),
     distinctUntilChanged(
       (a, b) => a === b,
-      (event) => event.message[2].id
+      (event) => getEvent(event).id
     )
   );
 }
@@ -62,6 +63,10 @@ export function verifyEvent() {
  */
 export function kind<K extends Nostr.Kind>(kind: K) {
   return filter<RelayReqMessageEvent>((event) => getEvent(event).kind === kind);
+}
+
+export function pickMessage() {
+  return map<RelayReqMessageEvent, Nostr.Event>(getEvent);
 }
 
 function getEvent(ev: RelayReqMessageEvent) {

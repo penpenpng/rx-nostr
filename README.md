@@ -30,7 +30,7 @@ const relays = new Relays(
 const observableReq = relays.observeReq(
   {
     subId: "...",
-    // You can specify a raw filter object or Observable<Filter[]>
+    // You can specify raw filters objects or Observable<Filter[]>
     filters: [
       /* ... */
     ],
@@ -65,10 +65,10 @@ observableReq
   )
   .subscribe((ev) => console.log(ev));
 
-// Broad cast your event. `created_at`, `id` and `sig` are calculated automatically.
+// Broadcast your event. `created_at`, `id` and `sig` are calculated automatically.
 relays.send(
   {
-    kind: [1],
+    kind: 1,
     pubkey: '...',
     content: '...',
     tags: [],

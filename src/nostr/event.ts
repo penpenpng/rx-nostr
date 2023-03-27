@@ -11,11 +11,7 @@ export function createEventBySecretKey(
   params: Nostr.EventParameters,
   seckey: string
 ): Nostr.Event {
-  const unsignedEvent: Nostr.UnsignedEvent = {
-    created_at: Math.floor(new Date().getTime() / 1000),
-    ...params,
-  };
-  return sign(unsignedEvent, seckey);
+  return sign(getUnsignedEvent(params), seckey);
 }
 
 export function createEventByNip07(
@@ -26,11 +22,7 @@ export function createEventByNip07(
     throw new Error("NIP-07 interface is not ready.");
   }
 
-  const unsignedEvent: Nostr.UnsignedEvent = {
-    created_at: Math.floor(new Date().getTime() / 1000),
-    ...params,
-  };
-  return nostr.signEvent(unsignedEvent);
+  return nostr.signEvent(getUnsignedEvent(params));
 }
 
 export function getEventHash({
@@ -83,4 +75,15 @@ export function ensureRequiredFields(event: Nostr.Event): boolean {
   }
 
   return true;
+}
+
+function getUnsignedEvent(params: Nostr.EventParameters): Nostr.UnsignedEvent {
+  const { kind, pubkey, content, tags = [] } = params;
+  return {
+    kind,
+    pubkey,
+    content,
+    tags,
+    created_at: Math.floor(new Date().getTime() / 1000),
+  };
 }

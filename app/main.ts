@@ -1,24 +1,53 @@
-import "./style.css";
-import typescriptLogo from "./typescript.svg";
-import viteLogo from "/vite.svg";
-import { setupCounter } from "./counter";
+// Playground
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`;
+import { tap } from "rxjs";
+import {
+  Relay,
+  Relays,
+  MonoFilterReq,
+  Req,
+  pickMessage,
+  distinctEvent,
+} from "../src";
+import { bech32encode } from "../src/nostr/bech32";
 
-setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+const consume = (label: string) => (ev: any) => console.log(label, ev);
+const me = bech32encode(
+  "npub133vj8ycevdle0cq8mtgddq0xtn34kxkwxvak983dx0u5vhqnycyqj6tcza"
+);
+
+const relays = new Relays([
+  new Relay("wss://relay-jp.nostr.wirednet.jp"),
+  new Relay("wss://nostr-relay.nokotaro.com"),
+]);
+
+const likeReq: Req = {
+  subId: "sub-likes",
+  filters: [{ kinds: [7], authors: [me], limit: 10 }],
+};
+const noteReq = new MonoFilterReq("sub-notes", {
+  debounce: 1000,
+  windowSize: 10,
+});
+
+relays
+  .observeReq(noteReq, { onError: "silence" })
+  .pipe(distinctEvent(), pickMessage())
+  .subscribe(consume("[NOTE]"));
+relays
+  .observeReq(likeReq, { onError: "silence" })
+  .pipe(
+    distinctEvent(),
+    pickMessage(),
+    tap(({ tags }) => {
+      const eventIds = tags
+        .filter(([tag]) => tag === "e")
+        .map(([, val]) => val);
+
+      if (eventIds.length > 0) {
+        noteReq.set("kinds", 1);
+        noteReq.set("ids", ...eventIds);
+      }
+    })
+  )
+  .subscribe(consume("[LIKE]"));
