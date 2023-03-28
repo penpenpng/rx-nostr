@@ -1,60 +1,121 @@
-import {
-  BehaviorSubject,
-  debounce,
-  filter,
-  identity,
-  interval,
-  map,
-  Observable,
-} from "rxjs";
+import { BehaviorSubject, Observable, of } from "rxjs";
+import { v4 as uuid } from "uuid";
 
 import { Nostr } from "./nostr/primitive";
 
 export interface Req {
-  subId: string;
-  filters: Observable<Nostr.Filter[]> | Nostr.Filter[];
+  readonly subId: string;
+  readonly filters: Nostr.Filter[];
 }
 
-interface MonoFilterReqOptions {
-  initialFilter?: Nostr.Filter;
-  debounce?: number | null;
-  windowSize?: number;
+export interface ObservableReq {
+  readonly subId: string;
+  readonly filters: Nostr.Filter[];
+  readonly observable: Observable<Req>;
+  readonly strategy: ReqStrategy;
 }
 
-export class MonoFilterReq implements Req {
+export type ReqStrategy = "until-eose" | "forever";
+
+class ObservableReqBase {
+  protected _subId: string;
   get subId() {
     return this._subId;
   }
-  private set subId(v: string) {
-    this._subId = v;
-  }
-  private _subId: string;
 
+  protected _filters: Nostr.Filter[];
   get filters() {
-    const debounceTime = this.options.debounce;
-
-    return this.subject.pipe(
-      filter((filter) =>
-        Object.values(filter).some((queries) => queries && queries.length > 0)
-      ),
-      map((filter) => [filter]),
-      debounceTime ? debounce(() => interval(debounceTime)) : identity
-    );
+    return this._filters;
   }
-  private subject: BehaviorSubject<Nostr.Filter>;
-  private filter: Nostr.Filter;
 
-  private options: Required<MonoFilterReqOptions>;
+  protected _strategy: ReqStrategy;
+  get strategy() {
+    return this._strategy;
+  }
 
-  constructor(subId: string, options?: MonoFilterReqOptions) {
-    this._subId = subId;
-    this.filter = options?.initialFilter ?? {};
-    this.subject = new BehaviorSubject(this.filter);
-    this.options = {
-      debounce: options?.debounce ?? null,
-      windowSize: options?.windowSize ?? 0,
-      initialFilter: options?.initialFilter ?? {},
-    };
+  constructor(params: {
+    subId: string;
+    filters: Nostr.Filter[];
+    strategy: ReqStrategy;
+  }) {
+    this._subId = params.subId;
+    this._filters = params.filters;
+    this._strategy = params.strategy;
+  }
+}
+
+export class ImmutableReq extends ObservableReqBase implements ObservableReq {
+  private _req$: Observable<Req>;
+  get observable() {
+    return this._req$;
+  }
+
+  constructor(strategy: ReqStrategy, filters: Nostr.Filter[]) {
+    super({
+      subId: uuid(),
+      filters: normalizeFilters(filters),
+      strategy,
+    });
+
+    this._req$ = of({
+      subId: this._subId,
+      filters: this._filters,
+    });
+  }
+}
+
+export class ForwardReq extends ObservableReqBase implements ObservableReq {
+  private _req$: BehaviorSubject<Req>;
+  get observable() {
+    return this._req$;
+  }
+
+  constructor(initial?: Nostr.Filter[]) {
+    super({
+      subId: uuid(),
+      filters: normalizeFilters(initial ?? []),
+      strategy: "forever",
+    });
+
+    this._req$ = new BehaviorSubject({
+      subId: this._subId,
+      filters: this._filters,
+    });
+  }
+
+  setFilters(filters: Nostr.Filter[]) {
+    this._req$.next({
+      subId: this._subId,
+      filters: filters.map((filter) => ({ ...filter, limit: 0 })),
+    });
+  }
+}
+
+// TODO: Reimpl as MonoFilterAccumulater
+export class MonoFilterForwardReq
+  extends ObservableReqBase
+  implements ObservableReq
+{
+  private _req$: BehaviorSubject<Req>;
+  get observable() {
+    return this._req$;
+  }
+
+  get filter() {
+    return this.filters[0] ?? {};
+  }
+
+  constructor(initial?: Nostr.Filter[]) {
+    super({
+      subId: uuid(),
+      filters: normalizeFilters(initial ?? []),
+      strategy: "forever",
+    });
+
+    this._req$ = new BehaviorSubject({
+      subId: this._subId,
+      filters: this._filters,
+    });
   }
 
   set(target: "kinds", ...queries: number[]): void;
@@ -67,7 +128,7 @@ export class MonoFilterReq implements Req {
     const next = Array.from(new Set([...prev, ...queries]));
 
     if (prev.length !== next.length) {
-      this.next({
+      this.setFilter({
         ...this.filter,
         [target]: next.length > 0 ? next : undefined,
       });
@@ -88,7 +149,7 @@ export class MonoFilterReq implements Req {
     const next = Array.from(set);
 
     if (prev.length !== next.length) {
-      this.next({
+      this.setFilter({
         ...this.filter,
         [target]: next.length > 0 ? next : undefined,
       });
@@ -99,7 +160,7 @@ export class MonoFilterReq implements Req {
     const prev = this.filter[target] ?? [];
 
     if (prev.length > 0) {
-      this.next({
+      this.setFilter({
         ...this.filter,
         [target]: undefined,
       });
@@ -114,7 +175,7 @@ export class MonoFilterReq implements Req {
         : Math.floor(datetime.getTime() / 1000);
 
     if (prev !== next) {
-      this.next({
+      this.setFilter({
         ...this.filter,
         since: next ?? undefined,
       });
@@ -128,18 +189,73 @@ export class MonoFilterReq implements Req {
         : Math.floor(datetime.getTime() / 1000);
 
     if (prev !== next) {
-      this.next({
+      this.setFilter({
         ...this.filter,
         until: next ?? undefined,
       });
     }
   }
 
-  private next(filter: Nostr.Filter) {
-    this.subject.next({
-      ...filter,
-      limit: this.options.windowSize,
+  private setFilter(filter: Nostr.Filter) {
+    this._filters = [{ ...filter, limit: 0 }];
+    this._req$.next({
+      subId: this._subId,
+      filters: this._filters,
     });
-    this.filter = filter;
   }
+}
+
+export class BackwardReq extends ObservableReqBase implements ObservableReq {
+  private _req$: BehaviorSubject<Req>;
+  get observable() {
+    return this._req$;
+  }
+
+  constructor(initial?: Nostr.Filter[]) {
+    super({
+      subId: uuid(),
+      filters: normalizeFilters(initial ?? []),
+      strategy: "until-eose",
+    });
+
+    this._req$ = new BehaviorSubject({
+      subId: this._subId,
+      filters: this._filters,
+    });
+  }
+
+  setFilters(filters: Nostr.Filter[]) {
+    this._subId = uuid();
+    this._req$.next({
+      subId: this._subId,
+      filters,
+    });
+  }
+}
+
+function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
+  const res: Nostr.Filter = {};
+  let isValid = true;
+  for (const [key, value] of Object.entries(filter)) {
+    if (
+      key === "since" ||
+      key === "until" ||
+      key === "limit" ||
+      (value && value.length > 0)
+    ) {
+      res[key as keyof Nostr.Filter] = value;
+    }
+
+    if (value && value.length <= 0) {
+      isValid = false;
+    }
+  }
+
+  return isValid ? res : null;
+}
+
+function normalizeFilters(filters: Nostr.Filter[]): Nostr.Filter[] {
+  return filters
+    .map(normalizeFilter)
+    .filter((e): e is Nostr.Filter => e !== null);
 }

@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.15.10",
+    "@types/uuid": "^9.0.1",
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
     "eslint": "^8.36.0",
@@ -42,6 +43,7 @@
     "@noble/hashes": "1.0.0",
     "@noble/secp256k1": "^1.7.1",
     "bech32": "^2.0.0",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "uuid": "^9.0.0"
   }
 }

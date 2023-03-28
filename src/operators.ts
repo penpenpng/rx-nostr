@@ -3,34 +3,22 @@ import {
   distinctUntilChanged,
   filter,
   map,
-  Observable,
   ObservableInput,
-  partition,
   pipe,
   scan,
 } from "rxjs";
 
-import { RelayError, RelayMessageEvent, RelayReqMessageEvent } from "./relay";
+import { RelayNotification } from "./relay";
 import { Nostr } from "./nostr/primitive";
 import { verify } from "./nostr/event";
 
-/**
- * Separate the results of `observeReq()` into `RelayError` and the rest.
- */
-export function extractRelayError<T extends RelayMessageEvent>(
-  source: ObservableInput<T | RelayError>
-): [Observable<RelayError>, Observable<T>] {
-  return partition<T | RelayError, RelayError>(
-    source,
-    (event): event is RelayError => event.kind === "error"
-  );
-}
+type EventNotification = RelayNotification.Message<Nostr.IncomingMessage.EVENT>;
 
 /**
  * Remove the events once seen.
  */
 export function distinctEvent(flushes?: ObservableInput<unknown>) {
-  return distinct<RelayReqMessageEvent, string>(
+  return distinct<EventNotification, string>(
     (event) => getEvent(event).id,
     flushes
   );
@@ -41,7 +29,7 @@ export function distinctEvent(flushes?: ObservableInput<unknown>) {
  */
 export function latest() {
   return pipe(
-    scan<RelayReqMessageEvent>((acc, event) =>
+    scan<EventNotification>((acc, event) =>
       getEvent(acc).created_at < getEvent(event).created_at ? event : acc
     ),
     distinctUntilChanged(
@@ -55,20 +43,20 @@ export function latest() {
  * Only events with a valid signature are allowed to pass.
  */
 export function verifyEvent() {
-  return filter<RelayReqMessageEvent>((event) => verify(getEvent(event)));
+  return filter<EventNotification>((event) => verify(getEvent(event)));
 }
 
 /**
  * Only events with given kind are allowed to pass.
  */
 export function kind<K extends Nostr.Kind>(kind: K) {
-  return filter<RelayReqMessageEvent>((event) => getEvent(event).kind === kind);
+  return filter<EventNotification>((event) => getEvent(event).kind === kind);
 }
 
 export function pickMessage() {
-  return map<RelayReqMessageEvent, Nostr.Event>(getEvent);
+  return map<EventNotification, Nostr.Event>(getEvent);
 }
 
-function getEvent(ev: RelayReqMessageEvent) {
+function getEvent(ev: EventNotification) {
   return ev.message[2];
 }
