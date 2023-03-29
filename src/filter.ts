@@ -1,4 +1,4 @@
-import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { BehaviorSubject, Observable } from "rxjs";
 import { Nostr } from "./nostr/primitive";
 
 export class MonoFilterAccumulater {

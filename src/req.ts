@@ -11,7 +11,7 @@ import { v4 as uuid } from "uuid";
 import { Nostr } from "./nostr/primitive";
 import { MonoFilterAccumulater, normalizeFilters } from "./filter";
 
-export interface Req {
+export interface ReqQuery {
   readonly subId: string;
   readonly filters: Nostr.Filter[];
 }
@@ -19,7 +19,7 @@ export interface Req {
 export interface ObservableReq {
   readonly subId: string;
   readonly filters: Nostr.Filter[];
-  readonly observable: Observable<Req>;
+  readonly observable: Observable<ReqQuery>;
   readonly strategy: ReqStrategy;
 }
 
@@ -52,8 +52,8 @@ class ObservableReqBase {
   }
 }
 
-export class ImmutableReq extends ObservableReqBase implements ObservableReq {
-  private _req$: Observable<Req>;
+export class Req extends ObservableReqBase implements ObservableReq {
+  private _req$: Observable<ReqQuery>;
   get observable() {
     return this._req$;
   }
@@ -73,7 +73,7 @@ export class ImmutableReq extends ObservableReqBase implements ObservableReq {
 }
 
 export class ForwardReq extends ObservableReqBase implements ObservableReq {
-  private _req$: BehaviorSubject<Req>;
+  private _req$: BehaviorSubject<ReqQuery>;
   get observable() {
     return this._req$;
   }
@@ -98,22 +98,24 @@ export class ForwardReq extends ObservableReqBase implements ObservableReq {
     });
   }
 
-  connect(
+  static from(
     acc: MonoFilterAccumulater,
     preprocess?: MonoTypeOperatorFunction<Nostr.Filter>
   ) {
-    this.setFilters([acc.getFilter()]);
+    const req = new ForwardReq([acc.getFilter()]);
     acc
       .observe()
       .pipe(preprocess ?? identity)
       .subscribe((filter) => {
-        this.setFilters([filter]);
+        req.setFilters([filter]);
       });
+
+    return req;
   }
 }
 
 export class BackwardReq extends ObservableReqBase implements ObservableReq {
-  private _req$: BehaviorSubject<Req>;
+  private _req$: BehaviorSubject<ReqQuery>;
   get observable() {
     return this._req$;
   }
@@ -139,11 +141,11 @@ export class BackwardReq extends ObservableReqBase implements ObservableReq {
     });
   }
 
-  connect(
+  static from(
     acc: MonoFilterAccumulater,
     preprocess?: MonoTypeOperatorFunction<Nostr.Filter>
   ) {
-    this.setFilters([acc.getFilter()]);
+    const req = new BackwardReq([acc.getFilter()]);
     acc
       .observe()
       .pipe(
@@ -154,7 +156,9 @@ export class BackwardReq extends ObservableReqBase implements ObservableReq {
         })
       )
       .subscribe((filter) => {
-        this.setFilters([filter]);
+        req.setFilters([filter]);
       });
+
+    return req;
   }
 }

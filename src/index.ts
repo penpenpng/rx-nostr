@@ -1,4 +1,5 @@
 export * from "./relay";
 export * from "./req";
-export * from "./operators";
+export * from "./filter";
+export * from "./operator";
 export * from "./nostr/primitive";

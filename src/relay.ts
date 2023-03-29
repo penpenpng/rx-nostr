@@ -5,8 +5,6 @@ import {
   merge,
   catchError,
   switchAll,
-  takeWhile,
-  identity,
   EMPTY,
   filter,
   Subscription,
@@ -19,7 +17,7 @@ import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 
 import { Nostr } from "./nostr/primitive";
 import { createEventBySecretKey, createEventByNip07 } from "./nostr/event";
-import { ObservableReq, Req } from "./req";
+import { ObservableReq, ReqQuery } from "./req";
 
 export interface RelaysOptions {
   /**
@@ -94,7 +92,7 @@ export class Relays {
   }
 
   observeReq(req$: ObservableReq): Observable<EventMessageNotification> {
-    const multiplex = (req: Req) =>
+    const multiplex = (req: ReqQuery) =>
       new Observable<EventMessageNotification>((observer) => {
         this.sendMessage(["REQ", req.subId, ...req.filters]);
 
