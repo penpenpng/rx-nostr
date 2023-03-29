@@ -8,17 +8,15 @@ import {
   scan,
 } from "rxjs";
 
-import { RelayNotification } from "./relay";
+import { EventMessageNotification } from "./relay";
 import { Nostr } from "./nostr/primitive";
 import { verify } from "./nostr/event";
-
-type EventNotification = RelayNotification.Message<Nostr.IncomingMessage.EVENT>;
 
 /**
  * Remove the events once seen.
  */
 export function distinctEvent(flushes?: ObservableInput<unknown>) {
-  return distinct<EventNotification, string>(
+  return distinct<EventMessageNotification, string>(
     (event) => getEvent(event).id,
     flushes
   );
@@ -29,7 +27,7 @@ export function distinctEvent(flushes?: ObservableInput<unknown>) {
  */
 export function latest() {
   return pipe(
-    scan<EventNotification>((acc, event) =>
+    scan<EventMessageNotification>((acc, event) =>
       getEvent(acc).created_at < getEvent(event).created_at ? event : acc
     ),
     distinctUntilChanged(
@@ -43,20 +41,22 @@ export function latest() {
  * Only events with a valid signature are allowed to pass.
  */
 export function verifyEvent() {
-  return filter<EventNotification>((event) => verify(getEvent(event)));
+  return filter<EventMessageNotification>((event) => verify(getEvent(event)));
 }
 
 /**
  * Only events with given kind are allowed to pass.
  */
 export function kind<K extends Nostr.Kind>(kind: K) {
-  return filter<EventNotification>((event) => getEvent(event).kind === kind);
+  return filter<EventMessageNotification>(
+    (event) => getEvent(event).kind === kind
+  );
 }
 
 export function pickMessage() {
-  return map<EventNotification, Nostr.Event>(getEvent);
+  return map<EventMessageNotification, Nostr.Event>(getEvent);
 }
 
-function getEvent(ev: EventNotification) {
+function getEvent(ev: EventMessageNotification) {
   return ev.message[2];
 }

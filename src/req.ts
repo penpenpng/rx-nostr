@@ -1,7 +1,15 @@
-import { BehaviorSubject, Observable, of } from "rxjs";
+import {
+  BehaviorSubject,
+  identity,
+  MonoTypeOperatorFunction,
+  Observable,
+  of,
+  tap,
+} from "rxjs";
 import { v4 as uuid } from "uuid";
 
 import { Nostr } from "./nostr/primitive";
+import { MonoFilterAccumulater, normalizeFilters } from "./filter";
 
 export interface Req {
   readonly subId: string;
@@ -89,119 +97,18 @@ export class ForwardReq extends ObservableReqBase implements ObservableReq {
       filters: filters.map((filter) => ({ ...filter, limit: 0 })),
     });
   }
-}
 
-// TODO: Reimpl as MonoFilterAccumulater
-export class MonoFilterForwardReq
-  extends ObservableReqBase
-  implements ObservableReq
-{
-  private _req$: BehaviorSubject<Req>;
-  get observable() {
-    return this._req$;
-  }
-
-  get filter() {
-    return this.filters[0] ?? {};
-  }
-
-  constructor(initial?: Nostr.Filter[]) {
-    super({
-      subId: uuid(),
-      filters: normalizeFilters(initial ?? []),
-      strategy: "forever",
-    });
-
-    this._req$ = new BehaviorSubject({
-      subId: this._subId,
-      filters: this._filters,
-    });
-  }
-
-  set(target: "kinds", ...queries: number[]): void;
-  set(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  set(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void {
-    const prev = this.filter[target] ?? [];
-    const next = Array.from(new Set([...prev, ...queries]));
-
-    if (prev.length !== next.length) {
-      this.setFilter({
-        ...this.filter,
-        [target]: next.length > 0 ? next : undefined,
+  connect(
+    acc: MonoFilterAccumulater,
+    preprocess?: MonoTypeOperatorFunction<Nostr.Filter>
+  ) {
+    this.setFilters([acc.getFilter()]);
+    acc
+      .observe()
+      .pipe(preprocess ?? identity)
+      .subscribe((filter) => {
+        this.setFilters([filter]);
       });
-    }
-  }
-
-  remove(target: "kinds", ...queries: number[]): void;
-  remove(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  remove(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void {
-    const prev = this.filter[target] ?? [];
-    const set = new Set<number | string>(prev);
-    for (const q of queries) {
-      set.delete(q);
-    }
-    const next = Array.from(set);
-
-    if (prev.length !== next.length) {
-      this.setFilter({
-        ...this.filter,
-        [target]: next.length > 0 ? next : undefined,
-      });
-    }
-  }
-
-  clear(target: "kinds" | "ids" | "authors" | Nostr.TagName) {
-    const prev = this.filter[target] ?? [];
-
-    if (prev.length > 0) {
-      this.setFilter({
-        ...this.filter,
-        [target]: undefined,
-      });
-    }
-  }
-
-  setSince(datetime: number | Date | null): void {
-    const prev = this.filter.since ?? null;
-    const next =
-      typeof datetime === "number" || datetime === null
-        ? datetime
-        : Math.floor(datetime.getTime() / 1000);
-
-    if (prev !== next) {
-      this.setFilter({
-        ...this.filter,
-        since: next ?? undefined,
-      });
-    }
-  }
-  setUntil(datetime: number | Date | null): void {
-    const prev = this.filter.until ?? null;
-    const next =
-      typeof datetime === "number" || datetime === null
-        ? datetime
-        : Math.floor(datetime.getTime() / 1000);
-
-    if (prev !== next) {
-      this.setFilter({
-        ...this.filter,
-        until: next ?? undefined,
-      });
-    }
-  }
-
-  private setFilter(filter: Nostr.Filter) {
-    this._filters = [{ ...filter, limit: 0 }];
-    this._req$.next({
-      subId: this._subId,
-      filters: this._filters,
-    });
   }
 }
 
@@ -231,31 +138,23 @@ export class BackwardReq extends ObservableReqBase implements ObservableReq {
       filters,
     });
   }
-}
 
-function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
-  const res: Nostr.Filter = {};
-  let isValid = true;
-  for (const [key, value] of Object.entries(filter)) {
-    if (
-      key === "since" ||
-      key === "until" ||
-      key === "limit" ||
-      (value && value.length > 0)
-    ) {
-      res[key as keyof Nostr.Filter] = value;
-    }
-
-    if (value && value.length <= 0) {
-      isValid = false;
-    }
+  connect(
+    acc: MonoFilterAccumulater,
+    preprocess?: MonoTypeOperatorFunction<Nostr.Filter>
+  ) {
+    this.setFilters([acc.getFilter()]);
+    acc
+      .observe()
+      .pipe(
+        preprocess ?? identity,
+        tap(() => {
+          // Each req in BackwardReq stream should be "prime" to each other
+          acc.flush();
+        })
+      )
+      .subscribe((filter) => {
+        this.setFilters([filter]);
+      });
   }
-
-  return isValid ? res : null;
-}
-
-function normalizeFilters(filters: Nostr.Filter[]): Nostr.Filter[] {
-  return filters
-    .map(normalizeFilter)
-    .filter((e): e is Nostr.Filter => e !== null);
 }

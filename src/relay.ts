@@ -33,18 +33,19 @@ const DEFAULT_RELAYS_OPTIONS: Required<RelaysOptions> = {
   retry: 10,
 };
 
-export namespace RelayNotification {
-  export interface Message<
-    M extends Nostr.IncomingMessage.Any = Nostr.IncomingMessage.Any
-  > {
-    from: string;
-    message: M;
-  }
+export interface AnyMessageNotification {
+  from: string;
+  message: Nostr.IncomingMessage.Any;
+}
 
-  export interface Error {
-    from: string;
-    error: unknown;
-  }
+export interface EventMessageNotification {
+  from: string;
+  message: Nostr.IncomingMessage.EVENT;
+}
+
+export interface ErrorNotification {
+  from: string;
+  error: unknown;
 }
 
 export class Relays {
@@ -53,8 +54,8 @@ export class Relays {
     url: string;
   }[];
   private options: Required<RelaysOptions>;
-  private message$: Observable<RelayNotification.Message>;
-  private error$: Subject<RelayNotification.Error>;
+  private message$: Observable<AnyMessageNotification>;
+  private error$: Subject<ErrorNotification>;
   private keeping: Subscription;
 
   constructor(urls: string[], options?: RelaysOptions) {
@@ -84,47 +85,41 @@ export class Relays {
     this.keeping = this.message$.subscribe();
   }
 
-  observeMessage(): Observable<RelayNotification.Message> {
+  observeMessage(): Observable<AnyMessageNotification> {
     return from(this.message$);
   }
 
-  observeError(): Observable<RelayNotification.Error> {
+  observeError(): Observable<ErrorNotification> {
     return from(this.error$);
   }
 
-  observeReq(
-    req$: ObservableReq
-  ): Observable<RelayNotification.Message<Nostr.IncomingMessage.EVENT>> {
-    const observe = (req: Req) => {
-      const streams = this.conns.map(({ websocket, url }) =>
-        websocket
-          .multiplex(
-            (): Nostr.OutgoingMessage.REQ => ["REQ", req.subId, ...req.filters],
-            (): Nostr.OutgoingMessage.CLOSE => ["CLOSE", req.subId],
-            ([type, maybeSubId]: Nostr.IncomingMessage.Any) =>
-              (type === "EVENT" || type === "EOSE") && maybeSubId === req.subId
-          )
-          .pipe(
-            req$.strategy === "until-eose"
-              ? takeWhile(([type]) => type !== "EOSE")
-              : identity,
-            filter(
-              (message): message is Nostr.IncomingMessage.EVENT =>
-                message[0] === "EVENT"
-            ),
-            map((message) => ({
-              from: url,
-              message,
-            })),
-            catchError(() => EMPTY)
-          )
-      );
-      return merge(...streams);
-    };
+  observeReq(req$: ObservableReq): Observable<EventMessageNotification> {
+    const multiplex = (req: Req) =>
+      new Observable<EventMessageNotification>((observer) => {
+        this.sendMessage(["REQ", req.subId, ...req.filters]);
+
+        const subscription = this.message$.subscribe({
+          next: (noti) => {
+            const type = noti.message[0];
+            if (type === "EVENT") {
+              observer.next(noti as EventMessageNotification);
+            } else if (type === "EOSE") {
+              observer.complete();
+            }
+          },
+          error: (err) => observer.error(err),
+          complete: () => observer.complete(),
+        });
+
+        return () => {
+          this.sendMessage(["CLOSE", req.subId]);
+          subscription.unsubscribe();
+        };
+      });
 
     return req$.observable.pipe(
       filter((req) => req.filters.length > 0),
-      map(observe),
+      map(multiplex),
       req$.strategy === "until-eose" ? mergeAll() : switchAll()
     );
   }
