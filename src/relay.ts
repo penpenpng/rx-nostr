@@ -12,12 +12,14 @@ import {
   share,
   from,
   mergeAll,
+  ErrorNotification,
 } from "rxjs";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 
 import { Nostr } from "./nostr/primitive";
 import { createEventBySecretKey, createEventByNip07 } from "./nostr/event";
 import { ObservableReq, ReqQuery } from "./req";
+import { AnyMessageNotification, EventMessageNotification } from "./type";
 
 export interface RelaysOptions {
   /**
@@ -30,21 +32,6 @@ export interface RelaysOptions {
 const DEFAULT_RELAYS_OPTIONS: Required<RelaysOptions> = {
   retry: 10,
 };
-
-export interface AnyMessageNotification {
-  from: string;
-  message: Nostr.IncomingMessage.Any;
-}
-
-export interface EventMessageNotification {
-  from: string;
-  message: Nostr.IncomingMessage.EVENT;
-}
-
-export interface ErrorNotification {
-  from: string;
-  error: unknown;
-}
 
 export class Relays {
   private conns: {
@@ -83,15 +70,15 @@ export class Relays {
     this.keeping = this.message$.subscribe();
   }
 
-  observeMessage(): Observable<AnyMessageNotification> {
+  observeAllMessage(): Observable<AnyMessageNotification> {
     return from(this.message$);
   }
 
-  observeError(): Observable<ErrorNotification> {
+  observeAllError(): Observable<ErrorNotification> {
     return from(this.error$);
   }
 
-  observeReq(req$: ObservableReq): Observable<EventMessageNotification> {
+  observe(req$: ObservableReq): Observable<EventMessageNotification> {
     const multiplex = (req: ReqQuery) =>
       new Observable<EventMessageNotification>((observer) => {
         this.sendMessage(["REQ", req.subId, ...req.filters]);
@@ -101,7 +88,7 @@ export class Relays {
             const type = noti.message[0];
             if (type === "EVENT") {
               observer.next(noti as EventMessageNotification);
-            } else if (type === "EOSE") {
+            } else if (type === "EOSE" && req$.strategy === "until-eose") {
               observer.complete();
             }
           },
