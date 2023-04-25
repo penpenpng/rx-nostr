@@ -1,20 +1,20 @@
 import {
   BehaviorSubject,
+  debounceTime,
   filter,
   generate,
   identity,
+  map,
   mergeAll,
   MonoTypeOperatorFunction,
   Observable,
   ObservableInput,
   of,
   OperatorFunction,
+  pipe,
   repeat,
   tap,
-  map,
   zipWith,
-  pipe,
-  debounceTime,
 } from "rxjs";
 import { v4 as uuid } from "uuid";
 
@@ -25,20 +25,20 @@ import { extractEvent } from "./util";
 type ReqStrategy =
   | {
       kind: "backward";
-      config?: {
-        // closeOnEOSE: true;
-        timeout?: number;
-        // joinBy: "merge";
-        reducer?: MonoTypeOperatorFunction<Nostr.Filter[]>;
-      };
+      // config?: {
+      //   // closeOnEOSE: true;
+      //   timeout?: number;
+      //   // joinBy: "merge";
+      //   reducer?: <T>() => MonoTypeOperatorFunction<T>;
+      // };
     }
   | {
       kind: "forward";
-      config?: {
-        // closeOnEOSE: false;
-        // joinBy: "switch";
-        reducer?: MonoTypeOperatorFunction<Nostr.Filter[]>;
-      };
+      // config?: {
+      //   // closeOnEOSE: false;
+      //   // joinBy: "switch";
+      //   reducer?: <T>() => MonoTypeOperatorFunction<T>;
+      // };
     };
 type ReqStrategyConfig<K extends ReqStrategy["kind"]> = (ReqStrategy & {
   kind: K;
@@ -74,6 +74,11 @@ export interface ReqBehavior {
   /** @internal */
   readonly strategy: ReqStrategy;
 }
+// もう REQ, consume(), strategy の observable にすればよくない？ ← 却下
+
+export interface ReqUpdater {
+  next(filters: Nostr.Filter[]): void;
+}
 
 class ReqBase {
   protected constructor(protected _strategy: ReqStrategy) {}
@@ -89,7 +94,7 @@ class ReqBase {
 
   observe() {
     return this.filters$.pipe(
-      this._strategy?.config?.reducer ?? identity,
+      this._strategy?.config?.reducer?.() ?? identity,
       toREQ(this.strategy)
     );
   }
@@ -97,10 +102,6 @@ class ReqBase {
   protected next(filters: Nostr.Filter[]) {
     this.filters$.next(normalizeFilters(filters));
   }
-}
-
-export interface ReqUpdater {
-  next(filters: Nostr.Filter[]): void;
 }
 
 export class Req extends ReqBase {

@@ -33,3 +33,11 @@ relays
   .subscribe(console.log);
 
 relays.observeReq(noteReq).pipe(uniq(), verify()).subscribe(console.log);
+
+
+// こんなかんじにしたい
+relays.observe(
+  req.publish(
+    reducer?
+  )
+)

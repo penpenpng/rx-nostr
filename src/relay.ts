@@ -1,23 +1,23 @@
 import {
-  Observable,
-  retry,
+  catchError,
+  EMPTY,
+  ErrorNotification,
+  filter,
+  from,
   map,
   merge,
-  catchError,
-  switchAll,
-  EMPTY,
-  filter,
-  Subscription,
-  Subject,
-  share,
-  from,
   mergeAll,
-  ErrorNotification,
+  Observable,
+  retry,
+  share,
+  Subject,
+  Subscription,
+  switchAll,
 } from "rxjs";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 
+import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
 import { Nostr } from "./nostr/primitive";
-import { createEventBySecretKey, createEventByNip07 } from "./nostr/event";
 import { ObservableReq, ReqQuery } from "./req";
 import { AnyMessageNotification, EventMessageNotification } from "./type";
 
@@ -27,6 +27,8 @@ export interface RelaysOptions {
    * Number of attempts to reconnect if the WebSocket disconnects unexpectedly.
    */
   retry?: number;
+  // EOSE で閉じるときだけ
+  timeout?: number;
 }
 
 const DEFAULT_RELAYS_OPTIONS: Required<RelaysOptions> = {
