@@ -1,5 +1,5 @@
-import * as secp256k1 from "@noble/secp256k1";
 import { sha256 } from "@noble/hashes/sha256";
+import * as secp256k1 from "@noble/secp256k1";
 
 import { Nostr } from "./primitive";
 
@@ -17,7 +17,7 @@ export function createEventBySecretKey(
 export function createEventByNip07(
   params: Nostr.EventParameters
 ): Promise<Nostr.Event> {
-  const nostr = window?.nostr;
+  const nostr = (window ?? {})?.nostr;
   if (!nostr) {
     throw new Error("NIP-07 interface is not ready.");
   }
@@ -41,9 +41,11 @@ export function getEventHash({
   );
 }
 
-export function sign(event: Nostr.UnsignedEvent, key: string): Nostr.Event {
+export function sign(event: Nostr.UnsignedEvent, seckey: string): Nostr.Event {
   const id = getEventHash(event);
-  const sig = secp256k1.utils.bytesToHex(secp256k1.schnorr.signSync(id, key));
+  const sig = secp256k1.utils.bytesToHex(
+    secp256k1.schnorr.signSync(id, seckey)
+  );
 
   return {
     id,

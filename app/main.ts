@@ -1,43 +1,29 @@
-// Playground
+// # Playground
+// Edit here and try `yarn dev`
 
-import { debounceTime } from "rxjs";
+import { delay } from "rxjs";
 
-import {
-  BackwardReq,
-  collect,
-  MonoFilterAccumulater,
-  Relays,
-  Req,
-  uniq,
-  verify,
-} from "../src";
-import { bech32encode } from "../src/nostr/bech32";
+import { createRxNostr, RxBackwardReq } from "../src";
 
-const me = bech32encode(
-  "npub133vj8ycevdle0cq8mtgddq0xtn34kxkwxvak983dx0u5vhqnycyqj6tcza"
-);
-
-const relays = new Relays([
+const rxNostr = createRxNostr();
+rxNostr.setRelays([
   "wss://relay-jp.nostr.wirednet.jp",
   "wss://nostr-relay.nokotaro.com",
 ]);
 
-const likeReq = new Req("forever", [{ kinds: [7], authors: [me], limit: 10 }]);
+const req0 = new RxBackwardReq();
+rxNostr
+  .use(req0)
+  .subscribe((e) => console.log(0, e.event.kind, e.subId, e.from));
 
-const acc = new MonoFilterAccumulater();
-const noteReq = BackwardReq.from(acc, debounceTime(500));
+const req1 = new RxBackwardReq();
+rxNostr
+  .use(req1.pipe(delay(1000)))
+  .subscribe((e) => console.log(1, e.event.kind, e.subId, e.from));
 
-relays
-  .observeReq(likeReq)
-  .pipe(uniq(), collect("e", acc))
-  .subscribe(console.log);
+req0.emit([{ kinds: [0], limit: 5 }]);
+req1.emit([{ kinds: [1], limit: 5 }]);
 
-relays.observeReq(noteReq).pipe(uniq(), verify()).subscribe(console.log);
-
-
-// こんなかんじにしたい
-relays.observe(
-  req.publish(
-    reducer?
-  )
-)
+setTimeout(() => {
+  rxNostr.addRelay("wss://nostr.h3z.jp");
+}, 2000);

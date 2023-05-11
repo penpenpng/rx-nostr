@@ -1,6 +1,6 @@
 import { bech32 } from "bech32";
 
-export function bech32encode(str: string) {
+export function toHex(str: string) {
   return hexEncode(fromWords(bech32.decode(str).words));
 }
 

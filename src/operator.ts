@@ -2,25 +2,20 @@ import {
   distinct,
   distinctUntilChanged,
   filter,
-  map,
   ObservableInput,
   pipe,
   scan,
 } from "rxjs";
 
-import { extractEvent } from "./util";
-import { EventMessageNotification } from "./type";
-import { Nostr } from "./nostr/primitive";
 import { verify as _verify } from "./nostr/event";
+import { Nostr } from "./nostr/primitive";
+import { EventPacket } from "./packet";
 
 /**
  * Remove the events once seen.
  */
 export function uniq(flushes?: ObservableInput<unknown>) {
-  return distinct<EventMessageNotification, string>(
-    (event) => extractEvent(event).id,
-    flushes
-  );
+  return distinct<EventPacket, string>(({ event }) => event.id, flushes);
 }
 
 /**
@@ -28,14 +23,12 @@ export function uniq(flushes?: ObservableInput<unknown>) {
  */
 export function latest() {
   return pipe(
-    scan<EventMessageNotification>((acc, event) =>
-      extractEvent(acc).created_at < extractEvent(event).created_at
-        ? event
-        : acc
+    scan<EventPacket>((acc, packet) =>
+      acc.event.created_at < packet.event.created_at ? packet : acc
     ),
     distinctUntilChanged(
       (a, b) => a === b,
-      (event) => extractEvent(event).id
+      ({ event }) => event.id
     )
   );
 }
@@ -44,20 +37,12 @@ export function latest() {
  * Only events with a valid signature are allowed to pass.
  */
 export function verify() {
-  return filter<EventMessageNotification>((event) =>
-    _verify(extractEvent(event))
-  );
+  return filter<EventPacket>(({ event }) => _verify(event));
 }
 
 /**
  * Only events with given kind are allowed to pass.
  */
 export function filterKind<K extends Nostr.Kind>(kind: K) {
-  return filter<EventMessageNotification>(
-    (event) => extractEvent(event).kind === kind
-  );
-}
-
-export function pickEvent() {
-  return map<EventMessageNotification, Nostr.Event>(extractEvent);
+  return filter<EventPacket>(({ event }) => event.kind === kind);
 }

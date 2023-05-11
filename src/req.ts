@@ -1,377 +1,228 @@
-import {
-  BehaviorSubject,
-  debounceTime,
-  filter,
-  generate,
-  identity,
-  map,
-  mergeAll,
-  MonoTypeOperatorFunction,
-  Observable,
-  ObservableInput,
-  of,
-  OperatorFunction,
-  pipe,
-  repeat,
-  tap,
-  zipWith,
-} from "rxjs";
-import { v4 as uuid } from "uuid";
+import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
 import { Nostr } from "./nostr/primitive";
-import { EventMessageNotification } from "./type";
-import { extractEvent } from "./util";
+import { ReqPacket } from "./packet";
 
-type ReqStrategy =
-  | {
-      kind: "backward";
-      // config?: {
-      //   // closeOnEOSE: true;
-      //   timeout?: number;
-      //   // joinBy: "merge";
-      //   reducer?: <T>() => MonoTypeOperatorFunction<T>;
-      // };
+/**
+ * The RxReq interface that is provided for RxNostr (not for users).
+ */
+export interface RxReq {
+  /** The RxReq strategy. It is read-only and must not change. */
+  get strategy(): RxReqStrategy;
+  /** Get an Observable of ReqPacket. */
+  getReqObservable(): Observable<ReqPacket>;
+  /**
+   * Callback function called when a ReqPacket is consumed by the RxNostr
+   * and a REQ is sent to the relay.
+   * Mainly used by backward strategy RxReq to reset the internal state.
+   * */
+  onConsumeReq?: (req: Nostr.OutgoingMessage.REQ) => void;
+  /**
+   * Callback function called when RxNostr receives an EVENT derived from this RxReq.
+   * For example, it can be used to implement the automatic REQ issuing based on e-tag or p-tag.
+   */
+  onReceiveEvent?: (event: Nostr.Event) => void;
+}
+
+export type RxReqStrategy = "forward" | "backward";
+
+/**
+ * The RxReq interface that is provided for users (not for RxNostr).
+ */
+export interface RxReqOperator extends RxReq {
+  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
+  emit(filters: Nostr.Filter[] | null): void;
+
+  /**
+   * Returns itself overriding only `getReqObservable()`.
+   * It is useful for throttling and other control purposes.
+   */
+  pipe(): RxReq;
+  pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
+  pipe<A>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, ReqPacket>
+  ): RxReq;
+  pipe<A, B>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, ReqPacket>
+  ): RxReq;
+}
+
+/**
+ * Base class for RxReq based on the backward strategy.
+ * This is useful if you want to retrieve past events that have already been published.
+ *
+ * In backward strategy:
+ * - All REQs have different subIds.
+ * - All subscriptions keep alive until timeout or getting EOSE.
+ * - Observable corresponding to each time REQ is flattened by `mergeAll()`.
+ *     - https://rxjs.dev/api/operators/mergeAll
+ * - In most cases, you should specify `limit` for filters.
+ */
+export class RxBackwardReq implements RxReqOperator {
+  private req$ = new BehaviorSubject<ReqPacket>(null);
+  private subIdBase: string;
+  private subCount = 0;
+
+  constructor(subIdBase?: string) {
+    this.subIdBase = subIdBase ?? getRandomDigitsString();
+  }
+
+  get strategy(): RxReqStrategy {
+    return "backward";
+  }
+
+  getReqObservable(): Observable<ReqPacket> {
+    return this.req$.asObservable();
+  }
+
+  emit(filters: Nostr.Filter[] | null) {
+    const normalized = normalizeFilters(filters);
+
+    if (normalized) {
+      this.req$.next(["REQ", this.nextSubId(), ...normalized]);
+    } else {
+      this.req$.next(null);
     }
-  | {
-      kind: "forward";
-      // config?: {
-      //   // closeOnEOSE: false;
-      //   // joinBy: "switch";
-      //   reducer?: <T>() => MonoTypeOperatorFunction<T>;
-      // };
+  }
+
+  pipe(): RxReq;
+  pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
+  pipe<A>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, ReqPacket>
+  ): RxReq;
+  pipe<A, B>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, ReqPacket>
+  ): RxReq;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pipe(...operators: OperatorFunction<any, any>[]): RxReq {
+    return {
+      ...this,
+      get strategy() {
+        return "backward";
+      },
+      getReqObservable: () =>
+        this.getReqObservable().pipe(...(operators as [])),
     };
-type ReqStrategyConfig<K extends ReqStrategy["kind"]> = (ReqStrategy & {
-  kind: K;
-})["config"];
+  }
 
-function toREQ(
-  strategy: ReqStrategy
-): OperatorFunction<Nostr.Filter[], Nostr.OutgoingMessage.REQ> {
-  if (strategy.kind === "backward") {
-    const subId = uuid();
-    return pipe(
-      filter((filters) => filters.length > 0),
-      map((filters): Nostr.OutgoingMessage.REQ => ["REQ", subId, ...filters])
-    );
-  } else {
-    return pipe(
-      filter((filters) => filters.length > 0),
-      map((filters): Nostr.OutgoingMessage.REQ => ["REQ", uuid(), ...filters])
-    );
+  private nextSubId() {
+    this.subCount++;
+    return `${this.subIdBase}:${this.subCount}`;
   }
 }
 
-export interface ReqQuery {
-  readonly subId: string;
-  readonly filters: Nostr.Filter[];
-}
+/**
+ * Base class for RxReq based on the forward strategy.
+ * This is useful if you want to listen future events.
+ *
+ * In forward strategy:
+ * - All REQs have the same subId.
+ * - When a new REQ is issued, the old REQ is overwritten and terminated immediately.
+ *   The latest REQ keeps alive until it is overwritten or explicitly terminated.
+ * - Observable corresponding to each time REQ is flattened by `switchAll()`.
+ *     - https://rxjs.dev/api/operators/switchAll
+ * - In most cases, you should not specify `limit` for filters.
+ */
+export class RxForwardReq implements RxReqOperator {
+  private req$ = new BehaviorSubject<ReqPacket>(null);
+  private subId: string;
 
-export interface ReqBehavior {
-  /** @internal */
-  observe: () => Observable<Nostr.OutgoingMessage.REQ>;
-  /** @internal */
-  consume: () => void;
-  /** @internal */
-  readonly strategy: ReqStrategy;
-}
-// もう REQ, consume(), strategy の observable にすればよくない？ ← 却下
-
-export interface ReqUpdater {
-  next(filters: Nostr.Filter[]): void;
-}
-
-class ReqBase {
-  protected constructor(protected _strategy: ReqStrategy) {}
-  get strategy() {
-    return this._strategy;
+  constructor(subId?: string) {
+    this.subId = subId ?? getRandomDigitsString();
   }
 
-  protected filters$ = new BehaviorSubject<Nostr.Filter[]>([]);
-
-  consume() {
-    /* Do nothing */
+  get strategy(): RxReqStrategy {
+    return "forward";
   }
 
-  observe() {
-    return this.filters$.pipe(
-      this._strategy?.config?.reducer?.() ?? identity,
-      toREQ(this.strategy)
-    );
+  getReqObservable(): Observable<ReqPacket> {
+    return this.req$.asObservable();
   }
 
-  protected next(filters: Nostr.Filter[]) {
-    this.filters$.next(normalizeFilters(filters));
-  }
-}
+  emit(filters: Nostr.Filter[] | null) {
+    const normalized = normalizeFilters(filters);
 
-export class Req extends ReqBase {
-  static backward(
-    options?: ReqStrategyConfig<"backward">
-  ): [ReqBehavior, ReqUpdater] {
-    const q = new this({
-      kind: "backward",
-      ...options,
-    });
-
-    return [q, q];
-  }
-
-  static forward(
-    options?: ReqStrategyConfig<"forward">
-  ): [ReqBehavior, ReqUpdater] {
-    const q = new this({
-      kind: "forward",
-      ...options,
-    });
-
-    return [q, q];
-  }
-
-  next(filters: Nostr.Filter[]) {
-    super.next(filters);
-  }
-}
-
-class AccumulativeReqBase extends ReqBase implements ReqBehavior {
-  protected constructor(baseFilter: Nostr.Filter, _strategy: ReqStrategy) {
-    super(_strategy);
-    this.acc = new MonoFilterAccumulater(baseFilter);
-  }
-
-  protected acc: MonoFilterAccumulater;
-
-  consume() {
-    if (this.strategy.kind === "backward") {
-      this.acc.reset();
+    if (normalized) {
+      this.req$.next(["REQ", this.subId, ...normalized]);
+    } else {
+      this.req$.next(null);
     }
   }
 
-  observe() {
-    return this.acc.filter$.pipe(
-      map((filter) => [filter]),
-      this._strategy?.config?.reducer ?? identity,
-      toREQ(this.strategy)
-    );
+  pipe(): RxReq;
+  pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
+  pipe<A>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, ReqPacket>
+  ): RxReq;
+  pipe<A, B>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, ReqPacket>
+  ): RxReq;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pipe(...operators: OperatorFunction<any, any>[]): RxReq {
+    return {
+      ...this,
+      get strategy() {
+        return "forward";
+      },
+      getReqObservable: () =>
+        this.getReqObservable().pipe(...(operators as [])),
+    };
   }
 }
 
-export class AccumulativeReq
-  extends AccumulativeReqBase
-  implements ReqBehavior
-{
-  static backward(
-    baseFilter: Nostr.Filter,
-    options?: ReqStrategyConfig<"backward">
-  ): [ReqBehavior, IMonoFilterAccumulater] {
-    const q = new this(baseFilter, {
-      kind: "backward",
-      ...options,
-    });
-
-    return [q, q.acc];
-  }
-
-  static forward(
-    baseFilter: Nostr.Filter,
-    options?: ReqStrategyConfig<"forward">
-  ): [ReqBehavior, IMonoFilterAccumulater] {
-    const q = new this(baseFilter, {
-      kind: "forward",
-      ...options,
-    });
-
-    return [q, q.acc];
-  }
+function getRandomDigitsString() {
+  return `${Math.floor(Math.random() * 1000000)}`;
 }
 
-export class EventReq extends AccumulativeReqBase {
-  static backward(options?: ReqStrategyConfig<"backward">) {
-    return new this(
-      {},
-      {
-        kind: "backward",
-        ...options,
-      }
-    );
-  }
-
-  add(...ids: string[]) {
-    this.acc.add("ids", ...ids);
-    this.acc.commit();
-  }
-
-  collectTags() {
-    return tap<EventMessageNotification>((event) => {
-      const { tags } = extractEvent(event);
-      const vals = tags.filter(([t]) => t === "e").map(([, val]) => val);
-
-      if (vals.length <= 0) {
-        return;
-      }
-
-      this.add(...vals);
-    });
-  }
-}
-
-export class UserReq extends AccumulativeReqBase {
-  static backward(
-    target: {
-      profile?: true;
-      follows?: true;
-      follower?: true;
-    },
-    options?: ReqStrategyConfig<"backward">
-  ) {
-    // TODO:
-
-    return new this(
-      {},
-      {
-        kind: "backward",
-        ...options,
-      }
-    );
-  }
-}
-
-export interface IMonoFilterAccumulater {
-  add(target: "kinds", ...queries: number[]): void;
-  add(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  add(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void;
-
-  remove(target: "kinds", ...queries: number[]): void;
-  remove(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  remove(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void;
-
-  clear(target: "kinds" | "ids" | "authors" | Nostr.TagName): void;
-
-  setSince(datetime: number | Date | null): void;
-  setUntil(datetime: number | Date | null): void;
-  setLimit(limit: number | null): void;
-
-  commit(): void;
-}
-
-class MonoFilterAccumulater implements IMonoFilterAccumulater {
-  private filter: Nostr.Filter;
-  /** @internal */
-  filter$: BehaviorSubject<Nostr.Filter>;
-
-  constructor(private baseFilter: Nostr.Filter) {
-    this.filter = baseFilter;
-    this.filter$ = new BehaviorSubject(baseFilter);
-  }
-
-  commit() {
-    if (validateFilter(this.filter)) {
-      this.filter$.next(this.filter);
-    }
-  }
-
-  add(target: "kinds", ...queries: number[]): void;
-  add(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  add(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void {
-    const prev = this.filter[target] ?? [];
-    const next = Array.from(new Set([...prev, ...queries]));
-
-    if (prev.length !== next.length) {
-      this.filter = {
-        ...this.filter,
-        [target]: next.length > 0 ? next : undefined,
-      };
-    }
-  }
-
-  remove(target: "kinds", ...queries: number[]): void;
-  remove(target: "ids" | "authors" | Nostr.TagName, ...queries: string[]): void;
-  remove(
-    target: "kinds" | "ids" | "authors" | Nostr.TagName,
-    ...queries: string[] | number[]
-  ): void {
-    const prev = this.filter[target] ?? [];
-    const set = new Set<number | string>(prev);
-    for (const q of queries) {
-      set.delete(q);
-    }
-    const next = Array.from(set);
-
-    if (prev.length !== next.length) {
-      this.filter = {
-        ...this.filter,
-        [target]: next.length > 0 ? next : undefined,
-      };
-    }
-  }
-
-  clear(target: "kinds" | "ids" | "authors" | Nostr.TagName) {
-    const prev = this.filter[target] ?? [];
-
-    if (prev.length > 0) {
-      this.filter = {
-        ...this.filter,
-        [target]: undefined,
-      };
-    }
-  }
-
-  setSince(datetime: number | Date | null): void {
-    const prev = this.filter.since ?? null;
-    const next =
-      typeof datetime === "number" || datetime === null
-        ? datetime
-        : Math.floor(datetime.getTime() / 1000);
-
-    if (prev !== next) {
-      this.filter = {
-        ...this.filter,
-        since: next ?? undefined,
-      };
-    }
-  }
-  setUntil(datetime: number | Date | null): void {
-    const prev = this.filter.until ?? null;
-    const next =
-      typeof datetime === "number" || datetime === null
-        ? datetime
-        : Math.floor(datetime.getTime() / 1000);
-
-    if (prev !== next) {
-      this.filter = {
-        ...this.filter,
-        until: next ?? undefined,
-      };
-    }
-  }
-  setLimit(limit: number | null): void {
-    const prev = this.filter.limit ?? null;
-    const next = limit;
-
-    if (prev !== next) {
-      this.filter = {
-        ...this.filter,
-        limit: next ?? undefined,
-      };
-    }
-  }
-
-  /** @internal */
-  reset() {
-    // Clears filters but does not send a notification.
-    this.filter = this.baseFilter;
-  }
-}
-
-function normalizeFilter(filter: Nostr.Filter): Nostr.Filter {
+function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
   const res: Nostr.Filter = {};
   for (const [key, value] of Object.entries(filter)) {
     if (
@@ -396,20 +247,22 @@ function normalizeFilter(filter: Nostr.Filter): Nostr.Filter {
 
   const timeRangeIsValid = !res.since || !res.until || res.since <= res.until;
   if (!timeRangeIsValid) {
-    return {};
+    return null;
   }
 
   if (Object.keys(res).length <= 0) {
-    return {};
+    return null;
   }
 
   return res;
 }
 
-function validateFilter(filter: Nostr.Filter): boolean {
-  return Object.keys(normalizeFilter(filter)).length > 0;
-}
-
-function normalizeFilters(filters: Nostr.Filter[]): Nostr.Filter[] {
-  return filters.map(normalizeFilter).filter(validateFilter);
+function normalizeFilters(
+  filters: Nostr.Filter[] | null
+): Nostr.Filter[] | null {
+  if (!filters) {
+    return null;
+  }
+  const normalized = filters.flatMap((e) => normalizeFilter(e) ?? []);
+  return normalized.length > 0 ? normalized : null;
 }

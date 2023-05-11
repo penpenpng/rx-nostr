@@ -1,8 +1,11 @@
-import { Nostr } from "./nostr/primitive";
-import { EventMessageNotification } from "./type";
-
-export function extractEvent(
-  x: EventMessageNotification | Nostr.IncomingMessage.EVENT
-) {
-  return ("message" in x ? x.message : x)[2];
+export function defineDefaultOptions<T extends Record<string, unknown>>(
+  defaultParams: T
+): (givenParams?: Partial<T>) => T {
+  return (givenParams) =>
+    Object.fromEntries(
+      Object.keys(defaultParams).map((key) => [
+        key,
+        givenParams?.[key] ?? defaultParams[key],
+      ])
+    ) as T;
 }
