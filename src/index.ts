@@ -174,6 +174,9 @@ class RxNostrImpl implements RxNostr {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           websocket.next(message as any);
         },
+        close: () => {
+          websocket.complete();
+        },
       };
     };
 
@@ -269,24 +272,32 @@ class RxNostrImpl implements RxNostr {
       completeOnEose?: boolean
     ): Observable<EventPacket> => {
       return new Observable<EventPacket>((observer) => {
-        const sub = this.message$.subscribe((packet) => {
-          const [type] = packet.message;
+        const sub = this.message$.subscribe({
+          next: (packet) => {
+            const [type] = packet.message;
 
-          if (type === "EVENT" && packet.message[1] === subId) {
-            rxReq.onReceiveEvent?.(packet.message[2]);
-            observer.next({
-              from: packet.from,
-              subId: packet.message[1],
-              event: packet.message[2],
-            });
-          }
-          if (
-            type === "EOSE" &&
-            packet.message[1] === subId &&
-            completeOnEose
-          ) {
-            this.finalizeReq(subId, packet.from);
-          }
+            if (type === "EVENT" && packet.message[1] === subId) {
+              rxReq.onReceiveEvent?.(packet.message[2]);
+              observer.next({
+                from: packet.from,
+                subId: packet.message[1],
+                event: packet.message[2],
+              });
+            }
+            if (
+              type === "EOSE" &&
+              packet.message[1] === subId &&
+              completeOnEose
+            ) {
+              this.finalizeReq(subId, packet.from);
+            }
+          },
+          complete: () => {
+            observer.complete();
+          },
+          error: (err) => {
+            observer.error(err);
+          },
         });
 
         return () => {
@@ -383,6 +394,9 @@ class RxNostrImpl implements RxNostr {
   dispose(): void {
     this.message$.complete();
     this.error$.complete();
+    for (const relay of Object.values(this.relays)) {
+      relay.websocket.close();
+    }
   }
 
   private ensureReq(req: Nostr.OutgoingMessage.REQ, relays?: RelayState[]) {
@@ -438,4 +452,5 @@ interface RelayState {
 
 interface RelayConnection {
   send: (message: Nostr.OutgoingMessage.Any) => void;
+  close: () => void;
 }
