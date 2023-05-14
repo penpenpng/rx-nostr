@@ -27,7 +27,9 @@
     "build": "tsc && vite build",
     "lint": "eslint src/**/*.ts && prettier src/**/*.ts",
     "lint:fix": "eslint --fix src/**/*.ts && prettier --write src/**/*.ts",
-    "test": "jest"
+    "test": "jest",
+    "docs:dev": "honkit serve",
+    "docs:build": "honkit build"
   },
   "devDependencies": {
     "@babel/core": "^7.21.8",
@@ -40,6 +42,7 @@
     "eslint": "^8.36.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-simple-import-sort": "^10.0.0",
+    "honkit": "^4.0.7",
     "jest": "^29.5.0",
     "jest-websocket-mock": "^2.4.0",
     "prettier": "^2.8.7",
