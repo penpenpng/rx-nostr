@@ -16,10 +16,17 @@ jobs:
         with:
           node-version: 18
           registry-url: https://www.npmjs.com
+      - name: cache node_modules
+        id: node_modules_cache_id
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+          key: node-v${{ matrix.node-version }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
       - run: yarn install
       - run: yarn lint
       - run: yarn test
-      - run: yarn build 
+      - run: yarn build
       - run: npx can-npm-publish && npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
