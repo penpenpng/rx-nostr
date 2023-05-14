@@ -25,7 +25,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint:fix": "eslint src/**/*.ts && prettier --write src/**/*.ts",
+    "lint": "eslint src/**/*.ts && prettier src/**/*.ts",
+    "lint:fix": "eslint --fix src/**/*.ts && prettier --write src/**/*.ts",
     "test": "jest"
   },
   "devDependencies": {

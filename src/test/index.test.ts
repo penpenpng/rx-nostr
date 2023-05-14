@@ -1,7 +1,7 @@
 import { createRxNostr, RxBackwardReq } from "../index";
 import { createMockRelay, expectReceiveMessage } from "./mock-relay";
 
-test("After receiving events for the limit, CLOSE is sent out.", async () => {
+test("After receiving EVENTs for the limit, CLOSE is sent out.", async () => {
   const RELAY_URL = "ws://localhost:1234";
   const relay = createMockRelay(RELAY_URL);
 
