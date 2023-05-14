@@ -2,8 +2,24 @@
 
 ## `interface RxReq`
 
-## `interface RxReqController`
+### `get strategy()`
 
-## `class RxBackwardReq`
+### `getReqObservable()`
 
-## `class RxForwardReq`
+### `onConsumeReq(req)`
+
+### `onReceiveEvent(event)`
+
+## `interface RxReqController extends RxReq`
+
+### `emit(filters)`
+
+### `pipe(...operators)`
+
+## `class RxBackwardReq implements RxReqController`
+
+### `constructor(subIdBase?)`
+
+## `class RxForwardReq implements RxReqController`
+
+### `constructor(subId?)`
