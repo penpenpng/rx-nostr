@@ -29,7 +29,7 @@ export type RxReqStrategy = "forward" | "backward";
 /**
  * The RxReq interface that is provided for users (not for RxNostr).
  */
-export interface RxReqOperator extends RxReq {
+export interface RxReqController extends RxReq {
   /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
   emit(filters: Nostr.Filter[] | null): void;
 
@@ -74,7 +74,7 @@ export interface RxReqOperator extends RxReq {
  *     - https://rxjs.dev/api/operators/mergeAll
  * - In most cases, you should specify `limit` for filters.
  */
-export class RxBackwardReq implements RxReqOperator {
+export class RxBackwardReq implements RxReqController {
   private req$ = new BehaviorSubject<ReqPacket>(null);
   private subIdBase: string;
   private subCount = 0;
@@ -155,7 +155,7 @@ export class RxBackwardReq implements RxReqOperator {
  *     - https://rxjs.dev/api/operators/switchAll
  * - In most cases, you should not specify `limit` for filters.
  */
-export class RxForwardReq implements RxReqOperator {
+export class RxForwardReq implements RxReqController {
   private req$ = new BehaviorSubject<ReqPacket>(null);
   private subId: string;
 

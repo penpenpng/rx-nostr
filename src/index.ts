@@ -104,7 +104,7 @@ export interface RxNostr {
 }
 
 /** Create a RxNostr object. This is the only way to create that. */
-export function createRxNostr(options?: RxNostrOptions): RxNostr {
+export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
   return new RxNostrImpl(options);
 }
 
@@ -136,7 +136,7 @@ class RxNostrImpl implements RxNostr {
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
 
-  constructor(options?: RxNostrOptions) {
+  constructor(options?: Partial<RxNostrOptions>) {
     this.options = defaultRxNostrOptions(options);
   }
 
