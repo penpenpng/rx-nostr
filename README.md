@@ -3,8 +3,15 @@
 
 # rx-nostr
 
-Utility to control Nostr in [RxJS](https://rxjs.dev/).
+rx-nostr is a library based on [RxJS](https://rxjs.dev/), which allows [Nostr](https://nostr.com/) clients to easily communicate with relays.
 
-## Examples
+## Installation
 
-TODO. A small example is [here](./app/main.ts).
+```sh
+npm install rx-nostr
+# or yarn install rx-nostr
+```
+
+## Usage
+
+See https://penpenpng.github.io/rx-nostr/

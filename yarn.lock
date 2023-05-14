@@ -2824,6 +2824,11 @@ gitbook-plugin-fontsettings@^2.0.0:
   resolved "https://registry.yarnpkg.com/gitbook-plugin-fontsettings/-/gitbook-plugin-fontsettings-2.0.0.tgz#835f900ae3dd111086fe7ed4425ee3de024861ab"
   integrity sha512-bZpz/Jev7lL1d3VNp41KHZD67UYqyqdOwbsJE6YEW93R2mGiLfZLpUs86d2nrY61BedhlNck1xF52FNT6sWeig==
 
+gitbook-plugin-intopic-toc@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/gitbook-plugin-intopic-toc/-/gitbook-plugin-intopic-toc-1.1.1.tgz#5c779ec91761256c74335d328027e2f84cf455da"
+  integrity sha512-iaFbc+2O0J7qzf/cbJZtN04f0EzlccKaSSoapMZzfyHv+q13deQZnD+HizTaIb+TqWYze2uNZslS6RASdH+6hA==
+
 gitbook-plugin-livereload@^0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/gitbook-plugin-livereload/-/gitbook-plugin-livereload-0.0.1.tgz#c0c9dc6f55f82fc24f97532b25287abbbb416b96"
