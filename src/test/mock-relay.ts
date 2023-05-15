@@ -1,6 +1,7 @@
 import { WS } from "jest-websocket-mock";
 
 import { Nostr } from "../nostr/primitive";
+import { fakeEventMessage } from "./stub";
 
 const FAKE_EVENTS_INTERVAL = 100;
 
@@ -67,7 +68,7 @@ class FakeEventProvider {
     callback(["EOSE", subId]);
 
     this.subs[url][subId] = setTimeout(() => {
-      callback(generateFakeEvent(subId));
+      callback(fakeEventMessage({ subId }));
     }, FAKE_EVENTS_INTERVAL);
   }
 
@@ -94,31 +95,13 @@ function generateFakeStoredEvents(
   return filters.flatMap((filter) => {
     const limit = filter.limit;
     if (limit) {
-      return Array.from({ length: limit }).map(() => generateFakeEvent(subId));
+      return Array.from({ length: limit }).map(() =>
+        fakeEventMessage({ subId })
+      );
     } else {
       return [];
     }
   });
-}
-
-function generateFakeEvent(
-  subId: string
-  // NOTE:
-  //   Returns a fixed event because currently there is no need
-  //   to generate an event according to the Filter.
-  // filter: Nostr.Filter
-): Nostr.IncomingMessage.EVENT {
-  const event: Nostr.Event = {
-    id: "*",
-    content: "*",
-    created_at: new Date("2000/1/1").getTime() / 1000,
-    kind: 0,
-    pubkey: "*",
-    sig: "*",
-    tags: [],
-  };
-
-  return ["EVENT", subId, event];
 }
 
 export async function expectReceiveMessage(
