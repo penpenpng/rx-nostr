@@ -63,29 +63,11 @@ export interface RxReqController extends RxReq {
   ): RxReq;
 }
 
-/**
- * Base class for RxReq based on the backward strategy.
- * This is useful if you want to retrieve past events that have already been published.
- *
- * In backward strategy:
- * - All REQs have different subIds.
- * - All subscriptions keep alive until timeout or getting EOSE.
- * - Observable corresponding to each time REQ is flattened by `mergeAll()`.
- *     - https://rxjs.dev/api/operators/mergeAll
- * - In most cases, you should specify `limit` for filters.
- */
-export class RxBackwardReq implements RxReqController {
-  private req$ = new BehaviorSubject<ReqPacket>(null);
-  private subIdBase: string;
-  private subCount = 0;
+abstract class RxReqBase implements RxReq {
+  protected req$ = new BehaviorSubject<ReqPacket>(null);
 
-  constructor(subIdBase?: string) {
-    this.subIdBase = subIdBase ?? getRandomDigitsString();
-  }
-
-  get strategy(): RxReqStrategy {
-    return "backward";
-  }
+  abstract get strategy(): RxReqStrategy;
+  protected abstract nextSubId(): string;
 
   getReqObservable(): Observable<ReqPacket> {
     return this.req$.asObservable();
@@ -127,17 +109,43 @@ export class RxBackwardReq implements RxReqController {
   ): RxReq;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipe(...operators: OperatorFunction<any, any>[]): RxReq {
+    const strategy = this.strategy;
     return {
       ...this,
       get strategy() {
-        return "backward";
+        return strategy;
       },
       getReqObservable: () =>
         this.getReqObservable().pipe(...(operators as [])),
     };
   }
+}
 
-  private nextSubId() {
+/**
+ * Base class for RxReq based on the backward strategy.
+ * This is useful if you want to retrieve past events that have already been published.
+ *
+ * In backward strategy:
+ * - All REQs have different subIds.
+ * - All subscriptions keep alive until timeout or getting EOSE.
+ * - Observable corresponding to each time REQ is flattened by `mergeAll()`.
+ *     - https://rxjs.dev/api/operators/mergeAll
+ * - In most cases, you should specify `limit` for filters.
+ */
+export class RxBackwardReq extends RxReqBase implements RxReqController {
+  private subIdBase: string;
+  private subCount = 0;
+
+  constructor(subIdBase?: string) {
+    super();
+    this.subIdBase = subIdBase ?? getRandomDigitsString();
+  }
+
+  override get strategy(): RxReqStrategy {
+    return "backward";
+  }
+
+  protected override nextSubId() {
     this.subCount++;
     return `${this.subIdBase}:${this.subCount}`;
   }
@@ -155,66 +163,20 @@ export class RxBackwardReq implements RxReqController {
  *     - https://rxjs.dev/api/operators/switchAll
  * - In most cases, you should not specify `limit` for filters.
  */
-export class RxForwardReq implements RxReqController {
-  private req$ = new BehaviorSubject<ReqPacket>(null);
+export class RxForwardReq extends RxReqBase implements RxReqController {
   private subId: string;
 
   constructor(subId?: string) {
+    super();
     this.subId = subId ?? getRandomDigitsString();
   }
 
-  get strategy(): RxReqStrategy {
+  override get strategy(): RxReqStrategy {
     return "forward";
   }
 
-  getReqObservable(): Observable<ReqPacket> {
-    return this.req$.asObservable();
-  }
-
-  emit(filters: Nostr.Filter[] | null) {
-    const normalized = normalizeFilters(filters);
-
-    if (normalized) {
-      this.req$.next(["REQ", this.subId, ...normalized]);
-    } else {
-      this.req$.next(null);
-    }
-  }
-
-  pipe(): RxReq;
-  pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
-  pipe<A>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, ReqPacket>
-  ): RxReq;
-  pipe<A, B>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, ReqPacket>
-  ): RxReq;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pipe(...operators: OperatorFunction<any, any>[]): RxReq {
-    return {
-      ...this,
-      get strategy() {
-        return "forward";
-      },
-      getReqObservable: () =>
-        this.getReqObservable().pipe(...(operators as [])),
-    };
+  protected override nextSubId() {
+    return this.subId;
   }
 }
 
