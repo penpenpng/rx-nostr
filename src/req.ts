@@ -2,13 +2,14 @@ import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
 import { Nostr } from "./nostr/primitive";
 import { ReqPacket } from "./packet";
+import type { Override } from "./util";
 
 /**
  * The RxReq interface that is provided for RxNostr (not for users).
  */
-export interface RxReq {
+export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
   /** The RxReq strategy. It is read-only and must not change. */
-  get strategy(): RxReqStrategy;
+  get strategy(): S;
   /** Get an Observable of ReqPacket. */
   getReqObservable(): Observable<ReqPacket>;
   /**
@@ -22,16 +23,6 @@ export interface RxReq {
    * For example, it can be used to implement the automatic REQ issuing based on e-tag or p-tag.
    */
   onReceiveEvent?: (event: Nostr.Event) => void;
-}
-
-export type RxReqStrategy = "forward" | "backward";
-
-/**
- * The RxReq interface that is provided for users (not for RxNostr).
- */
-export interface RxReqController extends RxReq {
-  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: Nostr.Filter[] | null): void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.
@@ -61,6 +52,16 @@ export interface RxReqController extends RxReq {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
+}
+
+export type RxReqStrategy = "forward" | "backward";
+
+/**
+ * The RxReq interface that is provided for users (not for RxNostr).
+ */
+export interface RxReqController {
+  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
+  emit(filters: Nostr.Filter[] | null): void;
 }
 
 abstract class RxReqBase implements RxReq {
@@ -121,6 +122,12 @@ abstract class RxReqBase implements RxReq {
   }
 }
 
+export function rxBackwardReq(
+  subIdBase?: string
+): RxReq<"backward"> & RxReqController {
+  return new RxBackwardReq(subIdBase);
+}
+
 /**
  * Base class for RxReq based on the backward strategy.
  * This is useful if you want to retrieve past events that have already been published.
@@ -136,12 +143,13 @@ export class RxBackwardReq extends RxReqBase implements RxReqController {
   private subIdBase: string;
   private subCount = 0;
 
+  /** @deprecated Use rxBackwardReq instead */
   constructor(subIdBase?: string) {
     super();
     this.subIdBase = subIdBase ?? getRandomDigitsString();
   }
 
-  override get strategy(): RxReqStrategy {
+  override get strategy(): "backward" {
     return "backward";
   }
 
@@ -149,6 +157,12 @@ export class RxBackwardReq extends RxReqBase implements RxReqController {
     this.subCount++;
     return `${this.subIdBase}:${this.subCount}`;
   }
+}
+
+export function rxForwardReq(
+  subId?: string
+): RxReq<"forward"> & RxReqController {
+  return new RxForwardReq(subId);
 }
 
 /**
@@ -166,18 +180,36 @@ export class RxBackwardReq extends RxReqBase implements RxReqController {
 export class RxForwardReq extends RxReqBase implements RxReqController {
   private subId: string;
 
+  /** @deprecated Use rxForwardReq instead */
   constructor(subId?: string) {
     super();
     this.subId = subId ?? getRandomDigitsString();
   }
 
-  override get strategy(): RxReqStrategy {
+  override get strategy(): "forward" {
     return "forward";
   }
 
   protected override nextSubId() {
     return this.subId;
   }
+}
+
+export interface Mixin<R, T> {
+  (): ThisType<R> & T;
+}
+
+export function mixin<R extends object, T extends object>(
+  def: () => ThisType<R> & T
+): Mixin<R, T> {
+  return def;
+}
+
+export function extend<B extends R, R extends object, T extends object>(
+  base: B,
+  mixin: Mixin<R, T>
+): Override<B, T> {
+  return Object.assign(base, mixin()) as Override<B, T>;
 }
 
 function getRandomDigitsString() {
