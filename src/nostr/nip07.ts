@@ -1,9 +1,8 @@
 export interface Nip07 {
-  getPublicKey: () => string;
+  getPublicKey: () => Promise<string>;
   signEvent: (event: {
     kind: number;
     tags: string[][];
-    pubkey: string;
     content: string;
     created_at: number;
   }) => Promise<{
