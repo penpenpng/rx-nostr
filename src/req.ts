@@ -54,7 +54,7 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
   ): RxReq;
 }
 
-export type RxReqStrategy = "forward" | "backward";
+export type RxReqStrategy = "forward" | "backward" | "oneshot";
 
 /**
  * The RxReq interface that is provided for users (not for RxNostr).
@@ -191,6 +191,31 @@ export class RxForwardReq extends RxReqBase implements RxReqController {
   }
 
   protected override nextSubId() {
+    return this.subId;
+  }
+}
+
+export function rxOneshotReq(req: {
+  filters: Nostr.Filter[];
+  subId?: string;
+}): RxReq {
+  return new RxOneshotReq(req);
+}
+
+class RxOneshotReq extends RxReqBase {
+  private subId: string;
+
+  constructor(req: { filters: Nostr.Filter[]; subId?: string }) {
+    super();
+    this.subId = req?.subId ?? getRandomDigitsString();
+    this.emit(req.filters);
+  }
+
+  override get strategy(): "oneshot" {
+    return "oneshot";
+  }
+
+  override nextSubId() {
     return this.subId;
   }
 }

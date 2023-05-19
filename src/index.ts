@@ -269,7 +269,9 @@ class RxNostrImpl implements RxNostr {
 
     const toEventObservable = (
       subId: string,
-      completeOnEose?: boolean
+      options?: {
+        completeOnEose?: boolean;
+      }
     ): Observable<EventPacket> => {
       return new Observable<EventPacket>((observer) => {
         const sub = this.message$.subscribe({
@@ -284,12 +286,11 @@ class RxNostrImpl implements RxNostr {
                 event: packet.message[2],
               });
             }
-            if (
-              type === "EOSE" &&
-              packet.message[1] === subId &&
-              completeOnEose
-            ) {
-              this.finalizeReq(subId, packet.from);
+            if (type === "EOSE" && packet.message[1] === subId) {
+              if (options?.completeOnEose) {
+                this.finalizeReq(subId, packet.from);
+                observer.complete();
+              }
             }
           },
           complete: () => {
@@ -319,7 +320,7 @@ class RxNostrImpl implements RxNostr {
     if (rxReq.strategy === "backward") {
       return req$.pipe(
         map((req) =>
-          toEventObservable(req[1], true).pipe(
+          toEventObservable(req[1], { completeOnEose: true }).pipe(
             timeout(this.options.timeout),
             catchError((error) => {
               if (error instanceof TimeoutError) {
@@ -348,6 +349,20 @@ class RxNostrImpl implements RxNostr {
             this.finalizeReqBySubId(subId);
           }
         })
+      );
+    } else if (rxReq.strategy === "oneshot") {
+      return req$.pipe(
+        first(),
+        map((req) =>
+          toEventObservable(req[1], {
+            completeOnEose: true,
+          }).pipe(
+            finalize(() => {
+              this.finalizeReqBySubId(req[1]);
+            })
+          )
+        ),
+        mergeAll()
       );
     } else {
       throw new Error("Not Implemented");
