@@ -62,14 +62,20 @@ class FakeEventProvider {
       clearInterval(timeout);
     }
 
-    for (const ev of generateFakeStoredEvents(subId, filters)) {
-      callback(ev);
-    }
-    callback(["EOSE", subId]);
+    const storedEvents = generateFakeStoredEvents(subId, filters);
+    let idx = 0;
 
-    this.subs[url][subId] = setTimeout(() => {
-      callback(fakeEventMessage({ subId }));
-    }, this.interval);
+    const sendingStoredEvents = setInterval(() => {
+      if (idx < storedEvents.length) {
+        callback(storedEvents[idx++]);
+      } else {
+        clearInterval(sendingStoredEvents);
+        callback(["EOSE", subId]);
+        this.subs[url][subId] = setTimeout(() => {
+          callback(fakeEventMessage({ subId }));
+        }, this.interval);
+      }
+    }, 10);
   }
 
   stop(url: string, subId?: string): void {

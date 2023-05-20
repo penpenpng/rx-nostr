@@ -77,28 +77,28 @@ describe("Single relay case", () => {
 
     // Relay mock returns messages at equal intervals,
     // so the REQs with the smallest limit should be CLOSE'd in turn.
-    req.emit([{ kinds: [0], limit: 1 }]);
-    req.emit([{ kinds: [0], limit: 1000 }]);
     req.emit([{ kinds: [0], limit: 100 }]);
+    req.emit([{ kinds: [0], limit: 50 }]);
+    req.emit([{ kinds: [0], limit: 10 }]);
 
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:0",
-      { kinds: [0], limit: 1 },
+      { kinds: [0], limit: 100 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:1",
-      { kinds: [0], limit: 1000 },
+      { kinds: [0], limit: 50 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:2",
-      { kinds: [0], limit: 100 },
+      { kinds: [0], limit: 10 },
     ]);
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
     await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:2"]);
     await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:1"]);
+    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
   });
 
   test("[forward] Each REQ is published with the same subId.", async () => {

@@ -1,3 +1,5 @@
+import { Observable, Subject, tap } from "rxjs";
+
 export function defineDefaultOptions<T extends Record<string, unknown>>(
   defaultParams: T
 ): (givenParams?: Partial<T>) => T {
@@ -17,3 +19,18 @@ export type Override<T extends object, U extends object> = {
     ? T[K]
     : never;
 };
+
+export function createSignal(): [Observable<void>, () => void] {
+  const subject = new Subject<void>();
+
+  return [
+    subject.pipe(
+      tap({
+        next() {
+          subject.complete();
+        },
+      })
+    ),
+    () => subject.next(1 as unknown as void),
+  ];
+}
