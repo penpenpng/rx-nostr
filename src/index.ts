@@ -10,6 +10,8 @@ import {
   mergeMap,
   Observable,
   of,
+  OperatorFunction,
+  pipe,
   retry,
   Subject,
   switchAll,
@@ -25,7 +27,7 @@ import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
 import type { Nip07 } from "./nostr/nip07";
 import { Nostr } from "./nostr/primitive";
 import type { ErrorPacket, EventPacket, MessagePacket } from "./packet";
-import type { RxReq } from "./req";
+import type { RxReq, RxReqStrategy } from "./req";
 import { defineDefaultOptions } from "./util";
 
 export * from "./nostr/primitive";
@@ -109,6 +111,8 @@ export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
 }
 
 export interface RxNostrOptions {
+  /** Used to construct subId. */
+  rxNostrId: string;
   /** Number of attempts to reconnect when websocket is disconnected. */
   retry: number;
   /**
@@ -119,6 +123,7 @@ export interface RxNostrOptions {
   timeout: number;
 }
 const defaultRxNostrOptions = defineDefaultOptions({
+  rxNostrId: undefined as string | undefined,
   retry: 10,
   timeout: 10000,
 });
@@ -129,15 +134,21 @@ export interface Relay {
   write: boolean;
 }
 
+let nextRxNostrId = 0;
+
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
   private relays: Record<string, RelayState> = {};
-  private usings: Set<RxReq> = new Set();
+  private activeReqs: Record<string, Nostr.OutgoingMessage.REQ> = {};
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
 
   constructor(options?: Partial<RxNostrOptions>) {
-    this.options = defaultRxNostrOptions(options);
+    const opt = defaultRxNostrOptions(options);
+    this.options = {
+      ...opt,
+      rxNostrId: opt.rxNostrId ?? `rx-nostr${nextRxNostrId++}`,
+    };
   }
 
   getRelays(): Relay[] {
@@ -190,18 +201,11 @@ class RxNostrImpl implements RxNostr {
     }
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
-    for (const rxReq of this.usings) {
-      rxReq
-        .getReqObservable()
-        .pipe(first())
-        .subscribe((req) => {
-          if (req !== null) {
-            this.ensureReq(
-              req,
-              urlsToBeRead.map((url) => nextRelays[url])
-            );
-          }
-        });
+    for (const req of Object.values(this.activeReqs)) {
+      this.ensureReq(
+        req,
+        urlsToBeRead.map((url) => nextRelays[url])
+      );
     }
 
     this.relays = nextRelays;
@@ -265,7 +269,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
-    this.usings.add(rxReq);
+    const TIMEOUT = this.options.timeout;
 
     const toEventObservable = (
       subId: string,
@@ -289,6 +293,7 @@ class RxNostrImpl implements RxNostr {
             if (type === "EOSE" && packet.message[1] === subId) {
               if (options?.completeOnEose) {
                 this.finalizeReq(subId, packet.from);
+                // TODO: 複数リレーあるときにバグるからだめ → url で groupBy したそれぞれを complete する
                 observer.complete();
               }
             }
@@ -306,66 +311,103 @@ class RxNostrImpl implements RxNostr {
         };
       });
     };
-    const req$ = rxReq.getReqObservable().pipe(
-      filter((req): req is Nostr.OutgoingMessage.REQ => req !== null),
-      tap((req) => {
-        this.ensureReq(req);
-        rxReq.onConsumeReq?.(req);
+
+    return rxReq.getReqObservable().pipe(
+      filter((filters): filters is Nostr.Filter[] => filters !== null),
+      attachSubId({
+        rxNostrId: this.options.rxNostrId,
+        rxReqId: rxReq.rxReqId,
+        strategy: rxReq.strategy,
       }),
-      finalize(() => {
-        this.usings.delete(rxReq);
-      })
+      tap({
+        next: (req) => {
+          if (rxReq.strategy === "forward") {
+            this.activeReqs[req[1]] = req;
+          }
+          this.ensureReq(req);
+        },
+        finalize: () => {
+          if (rxReq.strategy === "forward") {
+            // FIXME
+            delete this.activeReqs[
+              `${this.options.rxNostrId}:${rxReq.rxReqId}:0`
+            ];
+          }
+        },
+      }),
+      toEvent(rxReq.strategy, (subId) => this.finalizeReqBySubId(subId))
     );
 
-    if (rxReq.strategy === "backward") {
-      return req$.pipe(
-        map((req) =>
-          toEventObservable(req[1], { completeOnEose: true }).pipe(
-            timeout(this.options.timeout),
-            catchError((error) => {
-              if (error instanceof TimeoutError) {
-                return EMPTY;
-              } else {
-                return throwError(() => error);
-              }
-            }),
-            finalize(() => {
-              this.finalizeReqBySubId(req[1]);
-            })
-          )
-        ),
-        mergeAll()
-      );
-    } else if (rxReq.strategy === "forward") {
-      let subId: string | null = null;
-      return req$.pipe(
-        tap((req) => {
-          subId ??= req[1];
-        }),
-        map((req) => toEventObservable(req[1])),
-        switchAll(),
-        finalize(() => {
-          if (subId !== null) {
-            this.finalizeReqBySubId(subId);
-          }
-        })
-      );
-    } else if (rxReq.strategy === "oneshot") {
-      return req$.pipe(
-        first(),
-        map((req) =>
-          toEventObservable(req[1], {
-            completeOnEose: true,
-          }).pipe(
-            finalize(() => {
-              this.finalizeReqBySubId(req[1]);
-            })
-          )
-        ),
-        mergeAll()
-      );
-    } else {
-      throw new Error("Not Implemented");
+    function attachSubId(params: {
+      rxNostrId: string;
+      rxReqId: string;
+      strategy: RxReqStrategy;
+    }): OperatorFunction<Nostr.Filter[], Nostr.OutgoingMessage.REQ> {
+      const makeId = (index?: number) =>
+        `${params.rxNostrId}:${params.rxReqId}:${index ?? 0}`;
+
+      switch (params.strategy) {
+        case "backward":
+          return map((filters, index) => ["REQ", makeId(index), ...filters]);
+        case "forward":
+        case "oneshot":
+          return map((filters) => ["REQ", makeId(), ...filters]);
+      }
+    }
+    function toEvent(
+      strategy: RxReqStrategy,
+      finalizeReqBySubId: (subId: string) => void
+    ): OperatorFunction<Nostr.OutgoingMessage.REQ, EventPacket> {
+      if (strategy === "backward") {
+        return pipe(
+          map((req) =>
+            toEventObservable(req[1], { completeOnEose: true }).pipe(
+              timeout(TIMEOUT),
+              catchError((error) => {
+                if (error instanceof TimeoutError) {
+                  return EMPTY;
+                } else {
+                  return throwError(() => error);
+                }
+              }),
+              finalize(() => {
+                finalizeReqBySubId(req[1]);
+              })
+            )
+          ),
+          mergeAll()
+        );
+      } else if (strategy === "forward") {
+        let subId: string | null = null;
+        return pipe(
+          tap((req) => {
+            subId ??= req[1];
+          }),
+          map((req) => toEventObservable(req[1])),
+          switchAll(),
+          finalize(() => {
+            if (subId !== null) {
+              finalizeReqBySubId(subId);
+            }
+          })
+        );
+      } else if (strategy === "oneshot") {
+        return pipe(
+          first(),
+          map((req) =>
+            toEventObservable(req[1], {
+              completeOnEose: true,
+            }).pipe(
+              finalize(() => {
+                finalizeReqBySubId(req[1]);
+              })
+            )
+          ),
+          mergeAll()
+        );
+      } else {
+        throw new Error("Not Implemented");
+      }
     }
   }
   createAllEventObservable(): Observable<EventPacket> {

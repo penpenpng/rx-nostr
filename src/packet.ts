@@ -6,7 +6,7 @@ import { Nostr } from "./nostr/primitive";
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
  * When null is sent, the subscription is suspended.
  */
-export type ReqPacket = Nostr.OutgoingMessage.REQ | null;
+export type ReqPacket = Nostr.Filter[] | null;
 
 /**
  * Packets from websocket that represents an EVENT.

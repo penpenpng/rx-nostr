@@ -36,11 +36,11 @@ describe("Single relay case", () => {
     req.emit([{ kinds: [0], limit: 5 }]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "sub:1",
+      "rx-nostr0:sub:0",
       { kinds: [0], limit: 5 },
     ]);
     await eoseSync;
-    await expectReceiveMessage(relay, ["CLOSE", "sub:1"]);
+    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr0:sub:0"]);
   });
 
   test("[backward] Receipt of EOSE does not terminate the Observable.", async () => {

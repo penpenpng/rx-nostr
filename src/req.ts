@@ -10,14 +10,10 @@ import type { Override } from "./util";
 export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
   /** The RxReq strategy. It is read-only and must not change. */
   get strategy(): S;
+  /** Used to construct subId. */
+  get rxReqId(): string;
   /** Get an Observable of ReqPacket. */
   getReqObservable(): Observable<ReqPacket>;
-  /**
-   * Callback function called when a ReqPacket is consumed by the RxNostr
-   * and a REQ is sent to the relay.
-   * Mainly used by backward strategy RxReq to reset the internal state.
-   * */
-  onConsumeReq?: (req: Nostr.OutgoingMessage.REQ) => void;
   /**
    * Callback function called when RxNostr receives an EVENT derived from this RxReq.
    * For example, it can be used to implement the automatic REQ issuing based on e-tag or p-tag.
@@ -65,22 +61,29 @@ export interface RxReqController {
 }
 
 abstract class RxReqBase implements RxReq {
-  protected req$ = new BehaviorSubject<ReqPacket>(null);
+  protected filters$ = new BehaviorSubject<ReqPacket>(null);
+  private _rxReqId: string;
 
   abstract get strategy(): RxReqStrategy;
-  protected abstract nextSubId(): string;
+  get rxReqId() {
+    return this._rxReqId;
+  }
+
+  constructor(rxReqId?: string) {
+    this._rxReqId = rxReqId ?? getRandomDigitsString();
+  }
 
   getReqObservable(): Observable<ReqPacket> {
-    return this.req$.asObservable();
+    return this.filters$.asObservable();
   }
 
   emit(filters: Nostr.Filter[] | null) {
     const normalized = normalizeFilters(filters);
 
     if (normalized) {
-      this.req$.next(["REQ", this.nextSubId(), ...normalized]);
+      this.filters$.next(normalized);
     } else {
-      this.req$.next(null);
+      this.filters$.next(null);
     }
   }
 
@@ -140,22 +143,13 @@ export function rxBackwardReq(
  * - In most cases, you should specify `limit` for filters.
  */
 export class RxBackwardReq extends RxReqBase implements RxReqController {
-  private subIdBase: string;
-  private subCount = 0;
-
   /** @deprecated Use rxBackwardReq instead */
-  constructor(subIdBase?: string) {
-    super();
-    this.subIdBase = subIdBase ?? getRandomDigitsString();
+  constructor(rxReqId?: string) {
+    super(rxReqId);
   }
 
   override get strategy(): "backward" {
     return "backward";
-  }
-
-  protected override nextSubId() {
-    this.subCount++;
-    return `${this.subIdBase}:${this.subCount}`;
   }
 }
 
@@ -178,45 +172,31 @@ export function rxForwardReq(
  * - In most cases, you should not specify `limit` for filters.
  */
 export class RxForwardReq extends RxReqBase implements RxReqController {
-  private subId: string;
-
   /** @deprecated Use rxForwardReq instead */
-  constructor(subId?: string) {
-    super();
-    this.subId = subId ?? getRandomDigitsString();
+  constructor(rxReqId?: string) {
+    super(rxReqId);
   }
 
   override get strategy(): "forward" {
     return "forward";
-  }
-
-  protected override nextSubId() {
-    return this.subId;
   }
 }
 
 export function rxOneshotReq(req: {
   filters: Nostr.Filter[];
   subId?: string;
-}): RxReq {
+}): RxReq<"oneshot"> {
   return new RxOneshotReq(req);
 }
 
 class RxOneshotReq extends RxReqBase {
-  private subId: string;
-
   constructor(req: { filters: Nostr.Filter[]; subId?: string }) {
-    super();
-    this.subId = req?.subId ?? getRandomDigitsString();
+    super(req?.subId);
     this.emit(req.filters);
   }
 
   override get strategy(): "oneshot" {
     return "oneshot";
-  }
-
-  override nextSubId() {
-    return this.subId;
   }
 }
 
