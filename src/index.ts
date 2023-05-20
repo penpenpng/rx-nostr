@@ -202,10 +202,9 @@ class RxNostrImpl implements RxNostr {
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
     for (const req of Object.values(this.activeReqs)) {
-      this.ensureReq(
-        req,
-        urlsToBeRead.map((url) => nextRelays[url])
-      );
+      this.ensureReq(req, {
+        relays: urlsToBeRead.map((url) => nextRelays[url]),
+      });
     }
 
     this.relays = nextRelays;
@@ -324,7 +323,7 @@ class RxNostrImpl implements RxNostr {
           if (rxReq.strategy === "forward") {
             this.activeReqs[req[1]] = req;
           }
-          this.ensureReq(req);
+          this.ensureReq(req, { overwrite: rxReq.strategy === "forward" });
         },
         finalize: () => {
           if (rxReq.strategy === "forward") {
@@ -456,11 +455,17 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  private ensureReq(req: Nostr.OutgoingMessage.REQ, relays?: RelayState[]) {
+  private ensureReq(
+    req: Nostr.OutgoingMessage.REQ,
+    options?: { relays?: RelayState[]; overwrite?: boolean }
+  ) {
     const subId = req[1];
 
-    for (const relay of relays ?? Object.values(this.relays)) {
-      if (!relay.read || relay.activeSubIds.has(subId)) {
+    for (const relay of options?.relays ?? Object.values(this.relays)) {
+      if (
+        !relay.read ||
+        (!options?.overwrite && relay.activeSubIds.has(subId))
+      ) {
         continue;
       }
 

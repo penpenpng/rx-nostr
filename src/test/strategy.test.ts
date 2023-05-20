@@ -71,7 +71,7 @@ describe("Single relay case", () => {
     expect(completed).toBe(false);
   });
 
-  test("[backward] Each EOSE CLOSE the REQ in the order of arrival.", async () => {
+  test("[backward] Each EOSE CLOSEs the REQ in the order of arrival.", async () => {
     const req = rxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
@@ -106,28 +106,25 @@ describe("Single relay case", () => {
     const sub = rxNostr.use(req).subscribe();
 
     req.emit([{ kinds: [0], limit: 1 }]);
+    req.emit([{ kinds: [0], limit: 2 }]);
+    req.emit([{ kinds: [0], limit: 3 }]);
+    sub.unsubscribe();
+
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:0",
       { kinds: [0], limit: 1 },
     ]);
-
-    req.emit([{ kinds: [0], limit: 2 }]);
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:0",
       { kinds: [0], limit: 2 },
     ]);
-
-    req.emit([{ kinds: [0], limit: 3 }]);
     await expectReceiveMessage(relay, [
       "REQ",
       "rx-nostr:sub:0",
       { kinds: [0], limit: 3 },
     ]);
-
-    sub.unsubscribe();
-
     await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
   });
 
