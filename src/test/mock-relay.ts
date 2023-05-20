@@ -3,11 +3,9 @@ import { WS } from "jest-websocket-mock";
 import { Nostr } from "../nostr/primitive";
 import { fakeEventMessage } from "./stub";
 
-const FAKE_EVENTS_INTERVAL = 10;
-
-export function createMockRelay(url: string) {
+export function createMockRelay(url: string, interval = 10) {
   const server = new WS(url);
-  const provider = new FakeEventProvider();
+  const provider = new FakeEventProvider(interval);
 
   server.on("connection", (ws) => {
     ws.on("message", function incoming(rawMessage) {
@@ -47,6 +45,8 @@ export function createMockRelay(url: string) {
 class FakeEventProvider {
   private subs: Record<string, Record<string, NodeJS.Timeout>> = {};
 
+  constructor(private interval: number) {}
+
   start(
     url: string,
     subId: string,
@@ -69,11 +69,11 @@ class FakeEventProvider {
 
     this.subs[url][subId] = setTimeout(() => {
       callback(fakeEventMessage({ subId }));
-    }, FAKE_EVENTS_INTERVAL);
+    }, this.interval);
   }
 
   stop(url: string, subId?: string): void {
-    const subs = this.subs[url];
+    const subs = this.subs[url] ?? {};
     if (subId) {
       const timeout = subs[subId];
       if (timeout) {
