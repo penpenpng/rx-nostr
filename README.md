@@ -9,7 +9,7 @@ rx-nostr is a library based on [RxJS](https://rxjs.dev/), which allows [Nostr](h
 
 ```sh
 npm install rx-nostr
-# or yarn install rx-nostr
+# or yarn add rx-nostr
 ```
 
 ## Usage
