@@ -18,7 +18,7 @@ rx-nostr は [Nostr](https://nostr.com/) クライアントがリレーとより
 
 ```sh
 npm install rx-nostr
-# or yarn install rx-nostr
+# or yarn add rx-nostr
 ```
 
 ## Playground
