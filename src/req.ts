@@ -113,9 +113,13 @@ abstract class RxReqBase implements RxReq {
   ): RxReq;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipe(...operators: OperatorFunction<any, any>[]): RxReq {
+    const rxReqId = this.rxReqId;
     const strategy = this.strategy;
     return {
       ...this,
+      get rxReqId() {
+        return rxReqId;
+      },
       get strategy() {
         return strategy;
       },
