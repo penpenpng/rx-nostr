@@ -34,8 +34,14 @@ import { toHex } from "./nostr/bech32";
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
 import type { Nip07 } from "./nostr/nip07";
 import { Nostr } from "./nostr/primitive";
-import type { ErrorPacket, EventPacket, MessagePacket } from "./packet";
-import type { RxReq, RxReqStrategy } from "./req";
+import type {
+  ConnectionState,
+  ConnectionStatePacket,
+  ErrorPacket,
+  EventPacket,
+  MessagePacket,
+} from "./packet";
+import type { RxReq } from "./req";
 import { createSignal, defineDefaultOptions } from "./util";
 
 export * from "./nostr/primitive";
@@ -64,6 +70,10 @@ export interface RxNostr {
   ): void;
   addRelay(relay: string | Relay): void;
   removeRelay(url: string): void;
+
+  getAllRelayState(): Record<string, ConnectionState>;
+  getRelayState(url: string): ConnectionState;
+  reconnect(url: string): void;
 
   /**
    * Associate RxReq with RxNostr.
@@ -95,6 +105,7 @@ export interface RxNostr {
    * Nothing happens when this Observable is unsubscribed.
    * */
   createAllMessageObservable(): Observable<MessagePacket>;
+  createConnectionStateObservable(): Observable<ConnectionStatePacket>;
 
   /**
    * Attempts to send events to all relays that are allowed to write.
@@ -150,6 +161,7 @@ class RxNostrImpl implements RxNostr {
   private activeReqs: Record<string, Nostr.OutgoingMessage.REQ> = {};
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
+  private status$: Subject<ConnectionStatePacket> = new Subject();
 
   constructor(options?: Partial<RxNostrOptions>) {
     const opt = defaultRxNostrOptions(options);
@@ -166,39 +178,79 @@ class RxNostrImpl implements RxNostr {
       write,
     }));
   }
+
+  private createWebsocket(url: string): RelayConnection {
+    const websocket = webSocket<Nostr.IncomingMessage.Any>(url);
+
+    let state: ConnectionState = "not-started";
+    const setState = (s: ConnectionState) => {
+      if (state === s) {
+        return;
+      }
+      state = s;
+      this.status$.next({
+        from: url,
+        state,
+      });
+    };
+
+    const observable = websocket.pipe(
+      tap({
+        subscribe: () => {
+          setState(state === "not-started" ? "starting" : "reconnecting");
+        },
+        next: () => {
+          setState("ongoing");
+        },
+        complete: () => {
+          setState("terminated");
+        },
+      }),
+      retry(this.options.retry),
+      catchError((reason: unknown) => {
+        this.relays[url].activeSubIds.clear();
+        this.error$.next({ from: url, reason });
+        setState("error");
+        return EMPTY;
+      })
+    );
+    const connect = () => {
+      observable.subscribe((message) => {
+        this.message$.next({
+          from: url,
+          message,
+        });
+      });
+    };
+
+    return {
+      send: (message) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        websocket.next(message as any);
+      },
+      ensure: () => {
+        if (state === "not-started" || state === "error") {
+          connect();
+        }
+      },
+      close: () => {
+        websocket.complete();
+      },
+      reconnect: () => {
+        if (state === "error") {
+          connect();
+        } else {
+          throw new Error("reconnect() can be called only in 'error' state");
+        }
+      },
+      getState: () => state,
+    };
+  }
+
   setRelays(
     relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
   ): void {
-    const createWebsocket = (url: string): RelayConnection => {
-      const websocket = webSocket<Nostr.IncomingMessage.Any>(url);
-
-      websocket
-        .pipe(
-          retry(this.options.retry),
-          catchError((reason: unknown) => {
-            this.relays[url].activeSubIds.clear();
-            this.error$.next({ from: url, reason });
-            return EMPTY;
-          })
-        )
-        .subscribe((message) => {
-          this.message$.next({
-            from: url,
-            message,
-          });
-        });
-
-      return {
-        send: (message) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          websocket.next(message as any);
-        },
-        close: () => {
-          websocket.complete();
-        },
-      };
-    };
-
+    const createWebsocket = this.createWebsocket.bind(this);
     const nextRelays = getNextRelayState(this.relays, relays);
 
     const prevReadableUrls = getReadableUrls(Object.values(this.relays));
@@ -216,6 +268,9 @@ class RxNostrImpl implements RxNostr {
     }
 
     this.relays = nextRelays;
+    for (const relay of Object.values(nextRelays)) {
+      relay.websocket.ensure();
+    }
 
     // --- scoped untility pure functions ---
     function getNextRelayState(
@@ -270,6 +325,23 @@ class RxNostrImpl implements RxNostr {
     if (currentRelays.length !== nextRelays.length) {
       this.setRelays(nextRelays);
     }
+  }
+
+  getAllRelayState(): Record<string, ConnectionState> {
+    return Object.fromEntries(
+      Object.values(this.relays).map((e) => [e.url, this.getRelayState(e.url)])
+    );
+  }
+  getRelayState(url: string): ConnectionState {
+    const relay = this.relays[url];
+    if (!relay) {
+      throw new Error("Relay not found");
+    }
+    // this.relays[url] may be set before this.relays[url].websocket is initialized
+    return relay.websocket?.getState() ?? "not-started";
+  }
+  reconnect(url: string): void {
+    return this.relays[url].websocket?.reconnect();
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
@@ -467,6 +539,9 @@ class RxNostrImpl implements RxNostr {
   createAllMessageObservable(): Observable<MessagePacket> {
     return this.message$.asObservable();
   }
+  createConnectionStateObservable(): Observable<ConnectionStatePacket> {
+    return this.status$.asObservable();
+  }
 
   async send(
     params: Nostr.EventParameters,
@@ -544,7 +619,10 @@ interface RelayState {
 
 interface RelayConnection {
   send: (message: Nostr.OutgoingMessage.Any) => void;
+  ensure: () => void;
   close: () => void;
+  reconnect: () => void;
+  getState: () => ConnectionState;
 }
 
 function getReadableUrls(relays: Relay[]): string[] {

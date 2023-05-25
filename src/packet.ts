@@ -32,3 +32,16 @@ export interface MessagePacket {
   from: string;
   message: Nostr.IncomingMessage.Any;
 }
+
+export interface ConnectionStatePacket {
+  from: string;
+  state: ConnectionState;
+}
+
+export type ConnectionState =
+  | "not-started" // Not started yet.
+  | "starting" // The first trying to connect.
+  | "ongoing" // Active, but may be temporarily closed as idling.
+  | "reconnecting" // Trying to reconnect for error recovery.
+  | "error" // Inactive because of an error. You can try to recover by reconnect()
+  | "terminated";

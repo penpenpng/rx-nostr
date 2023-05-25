@@ -6,6 +6,10 @@ import { delay } from "rxjs";
 import { createRxNostr, RxBackwardReq } from "../src";
 
 const rxNostr = createRxNostr();
+rxNostr.createConnectionStateObservable().subscribe((ev) => {
+  console.log(ev);
+  console.log(rxNostr.getRelayState(ev.from));
+});
 rxNostr.setRelays([
   "wss://relay-jp.nostr.wirednet.jp",
   "wss://nostr-relay.nokotaro.com",
