@@ -1,6 +1,6 @@
 {
   "name": "rx-nostr",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "author": "penpenpng",
   "description": "Utility to control Nostr in RxJS.",
   "type": "module",
