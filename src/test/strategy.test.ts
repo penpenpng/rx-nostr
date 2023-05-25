@@ -1,11 +1,11 @@
 import { WS } from "jest-websocket-mock";
 
 import {
+  createRxBackwardReq,
+  createRxForwardReq,
   createRxNostr,
-  rxBackwardReq,
-  rxForwardReq,
+  createRxOneshotReq,
   RxNostr,
-  rxOneshotReq,
 } from "../index";
 import { createMockRelay, expectReceiveMessage } from "./mock-relay";
 import { asArray, sync } from "./test-helper";
@@ -29,7 +29,7 @@ describe("Single relay case", () => {
   });
 
   test("[backward] After receiving EOSE, CLOSE is sent out.", async () => {
-    const req = rxBackwardReq("sub");
+    const req = createRxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
     const [eoseSync, resolveEose] = sync();
@@ -50,7 +50,7 @@ describe("Single relay case", () => {
   });
 
   test("[backward] Receipt of EOSE does not terminate the Observable.", async () => {
-    const req = rxBackwardReq("sub");
+    const req = createRxBackwardReq("sub");
 
     let completed = false;
     rxNostr.use(req).subscribe({
@@ -72,7 +72,7 @@ describe("Single relay case", () => {
   });
 
   test("[backward] Each EOSE CLOSEs the REQ in the order of arrival.", async () => {
-    const req = rxBackwardReq("sub");
+    const req = createRxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
     // Relay mock returns messages at equal intervals,
@@ -102,7 +102,7 @@ describe("Single relay case", () => {
   });
 
   test("[forward] Each REQ is published with the same subId.", async () => {
-    const req = rxForwardReq("sub");
+    const req = createRxForwardReq("sub");
     const sub = rxNostr.use(req).subscribe();
 
     req.emit([{ kinds: [0], limit: 1 }]);
@@ -129,7 +129,7 @@ describe("Single relay case", () => {
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
-    const req = rxOneshotReq({
+    const req = createRxOneshotReq({
       subId: "sub",
       filters: [{ kinds: [0], limit: 5 }],
     });
@@ -177,7 +177,7 @@ describe("Slow relay and fast relay case", () => {
   });
 
   test("[oneshot] Collect all events under different timing EOSE.", async () => {
-    const req = rxOneshotReq({
+    const req = createRxOneshotReq({
       subId: "sub",
       filters: [{ kinds: [0], limit: 3 }],
     });

@@ -129,7 +129,7 @@ abstract class RxReqBase implements RxReq {
   }
 }
 
-export function rxBackwardReq(
+export function createRxBackwardReq(
   subIdBase?: string
 ): RxReq<"backward"> & RxReqController {
   return new RxBackwardReq(subIdBase);
@@ -157,7 +157,7 @@ export class RxBackwardReq extends RxReqBase implements RxReqController {
   }
 }
 
-export function rxForwardReq(
+export function createRxForwardReq(
   subId?: string
 ): RxReq<"forward"> & RxReqController {
   return new RxForwardReq(subId);
@@ -186,7 +186,7 @@ export class RxForwardReq extends RxReqBase implements RxReqController {
   }
 }
 
-export function rxOneshotReq(req: {
+export function createRxOneshotReq(req: {
   filters: Nostr.Filter[];
   subId?: string;
 }): RxReq<"oneshot"> {
