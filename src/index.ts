@@ -205,7 +205,7 @@ class RxNostrImpl implements RxNostr {
     const nextReadableUrls = getReadableUrls(Object.values(nextRelays));
     const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
     for (const url of urlsNoLongerRead) {
-      this.finalizeReqByRelayUrl(url);
+      this.finalizeReq({ url });
     }
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
@@ -272,15 +272,28 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  // TODO: Fix for readability
   use(rxReq: RxReq): Observable<EventPacket> {
     const TIMEOUT = this.options.timeout;
     const strategy = rxReq.strategy;
+    const rxNostrId = this.options.rxNostrId;
+    const rxReqId = rxReq.rxReqId;
+
+    const ensureReq = this.ensureReq.bind(this);
+    const finalizeReq = this.finalizeReq.bind(this);
+    const recordActiveReq = (req: Nostr.OutgoingMessage.REQ) => {
+      const subId = req[1];
+      this.activeReqs[subId] = req;
+    };
+    const forgetActiveReq = (subId: string) => {
+      delete this.activeReqs[subId];
+    };
+    const getReadableRelayCount = () =>
+      getReadableUrls(Object.values(this.relays)).length;
 
     const createSubEvent$ = (
       subId: string
     ): [Observable<EventPacket>, () => void] => {
-      const readableRelays = getReadableUrls(Object.values(this.relays)).length;
+      const readableRelays = getReadableRelayCount();
       const [signal$, sendSignal] = createSignal();
 
       return [
@@ -299,7 +312,7 @@ class RxNostrImpl implements RxNostr {
               strategy !== "forward" ? completeOnTimeout() : identity,
               strategy !== "forward"
                 ? finalize(() => {
-                    this.finalizeReq(subId, url);
+                    finalizeReq({ subId, url });
                   })
                 : identity
             );
@@ -309,27 +322,25 @@ class RxNostrImpl implements RxNostr {
       ];
     };
 
+    // TODO
     const x = rxReq.getReqObservable().pipe(
       filter((filters): filters is Nostr.Filter[] => filters !== null),
-      attachSubId({
-        rxNostrId: this.options.rxNostrId,
-        rxReqId: rxReq.rxReqId,
-        strategy: rxReq.strategy,
-      }),
-      // ensureReq
+      attachSubId(),
       tap({
         next: (req) => {
           if (strategy === "forward") {
-            this.activeReqs[req[1]] = req;
+            recordActiveReq(req);
           }
-          this.ensureReq(req, { overwrite: strategy === "forward" });
+          ensureReq(req, { overwrite: strategy === "forward" });
         },
         finalize: () => {
           if (strategy === "forward") {
-            delete this.activeReqs[
-              // FIXME
-              `${this.options.rxNostrId}:${rxReq.rxReqId}:0`
-            ];
+            forgetActiveReq(
+              makeSubId({
+                rxNostrId,
+                rxReqId,
+              })
+            );
           }
         },
       }),
@@ -344,50 +355,22 @@ class RxNostrImpl implements RxNostr {
           prev[1]();
         }
       }),
+      // TODO
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       map(([, next]) => next![0]),
       strategy === "forward" ? switchAll() : mergeAll(),
       strategy === "forward"
         ? finalize(() => {
-            this.finalizeReqBySubId(
-              // FIXME:
-              `${this.options.rxNostrId}:${rxReq.rxReqId}:0`
-            );
+            finalizeReq({
+              subId: makeSubId({
+                rxNostrId,
+                rxReqId,
+              }),
+            });
           })
         : identity
     );
 
-    function attachSubId(params: {
-      rxNostrId: string;
-      rxReqId: string;
-      strategy: RxReqStrategy;
-    }): OperatorFunction<Nostr.Filter[], Nostr.OutgoingMessage.REQ> {
-      const makeId = (index?: number) =>
-        `${params.rxNostrId}:${params.rxReqId}:${index ?? 0}`;
-
-      switch (params.strategy) {
-        case "backward":
-          return map((filters, index) => ["REQ", makeId(index), ...filters]);
-        case "forward":
-        case "oneshot":
-          return map((filters) => ["REQ", makeId(), ...filters]);
-      }
-    }
-    function filterBySubId(
-      subId: string
-    ): MonoTypeOperatorFunction<MessagePacket> {
-      return filter(
-        (packet) =>
-          (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
-          packet.message[1] === subId
-      );
-    }
-    function groupByRelay(): OperatorFunction<
-      MessagePacket,
-      GroupedObservable<string, MessagePacket>
-    > {
-      return groupBy(({ from }) => from);
-    }
     function createRelaySubEvent$(params: {
       url: string;
       subId: string;
@@ -424,6 +407,21 @@ class RxNostrImpl implements RxNostr {
         };
       });
     }
+    function filterBySubId(
+      subId: string
+    ): MonoTypeOperatorFunction<MessagePacket> {
+      return filter(
+        (packet) =>
+          (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
+          packet.message[1] === subId
+      );
+    }
+    function groupByRelay(): OperatorFunction<
+      MessagePacket,
+      GroupedObservable<string, MessagePacket>
+    > {
+      return groupBy(({ from }) => from);
+    }
     function completeOnTimeout<T>(): MonoTypeOperatorFunction<T> {
       return pipe(
         timeout(TIMEOUT),
@@ -435,6 +433,21 @@ class RxNostrImpl implements RxNostr {
           }
         })
       );
+    }
+    function attachSubId(): OperatorFunction<
+      Nostr.Filter[],
+      Nostr.OutgoingMessage.REQ
+    > {
+      const makeId = (index?: number) =>
+        makeSubId({ rxNostrId, rxReqId, index });
+
+      switch (strategy) {
+        case "backward":
+          return map((filters, index) => ["REQ", makeId(index), ...filters]);
+        case "forward":
+        case "oneshot":
+          return map((filters) => ["REQ", makeId(), ...filters]);
+      }
     }
   }
   createAllEventObservable(): Observable<EventPacket> {
@@ -502,32 +515,21 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  private finalizeReqBySubId(subId: string) {
-    for (const relay of Object.values(this.relays)) {
-      if (relay.activeSubIds.has(subId)) {
-        relay.websocket.send(["CLOSE", subId]);
+  private finalizeReq(params: { subId?: string; url?: string }) {
+    const { subId, url } = params;
+    if (subId === undefined && url === undefined) {
+      throw new Error();
+    }
+
+    const relays = url ? [this.relays[url]] : Object.values(this.relays);
+    for (const relay of relays) {
+      const subIds = subId ? [subId] : Array.from(relay.activeSubIds);
+      for (const subId of subIds) {
+        if (relay.activeSubIds.has(subId)) {
+          relay.websocket.send(["CLOSE", subId]);
+        }
+        relay.activeSubIds.delete(subId);
       }
-      relay.activeSubIds.delete(subId);
-    }
-  }
-  private finalizeReqByRelayUrl(url: string) {
-    const relay = this.relays[url];
-    if (!relay) {
-      return;
-    }
-    for (const subId of relay.activeSubIds) {
-      relay.websocket.send(["CLOSE", subId]);
-    }
-    relay.activeSubIds.clear();
-  }
-  private finalizeReq(subId: string, url: string) {
-    const relay = this.relays[url];
-    if (!relay) {
-      return;
-    }
-    if (relay.activeSubIds.has(subId)) {
-      relay.websocket.send(["CLOSE", subId]);
-      relay.activeSubIds.delete(subId);
     }
   }
 }
@@ -547,4 +549,11 @@ interface RelayConnection {
 
 function getReadableUrls(relays: Relay[]): string[] {
   return relays.filter((e) => e.read).map((e) => e.url);
+}
+function makeSubId(params: {
+  rxNostrId: string;
+  rxReqId: string;
+  index?: number;
+}): string {
+  return `${params.rxNostrId}:${params.rxReqId}:${params.index ?? 0}`;
 }
