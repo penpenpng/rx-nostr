@@ -1,4 +1,4 @@
-import { extend, mixin, rxBackwardReq } from "../index";
+import { createRxBackwardReq, extend, mixin } from "../index";
 
 test("Extend req.", async () => {
   const addFoo = mixin<{ strategy: "backward" }, { foo: () => string }>(() => ({
@@ -6,7 +6,7 @@ test("Extend req.", async () => {
       return this.strategy;
     },
   }));
-  const req = extend(rxBackwardReq(), addFoo);
+  const req = extend(createRxBackwardReq(), addFoo);
 
   expect(req.strategy).toBe("backward");
   expect(req.foo()).toBe("backward");
@@ -14,7 +14,7 @@ test("Extend req.", async () => {
 
 test("Override req.", async () => {
   const original = extend(
-    rxBackwardReq(),
+    createRxBackwardReq(),
     mixin<object, { foo: () => string }>(() => ({
       foo() {
         return "foo";
