@@ -225,6 +225,9 @@ class RxNostrImpl implements RxNostr {
         websocket.next(message as any);
       },
       ensure: () => {
+        if (state === "not-started") {
+          setState("not-started");
+        }
         if (state === "not-started" || state === "error") {
           connect();
         }
