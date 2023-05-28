@@ -146,8 +146,7 @@ export function createRxBackwardReq(
  *     - https://rxjs.dev/api/operators/mergeAll
  * - In most cases, you should specify `limit` for filters.
  */
-export class RxBackwardReq extends RxReqBase implements RxReqController {
-  /** @deprecated Use rxBackwardReq instead */
+class RxBackwardReq extends RxReqBase implements RxReqController {
   constructor(rxReqId?: string) {
     super(rxReqId);
   }
@@ -175,8 +174,7 @@ export function createRxForwardReq(
  *     - https://rxjs.dev/api/operators/switchAll
  * - In most cases, you should not specify `limit` for filters.
  */
-export class RxForwardReq extends RxReqBase implements RxReqController {
-  /** @deprecated Use rxForwardReq instead */
+class RxForwardReq extends RxReqBase implements RxReqController {
   constructor(rxReqId?: string) {
     super(rxReqId);
   }
