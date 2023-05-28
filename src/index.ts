@@ -17,16 +17,12 @@ import {
   of,
   OperatorFunction,
   pairwise,
-  pipe,
   retry,
   Subject,
   switchAll,
   take,
   takeUntil,
   tap,
-  throwError,
-  timeout,
-  TimeoutError,
 } from "rxjs";
 import { webSocket } from "rxjs/webSocket";
 
@@ -34,6 +30,7 @@ import { toHex } from "./nostr/bech32";
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
 import type { Nip07 } from "./nostr/nip07";
 import { Nostr } from "./nostr/primitive";
+import { completeOnTimeout } from "./operator";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -381,7 +378,7 @@ class RxNostrImpl implements RxNostr {
               url,
               subId,
             }).pipe(
-              strategy !== "forward" ? completeOnTimeout() : identity,
+              strategy !== "forward" ? completeOnTimeout(TIMEOUT) : identity,
               strategy !== "forward"
                 ? finalize(() => {
                     finalizeReq({ subId, url });
@@ -493,18 +490,6 @@ class RxNostrImpl implements RxNostr {
       GroupedObservable<string, MessagePacket>
     > {
       return groupBy(({ from }) => from);
-    }
-    function completeOnTimeout<T>(): MonoTypeOperatorFunction<T> {
-      return pipe(
-        timeout(TIMEOUT),
-        catchError((error) => {
-          if (error instanceof TimeoutError) {
-            return EMPTY;
-          } else {
-            return throwError(() => error);
-          }
-        })
-      );
     }
     function attachSubId(): OperatorFunction<
       Nostr.Filter[],

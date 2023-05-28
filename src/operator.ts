@@ -1,6 +1,8 @@
 import {
+  catchError,
   distinct,
   distinctUntilChanged,
+  EMPTY,
   filter,
   groupBy,
   map,
@@ -9,6 +11,8 @@ import {
   ObservableInput,
   pipe,
   scan,
+  timeout,
+  TimeoutError,
 } from "rxjs";
 
 import { verify as _verify } from "./nostr/event";
@@ -62,4 +66,19 @@ export function filterKind<K extends Nostr.Kind>(
   kind: K
 ): MonoTypeOperatorFunction<EventPacket> {
   return filter<EventPacket>(({ event }) => event.kind === kind);
+}
+
+export function completeOnTimeout<T>(
+  time: number
+): MonoTypeOperatorFunction<T> {
+  return pipe(
+    timeout(time),
+    catchError((error: unknown) => {
+      if (error instanceof TimeoutError) {
+        return EMPTY;
+      } else {
+        throw error;
+      }
+    })
+  );
 }
