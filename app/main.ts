@@ -3,7 +3,17 @@
 
 import { delay } from "rxjs";
 
-import { createRxNostr, RxBackwardReq } from "../src";
+import { createRxBackwardReq, createRxNostr } from "../src";
+
+document.getElementById("send")?.addEventListener("click", async () => {
+  const input = document.getElementById("input") as HTMLInputElement;
+  rxNostr.send({
+    kind: 1,
+    content: input.value,
+    pubkey: (await window.nostr?.getPublicKey()) ?? "",
+  });
+  input.value = "";
+});
 
 const rxNostr = createRxNostr();
 rxNostr.createConnectionStateObservable().subscribe((ev) => {
@@ -15,12 +25,12 @@ rxNostr.setRelays([
   "wss://nostr-relay.nokotaro.com",
 ]);
 
-const req0 = new RxBackwardReq();
+const req0 = createRxBackwardReq();
 rxNostr
   .use(req0)
   .subscribe((e) => console.log(0, e.event.kind, e.subId, e.from));
 
-const req1 = new RxBackwardReq();
+const req1 = createRxBackwardReq();
 rxNostr
   .use(req1.pipe(delay(1000)))
   .subscribe((e) => console.log(1, e.event.kind, e.subId, e.from));

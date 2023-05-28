@@ -18,10 +18,13 @@ export namespace Nostr {
   }
 
   export interface EventParameters<K = number> {
+    id?: string;
+    sig?: string;
     kind: K;
     tags?: string[][];
-    pubkey: string;
+    pubkey?: string;
     content: string;
+    created_at?: number;
   }
 
   export enum Kind {

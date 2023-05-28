@@ -1,20 +1,42 @@
+import { schnorr } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha256";
-import * as secp256k1 from "@noble/secp256k1";
+import { bytesToHex } from "@noble/hashes/utils";
 
+import { toHex } from "./bech32";
 import { Nostr } from "./primitive";
 
 const utf8Encoder = new TextEncoder();
-secp256k1.utils.sha256Sync = (...msgs) =>
-  sha256(secp256k1.utils.concatBytes(...msgs));
+
+export function getPublicKey(seckey: string): string {
+  return bytesToHex(schnorr.getPublicKey(seckey));
+}
 
 export function createEventBySecretKey(
   params: Nostr.EventParameters,
   seckey: string
 ): Nostr.Event {
-  return sign(getUnsignedEvent(params), seckey);
+  const sechex = seckey?.startsWith("nsec1") ? toHex(seckey) : seckey;
+  const pubhex = !params.pubkey
+    ? getPublicKey(sechex)
+    : params.pubkey.startsWith("npub1")
+    ? toHex(params.pubkey)
+    : params.pubkey;
+  const event = {
+    ...params,
+    tags: params.tags ?? [],
+    pubkey: pubhex,
+    created_at: params.created_at ?? getCreatedAt(),
+  };
+  const id = event.id ?? getEventHash(event);
+  const sig = event.sig ?? getSignature(id, sechex);
+  return {
+    ...event,
+    id,
+    sig,
+  };
 }
 
-export function createEventByNip07(
+export async function createEventByNip07(
   params: Nostr.EventParameters
 ): Promise<Nostr.Event> {
   const nostr = (window ?? {})?.nostr;
@@ -22,43 +44,37 @@ export function createEventByNip07(
     throw new Error("NIP-07 interface is not ready.");
   }
 
-  return nostr.signEvent(getUnsignedEvent(params));
+  return nostr.signEvent({
+    kind: params.kind,
+    tags: params.tags ?? [],
+    content: params.content,
+    created_at: params.created_at ?? getCreatedAt(),
+  });
 }
 
-export function getEventHash({
-  pubkey,
-  created_at,
-  kind,
-  tags,
-  content,
-}: Nostr.UnsignedEvent): string {
-  return secp256k1.utils.bytesToHex(
-    sha256(
-      utf8Encoder.encode(
-        JSON.stringify([0, pubkey, created_at, kind, tags, content])
-      )
-    )
-  );
+export function getEventHash(event: Nostr.UnsignedEvent): string {
+  const serialized = JSON.stringify([
+    0,
+    event.pubkey,
+    event.created_at,
+    event.kind,
+    event.tags,
+    event.content,
+  ]);
+  return bytesToHex(sha256(utf8Encoder.encode(serialized)));
 }
 
-export function sign(event: Nostr.UnsignedEvent, seckey: string): Nostr.Event {
-  const id = getEventHash(event);
-  const sig = secp256k1.utils.bytesToHex(
-    secp256k1.schnorr.signSync(id, seckey)
-  );
-
-  return {
-    id,
-    sig,
-    ...event,
-  };
+export function getSignature(eventHash: string, seckey: string): string {
+  return bytesToHex(schnorr.sign(eventHash, seckey));
 }
 
 export function verify(event: Nostr.Event): boolean {
-  return (
-    ensureRequiredFields(event) &&
-    secp256k1.schnorr.verifySync(event.sig, getEventHash(event), event.pubkey)
-  );
+  try {
+    return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
+  } catch (err) {
+    console.warn("The following error occurred during verify():", err);
+    return false;
+  }
 }
 
 export function ensureRequiredFields(event: Nostr.Event): boolean {
@@ -79,13 +95,6 @@ export function ensureRequiredFields(event: Nostr.Event): boolean {
   return true;
 }
 
-function getUnsignedEvent(params: Nostr.EventParameters): Nostr.UnsignedEvent {
-  const { kind, pubkey, content, tags = [] } = params;
-  return {
-    kind,
-    pubkey,
-    content,
-    tags,
-    created_at: Math.floor(new Date().getTime() / 1000),
-  };
+function getCreatedAt() {
+  return Math.floor(new Date().getTime() / 1000);
 }

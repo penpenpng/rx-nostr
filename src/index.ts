@@ -26,7 +26,6 @@ import {
 } from "rxjs";
 import { webSocket } from "rxjs/webSocket";
 
-import { toHex } from "./nostr/bech32";
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
 import type { Nip07 } from "./nostr/nip07";
 import { Nostr } from "./nostr/primitive";
@@ -532,13 +531,8 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     seckey?: string | undefined
   ): Promise<void> {
-    const sechex = seckey?.startsWith("nsec1") ? toHex(seckey) : seckey;
-    if (params.pubkey.startsWith("npub1")) {
-      params.pubkey = toHex(params.pubkey);
-    }
-
-    const event = sechex
-      ? createEventBySecretKey(params, sechex)
+    const event = seckey
+      ? createEventBySecretKey(params, seckey)
       : await createEventByNip07(params);
 
     for (const relay of Object.values(this.relays)) {
