@@ -17,8 +17,10 @@ import {
   of,
   OperatorFunction,
   pairwise,
+  ReplaySubject,
   retry,
   Subject,
+  Subscription,
   switchAll,
   take,
   takeUntil,
@@ -36,6 +38,7 @@ import type {
   ErrorPacket,
   EventPacket,
   MessagePacket,
+  OkPacket,
 } from "./packet";
 import type { RxReq } from "./req";
 import { createSignal, defineDefaultOptions } from "./util";
@@ -108,7 +111,7 @@ export interface RxNostr {
    * The `seckey` param accepts both nsec format and hex format,
    * and if omitted NIP-07 will be automatically used.
    */
-  send(params: Nostr.EventParameters, seckey?: string): Promise<void>;
+  send(params: Nostr.EventParameters, seckey?: string): Observable<OkPacket>;
 
   /**
    * Releases all resources held by the RxNostr object.
@@ -252,8 +255,8 @@ class RxNostrImpl implements RxNostr {
     const createWebsocket = this.createWebsocket.bind(this);
     const nextRelays = getNextRelayState(this.relays, relays);
 
-    const prevReadableUrls = getReadableUrls(Object.values(this.relays));
-    const nextReadableUrls = getReadableUrls(Object.values(nextRelays));
+    const prevReadableUrls = this.getReadableUrls();
+    const nextReadableUrls = this.getReadableUrls(Object.values(nextRelays));
     const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
     for (const url of urlsNoLongerRead) {
       this.finalizeReq({ url });
@@ -358,8 +361,7 @@ class RxNostrImpl implements RxNostr {
     const forgetActiveReq = (subId: string) => {
       delete this.activeReqs[subId];
     };
-    const getReadableRelayCount = () =>
-      getReadableUrls(Object.values(this.relays)).length;
+    const getReadableRelayCount = () => this.getReadableUrls().length;
 
     const createSubEvent$ = (
       subId: string
@@ -530,19 +532,45 @@ class RxNostrImpl implements RxNostr {
     return this.status$.asObservable();
   }
 
-  async send(
+  send(
     params: Nostr.EventParameters,
     seckey?: string | undefined
-  ): Promise<void> {
-    const event = seckey
-      ? createEventBySecretKey(params, seckey)
-      : await createEventByNip07(params);
+  ): Observable<OkPacket> {
+    const urls = this.getWritableUrls();
+    const subject = new ReplaySubject<OkPacket>(urls.length);
+    let subscription: Subscription | null = null;
 
-    for (const relay of Object.values(this.relays)) {
-      if (relay.write) {
-        relay.websocket.send(["EVENT", event]);
+    (seckey
+      ? Promise.resolve(createEventBySecretKey(params, seckey))
+      : createEventByNip07(params)
+    ).then((event) => {
+      if (!subject.closed) {
+        subscription = this.createAllMessageObservable().subscribe(
+          ({ from, message }) => {
+            if (message[0] !== "OK") {
+              return;
+            }
+            subject.next({
+              from,
+              id: event.id,
+            });
+          }
+        );
       }
-    }
+
+      for (const url of urls) {
+        this.relays[url].websocket.send(["EVENT", event]);
+      }
+    });
+
+    return subject.pipe(
+      take(urls.length),
+      finalize(() => {
+        subject.complete();
+        subject.unsubscribe();
+        subscription?.unsubscribe();
+      })
+    );
   }
 
   dispose(): void {
@@ -589,6 +617,17 @@ class RxNostrImpl implements RxNostr {
       }
     }
   }
+
+  private getReadableUrls(relays?: Relay[]): string[] {
+    return (relays ?? Object.values(this.relays))
+      .filter((e) => e.read)
+      .map((e) => e.url);
+  }
+  private getWritableUrls(relays?: Relay[]): string[] {
+    return (relays ?? Object.values(this.relays))
+      .filter((e) => e.write)
+      .map((e) => e.url);
+  }
 }
 
 interface RelayState {
@@ -607,9 +646,6 @@ interface RelayConnection {
   getState: () => ConnectionState;
 }
 
-function getReadableUrls(relays: Relay[]): string[] {
-  return relays.filter((e) => e.read).map((e) => e.url);
-}
 function makeSubId(params: {
   rxNostrId: string;
   rxReqId: string;

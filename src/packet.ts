@@ -45,3 +45,8 @@ export type ConnectionState =
   | "reconnecting" // Trying to reconnect for error recovery.
   | "error" // Inactive because of an error. You can try to recover by reconnect()
   | "terminated";
+
+export interface OkPacket {
+  from: string;
+  id: string;
+}

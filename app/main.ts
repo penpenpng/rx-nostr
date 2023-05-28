@@ -7,11 +7,20 @@ import { createRxBackwardReq, createRxNostr } from "../src";
 
 document.getElementById("send")?.addEventListener("click", async () => {
   const input = document.getElementById("input") as HTMLInputElement;
-  rxNostr.send({
-    kind: 1,
-    content: input.value,
-    pubkey: (await window.nostr?.getPublicKey()) ?? "",
-  });
+  rxNostr
+    .send({
+      kind: 1,
+      content: input.value,
+      pubkey: (await window.nostr?.getPublicKey()) ?? "",
+    })
+    .subscribe({
+      next: ({ from }) => {
+        console.log("OK", from);
+      },
+      complete: () => {
+        console.log("Send completed");
+      },
+    });
   input.value = "";
 });
 
