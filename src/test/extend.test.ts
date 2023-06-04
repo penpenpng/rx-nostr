@@ -1,4 +1,4 @@
-import { createRxBackwardReq, extend, mixin } from "../index";
+import { createRxBackwardReq, extend, mixin } from "../index.js";
 
 test("Extend req.", async () => {
   const addFoo = mixin<{ strategy: "backward" }, { foo: () => string }>(() => ({

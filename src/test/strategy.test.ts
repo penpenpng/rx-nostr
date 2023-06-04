@@ -6,9 +6,9 @@ import {
   createRxNostr,
   createRxOneshotReq,
   RxNostr,
-} from "../index";
-import { createMockRelay, expectReceiveMessage } from "./mock-relay";
-import { asArray, sync } from "./test-helper";
+} from "../index.js";
+import { createMockRelay, expectReceiveMessage } from "./mock-relay.js";
+import { asArray, sync } from "./test-helper.js";
 
 describe("Single relay case", () => {
   const RELAY_URL = "ws://localhost:1234";

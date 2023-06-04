@@ -1,5 +1,5 @@
-import { Nostr } from "../nostr/primitive";
-import { EventPacket } from "../packet";
+import { Nostr } from "../nostr/primitive.js";
+import { EventPacket } from "../packet.js";
 
 export function fakeEvent(event?: Partial<Nostr.Event>): Nostr.Event {
   return {

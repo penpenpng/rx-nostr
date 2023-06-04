@@ -1,9 +1,9 @@
 import { of } from "rxjs";
 
-import { latestEach } from "../operator";
-import { EventPacket } from "../packet";
-import { fakeEventPacket } from "./stub";
-import { asArray } from "./test-helper";
+import { latestEach } from "../operator.js";
+import { EventPacket } from "../packet.js";
+import { fakeEventPacket } from "./stub.js";
+import { asArray } from "./test-helper.js";
 
 test("latestEach()", async () => {
   const packet$ = of<EventPacket[]>(
