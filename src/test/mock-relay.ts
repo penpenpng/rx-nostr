@@ -1,7 +1,7 @@
 import { WS } from "jest-websocket-mock";
 
-import { Nostr } from "../nostr/primitive";
-import { fakeEventMessage } from "./stub";
+import { Nostr } from "../nostr/primitive.js";
+import { fakeEventMessage } from "./stub.js";
 
 export function createMockRelay(url: string, interval = 10) {
   const server = new WS(url);

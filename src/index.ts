@@ -28,10 +28,10 @@ import {
 } from "rxjs";
 import { webSocket } from "rxjs/webSocket";
 
-import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
-import type { Nip07 } from "./nostr/nip07";
-import { Nostr } from "./nostr/primitive";
-import { completeOnTimeout } from "./operator";
+import { createEventByNip07, createEventBySecretKey } from "./nostr/event.js";
+import type { Nip07 } from "./nostr/nip07.js";
+import { Nostr } from "./nostr/primitive.js";
+import { completeOnTimeout } from "./operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -39,14 +39,14 @@ import type {
   EventPacket,
   MessagePacket,
   OkPacket,
-} from "./packet";
-import type { RxReq } from "./req";
-import { createSignal, defineDefaultOptions } from "./util";
+} from "./packet.js";
+import type { RxReq } from "./req.js";
+import { createSignal, defineDefaultOptions } from "./util.js";
 
-export * from "./nostr/primitive";
-export * from "./operator";
-export * from "./packet";
-export * from "./req";
+export * from "./nostr/primitive.js";
+export * from "./operator.js";
+export * from "./packet.js";
+export * from "./req.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays

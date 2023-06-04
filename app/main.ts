@@ -3,7 +3,7 @@
 
 import { delay } from "rxjs";
 
-import { createRxBackwardReq, createRxNostr } from "../src";
+import { createRxBackwardReq, createRxNostr } from "../src/index.js";
 
 document.getElementById("send")?.addEventListener("click", async () => {
   const input = document.getElementById("input") as HTMLInputElement;

@@ -15,9 +15,9 @@ import {
   TimeoutError,
 } from "rxjs";
 
-import { verify as _verify } from "./nostr/event";
-import { Nostr } from "./nostr/primitive";
-import { EventPacket } from "./packet";
+import { verify as _verify } from "./nostr/event.js";
+import { Nostr } from "./nostr/primitive.js";
+import { EventPacket } from "./packet.js";
 
 /**
  * Remove the events once seen.
