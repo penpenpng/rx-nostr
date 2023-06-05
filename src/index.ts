@@ -69,6 +69,7 @@ export interface RxNostr {
   ): void;
   addRelay(relay: string | Relay): void;
   removeRelay(url: string): void;
+  hasRelay(url: string): boolean;
 
   getAllRelayState(): Record<string, ConnectionState>;
   getRelayState(url: string): ConnectionState;
@@ -327,6 +328,9 @@ class RxNostrImpl implements RxNostr {
     if (currentRelays.length !== nextRelays.length) {
       this.setRelays(nextRelays);
     }
+  }
+  hasRelay(url: string): boolean {
+    return this.getRelays().some((relay) => relay.url === url);
   }
 
   getAllRelayState(): Record<string, ConnectionState> {
