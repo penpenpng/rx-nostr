@@ -34,7 +34,12 @@ export function uniq(
 export function latest(): MonoTypeOperatorFunction<EventPacket> {
   return pipe(
     scan<EventPacket>((acc, packet) =>
-      acc.event.created_at < packet.event.created_at ? packet : acc
+      acc.event.created_at < packet.event.created_at ||
+      // https://github.com/nostr-protocol/nips/blob/master/16.md#replaceable-events
+      (acc.event.created_at === packet.event.created_at &&
+        acc.event.id < packet.event.id)
+        ? packet
+        : acc
     ),
     distinctUntilChanged(
       (a, b) => a === b,
