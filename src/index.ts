@@ -1,22 +1,20 @@
 import normalizeUrl from "normalize-url";
 import {
   catchError,
-  concat,
   EMPTY,
   filter,
   finalize,
   first,
-  groupBy,
-  GroupedObservable,
   identity,
   map,
+  merge,
   mergeAll,
   mergeMap,
   MonoTypeOperatorFunction,
   Observable,
   of,
   OperatorFunction,
-  pairwise,
+  pipe,
   ReplaySubject,
   retry,
   Subject,
@@ -39,9 +37,10 @@ import type {
   EventPacket,
   MessagePacket,
   OkPacket,
+  ReqPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import { createSignal, defineDefaultOptions } from "./util.js";
+import { defineDefaultOptions } from "./util.js";
 
 export * from "./nostr/primitive.js";
 export * from "./operator.js";
@@ -374,76 +373,75 @@ class RxNostrImpl implements RxNostr {
     const forgetActiveReq = (subId: string) => {
       delete this.activeReqs[subId];
     };
-    const getReadableRelayCount = () => this.getReadableUrls().length;
 
-    const createSubEvent$ = (
-      subId: string
-    ): [Observable<EventPacket>, () => void] => {
-      const readableRelays = getReadableRelayCount();
-      const [signal$, sendSignal] = createSignal();
-
-      return [
-        this.message$.pipe(
+    const createSubEvent$ = (subId: string): Observable<EventPacket> => {
+      if (strategy === "forward") {
+        return this.message$.pipe(
           filterBySubId(subId),
-          groupByRelay(),
-          strategy === "oneshot" ? take(readableRelays) : takeUntil(signal$),
-          mergeMap((relayMessage$) => {
-            const url = relayMessage$.key;
-            return createRelaySubEvent$({
-              message$: relayMessage$,
-              completeOnEose: strategy !== "forward",
-              url,
+          // XXX: packToEventPacket
+          map(
+            (x): EventPacket => ({
+              from: x.from,
               subId,
-            }).pipe(
-              strategy !== "forward" ? completeOnTimeout(TIMEOUT) : identity,
-              strategy !== "forward"
-                ? finalize(() => {
-                    finalizeReq({ subId, url });
-                  })
-                : identity
-            );
+              event: x.message[2] as any,
+            })
+          )
+        );
+      }
+
+      // FIXME: 健康なリレーが最初からひとつもなかったとき
+
+      const eose$ = new Subject<void>();
+      const complete$ = new Subject<void>();
+      const eoseRelays = new Set<string>();
+      const manageCompletion = merge(
+        eose$,
+        this.createConnectionStateObservable()
+      ).subscribe(() => {
+        const status = this.getAllRelayState();
+        const shouldComplete = Object.entries(status).every(
+          ([url, state]) =>
+            state === "error" ||
+            state === "terminated" ||
+            (state === "ongoing" && eoseRelays.has(url))
+        );
+        if (shouldComplete) {
+          complete$.next();
+        }
+      });
+
+      return this.message$.pipe(
+        takeUntil(complete$),
+        completeOnTimeout(TIMEOUT),
+        filterBySubId(subId),
+        filter((e) => !eoseRelays.has(e.from)),
+        tap((e) => {
+          if (e.message[0] === "EOSE") {
+            eoseRelays.add(e.from);
+            finalizeReq({ subId, url: e.from });
+            eose$.next();
+          }
+        }),
+        filter((e) => e.message[0] === "EVENT"),
+        map(
+          (x): EventPacket => ({
+            from: x.from,
+            subId,
+            event: x.message[2] as any,
           })
         ),
-        sendSignal,
-      ];
+        finalize(() => {
+          finalizeReq({ subId });
+          complete$.unsubscribe();
+          eose$.unsubscribe();
+          manageCompletion.unsubscribe();
+        })
+      );
     };
 
-    // TODO
-    const x = rxReq.getReqObservable().pipe(
-      filter((filters): filters is Nostr.Filter[] => filters !== null),
-      attachSubId(),
-      tap({
-        next: (req) => {
-          if (strategy === "forward") {
-            recordActiveReq(req);
-          }
-          ensureReq(req, { overwrite: strategy === "forward" });
-        },
-        finalize: () => {
-          if (strategy === "forward") {
-            forgetActiveReq(
-              makeSubId({
-                rxNostrId,
-                rxReqId,
-              })
-            );
-          }
-        },
-      }),
-      strategy === "oneshot" ? first() : identity,
-      map(([, subId]) => createSubEvent$(subId))
-    );
-
-    return concat(of(null), x).pipe(
-      pairwise(),
-      tap(([prev]) => {
-        if (prev !== null) {
-          prev[1]();
-        }
-      }),
-      // TODO
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      map(([, next]) => next![0]),
+    return rxReq.getReqObservable().pipe(
+      processReq(),
+      map(([, subId]) => createSubEvent$(subId)),
       strategy === "forward" ? switchAll() : mergeAll(),
       strategy === "forward"
         ? finalize(() => {
@@ -457,42 +455,6 @@ class RxNostrImpl implements RxNostr {
         : identity
     );
 
-    function createRelaySubEvent$(params: {
-      url: string;
-      subId: string;
-      message$: Observable<MessagePacket>;
-      completeOnEose?: boolean;
-    }): Observable<EventPacket> {
-      const { url, subId, message$, completeOnEose } = params;
-
-      return new Observable<EventPacket>((observer) => {
-        const sub = message$.subscribe({
-          next: ({ message }) => {
-            const type = message[0];
-
-            if (type === "EVENT") {
-              observer.next({
-                from: url,
-                subId,
-                event: message[2],
-              });
-            } else if (type === "EOSE" && completeOnEose) {
-              observer.complete();
-            }
-          },
-          complete: () => {
-            observer.complete();
-          },
-          error: (err) => {
-            observer.error(err);
-          },
-        });
-
-        return () => {
-          sub.unsubscribe();
-        };
-      });
-    }
     function filterBySubId(
       subId: string
     ): MonoTypeOperatorFunction<MessagePacket> {
@@ -501,12 +463,6 @@ class RxNostrImpl implements RxNostr {
           (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
           packet.message[1] === subId
       );
-    }
-    function groupByRelay(): OperatorFunction<
-      MessagePacket,
-      GroupedObservable<string, MessagePacket>
-    > {
-      return groupBy(({ from }) => from);
     }
     function attachSubId(): OperatorFunction<
       Nostr.Filter[],
@@ -522,6 +478,42 @@ class RxNostrImpl implements RxNostr {
         case "oneshot":
           return map((filters) => ["REQ", makeId(), ...filters]);
       }
+    }
+    function processReq(): OperatorFunction<
+      ReqPacket,
+      Nostr.OutgoingMessage.REQ
+    > {
+      return pipe(
+        filter((filters): filters is Nostr.Filter[] => filters !== null),
+        strategy === "oneshot" ? first() : identity,
+        attachSubId(),
+        manageActiveForwardReq(),
+        ensureReqOnNext()
+      );
+    }
+    function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
+      if (strategy === "forward") {
+        return tap({
+          next: (req: Nostr.OutgoingMessage.REQ) => {
+            recordActiveReq(req);
+          },
+          finalize: () => {
+            forgetActiveReq(
+              makeSubId({
+                rxNostrId,
+                rxReqId,
+              })
+            );
+          },
+        });
+      } else {
+        return identity;
+      }
+    }
+    function ensureReqOnNext(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
+      return tap((req: Nostr.OutgoingMessage.REQ) => {
+        ensureReq(req, { overwrite: strategy === "forward" });
+      });
     }
   }
   createAllEventObservable(): Observable<EventPacket> {
