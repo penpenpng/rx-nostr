@@ -64,7 +64,11 @@ export interface RxNostr {
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
+  /** @deprecated use switchRelays instead */
   setRelays(
+    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+  ): void;
+  switchRelays(
     relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
   ): void;
   addRelay(relay: string | Relay): void;
@@ -250,6 +254,11 @@ class RxNostrImpl implements RxNostr {
     };
   }
 
+  switchRelays(
+    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+  ): void {
+    this.setRelays(relays);
+  }
   setRelays(
     relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
   ): void {
