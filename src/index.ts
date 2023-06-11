@@ -23,7 +23,6 @@ import {
   tap,
   Unsubscribable,
 } from "rxjs";
-import { webSocket } from "rxjs/webSocket";
 
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event.js";
 import type { Nip07 } from "./nostr/nip07.js";
@@ -39,6 +38,7 @@ import type {
 } from "./packet.js";
 import type { RxReq } from "./req.js";
 import { defineDefaultOptions, onSubscribe, unnull } from "./util.js";
+import { WebsocketSubject } from "./websocket.js";
 
 export * from "./nostr/primitive.js";
 export * from "./operator.js";
@@ -180,75 +180,31 @@ class RxNostrImpl implements RxNostr {
     }));
   }
 
-  private createWebsocket(url: string): RelayConnection {
-    const websocket = webSocket<Nostr.IncomingMessage.Any>(url);
+  private createWebsocket(url: string): WebsocketSubject {
+    const websocket = new WebsocketSubject(url);
 
-    let state: ConnectionState = "not-started";
-    const setState = (s: ConnectionState) => {
-      if (state === s) {
-        return;
-      }
-      state = s;
+    websocket.getConnectionStateObservable().subscribe((state) => {
       this.status$.next({
         from: url,
         state,
       });
-    };
+    });
 
-    const observable = websocket.pipe(
-      tap({
-        subscribe: () => {
-          setState(state === "not-started" ? "starting" : "reconnecting");
-        },
-        next: () => {
-          setState("ongoing");
-        },
-        complete: () => {
-          setState("terminated");
-        },
-      }),
-      retry(this.options.retry),
-      catchError((reason: unknown) => {
-        this.relays.get(url)?.activeSubIds.clear();
-        this.error$.next({ from: url, reason });
-        setState("error");
-        return EMPTY;
-      })
-    );
-    const connect = () => {
-      observable.subscribe((message) => {
-        this.message$.next({
-          from: url,
-          message,
-        });
+    websocket
+      .getMessageObservable()
+      .pipe(
+        retry(this.options.retry),
+        catchError((reason: unknown) => {
+          this.relays.get(url)?.activeSubIds.clear();
+          this.error$.next({ from: url, reason });
+          return EMPTY;
+        })
+      )
+      .subscribe((v) => {
+        this.message$.next(v);
       });
-    };
 
-    return {
-      send: (message) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        websocket.next(message as any);
-      },
-      ensure: () => {
-        if (state === "not-started") {
-          setState("not-started");
-        }
-        if (state === "not-started" || state === "error") {
-          connect();
-        }
-      },
-      close: () => {
-        websocket.complete();
-      },
-      reconnect: () => {
-        if (state === "error") {
-          connect();
-        } else {
-          throw new Error("reconnect() can be called only in 'error' state");
-        }
-      },
-      getState: () => state,
-    };
+    return websocket;
   }
 
   switchRelays(
@@ -269,19 +225,34 @@ class RxNostrImpl implements RxNostr {
     const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
     for (const url of urlsNoLongerRead) {
       this.finalizeReq({ url });
+      this.relays.get(url)?.websocket.stop();
     }
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
+    for (const url of urlsToBeRead) {
+      nextRelays.get(url)?.websocket.start();
+    }
     for (const req of this.activeReqs.values()) {
       this.ensureReq(req, {
         relays: urlsToBeRead.map((url) => unnull(nextRelays.get(url))),
       });
     }
 
-    this.relays = nextRelays;
-    for (const relay of nextRelays.values()) {
-      relay.websocket.ensure();
+    for (const req of this.activeReqs.values()) {
+      this.ensureReq(req, {
+        relays: urlsToBeRead.map((url) => unnull(nextRelays.get(url))),
+      });
     }
+
+    const urlsNoLongerUsed = subtract(
+      Array.from(this.relays.keys()),
+      Array.from(nextRelays.keys())
+    );
+    for (const url of urlsNoLongerUsed) {
+      this.relays.get(url)?.websocket.dispose();
+    }
+
+    this.relays = nextRelays;
 
     // --- scoped untility pure functions ---
     function getNextRelayState(
@@ -358,7 +329,7 @@ class RxNostrImpl implements RxNostr {
     return relay.websocket?.getState() ?? "not-started";
   }
   reconnect(url: string): void {
-    return this.relays.get(url)?.websocket.reconnect();
+    this.relays.get(url)?.websocket.start();
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
@@ -582,7 +553,7 @@ class RxNostrImpl implements RxNostr {
     this.message$.complete();
     this.error$.complete();
     for (const relay of this.relays.values()) {
-      relay.websocket.close();
+      relay.websocket.dispose();
     }
   }
 
@@ -640,15 +611,7 @@ interface RelayState {
   read: boolean;
   write: boolean;
   activeSubIds: Set<string>;
-  websocket: RelayConnection;
-}
-
-interface RelayConnection {
-  send: (message: Nostr.OutgoingMessage.Any) => void;
-  ensure: () => void;
-  close: () => void;
-  reconnect: () => void;
-  getState: () => ConnectionState;
+  websocket: WebsocketSubject;
 }
 
 function makeSubId(params: {

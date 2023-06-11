@@ -3,7 +3,11 @@
 
 import { delay } from "rxjs";
 
-import { createRxBackwardReq, createRxNostr } from "../src/index.js";
+import {
+  createRxBackwardReq,
+  createRxForwardReq,
+  createRxNostr,
+} from "../src/index.js";
 
 document.getElementById("send")?.addEventListener("click", async () => {
   const input = document.getElementById("input") as HTMLInputElement;
@@ -26,27 +30,37 @@ document.getElementById("send")?.addEventListener("click", async () => {
 
 const rxNostr = createRxNostr();
 rxNostr.createConnectionStateObservable().subscribe((ev) => {
-  console.log(ev);
-  console.log(rxNostr.getRelayState(ev.from));
+  console.log(ev.state, ev.from);
 });
-rxNostr.setRelays([
+rxNostr.switchRelays([
   "wss://relay-jp.nostr.wirednet.jp",
   "wss://nostr-relay.nokotaro.com",
 ]);
 
 const req0 = createRxBackwardReq();
-rxNostr
+const sub0 = rxNostr
   .use(req0)
-  .subscribe((e) => console.log(0, e.event.kind, e.subId, e.from));
+  .subscribe((e) => console.log(0, e.event.id.slice(0, 5), e.subId, e.from));
 
-const req1 = createRxBackwardReq();
-rxNostr
-  .use(req1.pipe(delay(1000)))
-  .subscribe((e) => console.log(1, e.event.kind, e.subId, e.from));
+const req1 = createRxForwardReq();
+const sub1 = rxNostr
+  .use(req1)
+  .subscribe((e) => console.log(1, e.event.id.slice(0, 5), e.subId, e.from));
 
-req0.emit([{ kinds: [0], limit: 5 }]);
-req1.emit([{ kinds: [1], limit: 5 }]);
+req0.emit([{ kinds: [0], limit: 3 }]);
+req1.emit([{ kinds: [1], limit: 3 }]);
 
 setTimeout(() => {
-  rxNostr.addRelay("wss://nostr.h3z.jp");
-}, 2000);
+  console.log("---");
+  rxNostr.switchRelays([
+    "wss://relay-jp.nostr.wirednet.jp",
+    "wss://nostr.h3z.jp",
+  ]);
+}, 3000);
+
+// setTimeout(() => {
+//   console.log("---");
+//   rxNostr
+//     .use(req1)
+//     .subscribe((e) => console.log(1, e.event.id.slice(0, 5), e.subId, e.from));
+// }, 4000);
