@@ -14,15 +14,14 @@ import {
   Observable,
   of,
   OperatorFunction,
-  pipe,
   ReplaySubject,
   retry,
   Subject,
   Subscription,
-  switchAll,
   take,
   takeUntil,
   tap,
+  Unsubscribable,
 } from "rxjs";
 import { webSocket } from "rxjs/webSocket";
 
@@ -37,10 +36,9 @@ import type {
   EventPacket,
   MessagePacket,
   OkPacket,
-  ReqPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import { defineDefaultOptions, unnull } from "./util.js";
+import { defineDefaultOptions, onSubscribe, unnull } from "./util.js";
 
 export * from "./nostr/primitive.js";
 export * from "./operator.js";
@@ -368,9 +366,14 @@ class RxNostrImpl implements RxNostr {
     const strategy = rxReq.strategy;
     const rxNostrId = this.options.rxNostrId;
     const rxReqId = rxReq.rxReqId;
+    const message$ = this.message$;
 
+    const getAllRelayState = this.getAllRelayState.bind(this);
+    const createConnectionStateObservable =
+      this.createConnectionStateObservable.bind(this);
     const ensureReq = this.ensureReq.bind(this);
     const finalizeReq = this.finalizeReq.bind(this);
+
     const recordActiveReq = (req: Nostr.OutgoingMessage.REQ) => {
       const subId = req[1];
       this.activeReqs.set(subId, req);
@@ -379,96 +382,45 @@ class RxNostrImpl implements RxNostr {
       this.activeReqs.delete(subId);
     };
 
-    const createSubEvent$ = (subId: string): Observable<EventPacket> => {
-      if (strategy === "forward") {
-        return this.message$.pipe(
-          filterBySubId(subId),
-          // XXX: packToEventPacket
-          map(
-            (x): EventPacket => ({
-              from: x.from,
-              subId,
-              event: x.message[2] as any,
-            })
-          )
-        );
-      }
-
-      // FIXME: 健康なリレーが最初からひとつもなかったとき
-
-      const eose$ = new Subject<void>();
-      const complete$ = new Subject<void>();
-      const eoseRelays = new Set<string>();
-      const manageCompletion = merge(
-        eose$,
-        this.createConnectionStateObservable()
-      ).subscribe(() => {
-        const status = this.getAllRelayState();
-        const shouldComplete = Object.entries(status).every(
-          ([url, state]) =>
-            state === "error" ||
-            state === "terminated" ||
-            (state === "ongoing" && eoseRelays.has(url))
-        );
-        if (shouldComplete) {
-          complete$.next();
-        }
-      });
-
-      return this.message$.pipe(
-        takeUntil(complete$),
-        completeOnTimeout(TIMEOUT),
-        filterBySubId(subId),
-        filter((e) => !eoseRelays.has(e.from)),
-        tap((e) => {
-          if (e.message[0] === "EOSE") {
-            eoseRelays.add(e.from);
-            finalizeReq({ subId, url: e.from });
-            eose$.next();
-          }
-        }),
-        filter((e) => e.message[0] === "EVENT"),
-        map(
-          (x): EventPacket => ({
-            from: x.from,
-            subId,
-            event: x.message[2] as any,
-          })
-        ),
-        finalize(() => {
-          finalizeReq({ subId });
-          complete$.unsubscribe();
-          eose$.unsubscribe();
-          manageCompletion.unsubscribe();
-        })
-      );
-    };
-
-    return rxReq.getReqObservable().pipe(
-      processReq(),
-      map(([, subId]) => createSubEvent$(subId)),
-      strategy === "forward" ? switchAll() : mergeAll(),
-      strategy === "forward"
-        ? finalize(() => {
-            finalizeReq({
-              subId: makeSubId({
-                rxNostrId,
-                rxReqId,
-              }),
-            });
-          })
-        : identity
+    const subId$ = rxReq.getReqObservable().pipe(
+      filter((filters): filters is Nostr.Filter[] => filters !== null),
+      strategy === "oneshot" ? first() : identity,
+      attachSubId(),
+      strategy === "forward" ? manageActiveForwardReq() : identity,
+      ensureReqOnNext(),
+      map(([, subId]) => subId)
     );
 
-    function filterBySubId(
-      subId: string
-    ): MonoTypeOperatorFunction<MessagePacket> {
-      return filter(
-        (packet) =>
-          (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
-          packet.message[1] === subId
+    if (strategy === "forward") {
+      const subId = makeSubId({
+        rxNostrId,
+        rxReqId,
+      });
+
+      const resource: Unsubscribable[] = [];
+      const subject = new Subject<EventPacket>();
+      resource.push(subject);
+
+      return subject.pipe(
+        onSubscribe(() => {
+          resource.push(subId$.subscribe());
+          resource.push(
+            message$.pipe(filterBySubId(subId), pickEvents()).subscribe((v) => {
+              subject.next(v);
+            })
+          );
+        }),
+        finalize(() => {
+          for (const r of resource) {
+            r.unsubscribe();
+          }
+          finalizeReq({ subId });
+        })
       );
+    } else {
+      return subId$.pipe(map(createEoseManagedEventObservable), mergeAll());
     }
+
     function attachSubId(): OperatorFunction<
       Nostr.Filter[],
       Nostr.OutgoingMessage.REQ
@@ -484,41 +436,84 @@ class RxNostrImpl implements RxNostr {
           return map((filters) => ["REQ", makeId(), ...filters]);
       }
     }
-    function processReq(): OperatorFunction<
-      ReqPacket,
-      Nostr.OutgoingMessage.REQ
-    > {
-      return pipe(
-        filter((filters): filters is Nostr.Filter[] => filters !== null),
-        strategy === "oneshot" ? first() : identity,
-        attachSubId(),
-        manageActiveForwardReq(),
-        ensureReqOnNext()
-      );
-    }
     function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
-      if (strategy === "forward") {
-        return tap({
-          next: (req: Nostr.OutgoingMessage.REQ) => {
-            recordActiveReq(req);
-          },
-          finalize: () => {
-            forgetActiveReq(
-              makeSubId({
-                rxNostrId,
-                rxReqId,
-              })
-            );
-          },
-        });
-      } else {
-        return identity;
-      }
+      return tap({
+        next: (req: Nostr.OutgoingMessage.REQ) => {
+          recordActiveReq(req);
+        },
+        finalize: () => {
+          forgetActiveReq(
+            makeSubId({
+              rxNostrId,
+              rxReqId,
+            })
+          );
+        },
+      });
     }
     function ensureReqOnNext(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
       return tap((req: Nostr.OutgoingMessage.REQ) => {
         ensureReq(req, { overwrite: strategy === "forward" });
       });
+    }
+    function createEoseManagedEventObservable(
+      subId: string
+    ): Observable<EventPacket> {
+      const eose$ = new Subject<void>();
+      const complete$ = new Subject<void>();
+      const eoseRelays = new Set<string>();
+      const manageCompletion = merge(
+        eose$,
+        createConnectionStateObservable()
+      ).subscribe(() => {
+        const status = getAllRelayState();
+        const shouldComplete = Object.entries(status).every(
+          ([url, state]) =>
+            state === "error" ||
+            state === "terminated" ||
+            (state === "ongoing" && eoseRelays.has(url))
+        );
+        if (shouldComplete) {
+          complete$.next();
+        }
+      });
+
+      return message$.pipe(
+        takeUntil(complete$),
+        completeOnTimeout(TIMEOUT),
+        filterBySubId(subId),
+        filter((e) => !eoseRelays.has(e.from)),
+        tap((e) => {
+          if (e.message[0] === "EOSE") {
+            eoseRelays.add(e.from);
+            finalizeReq({ subId, url: e.from });
+            eose$.next();
+          }
+        }),
+        pickEvents(),
+        finalize(() => {
+          finalizeReq({ subId });
+          complete$.unsubscribe();
+          eose$.unsubscribe();
+          manageCompletion.unsubscribe();
+        })
+      );
+    }
+    function filterBySubId(
+      subId: string
+    ): MonoTypeOperatorFunction<MessagePacket> {
+      return filter(
+        (packet) =>
+          (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
+          packet.message[1] === subId
+      );
+    }
+    function pickEvents(): OperatorFunction<MessagePacket, EventPacket> {
+      return mergeMap(({ from, message }) =>
+        message[0] === "EVENT"
+          ? of({ from, subId: message[1], event: message[2] })
+          : EMPTY
+      );
     }
   }
   createAllEventObservable(): Observable<EventPacket> {

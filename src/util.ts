@@ -1,3 +1,5 @@
+import { MonoTypeOperatorFunction, tap } from "rxjs";
+
 export function defineDefaultOptions<T extends Record<string, unknown>>(
   defaultParams: T
 ): (givenParams?: Partial<T>) => T {
@@ -23,4 +25,12 @@ export function unnull<T>(v: T | null | undefined): T {
     throw new Error();
   }
   return v;
+}
+
+export function onSubscribe<T>(
+  callback: () => void
+): MonoTypeOperatorFunction<T> {
+  return tap({
+    subscribe: callback,
+  });
 }
