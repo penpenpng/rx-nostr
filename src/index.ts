@@ -40,7 +40,7 @@ import type {
   ReqPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import { defineDefaultOptions } from "./util.js";
+import { defineDefaultOptions, unnull } from "./util.js";
 
 export * from "./nostr/primitive.js";
 export * from "./operator.js";
@@ -160,8 +160,8 @@ let nextRxNostrId = 0;
 
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
-  private relays: Record<string, RelayState> = {};
-  private activeReqs: Record<string, Nostr.OutgoingMessage.REQ> = {};
+  private relays: Map<string, RelayState> = new Map();
+  private activeReqs: Map<string, Nostr.OutgoingMessage.REQ> = new Map();
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
   private status$: Subject<ConnectionStatePacket> = new Subject();
@@ -175,7 +175,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   getRelays(): Relay[] {
-    return Object.values(this.relays).map(({ url, read, write }) => ({
+    return Array.from(this.relays.values()).map(({ url, read, write }) => ({
       url,
       read,
       write,
@@ -211,7 +211,7 @@ class RxNostrImpl implements RxNostr {
       }),
       retry(this.options.retry),
       catchError((reason: unknown) => {
-        this.relays[url].activeSubIds.clear();
+        this.relays.get(url)?.activeSubIds.clear();
         this.error$.next({ from: url, reason });
         setState("error");
         return EMPTY;
@@ -265,45 +265,47 @@ class RxNostrImpl implements RxNostr {
     const nextRelays = getNextRelayState(this.relays, relays);
 
     const prevReadableUrls = this.getReadableUrls();
-    const nextReadableUrls = this.getReadableUrls(Object.values(nextRelays));
+    const nextReadableUrls = this.getReadableUrls(
+      Array.from(nextRelays.values())
+    );
     const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
     for (const url of urlsNoLongerRead) {
       this.finalizeReq({ url });
     }
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
-    for (const req of Object.values(this.activeReqs)) {
+    for (const req of this.activeReqs.values()) {
       this.ensureReq(req, {
-        relays: urlsToBeRead.map((url) => nextRelays[url]),
+        relays: urlsToBeRead.map((url) => unnull(nextRelays.get(url))),
       });
     }
 
     this.relays = nextRelays;
-    for (const relay of Object.values(nextRelays)) {
+    for (const relay of nextRelays.values()) {
       relay.websocket.ensure();
     }
 
     // --- scoped untility pure functions ---
     function getNextRelayState(
-      prev: Record<string, RelayState>,
+      prev: Map<string, RelayState>,
       relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
-    ): Record<string, RelayState> {
-      const next: Record<string, RelayState> = {};
+    ): Map<string, RelayState> {
+      const next: Map<string, RelayState> = new Map();
 
       for (const relay of Array.isArray(relays)
         ? relays.map(normalizeRelay)
         : Object.entries(relays).map(([url, flags]) => ({ url, ...flags }))) {
         const url = relay.url;
-        const prevState = prev[url];
+        const prevState = prev.get(url);
 
         const websocket = prevState?.websocket ?? createWebsocket(url);
         const activeSubIds = prevState?.activeSubIds ?? new Set();
 
-        next[relay.url] = {
+        next.set(relay.url, {
           ...relay,
           websocket,
           activeSubIds,
-        };
+        });
       }
 
       return next;
@@ -343,11 +345,14 @@ class RxNostrImpl implements RxNostr {
 
   getAllRelayState(): Record<string, ConnectionState> {
     return Object.fromEntries(
-      Object.values(this.relays).map((e) => [e.url, this.getRelayState(e.url)])
+      Array.from(this.relays.values()).map((e) => [
+        e.url,
+        this.getRelayState(e.url),
+      ])
     );
   }
   getRelayState(url: string): ConnectionState {
-    const relay = this.relays[url];
+    const relay = this.relays.get(url);
     if (!relay) {
       throw new Error("Relay not found");
     }
@@ -355,7 +360,7 @@ class RxNostrImpl implements RxNostr {
     return relay.websocket?.getState() ?? "not-started";
   }
   reconnect(url: string): void {
-    return this.relays[url].websocket?.reconnect();
+    return this.relays.get(url)?.websocket.reconnect();
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
@@ -368,10 +373,10 @@ class RxNostrImpl implements RxNostr {
     const finalizeReq = this.finalizeReq.bind(this);
     const recordActiveReq = (req: Nostr.OutgoingMessage.REQ) => {
       const subId = req[1];
-      this.activeReqs[subId] = req;
+      this.activeReqs.set(subId, req);
     };
     const forgetActiveReq = (subId: string) => {
-      delete this.activeReqs[subId];
+      this.activeReqs.delete(subId);
     };
 
     const createSubEvent$ = (subId: string): Observable<EventPacket> => {
@@ -564,7 +569,7 @@ class RxNostrImpl implements RxNostr {
       }
 
       for (const url of urls) {
-        this.relays[url].websocket.send(["EVENT", event]);
+        this.relays.get(url)?.websocket.send(["EVENT", event]);
       }
     });
 
@@ -581,7 +586,7 @@ class RxNostrImpl implements RxNostr {
   dispose(): void {
     this.message$.complete();
     this.error$.complete();
-    for (const relay of Object.values(this.relays)) {
+    for (const relay of this.relays.values()) {
       relay.websocket.close();
     }
   }
@@ -592,7 +597,7 @@ class RxNostrImpl implements RxNostr {
   ) {
     const subId = req[1];
 
-    for (const relay of options?.relays ?? Object.values(this.relays)) {
+    for (const relay of options?.relays ?? this.relays.values()) {
       if (
         !relay.read ||
         (!options?.overwrite && relay.activeSubIds.has(subId))
@@ -611,7 +616,7 @@ class RxNostrImpl implements RxNostr {
       throw new Error();
     }
 
-    const relays = url ? [this.relays[url]] : Object.values(this.relays);
+    const relays = url ? [unnull(this.relays.get(url))] : this.relays.values();
     for (const relay of relays) {
       const subIds = subId ? [subId] : Array.from(relay.activeSubIds);
       for (const subId of subIds) {
@@ -624,12 +629,12 @@ class RxNostrImpl implements RxNostr {
   }
 
   private getReadableUrls(relays?: Relay[]): string[] {
-    return (relays ?? Object.values(this.relays))
+    return Array.from(relays ?? this.relays.values())
       .filter((e) => e.read)
       .map((e) => e.url);
   }
   private getWritableUrls(relays?: Relay[]): string[] {
-    return (relays ?? Object.values(this.relays))
+    return Array.from(relays ?? this.relays.values())
       .filter((e) => e.write)
       .map((e) => e.url);
   }

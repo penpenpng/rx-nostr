@@ -17,3 +17,10 @@ export type Override<T extends object, U extends object> = {
     ? T[K]
     : never;
 };
+
+export function unnull<T>(v: T | null | undefined): T {
+  if (v === null || v === undefined) {
+    throw new Error();
+  }
+  return v;
+}
