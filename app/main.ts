@@ -1,8 +1,6 @@
 // # Playground
 // Edit here and try `yarn dev`
 
-import { delay } from "rxjs";
-
 import {
   createRxBackwardReq,
   createRxForwardReq,
@@ -38,12 +36,12 @@ rxNostr.switchRelays([
 ]);
 
 const req0 = createRxBackwardReq();
-const sub0 = rxNostr
+rxNostr
   .use(req0)
   .subscribe((e) => console.log(0, e.event.id.slice(0, 5), e.subId, e.from));
 
 const req1 = createRxForwardReq();
-const sub1 = rxNostr
+rxNostr
   .use(req1)
   .subscribe((e) => console.log(1, e.event.id.slice(0, 5), e.subId, e.from));
 
@@ -57,10 +55,3 @@ setTimeout(() => {
     "wss://nostr.h3z.jp",
   ]);
 }, 3000);
-
-// setTimeout(() => {
-//   console.log("---");
-//   rxNostr
-//     .use(req1)
-//     .subscribe((e) => console.log(1, e.event.id.slice(0, 5), e.subId, e.from));
-// }, 4000);
