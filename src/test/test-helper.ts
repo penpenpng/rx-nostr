@@ -1,4 +1,5 @@
 import { firstValueFrom, Observable, toArray } from "rxjs";
+import { TestScheduler } from "rxjs/testing";
 
 export function asArray<T>(val$: Observable<T>): Promise<T[]> {
   return firstValueFrom(val$.pipe(toArray()));
@@ -30,4 +31,8 @@ export function sleep(time: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, time);
   });
+}
+
+export function testScheduler() {
+  return new TestScheduler((a, b) => expect(a).toEqual(b));
 }
