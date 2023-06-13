@@ -7,8 +7,10 @@ import {
   groupBy,
   map,
   mergeAll,
+  mergeMap,
   MonoTypeOperatorFunction,
   ObservableInput,
+  of,
   OperatorFunction,
   pipe,
   scan,
@@ -107,5 +109,14 @@ export function batch(
       }
       return mergeFilter(acc, v);
     }, null)
+  );
+}
+
+export function chunk(
+  predicate: (f: Nostr.Filter[]) => boolean,
+  toChunk: (f: Nostr.Filter[]) => Nostr.Filter[][]
+): MonoTypeOperatorFunction<ReqPacket> {
+  return mergeMap((f) =>
+    f !== null && predicate(f) ? of(...toChunk(f)) : of(f)
   );
 }
