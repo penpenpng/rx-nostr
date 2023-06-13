@@ -9,6 +9,7 @@ import {
   mergeAll,
   MonoTypeOperatorFunction,
   ObservableInput,
+  OperatorFunction,
   pipe,
   scan,
   timeout,
@@ -17,7 +18,7 @@ import {
 
 import { verify as _verify } from "./nostr/event.js";
 import { Nostr } from "./nostr/primitive.js";
-import { EventPacket } from "./packet.js";
+import { EventPacket, ReqPacket } from "./packet.js";
 
 /**
  * Remove the events once seen.
@@ -85,5 +86,26 @@ export function completeOnTimeout<T>(
         throw error;
       }
     })
+  );
+}
+
+export type MergeFilter = (
+  a: Nostr.Filter[],
+  b: Nostr.Filter[]
+) => Nostr.Filter[];
+
+export function batch(
+  mergeFilter: MergeFilter
+): OperatorFunction<ReqPacket[], ReqPacket> {
+  return map((f) =>
+    f.reduce((acc, v) => {
+      if (acc === null) {
+        return v;
+      }
+      if (v === null) {
+        return acc;
+      }
+      return mergeFilter(acc, v);
+    }, null)
   );
 }
