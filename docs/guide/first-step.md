@@ -28,7 +28,7 @@ const rxReq = createRxForwardReq();
 const observable = rxNostr.use(rxReq);
 ```
 
-もちろん、`Observable` は `Observe` されなければ意味がありません。ここでは受け取った Packet をログに吐き出すコードを追加することにしましょう。
+もちろん、`Observable` は `subscribe()` されなければ意味がありません。ここでは受け取った Packet をログに吐き出すコードを追加することにしましょう。
 
 ```js{11-15}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
