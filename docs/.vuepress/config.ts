@@ -70,7 +70,7 @@ export default defineUserConfig({
     },
     editLinkText: "このページを編集",
     docsRepo: "https://github.com/penpenpng/rx-nostr",
-    docsBranch: "master",
+    docsBranch: "main",
     docsDir: "docs",
   }),
 });
