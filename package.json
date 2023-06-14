@@ -2,7 +2,7 @@
   "name": "rx-nostr",
   "version": "1.0.0-rc.0",
   "author": "penpenpng",
-  "description": "Utility to control Nostr in RxJS.",
+  "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
   "type": "module",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
