@@ -3,7 +3,7 @@
 
 # rx-nostr
 
-rx-nostr is a library based on [RxJS](https://rxjs.dev/), which allows [Nostr](https://nostr.com/) clients to easily communicate with relays.
+rx-nostr is a library based on [RxJS](https://rxjs.dev/), which allows [Nostr](https://nostr.com/) applications to easily communicate with relays.
 
 ## Installation
 
