@@ -2,14 +2,15 @@ import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
 import { Nostr } from "./nostr/primitive.js";
 import { ReqPacket } from "./packet.js";
-import type { Override } from "./util.js";
+import { defineDefaultOptions, Override } from "./util.js";
 
 /**
  * The RxReq interface that is provided for RxNostr (not for users).
  */
-export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
+export type RxReq<S extends RxReqStrategy = RxReqStrategy> = {
   /** The RxReq strategy. It is read-only and must not change. */
   get strategy(): S;
+  get config(): RxReqOptions<S>;
   /** Used to construct subId. */
   get rxReqId(): string;
   /** Get an Observable of ReqPacket. */
@@ -48,6 +49,16 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
+};
+
+export type RxReqOptions<S extends RxReqStrategy> = RxReqOptionsMap[S];
+
+interface RxReqOptionsMap {
+  forward: void;
+  backward: {
+    capacity?: number;
+  };
+  oneshot: void;
 }
 
 export type RxReqStrategy = "forward" | "backward" | "oneshot";
@@ -60,7 +71,7 @@ export interface RxReqController {
   emit(filters: Nostr.Filter[] | null): void;
 }
 
-abstract class RxReqBase implements RxReq {
+abstract class RxReqBase {
   protected filters$ = new BehaviorSubject<ReqPacket>(null);
   private _rxReqId: string;
 
@@ -129,10 +140,15 @@ abstract class RxReqBase implements RxReq {
   }
 }
 
+const defaultRxBackwardReqOptions = defineDefaultOptions({
+  capacity: undefined as number | undefined,
+});
+
 export function createRxBackwardReq(
-  subIdBase?: string
+  subIdBase?: string,
+  config?: RxReqOptions<"backward">
 ): RxReq<"backward"> & RxReqController {
-  return new RxBackwardReq(subIdBase);
+  return new RxBackwardReq(subIdBase, config);
 }
 
 /**
@@ -146,9 +162,19 @@ export function createRxBackwardReq(
  *     - https://rxjs.dev/api/operators/mergeAll
  * - In most cases, you should specify `limit` for filters.
  */
-class RxBackwardReq extends RxReqBase implements RxReqController {
-  constructor(rxReqId?: string) {
+class RxBackwardReq
+  extends RxReqBase
+  implements RxReq<"backward">, RxReqController
+{
+  private _config: RxReqOptions<"backward">;
+
+  constructor(rxReqId?: string, config?: RxReqOptions<"backward">) {
     super(rxReqId);
+    this._config = defaultRxBackwardReqOptions(config);
+  }
+
+  get config() {
+    return this._config;
   }
 
   override get strategy(): "backward" {
@@ -174,9 +200,16 @@ export function createRxForwardReq(
  *     - https://rxjs.dev/api/operators/switchAll
  * - In most cases, you should not specify `limit` for filters.
  */
-class RxForwardReq extends RxReqBase implements RxReqController {
+class RxForwardReq
+  extends RxReqBase
+  implements RxReq<"forward">, RxReqController
+{
   constructor(rxReqId?: string) {
     super(rxReqId);
+  }
+
+  get config() {
+    return undefined;
   }
 
   override get strategy(): "forward" {
@@ -191,10 +224,14 @@ export function createRxOneshotReq(req: {
   return new RxOneshotReq(req);
 }
 
-class RxOneshotReq extends RxReqBase {
+class RxOneshotReq extends RxReqBase implements RxReq<"oneshot"> {
   constructor(req: { filters: Nostr.Filter[]; subId?: string }) {
     super(req?.subId);
     this.emit(req.filters);
+  }
+
+  get config() {
+    return undefined;
   }
 
   override get strategy(): "oneshot" {
