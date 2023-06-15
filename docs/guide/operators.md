@@ -37,11 +37,11 @@ const addAuthor = (author) => {
 // For example, even if a large amount of author pubkey is brought
 // in from another REQ in a short period of time, they will be throttled.
 
-addAuthor("PUBKEY1"); // This will be published,
+addAuthor("PUBKEY1"); // This may be published,
 addAuthor("PUBKEY2"); // but this will be ignored.
 addAuthor("PUBKEY3"); // ditto.
 addAuthor("PUBKEY4"); // same.
 
 // One second later an REQ will be published
-// to subscribe to kind1 by all pubkeys PUBKEY1-5.
+// to subscribe to kind1 by all pubkeys PUBKEY1-4.
 ```
