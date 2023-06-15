@@ -10,9 +10,9 @@ rx-nostr の構造を理解するためには中心となる 3 種類の登場�
 
 ![flow](./data-flow.png)
 
-図中の各要素を実際の JavaScript オブジェクトと対応させていきましょう。上記の図で、矢印は[`Observable<T>`](https://rxjs.dev/api/index/class/Observable)、矢印に重なる四辺形は `T` の実体、矢印の根本は `Observable` を返すことができるオブジェクト、矢印の指す先は `Observer` (言い換えれば、`subscribe()` を呼び出すオブジェクト) を示しています。
+図中の各要素を実際の JavaScript オブジェクトと対応させていきましょう。上記の図で、矢印は[`Observable<T>`](https://rxjs.dev/api/index/class/Observable)、矢印に重なる四辺形は `T` の実体、矢印の根本は Observable を返すことができるオブジェクト、矢印の指す先は `Observer` (言い換えれば、`subscribe()` を呼び出すオブジェクト) を示しています。
 
-REQ Subscription と注釈された点線の枠に注目してください。今からこの枠で囲まれた太い矢印に対応する `Observable` を実際に生成・購読して、最小の Nostr アプリケーションを構築してみましょう！まずは `Observable` を次のようにして生成します。
+REQ Subscription と注釈された点線の枠に注目してください。今からこの枠で囲まれた太い矢印に対応する Observable を実際に生成・購読して、最小の Nostr アプリケーションを構築してみましょう！まずは Observable を次のようにして生成します。
 
 ```js{10-11}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
@@ -28,7 +28,7 @@ const rxReq = createRxForwardReq();
 const observable = rxNostr.use(rxReq);
 ```
 
-もちろん、`Observable` は `subscribe()` されなければ意味がありません。ここでは受け取った Packet をログに吐き出すコードを追加することにしましょう。
+もちろん、Observable は `subscribe()` されなければ意味がありません。ここでは受け取った Packet をログに吐き出すコードを追加することにしましょう。
 
 ```js{11-15}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
