@@ -18,7 +18,7 @@ describe("Single relay case", () => {
   beforeEach(async () => {
     relay = createMockRelay(RELAY_URL);
 
-    rxNostr = createRxNostr({ rxNostrId: "rx-nostr" });
+    rxNostr = createRxNostr();
     rxNostr.setRelays([RELAY_URL]);
     await relay.connected;
   });
@@ -164,7 +164,7 @@ describe("Slow relay and fast relay case", () => {
     relay1 = createMockRelay(RELAY_URL1, 10);
     relay2 = createMockRelay(RELAY_URL2, 100);
 
-    rxNostr = createRxNostr({ rxNostrId: "rx-nostr" });
+    rxNostr = createRxNostr();
     rxNostr.setRelays([RELAY_URL1, RELAY_URL2]);
     await relay1.connected;
     await relay2.connected;
