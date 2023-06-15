@@ -15,7 +15,8 @@ const rxNostr = createRxNostr();
 rxNostr.switchRelays(["wss://nostr-relay.nokotaro.com"]);
 
 const rxReq = createRxForwardReq();
-const subscription = rxNostr.use(rxReq).subscribe((packet) => {
+
+rxNostr.use(rxReq).subscribe((packet) => {
   console.log(packet);
 });
 
