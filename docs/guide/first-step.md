@@ -14,7 +14,7 @@ rx-nostr の構造を理解するためには中心となる 3 種類の登場�
 
 REQ Subscription と注釈された点線の枠に注目してください。今からこの枠で囲まれた太い矢印に対応する Observable を実際に生成・購読して、最小の Nostr アプリケーションを構築してみましょう！まずは Observable を次のようにして生成します。
 
-```js{10-11}
+```js:line-numbers{10-11}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
@@ -30,7 +30,7 @@ const observable = rxNostr.use(rxReq);
 
 もちろん、Observable は `subscribe()` されなければ意味がありません。ここでは受け取った Packet をログに吐き出すコードを追加することにしましょう。
 
-```js{11-15}
+```js:line-numbers{11-15}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
@@ -51,7 +51,7 @@ const subscription = observable.subscribe((packet) => {
 14 行目の `console.log()` が、先程の図の右端のブロックに相当することになります。つまり、あなたのアプリケーションです！
 しかしこのアプリケーションはまだ何も仕事をしないでしょう。なぜなら Packet が流れてこないからです。そう、REQ を発行しなければなりませんね。
 
-```js{17-18}
+```js:line-numbers{17-18}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
@@ -77,7 +77,7 @@ rxReq.emit([{ kinds: [1] }]);
 
 ただ少し待ってください、最後にひと仕事だけ残っています。このままでは購読は永遠に続きます。CLOSE message を送出しなければなりません。rx-nostr では [`Subscription`](https://rxjs.dev/guide/subscription) を `unsubscribe()` するだけでこれを実現できます。10 秒後に CLOSE するようコードを追加しましょう。
 
-```js{20-23}
+```js:line-numbers{20-23}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();

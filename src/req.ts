@@ -14,11 +14,6 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
   get rxReqId(): string;
   /** Get an Observable of ReqPacket. */
   getReqObservable(): Observable<ReqPacket>;
-  /**
-   * Callback function called when RxNostr receives an EVENT derived from this RxReq.
-   * For example, it can be used to implement the automatic REQ issuing based on e-tag or p-tag.
-   */
-  onReceiveEvent?: (event: Nostr.Event) => void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.

@@ -76,21 +76,6 @@ export function filterKind<K extends Nostr.Kind>(
   return filter<EventPacket>(({ event }) => event.kind === kind);
 }
 
-export function completeOnTimeout<T>(
-  time: number
-): MonoTypeOperatorFunction<T> {
-  return pipe(
-    timeout(time),
-    catchError((error: unknown) => {
-      if (error instanceof TimeoutError) {
-        return EMPTY;
-      } else {
-        throw error;
-      }
-    })
-  );
-}
-
 export type MergeFilter = (
   a: Nostr.Filter[],
   b: Nostr.Filter[]
@@ -118,5 +103,20 @@ export function chunk(
 ): MonoTypeOperatorFunction<ReqPacket> {
   return mergeMap((f) =>
     f !== null && predicate(f) ? of(...toChunk(f)) : of(f)
+  );
+}
+
+export function completeOnTimeout<T>(
+  time: number
+): MonoTypeOperatorFunction<T> {
+  return pipe(
+    timeout(time),
+    catchError((error: unknown) => {
+      if (error instanceof TimeoutError) {
+        return EMPTY;
+      } else {
+        throw error;
+      }
+    })
   );
 }

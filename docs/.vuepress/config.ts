@@ -10,6 +10,11 @@ export default defineUserConfig({
     "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
   // Ban README.md. Use index.md instead.
   pagePatterns: ["**/*.md", "!**/README.md", "!.vuepress", "!node_modules"],
+  markdown: {
+    code: {
+      lineNumbers: false,
+    },
+  },
   extendsMarkdown: (md) => {
     // Allow `# Header Text [#custom-id-attr]` syntax.
     // Default delimiters `{}` conflict with [line highlighting](https://v2.vuepress.vuejs.org/guide/markdown.html#code-blocks) feature.
@@ -40,6 +45,10 @@ export default defineUserConfig({
             text: "Operators",
             link: "/api/operators",
           },
+          {
+            text: "Packets",
+            link: "/api/packets",
+          },
         ],
       },
       {
@@ -64,7 +73,12 @@ export default defineUserConfig({
       "/api/": [
         {
           text: "API",
-          children: ["/api/rx-nostr.md", "/api/rx-req.md", "/api/operators.md"],
+          children: [
+            "/api/rx-nostr.md",
+            "/api/rx-req.md",
+            "/api/operators.md",
+            "/api/packets.md",
+          ],
         },
       ],
     },

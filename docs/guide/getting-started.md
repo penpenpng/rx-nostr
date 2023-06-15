@@ -7,14 +7,14 @@ npm または yarn から以下の通りインストールできます。
 :::: code-group
 ::: code-group-item npm
 
-```sh:no-line-numbers
+```sh
 npm install rx-nostr
 ```
 
 :::
 ::: code-group-item yarn
 
-```sh:no-line-numbers
+```sh
 yarn add rx-nostr
 ```
 
@@ -25,7 +25,7 @@ yarn add rx-nostr
 
 rx-nostr をすぐに試したい場合は以下の通りリポジトリをクローンして、`app/main.ts` を編集して動作を確認することができます。
 
-```sh:no-line-numbers
+```sh
 git clone https://github.com/penpenpng/rx-nostr
 cd rx-nostr
 npm install

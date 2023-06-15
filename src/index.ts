@@ -131,8 +131,6 @@ export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
 }
 
 export interface RxNostrOptions {
-  /** Used to construct subId. */
-  rxNostrId: string;
   /** Number of attempts to reconnect when websocket is disconnected. */
   retry: number;
   /**
@@ -143,7 +141,6 @@ export interface RxNostrOptions {
   timeout: number;
 }
 const defaultRxNostrOptions = defineDefaultOptions({
-  rxNostrId: undefined as string | undefined,
   retry: 10,
   timeout: 10000,
 });
@@ -153,8 +150,6 @@ export interface Relay {
   read: boolean;
   write: boolean;
 }
-
-let nextRxNostrId = 0;
 
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
@@ -168,7 +163,6 @@ class RxNostrImpl implements RxNostr {
     const opt = defaultRxNostrOptions(options);
     this.options = {
       ...opt,
-      rxNostrId: opt.rxNostrId ?? `rx-nostr${nextRxNostrId++}`,
     };
   }
 
@@ -335,7 +329,6 @@ class RxNostrImpl implements RxNostr {
   use(rxReq: RxReq): Observable<EventPacket> {
     const TIMEOUT = this.options.timeout;
     const strategy = rxReq.strategy;
-    const rxNostrId = this.options.rxNostrId;
     const rxReqId = rxReq.rxReqId;
     const message$ = this.message$;
 
@@ -364,7 +357,6 @@ class RxNostrImpl implements RxNostr {
 
     if (strategy === "forward") {
       const subId = makeSubId({
-        rxNostrId,
         rxReqId,
       });
 
@@ -396,8 +388,7 @@ class RxNostrImpl implements RxNostr {
       Nostr.Filter[],
       Nostr.OutgoingMessage.REQ
     > {
-      const makeId = (index?: number) =>
-        makeSubId({ rxNostrId, rxReqId, index });
+      const makeId = (index?: number) => makeSubId({ rxReqId, index });
 
       switch (strategy) {
         case "backward":
@@ -415,7 +406,6 @@ class RxNostrImpl implements RxNostr {
         finalize: () => {
           forgetActiveReq(
             makeSubId({
-              rxNostrId,
               rxReqId,
             })
           );
@@ -614,10 +604,6 @@ interface RelayState {
   websocket: WebsocketSubject;
 }
 
-function makeSubId(params: {
-  rxNostrId: string;
-  rxReqId: string;
-  index?: number;
-}): string {
-  return `${params.rxNostrId}:${params.rxReqId}:${params.index ?? 0}`;
+function makeSubId(params: { rxReqId: string; index?: number }): string {
+  return `${params.rxReqId}:${params.index ?? 0}`;
 }
