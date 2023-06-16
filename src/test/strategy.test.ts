@@ -42,11 +42,11 @@ describe("Single relay case", () => {
     req.emit([{ kinds: [0], limit: 5 }]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:0",
+      "sub:0",
       { kinds: [0], limit: 5 },
     ]);
     await eoseSync;
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
+    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
   });
 
   test("[backward] Receipt of EOSE does not terminate the Observable.", async () => {
@@ -83,22 +83,22 @@ describe("Single relay case", () => {
 
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:0",
+      "sub:0",
       { kinds: [0], limit: 3 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:1",
+      "sub:1",
       { kinds: [0], limit: 2 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:2",
+      "sub:2",
       { kinds: [0], limit: 1 },
     ]);
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:2"]);
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:1"]);
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
+    await expectReceiveMessage(relay, ["CLOSE", "sub:2"]);
+    await expectReceiveMessage(relay, ["CLOSE", "sub:1"]);
+    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
   });
 
   test("[forward] Each REQ is published with the same subId.", async () => {
@@ -112,20 +112,20 @@ describe("Single relay case", () => {
 
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:0",
+      "sub:0",
       { kinds: [0], limit: 1 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:0",
+      "sub:0",
       { kinds: [0], limit: 2 },
     ]);
     await expectReceiveMessage(relay, [
       "REQ",
-      "rx-nostr:sub:0",
+      "sub:0",
       { kinds: [0], limit: 3 },
     ]);
-    await expectReceiveMessage(relay, ["CLOSE", "rx-nostr:sub:0"]);
+    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
