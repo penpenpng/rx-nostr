@@ -1,5 +1,6 @@
 import { firstValueFrom, Observable, toArray } from "rxjs";
 import { TestScheduler } from "rxjs/testing";
+import { expect } from "vitest";
 
 export function asArray<T>(val$: Observable<T>): Promise<T[]> {
   return firstValueFrom(val$.pipe(toArray()));

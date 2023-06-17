@@ -1,4 +1,5 @@
-import { WS } from "jest-websocket-mock";
+import { expect } from "vitest";
+import { WS } from "vitest-websocket-mock";
 
 import { Nostr } from "../nostr/primitive.js";
 import { fakeEventMessage } from "./stub.js";

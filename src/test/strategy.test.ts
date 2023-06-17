@@ -1,4 +1,5 @@
-import { WS } from "jest-websocket-mock";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import type { WS } from "vitest-websocket-mock";
 
 import {
   createRxBackwardReq,

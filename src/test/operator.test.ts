@@ -1,4 +1,5 @@
 import { of } from "rxjs";
+import { test } from "vitest";
 
 import { latestEach } from "../operator.js";
 import { EventPacket } from "../packet.js";
