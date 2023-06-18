@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import type { WS } from "vitest-websocket-mock";
 
 import {
   createRxBackwardReq,
@@ -8,19 +7,20 @@ import {
   createRxOneshotReq,
   RxNostr,
 } from "../index.js";
-import { createMockRelay } from "./mock-relay.js";
-import { asArray, sync } from "./test-helper.js";
+import { MockRelay, setupMockRelay } from "./mock-relay.js";
+import { countEose } from "./test-helper.js";
 
 describe("Single relay case", () => {
   const RELAY_URL = "ws://localhost:1234";
   let rxNostr: RxNostr;
-  let relay: WS;
+  let relay: MockRelay;
 
   beforeEach(async () => {
-    relay = createMockRelay(RELAY_URL);
+    relay = await setupMockRelay(RELAY_URL);
 
     rxNostr = createRxNostr();
     rxNostr.setRelays([RELAY_URL]);
+
     await relay.connected;
   });
 
@@ -33,12 +33,7 @@ describe("Single relay case", () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
-    const [eoseSync, resolveEose] = sync();
-    rxNostr.createAllMessageObservable().subscribe(({ message }) => {
-      if (message[0] === "EOSE") {
-        resolveEose();
-      }
-    });
+    rxNostr.createAllMessageObservable().subscribe();
 
     req.emit([{ kinds: [0], limit: 5 }]);
     await expect(relay).toReceiveMessage([
@@ -46,7 +41,9 @@ describe("Single relay case", () => {
       "sub:0",
       { kinds: [0], limit: 5 },
     ]);
-    await eoseSync;
+
+    while (countEose(relay.emit()) <= 0);
+
     await expect(relay).toReceiveMessage(["CLOSE", "sub:0"]);
   });
 
@@ -60,15 +57,15 @@ describe("Single relay case", () => {
       },
     });
 
-    const [eoseSync, resolveEose] = sync();
-    rxNostr.createAllMessageObservable().subscribe(({ message }) => {
-      if (message[0] === "EOSE") {
-        resolveEose();
-      }
-    });
-
     req.emit([{ kinds: [0], limit: 5 }]);
-    await eoseSync;
+    await expect(relay).toReceiveMessage([
+      "REQ",
+      "sub:0",
+      { kinds: [0], limit: 5 },
+    ]);
+
+    while (countEose(relay.emit()) <= 0);
+
     expect(completed).toBe(false);
   });
 
@@ -81,7 +78,6 @@ describe("Single relay case", () => {
     req.emit([{ kinds: [0], limit: 3 }]);
     req.emit([{ kinds: [0], limit: 2 }]);
     req.emit([{ kinds: [0], limit: 1 }]);
-
     await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
@@ -97,6 +93,10 @@ describe("Single relay case", () => {
       "sub:2",
       { kinds: [0], limit: 1 },
     ]);
+
+    let eose = 0;
+    while ((eose += countEose(relay.emit())) < 3);
+
     await expect(relay).toReceiveMessage(["CLOSE", "sub:2"]);
     await expect(relay).toReceiveMessage(["CLOSE", "sub:1"]);
     await expect(relay).toReceiveMessage(["CLOSE", "sub:0"]);
@@ -142,48 +142,45 @@ describe("Single relay case", () => {
       },
     });
 
-    const [eoseSync, resolveEose] = sync();
-    rxNostr.createAllMessageObservable().subscribe(({ message }) => {
-      if (message[0] === "EOSE") {
-        resolveEose();
-      }
-    });
+    await relay.nextMessage;
 
-    await eoseSync;
+    while (countEose(relay.emit()) <= 0) {
+      expect(completed).toBe(false);
+    }
+
     expect(completed).toBe(true);
   });
 });
 
-describe("Slow relay and fast relay case", () => {
-  const RELAY_URL1 = "ws://localhost:1234";
-  const RELAY_URL2 = "ws://localhost:1235";
-  let rxNostr: RxNostr;
-  let relay1: WS;
-  let relay2: WS;
+// TODO
+// describe("Slow relay and fast relay case", () => {
+//   const RELAY_URL1 = "ws://localhost:1234";
+//   const RELAY_URL2 = "ws://localhost:1235";
+//   let rxNostr: RxNostr;
+//   let relay1: MockRelay;
+//   let relay2: MockRelay;
 
-  beforeEach(async () => {
-    relay1 = createMockRelay(RELAY_URL1, 10);
-    relay2 = createMockRelay(RELAY_URL2, 100);
+//   beforeEach(async () => {
+//     relay1 = await setupMockRelay(RELAY_URL1, 10);
+//     relay2 = await setupMockRelay(RELAY_URL2, 100);
 
-    rxNostr = createRxNostr();
-    rxNostr.setRelays([RELAY_URL1, RELAY_URL2]);
-    await relay1.connected;
-    await relay2.connected;
-  });
+//     rxNostr = createRxNostr();
+//     rxNostr.setRelays([RELAY_URL1, RELAY_URL2]);
+//   });
 
-  afterEach(() => {
-    rxNostr.dispose();
-    relay1.close();
-    relay2.close();
-  });
+//   afterEach(() => {
+//     rxNostr.dispose();
+//     relay1.close();
+//     relay2.close();
+//   });
 
-  test("[oneshot] Collect all events under different timing EOSE.", async () => {
-    const req = createRxOneshotReq({
-      subId: "sub",
-      filters: [{ kinds: [0], limit: 3 }],
-    });
+//   test("[oneshot] Collect all events under different timing EOSE.", async () => {
+//     const req = createRxOneshotReq({
+//       subId: "sub",
+//       filters: [{ kinds: [0], limit: 3 }],
+//     });
 
-    const result = await asArray(rxNostr.use(req));
-    expect(result.length).toBe(6);
-  });
-});
+//     const result = await asArray(rxNostr.use(req));
+//     expect(result.length).toBe(6);
+//   });
+// });

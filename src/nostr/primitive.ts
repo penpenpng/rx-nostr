@@ -50,7 +50,7 @@ export namespace Nostr {
     Auth = 22242,
     BadgeDefinition = 30008,
     ProfileBadge = 30009,
-    Article = 30023
+    Article = 30023,
   }
 
   export type TagName = `#${string}`;
@@ -75,6 +75,7 @@ export namespace Nostr {
 
   export namespace IncomingMessage {
     export type Any = EVENT | EOSE | OK | AUTH;
+    export type Sub = EVENT | EOSE;
     export type EVENT = [type: "EVENT", subId: string, event: Event];
     export type EOSE = [type: "EOSE", subId: string];
     export type OK = [

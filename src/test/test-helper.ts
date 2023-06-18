@@ -1,32 +1,7 @@
-import { firstValueFrom, Observable, toArray } from "rxjs";
 import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 
-export function asArray<T>(val$: Observable<T>): Promise<T[]> {
-  return firstValueFrom(val$.pipe(toArray()));
-}
-
-export function sync<T = void>(): [
-  Promise<T>,
-  (val: T) => void,
-  () => boolean
-] {
-  let resolved = false;
-  let resolver: (val: T) => void = () => {
-    throw new Error(`Call resolve before initializing resolver`);
-  };
-
-  const resolve = (val: T) => {
-    resolved = true;
-    resolver(val);
-  };
-  const promise = new Promise<T>((_resolver) => {
-    resolver = _resolver;
-  });
-  const isResolved = () => resolved;
-
-  return [promise, resolve, isResolved];
-}
+import { Nostr } from "../nostr/primitive";
 
 export function sleep(time: number): Promise<void> {
   return new Promise((resolve) => {
@@ -36,4 +11,16 @@ export function sleep(time: number): Promise<void> {
 
 export function testScheduler() {
   return new TestScheduler((a, b) => expect(a).toEqual(b));
+}
+
+export function isEvent(message: Nostr.IncomingMessage.Sub): boolean {
+  return message[0] === "EVENT";
+}
+
+export function isEose(message: Nostr.IncomingMessage.Sub): boolean {
+  return message[0] === "EOSE";
+}
+
+export function countEose(messages: Nostr.IncomingMessage.Sub[]): number {
+  return messages.filter(isEose).length;
 }
