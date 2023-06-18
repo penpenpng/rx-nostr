@@ -1,11 +1,10 @@
-import { expect } from "vitest";
 import { WS } from "vitest-websocket-mock";
 
 import { Nostr } from "../nostr/primitive.js";
 import { fakeEventMessage } from "./stub.js";
 
 export function createMockRelay(url: string, interval = 10) {
-  const server = new WS(url);
+  const server = new WS(url, { jsonProtocol: true });
   const provider = new FakeEventProvider(interval);
 
   server.on("connection", (ws) => {
@@ -109,11 +108,4 @@ function generateFakeStoredEvents(
       return [];
     }
   });
-}
-
-export async function expectReceiveMessage(
-  relay: WS,
-  message: Nostr.OutgoingMessage.Any
-) {
-  await expect(relay).toReceiveMessage(JSON.stringify(message));
 }

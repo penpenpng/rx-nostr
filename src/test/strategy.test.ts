@@ -8,7 +8,7 @@ import {
   createRxOneshotReq,
   RxNostr,
 } from "../index.js";
-import { createMockRelay, expectReceiveMessage } from "./mock-relay.js";
+import { createMockRelay } from "./mock-relay.js";
 import { asArray, sync } from "./test-helper.js";
 
 describe("Single relay case", () => {
@@ -41,13 +41,13 @@ describe("Single relay case", () => {
     });
 
     req.emit([{ kinds: [0], limit: 5 }]);
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
       { kinds: [0], limit: 5 },
     ]);
     await eoseSync;
-    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
+    await expect(relay).toReceiveMessage(["CLOSE", "sub:0"]);
   });
 
   test("[backward] Receipt of EOSE does not terminate the Observable.", async () => {
@@ -82,24 +82,24 @@ describe("Single relay case", () => {
     req.emit([{ kinds: [0], limit: 2 }]);
     req.emit([{ kinds: [0], limit: 1 }]);
 
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
       { kinds: [0], limit: 3 },
     ]);
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:1",
       { kinds: [0], limit: 2 },
     ]);
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:2",
       { kinds: [0], limit: 1 },
     ]);
-    await expectReceiveMessage(relay, ["CLOSE", "sub:2"]);
-    await expectReceiveMessage(relay, ["CLOSE", "sub:1"]);
-    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
+    await expect(relay).toReceiveMessage(["CLOSE", "sub:2"]);
+    await expect(relay).toReceiveMessage(["CLOSE", "sub:1"]);
+    await expect(relay).toReceiveMessage(["CLOSE", "sub:0"]);
   });
 
   test("[forward] Each REQ is published with the same subId.", async () => {
@@ -111,22 +111,22 @@ describe("Single relay case", () => {
     req.emit([{ kinds: [0], limit: 3 }]);
     sub.unsubscribe();
 
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
       { kinds: [0], limit: 1 },
     ]);
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
       { kinds: [0], limit: 2 },
     ]);
-    await expectReceiveMessage(relay, [
+    await expect(relay).toReceiveMessage([
       "REQ",
       "sub:0",
       { kinds: [0], limit: 3 },
     ]);
-    await expectReceiveMessage(relay, ["CLOSE", "sub:0"]);
+    await expect(relay).toReceiveMessage(["CLOSE", "sub:0"]);
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
