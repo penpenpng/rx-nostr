@@ -226,11 +226,6 @@ class RxNostrImpl implements RxNostr {
     for (const url of urlsToBeRead) {
       nextRelays.get(url)?.websocket.start();
     }
-    for (const req of this.activeReqs.values()) {
-      this.ensureReq(req, {
-        relays: urlsToBeRead.map((url) => unnull(nextRelays.get(url))),
-      });
-    }
 
     for (const req of this.activeReqs.values()) {
       this.ensureReq(req, {
