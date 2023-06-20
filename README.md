@@ -12,6 +12,6 @@ npm install rx-nostr
 # or yarn add rx-nostr
 ```
 
-## Usage
+## Document
 
-See https://penpenpng.github.io/rx-nostr/
+https://penpenpng.github.io/rx-nostr/
