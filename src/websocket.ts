@@ -1,7 +1,7 @@
 import { Subject } from "rxjs";
 
-import { Nostr } from "./nostr/primitive.js";
-import { ConnectionState, MessagePacket } from "./packet.js";
+import { Nostr } from "./nostr/primitive";
+import { ConnectionState, MessagePacket } from "./packet";
 
 export class WebsocketSubject {
   private socket: WebSocket | null = null;

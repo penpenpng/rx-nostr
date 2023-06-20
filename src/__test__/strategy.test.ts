@@ -6,7 +6,7 @@ import {
   createRxNostr,
   createRxOneshotReq,
   RxNostr,
-} from "../index.js";
+} from "../index";
 import {
   faker,
   isCLOSE,
@@ -14,7 +14,7 @@ import {
   MockRelay,
   setupMockRelay,
   subspy,
-} from "./helper.js";
+} from "./helper";
 
 describe("Single relay case", () => {
   const RELAY_URL = "ws://localhost:1234";

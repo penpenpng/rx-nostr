@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { createRxBackwardReq, extend, mixin } from "../index.js";
+import { createRxBackwardReq, extend, mixin } from "../index";
 
 test("Extend req.", async () => {
   const addFoo = mixin<{ strategy: "backward" }, { foo: () => string }>(() => ({

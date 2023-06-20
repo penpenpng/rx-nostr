@@ -1,8 +1,8 @@
 import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
-import { Nostr } from "./nostr/primitive.js";
-import { ReqPacket } from "./packet.js";
-import type { Override } from "./util.js";
+import { Nostr } from "./nostr/primitive";
+import { ReqPacket } from "./packet";
+import type { Override } from "./util";
 
 /**
  * The RxReq interface that is provided for RxNostr (not for users).

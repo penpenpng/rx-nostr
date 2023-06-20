@@ -2,8 +2,8 @@ import { schnorr } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 
-import { toHex } from "./bech32.js";
-import { Nostr } from "./primitive.js";
+import { toHex } from "./bech32";
+import { Nostr } from "./primitive";
 
 const utf8Encoder = new TextEncoder();
 

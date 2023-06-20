@@ -1,4 +1,4 @@
-import { Nostr } from "./nostr/primitive.js";
+import { Nostr } from "./nostr/primitive";
 
 // Packet is data treated by rx-nostr Observables.
 

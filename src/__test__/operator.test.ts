@@ -1,9 +1,9 @@
 import { map, of } from "rxjs";
 import { test } from "vitest";
 
-import { latestEach } from "../operator.js";
-import { EventPacket } from "../packet.js";
-import { faker, testScheduler } from "./helper.js";
+import { latestEach } from "../operator";
+import { EventPacket } from "../packet";
+import { faker, testScheduler } from "./helper";
 
 test("latestEach()", async () => {
   testScheduler().run((helpers) => {
