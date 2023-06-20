@@ -1,11 +1,22 @@
 {
   "name": "rx-nostr",
   "version": "1.0.0-rc.0",
-  "author": "penpenpng",
   "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
+  "author": "penpenpng",
+  "keywords": [
+    "rxjs",
+    "rxjs7",
+    "nostr"
+  ],
+  "homepage": "https://penpenpng.github.io/rx-nostr/",
+  "bugs": {
+    "url": "https://github.com/penpenpng/rx-nostr/issues"
+  },
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
+  "types": "./types/src/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.es.js",
@@ -13,12 +24,14 @@
       "types": "./types/src/index.d.ts"
     }
   },
-  "types": "./types/src/index.d.ts",
   "files": [
+    "src",
     "dist",
-    "types"
+    "types",
+    "!src/__test__",
+    "!types/src/__test__",
+    "!types/app"
   ],
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/penpenpng/rx-nostr.git"

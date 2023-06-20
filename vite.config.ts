@@ -9,5 +9,6 @@ export default defineConfig({
       entry: path.resolve(__dirname, "src/index.ts"),
       formats: ["es", "cjs", "umd"],
     },
+    sourcemap: true,
   },
 });
