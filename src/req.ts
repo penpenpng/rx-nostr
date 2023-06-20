@@ -220,23 +220,28 @@ function getRandomDigitsString() {
 
 function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
   const res: Nostr.Filter = {};
-  for (const [key, value] of Object.entries(filter)) {
+  for (const key of Object.keys(filter)) {
     if (
       (key === "since" || key === "until" || key === "limit") &&
-      (value ?? -1) >= 0
+      (filter[key] ?? -1) >= 0
     ) {
-      res[key] = value;
+      res[key] = filter[key];
       continue;
     }
     if (
-      ((key.startsWith("#") && key.length === 2) ||
-        key === "ids" ||
-        key === "kinds" ||
-        key === "authors") &&
-      value &&
-      value.length > 0
+      (Nostr.isTagName(key) || key === "ids" || key === "authors") &&
+      filter[key] !== undefined &&
+      (filter[key]?.length ?? -1) > 0
     ) {
-      res[key as "ids" | "kinds" | "authors" | `#${string}`] = value;
+      res[key] = filter[key];
+      continue;
+    }
+    if (
+      key === "kinds" &&
+      filter[key] !== undefined &&
+      (filter[key]?.length ?? -1) > 0
+    ) {
+      res[key] = filter[key];
       continue;
     }
   }

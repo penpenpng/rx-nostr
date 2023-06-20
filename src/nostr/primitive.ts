@@ -53,17 +53,24 @@ export namespace Nostr {
     Article = 30023,
   }
 
-  export type TagName = `#${string}`;
+  type Chars<S extends string> = S extends `${infer Head}${infer Tail}`
+    ? Uppercase<Head> | Lowercase<Head> | Chars<Tail>
+    : never;
+  // cf. NIP-12
+  export type TagName = `#${Chars<"abcdefghijklmnopqrstuvwxyz">}`;
+  export const isTagName = (str: string): str is TagName =>
+    /^#[a-zA-Z]$/.test(str);
 
-  export interface Filter {
+  export type Filter = {
     ids?: string[];
     kinds?: number[];
     authors?: string[];
     since?: number;
     until?: number;
     limit?: number;
-    [key: TagName]: string[];
-  }
+  } & {
+    [key in TagName]?: string[];
+  };
 
   export namespace OutgoingMessage {
     export type Any = REQ | CLOSE | EVENT | AUTH;
