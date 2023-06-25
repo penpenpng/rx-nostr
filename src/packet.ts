@@ -49,4 +49,5 @@ export type ConnectionState =
 export interface OkPacket {
   from: string;
   id: string;
+  ok: boolean;
 }

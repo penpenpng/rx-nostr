@@ -88,7 +88,7 @@ export namespace Nostr {
     export type OK = [
       type: "OK",
       eventId: string,
-      rejected: boolean,
+      succeeded: boolean,
       message?: string
     ];
     export type AUTH = [type: "AUTH", challengeMessage: string];

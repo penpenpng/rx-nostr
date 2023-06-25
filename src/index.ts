@@ -540,6 +540,7 @@ class RxNostrImpl implements RxNostr {
             subject.next({
               from,
               id: event.id,
+              ok: message[2],
             });
           }
         );

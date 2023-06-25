@@ -103,9 +103,11 @@ function relayBehavior(): MockRelayBehavior {
         case "EVENT": {
           const event = message[1];
           if (allowEvent) {
-            const ok: Nostr.IncomingMessage.OK = ["OK", event.id, false];
+            const ok: Nostr.IncomingMessage.OK = ["OK", event.id, true];
             socket.send(ok);
           } else {
+            const ok: Nostr.IncomingMessage.OK = ["OK", event.id, false];
+            socket.send(ok);
             const notice: Nostr.IncomingMessage.NOTICE = ["NOTICE", "Rejected"];
             socket.send(notice);
           }
