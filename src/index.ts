@@ -148,7 +148,7 @@ export interface RelayConfig {
 
 export type AcceptableRelaysConfig =
   | (string | RelayConfig)[]
-  | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>;
+  | Nostr.Nip07.GetRelayResult;
 
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;

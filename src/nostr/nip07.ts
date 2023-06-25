@@ -2,6 +2,6 @@ import { Nostr } from "./primitive";
 
 declare global {
   interface Window {
-    nostr?: Nostr.Nip07;
+    nostr?: Nostr.Nip07.Nostr;
   }
 }

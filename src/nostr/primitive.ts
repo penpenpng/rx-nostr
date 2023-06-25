@@ -95,23 +95,35 @@ export namespace Nostr {
     export type NOTICE = [type: "NOTICE", message: string];
   }
 
-  export interface Nip07 {
-    getPublicKey: () => Promise<string>;
-    signEvent: (event: {
-      kind: number;
-      tags: string[][];
-      content: string;
-      created_at: number;
-    }) => Promise<{
-      id: string;
-      sig: string;
-      kind: number;
-      tags: string[][];
-      pubkey: string;
-      content: string;
-      created_at: number;
-    }>;
-    getRelays(): Promise<{ [url: string]: { read: boolean; write: boolean } }>;
+  export namespace Nip07 {
+    export interface Nostr {
+      getPublicKey: () => Promise<string>;
+      signEvent: (event: {
+        kind: number;
+        tags: string[][];
+        content: string;
+        created_at: number;
+      }) => Promise<{
+        id: string;
+        sig: string;
+        kind: number;
+        tags: string[][];
+        pubkey: string;
+        content: string;
+        created_at: number;
+      }>;
+      getRelays?: () => Promise<GetRelayResult>;
+      nip04?: Nip04Crypto;
+    }
+
+    export interface GetRelayResult {
+      [url: string]: { read: boolean; write: boolean };
+    }
+
+    export interface Nip04Crypto {
+      encrypt: (pubkey: string, plaintext: string) => string;
+      decrypt: (pubkey: string, ciphertext: string) => string;
+    }
   }
 
   export namespace Nip11 {
