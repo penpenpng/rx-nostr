@@ -2535,10 +2535,10 @@ vite-node@0.31.4:
   optionalDependencies:
     fsevents "~2.3.2"
 
-vitest-websocket-mock@^0.2.0:
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/vitest-websocket-mock/-/vitest-websocket-mock-0.2.0.tgz#cf559c387d816134252c22d8cdffa23442a3e4f1"
-  integrity sha512-bIeEiH+qmxrDr+gH+nXk0hKnTmV6PyNQB6offvZ28YbSKVaNbfxdycqycmnV9/DeHjCXniVWmXhpoCi6OivfgA==
+vitest-websocket-mock@^0.2.1:
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/vitest-websocket-mock/-/vitest-websocket-mock-0.2.1.tgz#54da7480b5d8af98e43808568efac9063602435b"
+  integrity sha512-qcV5xsYqAvGIvC3eWxoIfaLPTXbm8JmA7Co0kO/89LPg5Rb7gUddE8apHPpGnWivq7JvstpyOO4PQcla3Y0EEw==
   dependencies:
     jest-diff "^29.2.0"
     mock-socket "^9.2.1"
