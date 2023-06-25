@@ -94,4 +94,23 @@ export namespace Nostr {
     export type AUTH = [type: "AUTH", challengeMessage: string];
     export type NOTICE = [type: "NOTICE", message: string];
   }
+
+  export interface Nip07 {
+    getPublicKey: () => Promise<string>;
+    signEvent: (event: {
+      kind: number;
+      tags: string[][];
+      content: string;
+      created_at: number;
+    }) => Promise<{
+      id: string;
+      sig: string;
+      kind: number;
+      tags: string[][];
+      pubkey: string;
+      content: string;
+      created_at: number;
+    }>;
+    getRelays(): Promise<{ [url: string]: { read: boolean; write: boolean } }>;
+  }
 }

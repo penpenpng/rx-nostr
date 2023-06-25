@@ -25,7 +25,6 @@ import {
 } from "rxjs";
 
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
-import type { Nip07 } from "./nostr/nip07";
 import { Nostr } from "./nostr/primitive";
 import { completeOnTimeout } from "./operator";
 import type {
@@ -63,10 +62,10 @@ export interface RxNostr {
    */
   /** @deprecated use switchRelays instead */
   setRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
   ): void;
   switchRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
   ): void;
   addRelay(relay: string | Relay): void;
   removeRelay(url: string): void;
@@ -202,12 +201,12 @@ class RxNostrImpl implements RxNostr {
   }
 
   switchRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
   ): void {
     this.setRelays(relays);
   }
   setRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
   ): void {
     const createWebsocket = this.createWebsocket.bind(this);
     const nextRelays = getNextRelayState(this.relays, relays);
@@ -246,7 +245,7 @@ class RxNostrImpl implements RxNostr {
     // --- scoped untility pure functions ---
     function getNextRelayState(
       prev: Map<string, RelayState>,
-      relays: (string | Relay)[] | Awaited<ReturnType<Nip07["getRelays"]>>
+      relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
     ): Map<string, RelayState> {
       const next: Map<string, RelayState> = new Map();
 
