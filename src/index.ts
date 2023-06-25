@@ -59,8 +59,6 @@ export interface RxNostr {
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
-  /** @deprecated use switchRelays instead */
-  setRelays(config: AcceptableRelaysConfig): void;
   switchRelays(config: AcceptableRelaysConfig): void;
   addRelay(relay: string | RelayConfig): void;
   removeRelay(url: string): void;
@@ -200,9 +198,6 @@ class RxNostrImpl implements RxNostr {
   }
 
   switchRelays(config: AcceptableRelaysConfig): void {
-    this.setRelays(config);
-  }
-  setRelays(config: AcceptableRelaysConfig): void {
     const createWebsocket = this.createWebsocket.bind(this);
     const nextRelays = getNextRelayState(this.relays, config);
 
@@ -289,13 +284,13 @@ class RxNostrImpl implements RxNostr {
     }
   }
   addRelay(relay: string | RelayConfig): void {
-    this.setRelays([...this.getRelays(), relay]);
+    this.switchRelays([...this.getRelays(), relay]);
   }
   removeRelay(url: string): void {
     const currentRelays = this.getRelays();
     const nextRelays = currentRelays.filter((relay) => relay.url !== url);
     if (currentRelays.length !== nextRelays.length) {
-      this.setRelays(nextRelays);
+      this.switchRelays(nextRelays);
     }
   }
   hasRelay(url: string): boolean {
