@@ -1,3 +1,4 @@
+import Nostr from "nostr-typedef";
 import {
   catchError,
   distinct,
@@ -19,7 +20,6 @@ import {
 } from "rxjs";
 
 import { verify as _verify } from "./nostr/event";
-import { Nostr } from "./nostr/primitive";
 import { EventPacket, ReqPacket } from "./packet";
 
 /**

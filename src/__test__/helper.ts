@@ -1,10 +1,10 @@
 import { CloseOptions } from "mock-socket";
+import Nostr from "nostr-typedef";
 import { MonoTypeOperatorFunction, tap } from "rxjs";
 import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { WS } from "vitest-websocket-mock";
 
-import { Nostr } from "../nostr/primitive";
 import { EventPacket } from "../packet";
 
 export function testScheduler() {
@@ -85,7 +85,7 @@ function relayBehavior(): MockRelayBehavior {
         throw new Error("Unexpected type message");
       }
 
-      const message: Nostr.OutgoingMessage.Any = JSON.parse(rawMessage);
+      const message: Nostr.ToRelayMessage.Any = JSON.parse(rawMessage);
       switch (message[0]) {
         case "REQ": {
           if (!subs.has(socket)) {
@@ -103,12 +103,12 @@ function relayBehavior(): MockRelayBehavior {
         case "EVENT": {
           const event = message[1];
           if (allowEvent) {
-            const ok: Nostr.IncomingMessage.OK = ["OK", event.id, true];
+            const ok: Nostr.ToClientMessage.OK = ["OK", event.id, true];
             socket.send(ok);
           } else {
-            const ok: Nostr.IncomingMessage.OK = ["OK", event.id, false];
+            const ok: Nostr.ToClientMessage.OK = ["OK", event.id, false];
             socket.send(ok);
-            const notice: Nostr.IncomingMessage.NOTICE = ["NOTICE", "Rejected"];
+            const notice: Nostr.ToClientMessage.NOTICE = ["NOTICE", "Rejected"];
             socket.send(notice);
           }
           break;
@@ -126,7 +126,7 @@ function relayBehavior(): MockRelayBehavior {
     emitEvent(subId) {
       for (const [socket, activeSubIds] of subs.entries()) {
         if (activeSubIds.has(subId)) {
-          const event: Nostr.IncomingMessage.EVENT = [
+          const event: Nostr.ToClientMessage.EVENT = [
             "EVENT",
             subId,
             faker.event(),
@@ -138,7 +138,7 @@ function relayBehavior(): MockRelayBehavior {
     emitEose(subId) {
       for (const [socket, activeSubIds] of subs.entries()) {
         if (activeSubIds.has(subId)) {
-          const eose: Nostr.IncomingMessage.EOSE = ["EOSE", subId];
+          const eose: Nostr.ToClientMessage.EOSE = ["EOSE", subId];
           socket.send(eose);
         }
       }
@@ -153,7 +153,7 @@ function relayBehavior(): MockRelayBehavior {
 }
 
 export interface MockRelay extends WS, MockRelayController {
-  next: () => Promise<Nostr.OutgoingMessage.Any>;
+  next: () => Promise<Nostr.ToRelayMessage.Any>;
 }
 
 export function setupMockRelay(url: string): MockRelay {
@@ -166,7 +166,7 @@ export function setupMockRelay(url: string): MockRelay {
     allowEvent: behavior.allowEvent.bind(behavior),
     denyEvent: behavior.denyEvent.bind(behavior),
     next: () =>
-      orTimeout(server.nextMessage as Promise<Nostr.OutgoingMessage.Any>),
+      orTimeout(server.nextMessage as Promise<Nostr.ToRelayMessage.Any>),
   });
 }
 
@@ -203,20 +203,20 @@ export const faker = {
 };
 
 export function isEVENT(
-  message: Nostr.IncomingMessage.Any | Nostr.OutgoingMessage.Any
-): message is Nostr.IncomingMessage.EVENT | Nostr.OutgoingMessage.EVENT {
+  message: Nostr.ToClientMessage.Any | Nostr.ToRelayMessage.Any
+): message is Nostr.ToClientMessage.EVENT | Nostr.ToRelayMessage.EVENT {
   return message[0] === "EVENT";
 }
 export function isREQ(
-  message: Nostr.OutgoingMessage.Any,
+  message: Nostr.ToRelayMessage.Any,
   subId?: string
-): message is Nostr.OutgoingMessage.REQ {
+): message is Nostr.ToRelayMessage.REQ {
   return message[0] === "REQ" && (subId === undefined || message[1] === subId);
 }
 export function isCLOSE(
-  message: Nostr.OutgoingMessage.Any,
+  message: Nostr.ToRelayMessage.Any,
   subId?: string
-): message is Nostr.OutgoingMessage.CLOSE {
+): message is Nostr.ToRelayMessage.CLOSE {
   return (
     message[0] === "CLOSE" && (subId === undefined || message[1] === subId)
   );

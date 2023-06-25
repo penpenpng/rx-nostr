@@ -32,7 +32,7 @@ interface ErrorPacket {
 ```ts
 interface MessagePacket {
   from: string;
-  message: Nostr.IncomingMessage.Any;
+  message: Nostr.ToClientMessage.Any;
 }
 ```
 

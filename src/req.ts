@@ -1,6 +1,6 @@
+import Nostr from "nostr-typedef";
 import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
-import { Nostr } from "./nostr/primitive";
 import { ReqPacket } from "./packet";
 import type { Override } from "./util";
 
@@ -220,6 +220,8 @@ function getRandomDigitsString() {
 
 function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
   const res: Nostr.Filter = {};
+  const isTagName = (s: string): s is Nostr.TagName => /^#[a-zA-Z]$/.test(s);
+
   for (const key of Object.keys(filter)) {
     if (
       (key === "since" || key === "until" || key === "limit") &&
@@ -229,7 +231,7 @@ function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
       continue;
     }
     if (
-      (Nostr.isTagName(key) || key === "ids" || key === "authors") &&
+      (isTagName(key) || key === "ids" || key === "authors") &&
       filter[key] !== undefined &&
       (filter[key]?.length ?? -1) > 0
     ) {

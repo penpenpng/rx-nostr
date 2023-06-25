@@ -1,3 +1,4 @@
+import Nostr from "nostr-typedef";
 import {
   catchError,
   EMPTY,
@@ -24,7 +25,6 @@ import {
 } from "rxjs";
 
 import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
-import { Nostr } from "./nostr/primitive";
 import { completeOnTimeout } from "./operator";
 import type {
   ConnectionState,
@@ -38,7 +38,6 @@ import type { RxReq } from "./req";
 import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
 import { WebsocketSubject } from "./websocket";
 
-export * from "./nostr/primitive";
 export * from "./operator";
 export * from "./packet";
 export * from "./req";
@@ -153,7 +152,7 @@ export type AcceptableRelaysConfig =
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
   private relays: Map<string, RelayState> = new Map();
-  private activeReqs: Map<string, Nostr.OutgoingMessage.REQ> = new Map();
+  private activeReqs: Map<string, Nostr.ToRelayMessage.REQ> = new Map();
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
   private status$: Subject<ConnectionStatePacket> = new Subject();
@@ -355,7 +354,7 @@ class RxNostrImpl implements RxNostr {
     const ensureReq = this.ensureReq.bind(this);
     const finalizeReq = this.finalizeReq.bind(this);
 
-    const recordActiveReq = (req: Nostr.OutgoingMessage.REQ) => {
+    const recordActiveReq = (req: Nostr.ToRelayMessage.REQ) => {
       const subId = req[1];
       this.activeReqs.set(subId, req);
     };
@@ -407,7 +406,7 @@ class RxNostrImpl implements RxNostr {
 
     function attachSubId(): OperatorFunction<
       Nostr.Filter[],
-      Nostr.OutgoingMessage.REQ
+      Nostr.ToRelayMessage.REQ
     > {
       const makeId = (index?: number) => makeSubId({ rxReqId, index });
 
@@ -419,9 +418,9 @@ class RxNostrImpl implements RxNostr {
           return map((filters) => ["REQ", makeId(), ...filters]);
       }
     }
-    function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
+    function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.ToRelayMessage.REQ> {
       return tap({
-        next: (req: Nostr.OutgoingMessage.REQ) => {
+        next: (req: Nostr.ToRelayMessage.REQ) => {
           recordActiveReq(req);
         },
         finalize: () => {
@@ -433,8 +432,8 @@ class RxNostrImpl implements RxNostr {
         },
       });
     }
-    function ensureReqOnNext(): MonoTypeOperatorFunction<Nostr.OutgoingMessage.REQ> {
-      return tap((req: Nostr.OutgoingMessage.REQ) => {
+    function ensureReqOnNext(): MonoTypeOperatorFunction<Nostr.ToRelayMessage.REQ> {
+      return tap((req: Nostr.ToRelayMessage.REQ) => {
         ensureReq(req, { overwrite: strategy === "forward" });
       });
     }
@@ -570,7 +569,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   private ensureReq(
-    req: Nostr.OutgoingMessage.REQ,
+    req: Nostr.ToRelayMessage.REQ,
     options?: { relays?: RelayState[]; overwrite?: boolean }
   ) {
     const subId = req[1];

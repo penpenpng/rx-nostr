@@ -1,4 +1,4 @@
-import { Nostr } from "./primitive";
+import Nostr from "nostr-typedef";
 
 declare global {
   interface Window {

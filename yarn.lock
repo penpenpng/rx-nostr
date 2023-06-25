@@ -1977,6 +1977,11 @@ normalize-url@^8.0.0:
   resolved "https://registry.yarnpkg.com/normalize-url/-/normalize-url-8.0.0.tgz#593dbd284f743e8dcf6a5ddf8fadff149c82701a"
   integrity sha512-uVFpKhj5MheNBJRTiMZ9pE/7hD1QTeEvugSJW/OmLzAp78PB5O6adfMNTvmfKhXBkvCzC+rqifWcVYpGFwTjnw==
 
+nostr-typedef@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/nostr-typedef/-/nostr-typedef-0.1.0.tgz#cafd0475346f6d00f1770c38cacae3ebed5e9893"
+  integrity sha512-0sY5nsGOV4iWOYKhUQyUUQABIHt75HVf9548Z+wtOHv299ac7l6pHJ0obdwube+GkoDX5/xhE5hlWdMICB2hfg==
+
 npm-run-path@^5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/npm-run-path/-/npm-run-path-5.1.0.tgz#bc62f7f3f6952d9894bd08944ba011a6ee7b7e00"

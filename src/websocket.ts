@@ -1,6 +1,6 @@
+import Nostr from "nostr-typedef";
 import { Subject } from "rxjs";
 
-import { Nostr } from "./nostr/primitive";
 import { ConnectionState, MessagePacket } from "./packet";
 
 export class WebsocketSubject {
@@ -8,7 +8,7 @@ export class WebsocketSubject {
   private message$ = new Subject<MessagePacket>();
   private connectionState$ = new Subject<ConnectionState>();
   private connectionState: ConnectionState = "not-started";
-  private buffer: Nostr.OutgoingMessage.Any[] = [];
+  private buffer: Nostr.ToRelayMessage.Any[] = [];
 
   constructor(public url: string) {
     this.connectionState$.next("not-started");
@@ -86,7 +86,7 @@ export class WebsocketSubject {
     return this.connectionState$.asObservable();
   }
 
-  send(message: Nostr.OutgoingMessage.Any) {
+  send(message: Nostr.ToRelayMessage.Any) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
     } else if (this.socket?.readyState === WebSocket.CONNECTING) {
@@ -98,7 +98,7 @@ export class WebsocketSubject {
       };
       socket.onmessage = ({ data }) => {
         try {
-          const response: Nostr.IncomingMessage.Any = JSON.parse(data);
+          const response: Nostr.ToClientMessage.Any = JSON.parse(data);
           if (response[0] === "OK") {
             socket.close();
           }

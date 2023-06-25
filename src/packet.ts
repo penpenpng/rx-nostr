@@ -1,4 +1,4 @@
-import { Nostr } from "./nostr/primitive";
+import Nostr from "nostr-typedef";
 
 // Packet is data treated by rx-nostr Observables.
 
@@ -30,7 +30,7 @@ export interface ErrorPacket {
  */
 export interface MessagePacket {
   from: string;
-  message: Nostr.IncomingMessage.Any;
+  message: Nostr.ToClientMessage.Any;
 }
 
 export interface ConnectionStatePacket {
