@@ -64,6 +64,9 @@ export interface RxNostr {
   removeRelay(url: string): void;
   hasRelay(url: string): boolean;
 
+  fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo>;
+  fetchAllRelaysInfo(): Promise<Record<string, Nostr.Nip11.RelayInfo | null>>;
+
   getAllRelayState(): Record<string, ConnectionState>;
   getRelayState(url: string): ConnectionState;
   reconnect(url: string): void;
@@ -295,6 +298,29 @@ class RxNostrImpl implements RxNostr {
   }
   hasRelay(url: string): boolean {
     return this.getRelays().some((relay) => relay.url === url);
+  }
+
+  async fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo> {
+    const u = new URL(normalizeRelayUrl(url));
+    u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");
+
+    const res = await fetch(u.toString(), {
+      headers: { Accept: "application/nostr+json" },
+    });
+    return res.json();
+  }
+  async fetchAllRelaysInfo(): Promise<
+    Record<string, Nostr.Nip11.RelayInfo | null>
+  > {
+    const entries = await Promise.all(
+      Array.from(this.relays.keys()).map(
+        async (url): Promise<[string, Nostr.Nip11.RelayInfo | null]> => [
+          url,
+          await this.fetchRelayInfo(url).catch(() => null),
+        ]
+      )
+    );
+    return Object.fromEntries(entries);
   }
 
   getAllRelayState(): Record<string, ConnectionState> {

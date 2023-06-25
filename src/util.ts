@@ -30,5 +30,6 @@ export function unnull<T>(v: T | null | undefined): T {
 export function normalizeRelayUrl(url: string) {
   return normalizeUrl(url, {
     normalizeProtocol: false,
+    removeTrailingSlash: true,
   });
 }

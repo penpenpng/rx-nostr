@@ -113,4 +113,75 @@ export namespace Nostr {
     }>;
     getRelays(): Promise<{ [url: string]: { read: boolean; write: boolean } }>;
   }
+
+  export namespace Nip11 {
+    export interface RelayInfo {
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#name */
+      name?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#description */
+      description?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#pubkey */
+      pubkey?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#contact */
+      contact?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#supported-nips */
+      supported_nips?: number[];
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#software */
+      software?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#version */
+      version?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#server-limitations */
+      limitation?: ServerLimitations;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#event-retention */
+      retention?: EventRetention[];
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#content-limitations */
+      relay_countries?: string[];
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#community-preferences */
+      language_tags?: string[];
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#community-preferences */
+      tags?: string[];
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#community-preferences */
+      posting_policy?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#pay-to-relay */
+      payments_url?: string;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#pay-to-relay */
+      fees?: RelayFees;
+      /** https://github.com/nostr-protocol/nips/blob/master/11.md#icon */
+      icon?: string;
+      [key: string]: unknown;
+    }
+
+    export interface ServerLimitations {
+      max_message_length?: number;
+      max_subscriptions?: number;
+      max_filters?: number;
+      max_limit?: number;
+      max_subid_length?: number;
+      min_prefix?: number;
+      max_event_tags?: number;
+      max_content_length?: number;
+      min_pow_difficulty?: number;
+      auth_required?: boolean;
+      payment_required?: boolean;
+    }
+
+    export interface EventRetention {
+      kinds?: (number | [start: number, end: number])[];
+      time?: number | null;
+      count?: number;
+    }
+
+    export interface RelayFees {
+      admission?: RelayFeeAmount[];
+      subscription?: RelayFeeAmount[];
+      publication?: RelayFeeAmount[];
+    }
+
+    export interface RelayFeeAmount {
+      amount?: number;
+      unit?: string;
+      period?: number;
+      kinds?: number[];
+    }
+  }
 }
