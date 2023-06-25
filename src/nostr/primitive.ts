@@ -37,20 +37,37 @@ export namespace Nostr {
     Repost = 6,
     Reaction = 7,
     BadgeAward = 8,
+    GenericRepost = 16,
     ChannelCreation = 40,
     ChannelMetadata = 41,
     ChannelMessage = 42,
     ChannelHideMessage = 43,
     ChannelMuteUser = 44,
     Blank = 255,
-    Report = 1984,
+    FileMetadata = 1063,
+    Reporting = 1984,
+    Label = 1985,
     ZapRequest = 9734,
     Zap = 9735,
-    RelayList = 10002,
-    Auth = 22242,
-    BadgeDefinition = 30008,
-    ProfileBadge = 30009,
-    Article = 30023,
+    MuteList = 10000,
+    PinList = 10001,
+    RelayListMetadata = 10002,
+    WalletInfo = 13194,
+    ClientAuthentication = 22242,
+    WalletRequest = 23194,
+    WalletResponse = 23195,
+    NostrConnect = 24133,
+    HttpAuth = 27235,
+    CategorizedPeopleList = 30000,
+    GategorizedBookmarkList = 30001,
+    ProfileBadges = 30008,
+    BadgeDefinition = 30009,
+    CreateOrUpdateStall = 30017,
+    CreateOrUpdateProduct = 30018,
+    LongFormContent = 30023,
+    ApplicationSpecificData = 30078,
+    HandlerRecommendation = 31989,
+    HandlerInformation = 31990,
   }
 
   type Chars<S extends string> = S extends `${infer Head}${infer Tail}`
@@ -72,27 +89,33 @@ export namespace Nostr {
     [key in TagName]?: string[];
   };
 
+  interface CountResponse {
+    count: number;
+  }
+
   export namespace OutgoingMessage {
-    export type Any = REQ | CLOSE | EVENT | AUTH;
-    export type REQ = [type: "REQ", subId: string, ...filters: Filter[]];
+    export type Any = AUTH | CLOSE | COUNT | EVENT | REQ;
+    export type AUTH = [type: "AUTH", event: Event<Kind.ClientAuthentication>];
     export type CLOSE = [type: "CLOSE", subId: string];
+    export type COUNT = [type: "COUNT", subId: string, ...filters: Filter[]];
     export type EVENT = [type: "EVENT", event: Event];
-    export type AUTH = [type: "AUTH", event: Event<Kind.Auth>];
+    export type REQ = [type: "REQ", subId: string, ...filters: Filter[]];
   }
 
   export namespace IncomingMessage {
-    export type Any = EVENT | EOSE | OK | AUTH;
+    export type Any = AUTH | COUNT | EOSE | EVENT | NOTICE | OK;
     export type Sub = EVENT | EOSE;
-    export type EVENT = [type: "EVENT", subId: string, event: Event];
+    export type AUTH = [type: "AUTH", challengeMessage: string];
+    export type COUNT = [type: "COUNT", subId: string, count: CountResponse];
     export type EOSE = [type: "EOSE", subId: string];
+    export type EVENT = [type: "EVENT", subId: string, event: Event];
+    export type NOTICE = [type: "NOTICE", message: string];
     export type OK = [
       type: "OK",
       eventId: string,
       succeeded: boolean,
       message?: string
     ];
-    export type AUTH = [type: "AUTH", challengeMessage: string];
-    export type NOTICE = [type: "NOTICE", message: string];
   }
 
   export namespace Nip07 {
