@@ -1,4 +1,4 @@
-import { MonoTypeOperatorFunction, tap } from "rxjs";
+import normalizeUrl from "normalize-url";
 
 export function defineDefaultOptions<T extends Record<string, unknown>>(
   defaultParams: T
@@ -27,10 +27,8 @@ export function unnull<T>(v: T | null | undefined): T {
   return v;
 }
 
-export function onSubscribe<T>(
-  callback: () => void
-): MonoTypeOperatorFunction<T> {
-  return tap({
-    subscribe: callback,
+export function normalizeRelayUrl(url: string) {
+  return normalizeUrl(url, {
+    normalizeProtocol: false,
   });
 }

@@ -1,4 +1,3 @@
-import normalizeUrl from "normalize-url";
 import {
   catchError,
   EMPTY,
@@ -36,7 +35,7 @@ import type {
   OkPacket,
 } from "./packet";
 import type { RxReq } from "./req";
-import { defineDefaultOptions, onSubscribe, unnull } from "./util";
+import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
 import { WebsocketSubject } from "./websocket";
 
 export * from "./nostr/primitive";
@@ -54,20 +53,16 @@ export interface RxNostr {
    * Returns a list of relays used by this object.
    * The relay URLs are normalised so may not match the URLs set.
    */
-  getRelays(): Relay[];
+  getRelays(): RelayConfig[];
   /**
    * Sets the list of relays.
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
   /** @deprecated use switchRelays instead */
-  setRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
-  ): void;
-  switchRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
-  ): void;
-  addRelay(relay: string | Relay): void;
+  setRelays(config: AcceptableRelaysConfig): void;
+  switchRelays(config: AcceptableRelaysConfig): void;
+  addRelay(relay: string | RelayConfig): void;
   removeRelay(url: string): void;
   hasRelay(url: string): boolean;
 
@@ -144,11 +139,15 @@ const defaultRxNostrOptions = defineDefaultOptions({
   timeout: 10000,
 });
 
-export interface Relay {
+export interface RelayConfig {
   url: string;
   read: boolean;
   write: boolean;
 }
+
+export type AcceptableRelaysConfig =
+  | (string | RelayConfig)[]
+  | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>;
 
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
@@ -165,7 +164,7 @@ class RxNostrImpl implements RxNostr {
     };
   }
 
-  getRelays(): Relay[] {
+  getRelays(): RelayConfig[] {
     return Array.from(this.relays.values()).map(({ url, read, write }) => ({
       url,
       read,
@@ -200,16 +199,12 @@ class RxNostrImpl implements RxNostr {
     return websocket;
   }
 
-  switchRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
-  ): void {
-    this.setRelays(relays);
+  switchRelays(config: AcceptableRelaysConfig): void {
+    this.setRelays(config);
   }
-  setRelays(
-    relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
-  ): void {
+  setRelays(config: AcceptableRelaysConfig): void {
     const createWebsocket = this.createWebsocket.bind(this);
-    const nextRelays = getNextRelayState(this.relays, relays);
+    const nextRelays = getNextRelayState(this.relays, config);
 
     const prevReadableUrls = this.getReadableUrls();
     const nextReadableUrls = this.getReadableUrls(
@@ -245,13 +240,11 @@ class RxNostrImpl implements RxNostr {
     // --- scoped untility pure functions ---
     function getNextRelayState(
       prev: Map<string, RelayState>,
-      relays: (string | Relay)[] | Awaited<ReturnType<Nostr.Nip07["getRelays"]>>
+      config: AcceptableRelaysConfig
     ): Map<string, RelayState> {
       const next: Map<string, RelayState> = new Map();
 
-      for (const relay of Array.isArray(relays)
-        ? relays.map(normalizeRelay)
-        : Object.entries(relays).map(([url, flags]) => ({ url, ...flags }))) {
+      for (const relay of normalizeRelaysConfig(config)) {
         const url = relay.url;
         const prevState = prev.get(url);
 
@@ -267,26 +260,35 @@ class RxNostrImpl implements RxNostr {
 
       return next;
     }
-    function normalizeRelay(urlOrRelay: string | Relay): Relay {
-      const relay: Relay =
-        typeof urlOrRelay === "string"
-          ? {
-              url: urlOrRelay,
-              read: true,
-              write: true,
-            }
-          : urlOrRelay;
-      relay.url = normalizeUrl(relay.url, {
-        normalizeProtocol: false,
-      });
+    function normalizeRelaysConfig(
+      config: AcceptableRelaysConfig
+    ): RelayConfig[] {
+      if (Array.isArray(config)) {
+        return config.map((urlOrConfig) => {
+          const relay: RelayConfig =
+            typeof urlOrConfig === "string"
+              ? {
+                  url: urlOrConfig,
+                  read: true,
+                  write: true,
+                }
+              : urlOrConfig;
+          relay.url = normalizeRelayUrl(relay.url);
 
-      return relay;
+          return relay;
+        });
+      } else {
+        return Object.entries(config).map(([url, flags]) => ({
+          url: normalizeRelayUrl(url),
+          ...flags,
+        }));
+      }
     }
     function subtract<T>(a: T[], b: T[]): T[] {
       return a.filter((e) => !b.includes(e));
     }
   }
-  addRelay(relay: string | Relay): void {
+  addRelay(relay: string | RelayConfig): void {
     this.setRelays([...this.getRelays(), relay]);
   }
   removeRelay(url: string): void {
@@ -309,15 +311,15 @@ class RxNostrImpl implements RxNostr {
     );
   }
   getRelayState(url: string): ConnectionState {
-    const relay = this.relays.get(url);
+    const relay = this.relays.get(normalizeRelayUrl(url));
     if (!relay) {
-      throw new Error("Relay not found");
+      throw new Error("RelayConfig not found");
     }
     // this.relays[url] may be set before this.relays[url].websocket is initialized
     return relay.websocket?.getState() ?? "not-started";
   }
   reconnect(url: string): void {
-    this.relays.get(url)?.websocket.start();
+    this.relays.get(normalizeRelayUrl(url))?.websocket.start();
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
@@ -359,19 +361,23 @@ class RxNostrImpl implements RxNostr {
       resource.push(subject);
 
       return subject.pipe(
-        onSubscribe(() => {
-          resource.push(subId$.subscribe());
-          resource.push(
-            message$.pipe(filterBySubId(subId), pickEvents()).subscribe((v) => {
-              subject.next(v);
-            })
-          );
-        }),
-        finalize(() => {
-          for (const r of resource) {
-            r.unsubscribe();
-          }
-          finalizeReq({ subId });
+        tap({
+          subscribe: () => {
+            resource.push(subId$.subscribe());
+            resource.push(
+              message$
+                .pipe(filterBySubId(subId), pickEvents())
+                .subscribe((v) => {
+                  subject.next(v);
+                })
+            );
+          },
+          finalize: () => {
+            for (const r of resource) {
+              r.unsubscribe();
+            }
+            finalizeReq({ subId });
+          },
         })
       );
     } else {
@@ -578,12 +584,12 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  private getReadableUrls(relays?: Relay[]): string[] {
+  private getReadableUrls(relays?: RelayConfig[]): string[] {
     return Array.from(relays ?? this.relays.values())
       .filter((e) => e.read)
       .map((e) => e.url);
   }
-  private getWritableUrls(relays?: Relay[]): string[] {
+  private getWritableUrls(relays?: RelayConfig[]): string[] {
     return Array.from(relays ?? this.relays.values())
       .filter((e) => e.write)
       .map((e) => e.url);
