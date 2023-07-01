@@ -1,5 +1,5 @@
 import { afterEach, assert, beforeEach, describe, expect, test } from "vitest";
-import { createMockRelay, faker, type MockRelay } from "vitest-nostr";
+import { createMockRelay, type MockRelay } from "vitest-nostr";
 
 import {
   createRxBackwardReq,
@@ -8,7 +8,7 @@ import {
   createRxOneshotReq,
   RxNostr,
 } from "../index";
-import { subspy } from "./helper";
+import { faker, spyEvent, spySub } from "./helper";
 
 describe("Single relay case", () => {
   const RELAY_URL = "ws://localhost:1234";
@@ -42,7 +42,7 @@ describe("Single relay case", () => {
 
   test("[backward] Receipt of EOSE does not terminate the Observable.", async () => {
     const req = createRxBackwardReq("sub");
-    const spy = subspy();
+    const spy = spySub();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
@@ -56,15 +56,12 @@ describe("Single relay case", () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
-    // sub:0
     req.emit(faker.filters());
     await expect(relay).toReceiveREQ("sub:0");
 
-    // sub:1
     req.emit(faker.filters());
     await expect(relay).toReceiveREQ("sub:1");
 
-    // sub:2
     req.emit(faker.filters());
     await expect(relay).toReceiveREQ("sub:2");
 
@@ -73,6 +70,27 @@ describe("Single relay case", () => {
 
     relay.emitEOSE("sub:1");
     await expect(relay).toReceiveCLOSE("sub:1");
+
+    relay.emitEOSE("sub:0");
+    await expect(relay).toReceiveCLOSE("sub:0");
+  });
+
+  test.only("[backward] Even if a newer REQ emits EOSE, EVENTs from older but still active REQ can be received.", async () => {
+    const req = createRxBackwardReq("sub");
+    const spy = spyEvent();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:0");
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:1");
+
+    relay.emitEOSE("sub:1");
+    await expect(relay).toReceiveCLOSE("sub:1");
+
+    relay.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT("sub:0");
 
     relay.emitEOSE("sub:0");
     await expect(relay).toReceiveCLOSE("sub:0");
@@ -97,7 +115,7 @@ describe("Single relay case", () => {
       subId: "sub",
       filters: faker.filters(),
     });
-    const spy = subspy();
+    const spy = spySub();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
     await expect(relay).toReceiveREQ("sub:0");
 
@@ -137,23 +155,25 @@ describe("Multiple relays case", () => {
       subId: "sub",
       filters: faker.filters(),
     });
-    const spy = subspy();
+    const spy = spyEvent();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
-    relay1.emitEVENT("sub:0"); // 1
-    relay2.emitEVENT("sub:0"); // 2
+    relay1.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT("sub:0");
+
+    relay2.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT("sub:0");
 
     relay1.emitEOSE("sub:0");
     await expect(relay1).toReceiveCLOSE("sub:0");
 
-    relay2.emitEVENT("sub:0"); // 3
+    relay2.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT("sub:0");
 
     relay2.emitEOSE("sub:0");
     await expect(relay2).toReceiveCLOSE("sub:0");
-
-    assert(spy.count() === 3);
   });
 });

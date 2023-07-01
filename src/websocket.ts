@@ -33,9 +33,7 @@ export class WebsocketSubject {
       this.setConnectionState("reconnecting");
     }
 
-    let resolve = () => {
-      /* do nothing */
-    };
+    let resolve: () => void;
     const resolveOnOpen = new Promise<void>((_resolve) => {
       resolve = _resolve;
     });
@@ -74,7 +72,7 @@ export class WebsocketSubject {
     this.socket?.close();
   }
 
-  getState() {
+  getConnectionState() {
     return this.connectionState;
   }
 
@@ -92,10 +90,13 @@ export class WebsocketSubject {
     } else if (this.socket?.readyState === WebSocket.CONNECTING) {
       this.buffer.push(message);
     } else {
+      // Create a temporary socket to send message.
       const socket = new WebSocket(this.url);
       socket.onopen = () => {
         socket.send(JSON.stringify(message));
       };
+
+      // Close the temporary socket after receiveing OK or timed out.
       socket.onmessage = ({ data }) => {
         try {
           const response: Nostr.ToClientMessage.Any = JSON.parse(data);

@@ -336,7 +336,7 @@ class RxNostrImpl implements RxNostr {
       throw new Error("RelayConfig not found");
     }
     // this.relays[url] may be set before this.relays[url].websocket is initialized
-    return relay.websocket?.getState() ?? "not-started";
+    return relay.websocket?.getConnectionState() ?? "not-started";
   }
   reconnect(url: string): void {
     this.relays.get(normalizeRelayUrl(url))?.websocket.start();
