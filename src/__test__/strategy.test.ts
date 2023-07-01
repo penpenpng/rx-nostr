@@ -75,7 +75,7 @@ describe("Single relay case", () => {
     await expect(relay).toReceiveCLOSE("sub:0");
   });
 
-  test.only("[backward] Even if a newer REQ emits EOSE, EVENTs from older but still active REQ can be received.", async () => {
+  test("[backward] Even if a newer REQ emits EOSE, EVENTs from older but still active REQ can be received.", async () => {
     const req = createRxBackwardReq("sub");
     const spy = spyEvent();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
