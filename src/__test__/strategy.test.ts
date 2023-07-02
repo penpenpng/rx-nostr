@@ -19,7 +19,9 @@ describe("Single relay case", () => {
   beforeEach(async () => {
     relay = createMockRelay(RELAY_URL);
 
-    rxNostr = createRxNostr();
+    rxNostr = createRxNostr({
+      retry: { strategy: "immediately", maxCount: 5 },
+    });
     rxNostr.switchRelays([RELAY_URL]);
 
     await relay.connected;

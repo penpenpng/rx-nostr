@@ -1,6 +1,7 @@
 import normalizeUrl from "normalize-url";
 
-export function defineDefaultOptions<T extends Record<string, unknown>>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function defineDefaultOptions<T extends Record<string, any>>(
   defaultParams: T
 ): (givenParams?: Partial<T>) => T {
   return (givenParams) =>

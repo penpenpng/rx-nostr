@@ -1,13 +1,15 @@
 import Nostr from "nostr-typedef";
 import {
   EMPTY,
+  identity,
   mergeMap,
   Observable,
+  ObservableInput,
   of,
   retry,
   Subject,
   tap,
-  throwError,
+  timer,
 } from "rxjs";
 
 import { ConnectionState, MessagePacket } from "./packet";
@@ -21,7 +23,7 @@ export class RxNostrWebSocket {
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
   private reqs: Map<string /* subId */, Nostr.ToRelayMessage.REQ> = new Map();
 
-  constructor(public url: string) {
+  constructor(public url: string, private backoffConfig: BackoffConfig) {
     this.connectionState$.next("not-started");
   }
 
@@ -124,7 +126,7 @@ export class RxNostrWebSocket {
           if (data.code === WebSocketCloseCode.DONT_RETRY) {
             return EMPTY;
           } else {
-            return throwError(() => data);
+            throw data;
           }
         } else {
           return of(data);
@@ -141,7 +143,13 @@ export class RxNostrWebSocket {
           this.start();
         },
       }),
-      retry(2), // TODO: config
+      this.backoffConfig.strategy === "off"
+        ? identity
+        : retry({
+            delay: (_, retryCount) =>
+              backoffSignal(this.backoffConfig, retryCount),
+            count: this.backoffConfig.maxCount,
+          }),
       tap({
         error: () => {
           this.setConnectionState("error");
@@ -259,6 +267,44 @@ export const WebSocketCloseCode = {
   /** @internal rx-nostr uses it internally. */
   DISPOSED_BY_RX_NOSTR: 4538,
 } as const;
+
+export type BackoffConfig =
+  | {
+      strategy: "exponential";
+      maxCount: number;
+      initialDelay: number;
+    }
+  | {
+      strategy: "linear";
+      maxCount: number;
+      interval: number;
+    }
+  | {
+      strategy: "immediately";
+      maxCount: number;
+    }
+  | {
+      strategy: "off";
+    };
+
+function backoffSignal(
+  config: BackoffConfig,
+  count: number
+): ObservableInput<unknown> {
+  if (config.strategy === "exponential") {
+    const time = Math.max(
+      config.initialDelay * 2 ** (count - 1) + (Math.random() - 1) * 1000,
+      1000
+    );
+    return timer(time);
+  } else if (config.strategy === "linear") {
+    return timer(config.interval);
+  } else if (config.strategy === "immediately") {
+    return of(0);
+  } else {
+    return EMPTY;
+  }
+}
 
 class WebSocketError extends Error {
   constructor(public code?: number) {

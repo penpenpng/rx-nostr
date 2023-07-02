@@ -35,7 +35,7 @@ import type {
 } from "./packet";
 import type { RxReq } from "./req";
 import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
-import { RxNostrWebSocket } from "./websocket";
+import { BackoffConfig, RxNostrWebSocket } from "./websocket";
 
 export * from "./operator";
 export * from "./packet";
@@ -124,6 +124,7 @@ export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
 }
 
 export interface RxNostrOptions {
+  retry: BackoffConfig;
   /**
    * The time in milliseconds to timeout when following the backward strategy.
    * The observable is terminated when the specified amount of time has elapsed
@@ -131,7 +132,12 @@ export interface RxNostrOptions {
    */
   timeout: number;
 }
-const defaultRxNostrOptions = defineDefaultOptions({
+const defaultRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
+  retry: {
+    strategy: "exponential",
+    maxCount: 5,
+    initialDelay: 1,
+  },
   timeout: 10000,
 });
 
@@ -169,7 +175,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   private createWebsocket(url: string): RxNostrWebSocket {
-    const websocket = new RxNostrWebSocket(url);
+    const websocket = new RxNostrWebSocket(url, this.options.retry);
 
     websocket.getConnectionStateObservable().subscribe((state) => {
       this.status$.next({
