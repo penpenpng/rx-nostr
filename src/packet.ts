@@ -39,12 +39,13 @@ export interface ConnectionStatePacket {
 }
 
 export type ConnectionState =
-  | "not-started" // Not started yet.
-  | "starting" // The first trying to connect.
+  | "not-started" // Not started yet, or closed by expected ways.
+  | "starting" // Attempting to connect (for reasons other than error recovery).
   | "ongoing" // Active, but may be temporarily closed as idling.
   | "reconnecting" // Trying to reconnect for error recovery.
-  | "error" // Inactive because of an error. You can try to recover by reconnect()
-  | "terminated";
+  | "error" // Inactive because of an unexpected error. You can try to recover by reconnect()
+  | "rejected" // Inactive because of closing code 4000. You can try to reconnect, but should not do.
+  | "terminated"; // No longer available because of dispose()
 
 export interface OkPacket {
   from: string;

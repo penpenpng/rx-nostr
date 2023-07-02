@@ -7,7 +7,8 @@ import {
   createRxNostr,
   createRxOneshotReq,
   RxNostr,
-} from "../index";
+} from "..";
+import { WebSocketCloseCode } from "../websocket";
 import { faker, spyEvent, spySub } from "./helper";
 
 describe("Single relay case", () => {
@@ -26,7 +27,11 @@ describe("Single relay case", () => {
 
   afterEach(() => {
     rxNostr.dispose();
-    relay.close();
+    relay.close({
+      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      reason: "Clean up on after each",
+      wasClean: true,
+    });
   });
 
   test("[backward] After receiving EOSE, CLOSE is sent out.", async () => {
@@ -96,6 +101,52 @@ describe("Single relay case", () => {
     await expect(relay).toReceiveCLOSE("sub:0");
   });
 
+  test("[backward] If connection is abnormally closed before receiving EOSE, REQ will be retried.", async () => {
+    const req = createRxBackwardReq("sub");
+    const spy = spyEvent();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:0");
+
+    // Emulate an abnormal disconnection of a relay.
+    const socket = await relay.getSocket(0);
+    socket.close({
+      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      reason: "Relay's internal error",
+      wasClean: true,
+    });
+
+    await expect(relay).toReceiveREQ("sub:0");
+
+    relay.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT();
+
+    relay.emitEOSE("sub:0");
+    await expect(relay).toReceiveCLOSE("sub:0");
+  });
+
+  test("[backward] If connection is abnormally closed after receiving EOSE, REQ will not be retried.", async () => {
+    const req = createRxBackwardReq("sub");
+    rxNostr.use(req).subscribe();
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:0");
+
+    relay.emitEOSE("sub:0");
+    await expect(relay).toReceiveCLOSE("sub:0");
+
+    // Emulate an abnormal disconnection of a relay.
+    const socket = await relay.getSocket(0);
+    socket.close({
+      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      reason: "Relay's internal error",
+      wasClean: true,
+    });
+
+    // TODO: send and receive a dummy EVENT to test not to send REQ (depends on #36)
+  });
+
   test("[forward] Each REQ is published with the same subId.", async () => {
     const req = createRxForwardReq("sub");
     rxNostr.use(req).subscribe();
@@ -108,6 +159,50 @@ describe("Single relay case", () => {
 
     req.emit(faker.filters());
     await expect(relay).toReceiveREQ("sub:0");
+  });
+
+  test.only("[forward] If connection is abnormally closed, REQ will be retried.", async () => {
+    const req = createRxForwardReq("sub");
+    const spy = spyEvent();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:0");
+
+    // Emulate an abnormal disconnection of a relay.
+    const socket = await relay.getSocket(0);
+    socket.close({
+      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      reason: "Relay's internal error",
+      wasClean: true,
+    });
+
+    await expect(relay).toReceiveREQ("sub:0");
+
+    relay.emitEVENT("sub:0");
+    await expect(spy).toSeeEVENT();
+  });
+
+  test("[forward] If connection is closed with 4000, REQ will not be retried.", async () => {
+    const req = createRxForwardReq("sub");
+    const spy = spyEvent();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit(faker.filters());
+    await expect(relay).toReceiveREQ("sub:0");
+
+    // Emulate an abnormal disconnection of a relay.
+    const socket = await relay.getSocket(0);
+    socket.close({
+      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      reason: "Relay's internal error, but should not retry.",
+      wasClean: true,
+    });
+
+    // TODO: test not to attempting to reconnect
+    // await relay.waitConnected(2);
+
+    // TODO: send and receive a dummy EVENT to test not to send REQ (depends on #36)
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
@@ -146,8 +241,16 @@ describe("Multiple relays case", () => {
 
   afterEach(() => {
     rxNostr.dispose();
-    relay1.close();
-    relay2.close();
+    relay1.close({
+      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      reason: "Clean up on after each",
+      wasClean: true,
+    });
+    relay2.close({
+      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      reason: "Clean up on after each",
+      wasClean: true,
+    });
   });
 
   test("[oneshot] Collect all events under different timing EOSE.", async () => {

@@ -15,7 +15,6 @@ import {
   of,
   OperatorFunction,
   ReplaySubject,
-  retry,
   Subject,
   Subscription,
   take,
@@ -36,7 +35,7 @@ import type {
 } from "./packet";
 import type { RxReq } from "./req";
 import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
-import { WebsocketSubject } from "./websocket";
+import { RxNostrWebSocket } from "./websocket";
 
 export * from "./operator";
 export * from "./packet";
@@ -125,8 +124,6 @@ export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
 }
 
 export interface RxNostrOptions {
-  /** Number of attempts to reconnect when websocket is disconnected. */
-  retry: number;
   /**
    * The time in milliseconds to timeout when following the backward strategy.
    * The observable is terminated when the specified amount of time has elapsed
@@ -135,7 +132,6 @@ export interface RxNostrOptions {
   timeout: number;
 }
 const defaultRxNostrOptions = defineDefaultOptions({
-  retry: 10,
   timeout: 10000,
 });
 
@@ -172,8 +168,8 @@ class RxNostrImpl implements RxNostr {
     }));
   }
 
-  private createWebsocket(url: string): WebsocketSubject {
-    const websocket = new WebsocketSubject(url);
+  private createWebsocket(url: string): RxNostrWebSocket {
+    const websocket = new RxNostrWebSocket(url);
 
     websocket.getConnectionStateObservable().subscribe((state) => {
       this.status$.next({
@@ -182,10 +178,13 @@ class RxNostrImpl implements RxNostr {
       });
     });
 
+    websocket.getErrorObservable().subscribe((reason) => {
+      this.error$.next({ from: url, reason });
+    });
+
     websocket
       .getMessageObservable()
       .pipe(
-        retry(this.options.retry),
         catchError((reason: unknown) => {
           this.relays.get(url)?.activeSubIds.clear();
           this.error$.next({ from: url, reason });
@@ -622,7 +621,7 @@ interface RelayState {
   read: boolean;
   write: boolean;
   activeSubIds: Set<string>;
-  websocket: WebsocketSubject;
+  websocket: RxNostrWebSocket;
 }
 
 function makeSubId(params: { rxReqId: string; index?: number }): string {
