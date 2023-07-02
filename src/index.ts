@@ -23,7 +23,7 @@ import {
   Unsubscribable,
 } from "rxjs";
 
-import { createEventByNip07, createEventBySecretKey } from "./nostr/event";
+import { getSignedEvent } from "./nostr/event";
 import { completeOnTimeout } from "./operator";
 import type {
   ConnectionState,
@@ -37,6 +37,12 @@ import type { RxReq } from "./req";
 import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
 import { BackoffConfig, RxNostrWebSocket } from "./websocket";
 
+export {
+  getEventHash,
+  getPublicKey,
+  getSignature,
+  getSignedEvent,
+} from "./nostr/event";
 export * from "./operator";
 export * from "./packet";
 export * from "./req";
@@ -531,10 +537,7 @@ class RxNostrImpl implements RxNostr {
     const subject = new ReplaySubject<OkPacket>(urls.length);
     let subscription: Subscription | null = null;
 
-    (seckey
-      ? Promise.resolve(createEventBySecretKey(params, seckey))
-      : createEventByNip07(params)
-    ).then((event) => {
+    getSignedEvent(params, seckey).then((event) => {
       if (!subject.closed) {
         subscription = this.createAllMessageObservable().subscribe(
           ({ from, message }) => {

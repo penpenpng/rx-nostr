@@ -7,49 +7,72 @@ import { toHex } from "./bech32";
 
 const utf8Encoder = new TextEncoder();
 
-export function getPublicKey(seckey: string): string {
-  return bytesToHex(schnorr.getPublicKey(seckey));
-}
-
-export function createEventBySecretKey(
+export async function getSignedEvent(
   params: Nostr.EventParameters,
-  seckey: string
-): Nostr.Event {
-  const sechex = seckey?.startsWith("nsec1") ? toHex(seckey) : seckey;
-  const pubhex = !params.pubkey
-    ? getPublicKey(sechex)
-    : params.pubkey.startsWith("npub1")
-    ? toHex(params.pubkey)
-    : params.pubkey;
+  seckey?: string
+): Promise<Nostr.Event> {
   const event = {
     ...params,
+    pubkey: params.pubkey ?? (await getPubkey()),
     tags: params.tags ?? [],
-    pubkey: pubhex,
     created_at: params.created_at ?? getCreatedAt(),
   };
-  const id = event.id ?? getEventHash(event);
-  const sig = event.sig ?? getSignature(id, sechex);
-  return {
-    ...event,
-    id,
-    sig,
-  };
-}
 
-export async function createEventByNip07(
-  params: Nostr.EventParameters
-): Promise<Nostr.Event> {
-  const nostr = (window ?? {})?.nostr;
-  if (!nostr) {
-    throw new Error("NIP-07 interface is not ready.");
+  if (ensureRequiredFields(params)) {
+    return params;
+  } else if (seckey) {
+    const id = event.id ?? getEventHash(event);
+    const sechex = seckey.startsWith("nsec1") ? toHex(seckey) : seckey;
+    return {
+      ...event,
+      id,
+      sig: event.sig ?? getSignature(id, sechex),
+    };
+  } else {
+    const nostr = (window ?? {})?.nostr;
+    if (!nostr) {
+      throw new Error(
+        "Couldn't get sig. To automatically calculate signature, a seckey argument or NIP-07 environment is required."
+      );
+    }
+
+    return nostr.signEvent({
+      kind: event.kind,
+      tags: event.tags,
+      content: event.content,
+      created_at: event.created_at,
+    });
   }
 
-  return nostr.signEvent({
-    kind: params.kind,
-    tags: params.tags ?? [],
-    content: params.content,
-    created_at: params.created_at ?? getCreatedAt(),
-  });
+  async function getPubkey() {
+    if (params.pubkey) {
+      if (params.pubkey.startsWith("npub1")) {
+        return toHex(params.pubkey);
+      } else {
+        return params.pubkey;
+      }
+    } else {
+      if (seckey) {
+        if (seckey.startsWith("nsec1")) {
+          return getPublicKey(toHex(seckey));
+        } else {
+          return getPublicKey(seckey);
+        }
+      } else {
+        const pubkey = await window?.nostr?.getPublicKey();
+        if (!pubkey) {
+          throw new Error(
+            "Couldn't get pubkey. To automatically calculate pubkey, a seckey argument or NIP-07 environment is required."
+          );
+        }
+        return pubkey;
+      }
+    }
+  }
+}
+
+export function getPublicKey(seckey: string): string {
+  return bytesToHex(schnorr.getPublicKey(seckey));
 }
 
 export function getEventHash(event: Nostr.UnsignedEvent): string {
@@ -77,7 +100,9 @@ export function verify(event: Nostr.Event): boolean {
   }
 }
 
-export function ensureRequiredFields(event: Nostr.Event): boolean {
+export function ensureRequiredFields(
+  event: Partial<Nostr.Event>
+): event is Nostr.Event {
   if (typeof event.content !== "string") return false;
   if (typeof event.created_at !== "number") return false;
   if (typeof event.pubkey !== "string") return false;
