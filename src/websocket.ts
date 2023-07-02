@@ -1,5 +1,6 @@
 import Nostr from "nostr-typedef";
 import {
+  EMPTY,
   mergeMap,
   Observable,
   of,
@@ -111,13 +112,20 @@ export class RxNostrWebSocket {
   getMessageObservable(): Observable<MessagePacket> {
     return this.message$.asObservable().pipe(
       tap((data) => {
-        if (data instanceof WebSocketError) {
+        if (
+          data instanceof WebSocketError &&
+          data.code !== WebSocketCloseCode.DONT_RETRY
+        ) {
           this.start();
         }
       }),
       mergeMap((data) => {
         if (data instanceof WebSocketError) {
-          return throwError(() => data);
+          if (data.code === WebSocketCloseCode.DONT_RETRY) {
+            return EMPTY;
+          } else {
+            return throwError(() => data);
+          }
         } else {
           return of(data);
         }
