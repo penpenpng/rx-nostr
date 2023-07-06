@@ -65,6 +65,8 @@ export default defineUserConfig({
             "/guide/getting-started.md",
             "/guide/first-step.md",
             "/guide/req-strategy.md",
+            "/guide/sending-event.md",
+            "/guide/monitor-connections.md",
             "/guide/operators.md",
             "/guide/examples.md",
           ],

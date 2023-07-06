@@ -4,17 +4,18 @@ rx-nostr の各所に存在する Observable は純粋な RxJS の Observable �
 
 rx-nostr が提供する operator はもちろんのこと、RxJS が提供する強力な operator の力を借りることも可能です。以下はその一例です。より多くの例は [Examples](/guide/examples.md) を参照してください。
 
-```js{8-9,15-18}
+```js:line-numbers{8-11,15-20}
 import { throttleTime } from "rxjs";
 import { createRxNostr, createRxForwardReq, verify, uniq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr-relay.nokotaro.com"]);
+rxNostr.switchRelays(["wss://nostr.example.com"]);
 
-const rxReq = createRxForwardReq().pipe(
-  // cf. https://rxjs.dev/api/index/function/throttleTime
-  throttleTime(1000)
-);
+const rxReq = createRxForwardReq()
+  .pipe(
+    // cf. https://rxjs.dev/api/index/function/throttleTime
+    throttleTime(1000)
+  );
 
 rxNostr
   .use(rxReq)
@@ -24,9 +25,7 @@ rxNostr
     // Uniq by event hash
     uniq()
   )
-  .subscribe((packet) => {
-    console.log(packet);
-  });
+  .subscribe(console.log);
 
 const authors = [];
 const addAuthor = (author) => {

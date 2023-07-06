@@ -21,6 +21,10 @@ yarn add rx-nostr
 :::
 ::::
 
+::: tip Node
+rx-nostr を Node.js ランタイムの上で使用する場合は [websocket-polyfill](https://www.npmjs.com/package/websocket-polyfill) も同時にインストールする必要があります。
+:::
+
 ## Playground
 
 rx-nostr をすぐに試したい場合は以下の通りリポジトリをクローンして、`app/main.ts` を編集して動作を確認することができます。

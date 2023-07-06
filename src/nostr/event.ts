@@ -15,7 +15,7 @@ export async function getSignedEvent(
     ...params,
     pubkey: params.pubkey ?? (await getPubkey()),
     tags: params.tags ?? [],
-    created_at: params.created_at ?? getCreatedAt(),
+    created_at: params.created_at ?? now(),
   };
 
   if (ensureRequiredFields(params)) {
@@ -120,6 +120,26 @@ export function ensureRequiredFields(
   return true;
 }
 
-function getCreatedAt() {
+export function now() {
   return Math.floor(new Date().getTime() / 1000);
+}
+
+export function earlierEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
+  return compareEvents(a, b) < 0 ? a : b;
+}
+
+export function laterEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
+  return compareEvents(a, b) < 0 ? b : a;
+}
+
+export function compareEvents(a: Nostr.Event, b: Nostr.Event): number {
+  if (a.id === b.id) {
+    return 0;
+  }
+
+  return a.created_at < b.created_at ||
+    // https://github.com/nostr-protocol/nips/blob/master/16.md#replaceable-events
+    (a.created_at === b.created_at && a.id < b.id)
+    ? -1
+    : 1;
 }

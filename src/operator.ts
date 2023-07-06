@@ -19,7 +19,7 @@ import {
   TimeoutError,
 } from "rxjs";
 
-import { verify as _verify } from "./nostr/event";
+import { compareEvents, verify as _verify } from "./nostr/event";
 import { isFiltered } from "./nostr/filter";
 import { MatchFilterOptions } from "./nostr/filter";
 import { EventPacket, ReqPacket } from "./packet";
@@ -39,12 +39,7 @@ export function uniq(
 export function latest(): MonoTypeOperatorFunction<EventPacket> {
   return pipe(
     scan<EventPacket>((acc, packet) =>
-      acc.event.created_at < packet.event.created_at ||
-      // https://github.com/nostr-protocol/nips/blob/master/16.md#replaceable-events
-      (acc.event.created_at === packet.event.created_at &&
-        acc.event.id < packet.event.id)
-        ? packet
-        : acc
+      compareEvents(acc.event, packet.event) < 0 ? packet : acc
     ),
     distinctUntilChanged(
       (a, b) => a === b,
@@ -78,13 +73,41 @@ export function filterKind<K extends Nostr.Kind>(
   return filter<EventPacket>(({ event }) => event.kind === kind);
 }
 
+export function filterBy(
+  filters: Nostr.Filter | Nostr.Filter[],
+  options?: MatchFilterOptions
+): MonoTypeOperatorFunction<EventPacket> {
+  return filter(({ event }) => isFiltered(event, filters, options));
+}
+
+export function timeline(
+  limit?: number
+): OperatorFunction<EventPacket, EventPacket[]> {
+  return scan<EventPacket, EventPacket[]>((acc, packet) => {
+    const next = [...acc, packet].sort(
+      (a, b) => -1 * compareEvents(a.event, b.event)
+    );
+    if (limit !== undefined) {
+      next.splice(limit);
+    }
+    return next;
+  }, []);
+}
+
 export type MergeFilter = (
   a: Nostr.Filter[],
   b: Nostr.Filter[]
 ) => Nostr.Filter[];
 
+function defaultMergeFilter(
+  a: Nostr.Filter[],
+  b: Nostr.Filter[]
+): Nostr.Filter[] {
+  return [...a, ...b];
+}
+
 export function batch(
-  mergeFilter: MergeFilter
+  mergeFilter?: MergeFilter
 ): OperatorFunction<ReqPacket[], ReqPacket> {
   return map((f) =>
     f.reduce((acc, v) => {
@@ -94,7 +117,7 @@ export function batch(
       if (v === null) {
         return acc;
       }
-      return mergeFilter(acc, v);
+      return (mergeFilter ?? defaultMergeFilter)(acc, v);
     }, null)
   );
 }
@@ -121,11 +144,4 @@ export function completeOnTimeout<T>(
       }
     })
   );
-}
-
-export function filterBy(
-  filters: Nostr.Filter[],
-  options?: MatchFilterOptions
-): MonoTypeOperatorFunction<EventPacket> {
-  return filter(({ event }) => isFiltered(event, filters, options));
 }
