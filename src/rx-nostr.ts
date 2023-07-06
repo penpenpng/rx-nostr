@@ -132,7 +132,7 @@ const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
   retry: {
     strategy: "exponential",
     maxCount: 5,
-    initialDelay: 1,
+    initialDelay: 1000,
   },
   timeout: 10000,
 });

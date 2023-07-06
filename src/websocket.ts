@@ -293,7 +293,7 @@ function backoffSignal(
 ): ObservableInput<unknown> {
   if (config.strategy === "exponential") {
     const time = Math.max(
-      config.initialDelay * 2 ** (count - 1) + (Math.random() - 1) * 1000,
+      config.initialDelay * 2 ** (count - 1) + (Math.random() - 0.5) * 1000,
       1000
     );
     return timer(time);
