@@ -128,7 +128,7 @@ export interface RxNostrOptions {
    */
   timeout: number;
 }
-const defaultRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
+const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
   retry: {
     strategy: "exponential",
     maxCount: 5,
@@ -156,7 +156,7 @@ class RxNostrImpl implements RxNostr {
   private status$: Subject<ConnectionStatePacket> = new Subject();
 
   constructor(options?: Partial<RxNostrOptions>) {
-    const opt = defaultRxNostrOptions(options);
+    const opt = makeRxNostrOptions(options);
     this.options = {
       ...opt,
     };

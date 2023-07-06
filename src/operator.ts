@@ -20,6 +20,8 @@ import {
 } from "rxjs";
 
 import { verify as _verify } from "./nostr/event";
+import { isFiltered } from "./nostr/filter";
+import { MatchFilterOptions } from "./nostr/filter";
 import { EventPacket, ReqPacket } from "./packet";
 
 /**
@@ -119,4 +121,11 @@ export function completeOnTimeout<T>(
       }
     })
   );
+}
+
+export function filterBy(
+  filters: Nostr.Filter[],
+  options?: MatchFilterOptions
+): MonoTypeOperatorFunction<EventPacket> {
+  return filter(({ event }) => isFiltered(event, filters, options));
 }
