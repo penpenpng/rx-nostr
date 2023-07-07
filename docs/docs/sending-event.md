@@ -37,7 +37,7 @@ rxNostr.send(event);
 
 ## Handling OK Messages
 
-`use()` 送信した EVENT に対する OK Message を購読する Observable を返します。Observable は送信先のリレーの数と同じ数の OK Message を受け取ったときに complete、または 30 秒経過したときに error で終了します。
+`use()` は送信した EVENT に対する OK Message を購読する Observable を返します。Observable は送信先のリレーの数と同じ数の OK Message を受け取ったときに complete、または何もメッセージを受信しないまま 30 秒経過したときに error で終了します。
 
 ```js
 rxNostr.send(event).subscribe((packet) => {
