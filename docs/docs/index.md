@@ -6,7 +6,7 @@ rx-nostr は [Nostr](https://nostr.com/) アプリケーションがリレーと
 - **リレープールの管理**: リレーの集合をリアクティブに扱います。リレーの増減や Read/Write 設定の変更といったリレー構成の変化に反応して、新しいリレー構成のもとで現在アクティブな REQ を適切に再構成します。
 - **WebSocket 接続の管理**: WebSocket の自動再接続と、それに伴う必要に応じた REQ の再発行を行います。接続状態の変化を購読することも可能で、アプリケーションが接続しているリレー集合のヘルスステータスを簡単に確認できるようにします。
 
-rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、これと同等のコードの説明は [First Step](/guide/first-step.md) で詳述します。より複雑な例は [Examples](/guide/examples.md) で見ることができます。
+rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、これと同等のコードの説明は [First Step](/docs/first-step.md) で詳述します。より複雑な例は [Examples](/docs/examples.md) で見ることができます。
 
 ```js
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
