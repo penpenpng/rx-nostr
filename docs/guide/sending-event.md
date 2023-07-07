@@ -1,3 +1,0 @@
-# Sending EVENT
-
-// TODO

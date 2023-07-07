@@ -20,6 +20,7 @@ import {
   take,
   takeUntil,
   tap,
+  timeout,
   Unsubscribable,
 } from "rxjs";
 
@@ -57,6 +58,8 @@ export interface RxNostr {
   addRelay(relay: string | RelayConfig): void;
   removeRelay(url: string): void;
   hasRelay(url: string): boolean;
+  canWriteRelay(url: string): boolean;
+  canReadRelay(url: string): boolean;
 
   fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo>;
   fetchAllRelaysInfo(): Promise<Record<string, Nostr.Nip11.RelayInfo | null>>;
@@ -290,14 +293,24 @@ class RxNostrImpl implements RxNostr {
     this.switchRelays([...this.getRelays(), relay]);
   }
   removeRelay(url: string): void {
+    const u = normalizeRelayUrl(url);
     const currentRelays = this.getRelays();
-    const nextRelays = currentRelays.filter((relay) => relay.url !== url);
+    const nextRelays = currentRelays.filter((relay) => relay.url !== u);
     if (currentRelays.length !== nextRelays.length) {
       this.switchRelays(nextRelays);
     }
   }
   hasRelay(url: string): boolean {
-    return this.getRelays().some((relay) => relay.url === url);
+    const u = normalizeRelayUrl(url);
+    return this.getRelays().some((relay) => relay.url === u);
+  }
+  canWriteRelay(url: string): boolean {
+    const u = normalizeRelayUrl(url);
+    return this.getRelays().some((relay) => relay.url === u && relay.write);
+  }
+  canReadRelay(url: string): boolean {
+    const u = normalizeRelayUrl(url);
+    return this.getRelays().some((relay) => relay.url === u && relay.read);
   }
 
   async fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo> {
@@ -340,7 +353,9 @@ class RxNostrImpl implements RxNostr {
     return relay.websocket?.getConnectionState() ?? "not-started";
   }
   reconnect(url: string): void {
-    this.relays.get(normalizeRelayUrl(url))?.websocket.start();
+    if (this.canReadRelay(url)) {
+      this.relays.get(normalizeRelayUrl(url))?.websocket.start();
+    }
   }
 
   use(rxReq: RxReq): Observable<EventPacket> {
@@ -550,6 +565,7 @@ class RxNostrImpl implements RxNostr {
 
     return subject.pipe(
       take(urls.length),
+      timeout(30 * 1000),
       finalize(() => {
         subject.complete();
         subject.unsubscribe();

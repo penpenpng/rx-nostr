@@ -26,30 +26,8 @@ export default defineUserConfig({
   theme: defaultTheme({
     navbar: [
       {
-        text: "Guide",
-        link: "/guide/",
-      },
-      {
-        text: "API",
-        link: "/api/",
-        children: [
-          {
-            text: "RxNostr",
-            link: "/api/rx-nostr",
-          },
-          {
-            text: "RxReq",
-            link: "/api/rx-req",
-          },
-          {
-            text: "Operators",
-            link: "/api/operators",
-          },
-          {
-            text: "Packets",
-            link: "/api/packets",
-          },
-        ],
+        text: "Docs",
+        link: "/docs/",
       },
       {
         text: "GitHub",
@@ -57,30 +35,29 @@ export default defineUserConfig({
       },
     ],
     sidebar: {
-      "/guide/": [
+      "/docs/": [
+        {
+          text: "Introduction",
+          children: [
+            "/docs/index.md",
+            "/docs/getting-started.md",
+            "/docs/first-step.md",
+          ],
+        },
         {
           text: "Guide",
           children: [
-            "/guide/index.md",
-            "/guide/getting-started.md",
-            "/guide/first-step.md",
-            "/guide/req-strategy.md",
-            "/guide/sending-event.md",
-            "/guide/monitor-connections.md",
-            "/guide/operators.md",
-            "/guide/examples.md",
+            "/docs/req-strategy.md",
+            "/docs/relay-configuration.md",
+            "/docs/sending-event.md",
+            "/docs/monitoring-connections.md",
+            "/docs/error-handling.md",
+            "/docs/operators.md",
           ],
         },
-      ],
-      "/api/": [
         {
-          text: "API",
-          children: [
-            "/api/rx-nostr.md",
-            "/api/rx-req.md",
-            "/api/operators.md",
-            "/api/packets.md",
-          ],
+          text: "Examples",
+          link: "/docs/examples.md",
         },
       ],
     },
