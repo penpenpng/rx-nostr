@@ -146,7 +146,8 @@ describe("Single relay case", () => {
       wasClean: true,
     });
 
-    // TODO: send and receive a dummy EVENT to test not to send REQ (depends on #36)
+    rxNostr.send(faker.event());
+    await expect(relay).toReceiveEVENT();
   });
 
   test("[forward] Each REQ is published with the same subId.", async () => {
@@ -196,15 +197,15 @@ describe("Single relay case", () => {
     // Emulate an abnormal disconnection of a relay.
     const socket = await relay.getSocket(0);
     socket.close({
-      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      code: WebSocketCloseCode.DONT_RETRY,
       reason: "Relay's internal error, but should not retry.",
       wasClean: true,
     });
 
-    // TODO: test not to attempting to reconnect
-    // await relay.waitConnected(2);
+    await expect(relay.getSockets(2)).rejects.toThrow();
 
-    // TODO: send and receive a dummy EVENT to test not to send REQ (depends on #36)
+    rxNostr.send(faker.event());
+    await expect(relay).toReceiveEVENT();
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
