@@ -73,6 +73,9 @@ export function filterKind<K extends Nostr.Kind>(
   return filter<EventPacket>(({ event }) => event.kind === kind);
 }
 
+/**
+ * Filter events based on a REQ filter object.
+ */
 export function filterBy(
   filters: Nostr.Filter | Nostr.Filter[],
   options?: MatchFilterOptions
@@ -80,6 +83,9 @@ export function filterBy(
   return filter(({ event }) => isFiltered(event, filters, options));
 }
 
+/**
+ * Accumulate latest events in order of new arrival (based on `created_at`).
+ */
 export function timeline(
   limit?: number
 ): OperatorFunction<EventPacket, EventPacket[]> {
@@ -106,7 +112,13 @@ function defaultMergeFilter(
   return [...a, ...b];
 }
 
+/**
+ * Map REQ packets into a single REQ packet.
+ *
+ * It is useful to reduce REQ requests in a time interval.
+ */
 export function batch(
+  /** Function used for merge REQ filters. Default behavior is simple concatenation. */
   mergeFilter?: MergeFilter
 ): OperatorFunction<ReqPacket[], ReqPacket> {
   return map((f) =>
@@ -122,6 +134,11 @@ export function batch(
   );
 }
 
+/**
+ * Chunk a REQ packet into multiple REQ packets.
+ *
+ * It is useful to avoid to send large REQ filter.
+ */
 export function chunk(
   predicate: (f: Nostr.Filter[]) => boolean,
   toChunk: (f: Nostr.Filter[]) => Nostr.Filter[][]
@@ -131,6 +148,9 @@ export function chunk(
   );
 }
 
+/**
+ * Almost RxJS's `timeout`, but won't throw.
+ */
 export function completeOnTimeout<T>(
   time: number
 ): MonoTypeOperatorFunction<T> {

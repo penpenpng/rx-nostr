@@ -7,8 +7,12 @@ import { toHex } from "./bech32";
 
 const utf8Encoder = new TextEncoder();
 
+/**
+ * Return a signed event that is ready for sending.
+ */
 export async function getSignedEvent(
   params: Nostr.EventParameters,
+  /** Private key in bech32 format of HEX format. If omitted, attempt to use NIP-07 interface. */
   seckey?: string
 ): Promise<Nostr.Event> {
   const event = {
@@ -71,10 +75,12 @@ export async function getSignedEvent(
   }
 }
 
+/** Calculate and return public key in HEX format. */
 export function getPublicKey(seckey: string): string {
   return bytesToHex(schnorr.getPublicKey(seckey));
 }
 
+/** Calculate and return event's hash (ID). */
 export function getEventHash(event: Nostr.UnsignedEvent): string {
   const serialized = JSON.stringify([
     0,
@@ -87,10 +93,12 @@ export function getEventHash(event: Nostr.UnsignedEvent): string {
   return bytesToHex(sha256(utf8Encoder.encode(serialized)));
 }
 
+/** Calculate and return schnorr signature. */
 export function getSignature(eventHash: string, seckey: string): string {
   return bytesToHex(schnorr.sign(eventHash, seckey));
 }
 
+/** Verify the given event and return true if it is valid. */
 export function verify(event: Nostr.Event): boolean {
   try {
     return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
@@ -119,18 +127,22 @@ export function ensureRequiredFields(
   return true;
 }
 
+/** Return current time that can be used for `created_at`. */
 export function now() {
   return Math.floor(new Date().getTime() / 1000);
 }
 
+/** Return an event that has earlier `created_at`. */
 export function earlierEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? a : b;
 }
 
+/** Return an event that has later `created_at`. */
 export function laterEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? b : a;
 }
 
+/** Sort key function to sort events based on `created_at`. */
 export function compareEvents(a: Nostr.Event, b: Nostr.Event): number {
   if (a.id === b.id) {
     return 0;

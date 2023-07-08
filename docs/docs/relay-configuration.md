@@ -46,3 +46,7 @@ rxNostr.switchRelays(await window.nostr.getRelays());
 ## Reactivity
 
 リレー構成の変更は、現在確立している REQ サブスクリプションに直ちに反映されます。すなわち、新しい構成のもとでもはや読み取りが許可されなくなったリレーにおける REQ は即座に CLOSE され、逆に新しく読み取りが可能になったリレーに対しては同等の REQ が自動的に送信されます。
+
+## Auto Reconnection
+
+WebSocket が予期しない理由で切断されたとき、rx-nostr は [exponential backoff and jitter](https://aws.amazon.com/jp/blogs/architecture/exponential-backoff-and-jitter/) 戦略に従って自動で再接続を試みます。この挙動は `createRxNostr()` のオプションで変更できます。

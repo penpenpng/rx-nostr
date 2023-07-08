@@ -270,20 +270,24 @@ export const WebSocketCloseCode = {
 
 export type BackoffConfig =
   | {
+      // Exponential backoff and jitter strategy
       strategy: "exponential";
       maxCount: number;
       initialDelay: number;
     }
   | {
+      // Retry at regular intervals
       strategy: "linear";
       maxCount: number;
       interval: number;
     }
   | {
+      // Retry immediately
       strategy: "immediately";
       maxCount: number;
     }
   | {
+      // Won't retry
       strategy: "off";
     };
 

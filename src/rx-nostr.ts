@@ -25,6 +25,7 @@ import {
 } from "rxjs";
 
 import { getSignedEvent } from "./nostr/event";
+import { fetchRelayInfo } from "./nostr/nip11";
 import { completeOnTimeout } from "./operator";
 import type {
   ConnectionState,
@@ -45,27 +46,47 @@ import { BackoffConfig, RxNostrWebSocket } from "./websocket";
  */
 export interface RxNostr {
   /**
-   * Returns a list of relays used by this object.
+   * Return a list of relays used by this object.
    * The relay URLs are normalised so may not match the URLs set.
    */
   getRelays(): RelayConfig[];
+
   /**
-   * Sets the list of relays.
+   * Set the list of relays.
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
   switchRelays(config: AcceptableRelaysConfig): void;
+  /** Utility wrapper for `switchRelays()`. */
   addRelay(relay: string | RelayConfig): void;
+  /** Utility wrapper for `switchRelays()`. */
   removeRelay(url: string): void;
+
+  /** Return true if the given relay is set to rxNostr. */
   hasRelay(url: string): boolean;
+  /** Return true if the given relay allows to be written. */
   canWriteRelay(url: string): boolean;
+  /** Return true if the given relay allows to be read. */
   canReadRelay(url: string): boolean;
 
-  fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo>;
+  /** Fetch all relays' info based on [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) */
   fetchAllRelaysInfo(): Promise<Record<string, Nostr.Nip11.RelayInfo | null>>;
 
+  /**
+   * Return a dictionary in which you can look up connection state.
+   *
+   * **NOTE**: Keys are **normalized** URL, so may be different from one you set.
+   */
   getAllRelayState(): Record<string, ConnectionState>;
+  /**
+   * Return connection state of the given relay.
+   * Throw if unknown URL is given.
+   */
   getRelayState(url: string): ConnectionState;
+  /**
+   * Attempt to reconnect the WebSocket if its state is `error` or `rejected`.
+   * If not, do nothing.
+   */
   reconnect(url: string): void;
 
   /**
@@ -98,17 +119,22 @@ export interface RxNostr {
    * Nothing happens when this Observable is unsubscribed.
    * */
   createAllMessageObservable(): Observable<MessagePacket>;
+  /**
+   * Create an Observable that receives changing of WebSocket connection state.
+   *
+   * Nothing happens when this Observable is unsubscribed.
+   */
   createConnectionStateObservable(): Observable<ConnectionStatePacket>;
 
   /**
-   * Attempts to send events to all relays that are allowed to write.
+   * Attempt to send events to all relays that are allowed to write.
    * The `seckey` param accepts both nsec format and hex format,
    * and if omitted NIP-07 will be automatically used.
    */
   send(params: Nostr.EventParameters, seckey?: string): Observable<OkPacket>;
 
   /**
-   * Releases all resources held by the RxNostr object.
+   * Release all resources held by the RxNostr object.
    * Any Observable resulting from this RxNostr will be in the completed state
    * and will never receive messages again.
    * RxReq used by this object is not affected; in other words, if the RxReq is used
@@ -123,6 +149,7 @@ export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
 }
 
 export interface RxNostrOptions {
+  /** Auto reconnection strategy. */
   retry: BackoffConfig;
   /**
    * The time in milliseconds to timeout when following the backward strategy.
@@ -140,12 +167,17 @@ const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
   timeout: 10000,
 });
 
+/** Config object specifying WebSocket behavior. */
 export interface RelayConfig {
+  /** WebSocket endpoint URL. */
   url: string;
+  /** If true, rxNostr can publish REQ and subscribe EVENTs. */
   read: boolean;
+  /** If true, rxNostr can send EVENTs. */
   write: boolean;
 }
 
+/** Parameter of `RxNostr#switchRelays()` */
 export type AcceptableRelaysConfig =
   | (string | RelayConfig)[]
   | Nostr.Nip07.GetRelayResult;
@@ -313,15 +345,6 @@ class RxNostrImpl implements RxNostr {
     return this.getRelays().some((relay) => relay.url === u && relay.read);
   }
 
-  async fetchRelayInfo(url: string): Promise<Nostr.Nip11.RelayInfo> {
-    const u = new URL(normalizeRelayUrl(url));
-    u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");
-
-    const res = await fetch(u.toString(), {
-      headers: { Accept: "application/nostr+json" },
-    });
-    return res.json();
-  }
   async fetchAllRelaysInfo(): Promise<
     Record<string, Nostr.Nip11.RelayInfo | null>
   > {
@@ -329,7 +352,7 @@ class RxNostrImpl implements RxNostr {
       Array.from(this.relays.keys()).map(
         async (url): Promise<[string, Nostr.Nip11.RelayInfo | null]> => [
           url,
-          await this.fetchRelayInfo(url).catch(() => null),
+          await fetchRelayInfo(url).catch(() => null),
         ]
       )
     );

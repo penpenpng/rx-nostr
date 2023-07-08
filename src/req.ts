@@ -5,15 +5,30 @@ import { ReqPacket } from "./packet";
 import type { Override } from "./util";
 
 /**
- * The RxReq interface that is provided for RxNostr (not for users).
+ * The RxReq interface that is provided for RxNostr (**not for users**).
  */
 export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
-  /** The RxReq strategy. It is read-only and must not change. */
+  /** @internal User should not use this directly.The RxReq strategy. It is read-only and must not change. */
   get strategy(): S;
-  /** Used to construct subId. */
+  /** @internal User should not use this directly. Used to construct subId. */
   get rxReqId(): string;
-  /** Get an Observable of ReqPacket. */
+  /** @internal User should not use this directly. Get an Observable of ReqPacket. */
   getReqObservable(): Observable<ReqPacket>;
+}
+
+/**
+ * REQ strategy.
+ *
+ * See comments on `createRxForwardReq()`, `createRxBackwardReq()` and `createRxOneshotReq()
+ */
+export type RxReqStrategy = "forward" | "backward" | "oneshot";
+
+/**
+ * The RxReq interface that is provided for users (not for RxNostr).
+ */
+export interface RxReqController {
+  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
+  emit(filters: Nostr.Filter[] | null): void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.
@@ -43,16 +58,6 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
-}
-
-export type RxReqStrategy = "forward" | "backward" | "oneshot";
-
-/**
- * The RxReq interface that is provided for users (not for RxNostr).
- */
-export interface RxReqController {
-  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: Nostr.Filter[] | null): void;
 }
 
 abstract class RxReqBase implements RxReq {
@@ -124,23 +129,23 @@ abstract class RxReqBase implements RxReq {
   }
 }
 
+/**
+ * Create a RxReq instance based on the backward strategy.
+ * It is useful if you want to retrieve past events that have already been published.
+ *
+ * In backward strategy:
+ * - All REQs have different subIds.
+ * - All REQ-subscriptions keep alive until timeout or getting EOSE.
+ * - In most cases, you should specify `until` or `limit` for filters.
+ *
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#backward-strategy).
+ */
 export function createRxBackwardReq(
   subIdBase?: string
 ): RxReq<"backward"> & RxReqController {
   return new RxBackwardReq(subIdBase);
 }
 
-/**
- * Base class for RxReq based on the backward strategy.
- * This is useful if you want to retrieve past events that have already been published.
- *
- * In backward strategy:
- * - All REQs have different subIds.
- * - All subscriptions keep alive until timeout or getting EOSE.
- * - Observable corresponding to each time REQ is flattened by `mergeAll()`.
- *     - https://rxjs.dev/api/operators/mergeAll
- * - In most cases, you should specify `limit` for filters.
- */
 class RxBackwardReq extends RxReqBase implements RxReqController {
   constructor(rxReqId?: string) {
     super(rxReqId);
@@ -151,24 +156,24 @@ class RxBackwardReq extends RxReqBase implements RxReqController {
   }
 }
 
+/**
+ * Create a RxReq instance based on the forward strategy.
+ * It is useful if you want to listen future events.
+ *
+ * In forward strategy:
+ * - All REQs have the same subId.
+ * - When a new REQ is issued, the old REQ is overwritten and terminated immediately.
+ *   The latest REQ keeps alive until it is overwritten or explicitly terminated.
+ * - In most cases, you should not specify `limit` for filters.
+ *
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#forward-strategy).
+ */
 export function createRxForwardReq(
   subId?: string
 ): RxReq<"forward"> & RxReqController {
   return new RxForwardReq(subId);
 }
 
-/**
- * Base class for RxReq based on the forward strategy.
- * This is useful if you want to listen future events.
- *
- * In forward strategy:
- * - All REQs have the same subId.
- * - When a new REQ is issued, the old REQ is overwritten and terminated immediately.
- *   The latest REQ keeps alive until it is overwritten or explicitly terminated.
- * - Observable corresponding to each time REQ is flattened by `switchAll()`.
- *     - https://rxjs.dev/api/operators/switchAll
- * - In most cases, you should not specify `limit` for filters.
- */
 class RxForwardReq extends RxReqBase implements RxReqController {
   constructor(rxReqId?: string) {
     super(rxReqId);
@@ -179,6 +184,13 @@ class RxForwardReq extends RxReqBase implements RxReqController {
   }
 }
 
+/**
+ * Create a RxReq instance based on the oneshot strategy.
+ * It is almost the same as backward strategy, however can publish only one REQ
+ * and the Observable completes on EOSE.
+ *
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#oneshot-strategy).
+ */
 export function createRxOneshotReq(req: {
   filters: Nostr.Filter[];
   subId?: string;
@@ -201,12 +213,14 @@ export interface Mixin<R, T> {
   (): ThisType<R> & T;
 }
 
+/** NOTE: unstable feature */
 export function mixin<R extends object, T extends object>(
   def: () => ThisType<R> & T
 ): Mixin<R, T> {
   return def;
 }
 
+/** NOTE: unstable feature */
 export function extend<B extends R, R extends object, T extends object>(
   base: B,
   mixin: Mixin<R, T>

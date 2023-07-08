@@ -12,6 +12,9 @@ const makeMatchFilterOptions = defineDefaultOptions<MatchFilterOptions>({
   untilInclusive: false,
 });
 
+/**
+ * Return true if the given filter matches the given filters.
+ */
 export function isFiltered(
   event: Nostr.Event,
   filters: Nostr.Filter | Nostr.Filter[],
