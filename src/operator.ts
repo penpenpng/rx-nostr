@@ -24,6 +24,10 @@ import { isFiltered } from "./nostr/filter";
 import { MatchFilterOptions } from "./nostr/filter";
 import { EventPacket, ReqPacket } from "./packet";
 
+// --------------------- //
+// EventPacket operators //
+// --------------------- //
+
 /**
  * Remove the events once seen.
  */
@@ -100,17 +104,9 @@ export function timeline(
   }, []);
 }
 
-export type MergeFilter = (
-  a: Nostr.Filter[],
-  b: Nostr.Filter[]
-) => Nostr.Filter[];
-
-function defaultMergeFilter(
-  a: Nostr.Filter[],
-  b: Nostr.Filter[]
-): Nostr.Filter[] {
-  return [...a, ...b];
-}
+// ------------------- //
+// ReqPacket operators //
+// ------------------- //
 
 /**
  * Map REQ packets into a single REQ packet.
@@ -148,6 +144,10 @@ export function chunk(
   );
 }
 
+// ----------------- //
+// General operators //
+// ----------------- //
+
 /**
  * Almost RxJS's `timeout`, but won't throw.
  */
@@ -164,4 +164,20 @@ export function completeOnTimeout<T>(
       }
     })
   );
+}
+
+// ----------- //
+// Other stuff //
+// ----------- //
+
+export type MergeFilter = (
+  a: Nostr.Filter[],
+  b: Nostr.Filter[]
+) => Nostr.Filter[];
+
+function defaultMergeFilter(
+  a: Nostr.Filter[],
+  b: Nostr.Filter[]
+): Nostr.Filter[] {
+  return [...a, ...b];
 }
