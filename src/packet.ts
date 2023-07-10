@@ -28,9 +28,11 @@ export interface ErrorPacket {
 /**
  * Packets from websocket that represents all raw incoming messages.
  */
-export interface MessagePacket {
+export interface MessagePacket<
+  M extends Nostr.ToClientMessage.Any = Nostr.ToClientMessage.Any
+> {
   from: string;
-  message: Nostr.ToClientMessage.Any;
+  message: M;
 }
 
 /**

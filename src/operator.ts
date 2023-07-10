@@ -22,7 +22,7 @@ import {
 import { compareEvents, verify as _verify } from "./nostr/event";
 import { isFiltered } from "./nostr/filter";
 import { MatchFilterOptions } from "./nostr/filter";
-import { EventPacket, ReqPacket } from "./packet";
+import { EventPacket, MessagePacket, ReqPacket } from "./packet";
 
 // --------------------- //
 // EventPacket operators //
@@ -102,6 +102,22 @@ export function timeline(
     }
     return next;
   }, []);
+}
+
+// ----------------------- //
+// MessagePacket operators //
+// ----------------------- //
+
+export function filterType<T extends Nostr.ToClientMessage.Type>(
+  type: T
+): OperatorFunction<
+  MessagePacket,
+  MessagePacket<Nostr.ToClientMessage.Message<T>>
+> {
+  return filter(
+    (packet): packet is MessagePacket<Nostr.ToClientMessage.Message<T>> =>
+      packet.message[0] === type
+  );
 }
 
 // ------------------- //

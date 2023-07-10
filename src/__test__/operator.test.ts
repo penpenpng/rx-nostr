@@ -1,8 +1,8 @@
 import { map, of } from "rxjs";
 import { test } from "vitest";
 
-import { latestEach } from "../operator";
-import { EventPacket } from "../packet";
+import { filterType, latestEach } from "../operator";
+import { EventPacket, MessagePacket } from "../packet";
 import { faker, testScheduler } from "./helper";
 
 test("latestEach()", async () => {
@@ -21,5 +21,25 @@ test("latestEach()", async () => {
     expectObservable(packet$.pipe(map((e) => e.event.id))).toEqual(
       of("1", "2", "5")
     );
+  });
+});
+
+test("filterType()", async () => {
+  testScheduler().run((helpers) => {
+    const { expectObservable } = helpers;
+
+    const packets: MessagePacket[] = [
+      faker.messagePacket(faker.toClientMessage.NOTICE("Hello")),
+      faker.messagePacket(faker.toClientMessage.EVENT("*")),
+      faker.messagePacket(faker.toClientMessage.AUTH()),
+      faker.messagePacket(faker.toClientMessage.NOTICE("Nostr")),
+      faker.messagePacket(faker.toClientMessage.COUNT("*")),
+      faker.messagePacket(faker.toClientMessage.EVENT("*")),
+    ];
+
+    const packet$ = of(...packets).pipe(filterType("NOTICE"));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expectObservable(packet$).toEqual(of<any[]>(packets[0], packets[3]));
   });
 });
