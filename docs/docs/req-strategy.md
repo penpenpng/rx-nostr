@@ -35,6 +35,6 @@ Backward Strategy はすべての REQ が有限のイベントを返すことを
 
 ## Oneshot Strategy
 
-Oneshot Strategy は Backward Strategy と同じく既に発行された過去のイベントを取得するための戦略ですが、`ReqPacket` をひとつしか送出することができません。その代わり、最初の REQ サブスクリプションが CLOSE したとき Observable が complete します。 `rxNostr.use(rxReq)` が返す `Observable<EventPacket>` が (`rxNostr.dispose()` が呼ばれる以外の理由で) complete する戦略はこれだけです。この戦略は必要なデータの読み込みが完了したときに何かを実行したい場合に便利です。
+Oneshot Strategy は Backward Strategy と同じく既に発行された過去のイベントを取得するための戦略ですが、`ReqPacket` をひとつしか送出することができません。その代わり、最初の REQ サブスクリプションが CLOSE したとき Observable が complete します。 `rxNostr.use()` が返す `Observable<EventPacket>` が (`rxNostr.dispose()` が呼ばれる以外の理由で) complete する戦略はこれだけです。この戦略は必要なデータの読み込みが完了したときに何かを実行したい場合に便利です。
 
 `createRxOneshotReq()` によって生成された `RxReq` がこの戦略に基づきます。

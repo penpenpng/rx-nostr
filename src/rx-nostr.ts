@@ -177,7 +177,7 @@ export interface RelayConfig {
   write: boolean;
 }
 
-/** Parameter of `RxNostr#switchRelays()` */
+/** Parameter of `rxNostr.switchRelays()` */
 export type AcceptableRelaysConfig =
   | (string | RelayConfig)[]
   | Nostr.Nip07.GetRelayResult;

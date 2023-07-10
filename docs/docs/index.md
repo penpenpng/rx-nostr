@@ -28,7 +28,7 @@ rxReq.emit([{ kinds: [1] }]);
 ::: tip Note
 本ドキュメントは Nostr と RxJS に関する基本的な知識を前提として記述されます。これらについて馴染みのない方は先に次に挙げる資料に目を通すことをおすすめします。
 
-- [NIPs](https://github.com/nostr-protocol/nips)
+- [NIPs](https://github.com/nostr-protocol/nips) の特に [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)
 - [RxJS Introduction](https://rxjs.dev/guide/overview)
 
 :::
