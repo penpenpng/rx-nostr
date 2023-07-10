@@ -2540,10 +2540,10 @@ vite-node@0.32.2:
   optionalDependencies:
     fsevents "~2.3.2"
 
-vitest-nostr@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/vitest-nostr/-/vitest-nostr-0.3.0.tgz#8511f3970035e107166df34116c77c053a32d048"
-  integrity sha512-SOPMGHDNC5TDhzUVdZsDpb2rxdg+UsXLVBXr41MuaRv+kJa0GCqHM5mNKdX1FezHwbkmVVZPO7V2BSD7FUX6Xg==
+vitest-nostr@^0.4.1:
+  version "0.4.1"
+  resolved "https://registry.yarnpkg.com/vitest-nostr/-/vitest-nostr-0.4.1.tgz#1d7e0d6353028db036a63f868b8fb6421e0e97cc"
+  integrity sha512-x40E7uYXFTccVC8ebr64gfYYq9p5pyMCaksk8ayfUsTHTTSpNXhZ2S/DWOGrJoPws33WGjGWY+ukDfW69bZ2Ow==
 
 vitest-websocket-mock@^0.2.1:
   version "0.2.1"
