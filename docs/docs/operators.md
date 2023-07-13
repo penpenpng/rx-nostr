@@ -9,7 +9,7 @@ import { throttleTime } from "rxjs";
 import { createRxNostr, createRxForwardReq, verify, uniq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq()
   .pipe(

@@ -8,7 +8,7 @@
 import { createRxNostr } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 // NIP-07 is required because the 2nd positional argument is omitted.
 rxNostr.send({
@@ -23,7 +23,7 @@ rxNostr.send({
 import { createRxNostr, getSignedEvent } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const event = await getSignedEvent({
   kind: 1,

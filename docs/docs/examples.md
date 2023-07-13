@@ -10,7 +10,7 @@ import { createRxNostr, createRxForwardReq, filterBy, now } from "rx-nostr";
 const MY_FOLLOWEES = ["hex1", "hex2", "hex3"];
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 rxNostr
@@ -34,7 +34,7 @@ import {
 } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 rxNostr.use(rxReq).pipe(
@@ -60,7 +60,7 @@ import {
 } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const timelineReq = createRxForwardReq();
 const profileReq = createRxBackwardReq();
@@ -105,7 +105,7 @@ import { createRxNostr, createRxOneshotReq } from "rx-nostr";
 const NOTE_ID = "hex";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays([
+await rxNostr.switchRelays([
   "wss://nostr1.example.com",
   "wss://nostr2.example.com"
 ]);
@@ -128,7 +128,7 @@ import { createRxNostr, createRxOneshotReq, type EventPacket } from "rx-nostr";
 const NOTE_IDS = ["hex1", "hex2", "hex3"];
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays([
+await rxNostr.switchRelays([
   "wss://nostr1.example.com",
   "wss://nostr2.example.com",
 ]);

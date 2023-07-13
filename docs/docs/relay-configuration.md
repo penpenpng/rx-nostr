@@ -6,7 +6,7 @@
 import { createRxNostr } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays([
+await rxNostr.switchRelays([
   "wss://nostr1.example.com",
   "wss://nostr2.example.com",
   "wss://nostr3.example.com",
@@ -18,7 +18,7 @@ rxNostr.switchRelays([
 特定のリレーに対して読み取りまたは書き込みのいずれかのみを許可したい場合、`rxNostr.switchRelays()` の引数にオブジェクトのリストを渡すことができます。
 
 ```js
-rxNostr.switchRelays([
+await rxNostr.switchRelays([
   {
     url: "wss://nostr1.example.com",
     read: true,
@@ -40,7 +40,7 @@ rxNostr.switchRelays([
 NIP-07 インターフェースが存在するブラウザ環境下では `window.nostr.getRelays()` の引数をそのまま使うこともできます。
 
 ```js
-rxNostr.switchRelays(await window.nostr.getRelays());
+await rxNostr.switchRelays(await window.nostr.getRelays());
 ```
 
 ## Reactivity
@@ -57,7 +57,10 @@ WebSocket が予期しない理由で切断されたとき、rx-nostr は [expon
 `scope` オプションに URL を指定しても、指定された URL が構成されていない場合には読み取りは発生しないことに注意してください。
 
 ```js
-rxNostr.switchRelays(["wss://nostr1.example.com", "wss://nostr2.example.com"]);
+await rxNostr.switchRelays([
+  "wss://nostr1.example.com",
+  "wss://nostr2.example.com",
+]);
 
 // - `wss://nostr1.example.com` will be used.
 // - `wss://unknown.example.com` and `wss://not-yet.example.com`
@@ -73,7 +76,7 @@ rxNostr.use(rxReq, {
 // `addRelay()` is a wrapper of `switchRelays()`.
 // This is equivalent to:
 //   `rxNostr.switchRelays([...rxNostr.getRelays(), 'wss://not-yet.example.com'])`
-rxNostr.addRelay("wss://not-yet.example.com");
+await rxNostr.addRelay("wss://not-yet.example.com");
 
 // Now `wss://not-yet.example.com` is available.
 rxReq.emit(filters);

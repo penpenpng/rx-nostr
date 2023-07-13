@@ -18,7 +18,7 @@ REQ Subscription と注釈された点線の枠に注目してください。今
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 
@@ -32,7 +32,7 @@ const observable = rxNostr.use(rxReq);
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 
@@ -53,7 +53,7 @@ const subscription = observable.subscribe((packet) => {
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 
@@ -82,7 +82,7 @@ rx-nostr では [`Subscription`](https://rxjs.dev/guide/subscription) が `unsub
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 

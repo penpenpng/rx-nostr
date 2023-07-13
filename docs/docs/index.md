@@ -12,7 +12,7 @@ rx-nostr を使うと、例えば kind1 のイベントを購読するコード�
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-rxNostr.switchRelays(["wss://nostr.example.com"]);
+await rxNostr.switchRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 
