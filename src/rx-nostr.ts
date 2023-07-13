@@ -512,7 +512,6 @@ class RxNostrImpl implements RxNostr {
         createConnectionStateObservable()
       ).subscribe(() => {
         const status = getAllRelayState();
-        // relayset の外は無視する
         const shouldComplete = Object.entries(status).every(
           ([url, state]) =>
             (scope && !scope.includes(url)) ||
