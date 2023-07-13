@@ -56,11 +56,11 @@ export interface RxNostr {
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
-  switchRelays(config: AcceptableRelaysConfig): void;
+  switchRelays(config: AcceptableRelaysConfig): Promise<void>;
   /** Utility wrapper for `switchRelays()`. */
-  addRelay(relay: string | RelayConfig): void;
+  addRelay(relay: string | RelayConfig): Promise<void>;
   /** Utility wrapper for `switchRelays()`. */
-  removeRelay(url: string): void;
+  removeRelay(url: string): Promise<void>;
 
   /** Return true if the given relay is set to rxNostr. */
   hasRelay(url: string): boolean;
@@ -131,10 +131,13 @@ export interface RxNostr {
 
   /**
    * Attempt to send events to all relays that are allowed to write.
-   * The `seckey` param accepts both nsec format and hex format,
+   * The `seckey` option accepts both nsec format and hex format,
    * and if omitted NIP-07 will be automatically used.
    */
-  send(params: Nostr.EventParameters, seckey?: string): Observable<OkPacket>;
+  send(
+    params: Nostr.EventParameters,
+    options?: RxNostrSendOptions
+  ): Observable<OkPacket>;
 
   /**
    * Release all resources held by the RxNostr object.
@@ -171,10 +174,19 @@ const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
 });
 
 export interface RxNostrUseOptions {
-  scope: string[] | null;
+  scope?: string[];
 }
 const makeRxNostrUseOptions = defineDefaultOptions<RxNostrUseOptions>({
-  scope: null,
+  scope: undefined,
+});
+
+export interface RxNostrSendOptions {
+  scope?: string[];
+  seckey?: string;
+}
+const makeRxNostrSendOptions = defineDefaultOptions<RxNostrSendOptions>({
+  scope: undefined,
+  seckey: undefined,
 });
 
 /** Config object specifying WebSocket behavior. */
@@ -245,7 +257,7 @@ class RxNostrImpl implements RxNostr {
     return websocket;
   }
 
-  switchRelays(config: AcceptableRelaysConfig): void {
+  async switchRelays(config: AcceptableRelaysConfig): Promise<void> {
     const createWebsocket = this.createWebsocket.bind(this);
     const prevRelays = this.relays;
     const nextRelays = getNextRelayState(prevRelays, config);
@@ -272,17 +284,16 @@ class RxNostrImpl implements RxNostr {
     this.relays = nextRelays;
 
     const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
-    Promise.all(
+    await Promise.all(
       urlsToBeRead.map((url) => nextRelays.get(url)?.websocket.start())
-    ).then(() => {
-      for (const { req, scope } of this.ongoings.values()) {
-        this.ensureReq(req, {
-          relays: scope
-            ? urlsToBeRead.filter((url) => scope.includes(url))
-            : null,
-        });
-      }
-    });
+    );
+    for (const { req, scope } of this.ongoings.values()) {
+      this.ensureReq(req, {
+        relays: scope
+          ? urlsToBeRead.filter((url) => scope.includes(url))
+          : null,
+      });
+    }
 
     // --- scoped untility pure functions ---
     function getReadableUrls(relays: RelayConfig[]): string[] {
@@ -340,15 +351,15 @@ class RxNostrImpl implements RxNostr {
       return a.filter((e) => !b.includes(e));
     }
   }
-  addRelay(relay: string | RelayConfig): void {
-    this.switchRelays([...this.getRelays(), relay]);
+  async addRelay(relay: string | RelayConfig): Promise<void> {
+    await this.switchRelays([...this.getRelays(), relay]);
   }
-  removeRelay(url: string): void {
+  async removeRelay(url: string): Promise<void> {
     const u = normalizeRelayUrl(url);
     const currentRelays = this.getRelays();
     const nextRelays = currentRelays.filter((relay) => relay.url !== u);
     if (currentRelays.length !== nextRelays.length) {
-      this.switchRelays(nextRelays);
+      await this.switchRelays(nextRelays);
     }
   }
   hasRelay(url: string): boolean {
@@ -404,7 +415,8 @@ class RxNostrImpl implements RxNostr {
     rxReq: RxReq,
     options?: Partial<RxNostrUseOptions>
   ): Observable<EventPacket> {
-    const { scope } = makeRxNostrUseOptions(options);
+    const { scope: _scope } = makeRxNostrUseOptions(options);
+    const scope = _scope?.map(normalizeRelayUrl);
 
     const TIMEOUT = this.options.timeout;
     const strategy = rxReq.strategy;
@@ -585,9 +597,14 @@ class RxNostrImpl implements RxNostr {
 
   send(
     params: Nostr.EventParameters,
-    seckey?: string | undefined
+    options?: RxNostrSendOptions
   ): Observable<OkPacket> {
-    const urls = this.getWritableUrls();
+    const { seckey, scope: _scope } = makeRxNostrSendOptions(options);
+    const scope = _scope?.map(normalizeRelayUrl);
+
+    const urls = this.getWritableUrls().filter(
+      (url) => !scope || scope.includes(url)
+    );
     const subject = new ReplaySubject<OkPacket>(urls.length);
     let subscription: Subscription | null = null;
 
@@ -687,7 +704,7 @@ interface RelayState {
 
 interface OngoingReq {
   req: Nostr.ToRelayMessage.REQ;
-  scope: string[] | null;
+  scope?: string[];
 }
 
 function makeSubId(params: { rxReqId: string; index?: number }): string {

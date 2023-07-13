@@ -22,7 +22,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr = createRxNostr({
       retry: { strategy: "immediately", maxCount: 5 },
     });
-    rxNostr.switchRelays([RELAY_URL]);
+    await rxNostr.switchRelays([RELAY_URL]);
 
     await relay.connected;
   });
@@ -238,7 +238,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
     relay3 = createMockRelay(RELAY_URL3);
 
     rxNostr = createRxNostr();
-    rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
+    await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
 
     await relay1.connected;
     await relay2.connected;
@@ -272,7 +272,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
-    rxNostr.addRelay(RELAY_URL3);
+    await rxNostr.addRelay(RELAY_URL3);
     await expect(relay3).toReceiveREQ("sub:0");
   });
 
@@ -285,7 +285,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
-    rxNostr.removeRelay(RELAY_URL2);
+    await rxNostr.removeRelay(RELAY_URL2);
     await expect(relay2).toReceiveCLOSE("sub:0");
   });
 
@@ -297,7 +297,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
     req.emit(faker.filters());
     await expect(relay1).toReceiveREQ("sub:0");
 
-    rxNostr.addRelay(RELAY_URL3);
+    await rxNostr.addRelay(RELAY_URL3);
 
     rxNostr.send(faker.event());
     await expect(relay1).toReceiveEVENT();
@@ -316,7 +316,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
     req.emit(faker.filters());
     await expect(relay1).toReceiveREQ("sub:0");
 
-    rxNostr.addRelay(RELAY_URL3);
+    await rxNostr.addRelay(RELAY_URL3);
     await expect(relay3).toReceiveREQ("sub:0");
 
     expect(relay2.messagesToConsume.pendingItems.length).toBe(0);
