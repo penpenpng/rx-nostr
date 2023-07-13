@@ -40,7 +40,7 @@ describe("Basic subscription behavior (single relay)", () => {
     const req = createRxForwardReq("sub");
     rxNostr.use(req).subscribe();
 
-    req.emit(faker.filters());
+    req.emit(faker.filter());
     await expect(relay).toReceiveREQ("sub:0");
 
     req.emit(faker.filters());
@@ -210,7 +210,7 @@ describe("Basic subscription behavior (single relay)", () => {
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
     const req = createRxOneshotReq({
       subId: "sub",
-      filters: faker.filters(),
+      filters: faker.filter(),
     });
     const spy = spySub();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
