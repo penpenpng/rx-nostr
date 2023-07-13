@@ -20,7 +20,7 @@ describe("Basic sending behavior", () => {
     relay3 = createMockRelay(RELAY_URL3);
 
     rxNostr = createRxNostr();
-    rxNostr.switchRelays([
+    await rxNostr.switchRelays([
       { url: RELAY_URL1, write: true, read: false },
       { url: RELAY_URL2, write: false, read: true },
     ]);
@@ -66,6 +66,22 @@ describe("Basic sending behavior", () => {
     expect(relay3.messagesToConsume.pendingItems.length).toBe(0);
 
     relay1.emitOK("*", true);
+    expect(spy.completed()).toBe(true);
+  });
+
+  test("send() doesn't wait for OK from out of scope.", async () => {
+    const spy = spySub();
+
+    await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
+    rxNostr
+      .send(faker.event(), { scope: [RELAY_URL2] })
+      .pipe(spy.tap())
+      .subscribe();
+
+    await expect(relay2).toReceiveEVENT();
+    expect(relay1.messagesToConsume.pendingItems.length).toBe(0);
+
+    relay2.emitOK("*", true);
     expect(spy.completed()).toBe(true);
   });
 });

@@ -53,7 +53,8 @@ WebSocket が予期しない理由で切断されたとき、rx-nostr は [expon
 
 ## Read on a subset of relays (v1.1.0+)
 
-構成された読み取り可能リレーのうちの一部だけで REQ サブスクリプションを確立したい場合、`rxNostr.use()` の `scope` オプションに URL のリストを指定できます。`scope` オプションに URL を指定しても、指定された URL が構成されていない場合には読み取りは発生しないことに注意してください。
+構成された読み取り可能リレーのうちの一部だけで REQ サブスクリプションを確立したい場合、`rxNostr.use()` の `scope` オプションにリレーの URL のリストを指定できます。
+`scope` オプションに URL を指定しても、指定された URL が構成されていない場合には読み取りは発生しないことに注意してください。
 
 ```js
 rxNostr.switchRelays(["wss://nostr1.example.com", "wss://nostr2.example.com"]);
