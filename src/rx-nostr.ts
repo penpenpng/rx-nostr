@@ -97,7 +97,10 @@ export interface RxNostr {
    * when an EVENT is received that is subscribed by RxReq.
    * You can unsubscribe the Observable to CLOSE.
    */
-  use(rxReq: RxReq): Observable<EventPacket>;
+  use(
+    rxReq: RxReq,
+    options?: Partial<RxNostrUseOptions>
+  ): Observable<EventPacket>;
   /**
    * Create an Observable that receives all events (EVENT) from all websocket connections.
    *
@@ -167,6 +170,13 @@ const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
   timeout: 10000,
 });
 
+export interface RxNostrUseOptions {
+  scope: string[] | null;
+}
+const makeRxNostrUseOptions = defineDefaultOptions<RxNostrUseOptions>({
+  scope: null,
+});
+
 /** Config object specifying WebSocket behavior. */
 export interface RelayConfig {
   /** WebSocket endpoint URL. */
@@ -185,7 +195,7 @@ export type AcceptableRelaysConfig =
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
   private relays: Map<string, RelayState> = new Map();
-  private activeReqs: Map<string, Nostr.ToRelayMessage.REQ> = new Map();
+  private ongoings: Map<string, OngoingReq> = new Map();
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
   private status$: Subject<ConnectionStatePacket> = new Subject();
@@ -237,40 +247,49 @@ class RxNostrImpl implements RxNostr {
 
   switchRelays(config: AcceptableRelaysConfig): void {
     const createWebsocket = this.createWebsocket.bind(this);
-    const nextRelays = getNextRelayState(this.relays, config);
+    const prevRelays = this.relays;
+    const nextRelays = getNextRelayState(prevRelays, config);
 
-    const prevReadableUrls = this.getReadableUrls();
-    const nextReadableUrls = this.getReadableUrls(
-      Array.from(nextRelays.values())
-    );
+    const prevReadableUrls = getReadableUrls(Array.from(prevRelays.values()));
+    const nextReadableUrls = getReadableUrls(Array.from(nextRelays.values()));
+
+    // Clean up -- Finalize no longer needed subscriptions.
     const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
     for (const url of urlsNoLongerRead) {
       this.finalizeReq({ url });
-      this.relays.get(url)?.websocket.stop();
-    }
-
-    const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
-    for (const url of urlsToBeRead) {
-      nextRelays.get(url)?.websocket.start();
-    }
-
-    for (const req of this.activeReqs.values()) {
-      this.ensureReq(req, {
-        relays: urlsToBeRead.map((url) => unnull(nextRelays.get(url))),
-      });
+      prevRelays.get(url)?.websocket.stop();
     }
 
     const urlsNoLongerUsed = subtract(
-      Array.from(this.relays.keys()),
+      Array.from(prevRelays.keys()),
       Array.from(nextRelays.keys())
     );
     for (const url of urlsNoLongerUsed) {
-      this.relays.get(url)?.websocket.dispose();
+      prevRelays.get(url)?.websocket.dispose();
     }
 
+    // Set up -- Initialize subscriptions on new relay set.
     this.relays = nextRelays;
 
+    const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
+    Promise.all(
+      urlsToBeRead.map((url) => nextRelays.get(url)?.websocket.start())
+    ).then(() => {
+      for (const { req, scope } of this.ongoings.values()) {
+        this.ensureReq(req, {
+          relays: scope
+            ? urlsToBeRead.filter((url) => scope.includes(url))
+            : null,
+        });
+      }
+    });
+
     // --- scoped untility pure functions ---
+    function getReadableUrls(relays: RelayConfig[]): string[] {
+      return Array.from(relays)
+        .filter((e) => e.read)
+        .map((e) => e.url);
+    }
     function getNextRelayState(
       prev: Map<string, RelayState>,
       config: AcceptableRelaysConfig
@@ -381,11 +400,17 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  use(rxReq: RxReq): Observable<EventPacket> {
+  use(
+    rxReq: RxReq,
+    options?: Partial<RxNostrUseOptions>
+  ): Observable<EventPacket> {
+    const { scope } = makeRxNostrUseOptions(options);
+
     const TIMEOUT = this.options.timeout;
     const strategy = rxReq.strategy;
     const rxReqId = rxReq.rxReqId;
     const message$ = this.message$;
+    const ongoings = this.ongoings;
 
     const getAllRelayState = this.getAllRelayState.bind(this);
     const createConnectionStateObservable =
@@ -393,20 +418,14 @@ class RxNostrImpl implements RxNostr {
     const ensureReq = this.ensureReq.bind(this);
     const finalizeReq = this.finalizeReq.bind(this);
 
-    const recordActiveReq = (req: Nostr.ToRelayMessage.REQ) => {
-      const subId = req[1];
-      this.activeReqs.set(subId, req);
-    };
-    const forgetActiveReq = (subId: string) => {
-      this.activeReqs.delete(subId);
-    };
-
     const subId$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is Nostr.Filter[] => filters !== null),
       strategy === "oneshot" ? first() : identity,
       attachSubId(),
       strategy === "forward" ? manageActiveForwardReq() : identity,
-      ensureReqOnNext(),
+      tap((req) => {
+        ensureReq(req, { overwrite: strategy === "forward", relays: scope });
+      }),
       map(([, subId]) => subId)
     );
 
@@ -458,6 +477,17 @@ class RxNostrImpl implements RxNostr {
       }
     }
     function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.ToRelayMessage.REQ> {
+      const recordActiveReq = (req: Nostr.ToRelayMessage.REQ) => {
+        const subId = req[1];
+        ongoings.set(subId, {
+          req,
+          scope,
+        });
+      };
+      const forgetActiveReq = (subId: string) => {
+        ongoings.delete(subId);
+      };
+
       return tap({
         next: (req: Nostr.ToRelayMessage.REQ) => {
           recordActiveReq(req);
@@ -471,11 +501,6 @@ class RxNostrImpl implements RxNostr {
         },
       });
     }
-    function ensureReqOnNext(): MonoTypeOperatorFunction<Nostr.ToRelayMessage.REQ> {
-      return tap((req: Nostr.ToRelayMessage.REQ) => {
-        ensureReq(req, { overwrite: strategy === "forward" });
-      });
-    }
     function createEoseManagedEventObservable(
       subId: string
     ): Observable<EventPacket> {
@@ -487,8 +512,10 @@ class RxNostrImpl implements RxNostr {
         createConnectionStateObservable()
       ).subscribe(() => {
         const status = getAllRelayState();
+        // relayset の外は無視する
         const shouldComplete = Object.entries(status).every(
           ([url, state]) =>
+            (scope && !scope.includes(url)) ||
             state === "error" ||
             state === "terminated" ||
             (state === "ongoing" && eoseRelays.has(url))
@@ -607,12 +634,14 @@ class RxNostrImpl implements RxNostr {
 
   private ensureReq(
     req: Nostr.ToRelayMessage.REQ,
-    options?: { relays?: RelayState[]; overwrite?: boolean }
+    options?: { relays?: string[] | null; overwrite?: boolean }
   ) {
     const subId = req[1];
 
-    for (const relay of options?.relays ?? this.relays.values()) {
+    for (const url of options?.relays ?? this.relays.keys()) {
+      const relay = this.relays.get(url);
       if (
+        !relay ||
         !relay.read ||
         (!options?.overwrite && relay.activeSubIds.has(subId))
       ) {
@@ -642,11 +671,6 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  private getReadableUrls(relays?: RelayConfig[]): string[] {
-    return Array.from(relays ?? this.relays.values())
-      .filter((e) => e.read)
-      .map((e) => e.url);
-  }
   private getWritableUrls(relays?: RelayConfig[]): string[] {
     return Array.from(relays ?? this.relays.values())
       .filter((e) => e.write)
@@ -660,6 +684,11 @@ interface RelayState {
   write: boolean;
   activeSubIds: Set<string>;
   websocket: RxNostrWebSocket;
+}
+
+interface OngoingReq {
+  req: Nostr.ToRelayMessage.REQ;
+  scope: string[] | null;
 }
 
 function makeSubId(params: { rxReqId: string; index?: number }): string {
