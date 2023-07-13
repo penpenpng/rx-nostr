@@ -28,7 +28,7 @@ export type RxReqStrategy = "forward" | "backward" | "oneshot";
  */
 export interface RxReqController {
   /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: Nostr.Filter[] | null): void;
+  emit(filters: Nostr.Filter | Nostr.Filter[] | null): void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.
@@ -77,7 +77,7 @@ abstract class RxReqBase implements RxReq {
     return this.filters$.asObservable();
   }
 
-  emit(filters: Nostr.Filter[] | null) {
+  emit(filters: Nostr.Filter | Nostr.Filter[] | null) {
     const normalized = normalizeFilters(filters);
 
     if (normalized) {
@@ -192,14 +192,14 @@ class RxForwardReq extends RxReqBase implements RxReqController {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#oneshot-strategy).
  */
 export function createRxOneshotReq(req: {
-  filters: Nostr.Filter[];
+  filters: Nostr.Filter | Nostr.Filter[];
   subId?: string;
 }): RxReq<"oneshot"> {
   return new RxOneshotReq(req);
 }
 
 class RxOneshotReq extends RxReqBase {
-  constructor(req: { filters: Nostr.Filter[]; subId?: string }) {
+  constructor(req: { filters: Nostr.Filter | Nostr.Filter[]; subId?: string }) {
     super(req?.subId);
     this.emit(req.filters);
   }
@@ -275,11 +275,13 @@ function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
 }
 
 function normalizeFilters(
-  filters: Nostr.Filter[] | null
+  filters: Nostr.Filter | Nostr.Filter[] | null
 ): Nostr.Filter[] | null {
   if (!filters) {
     return null;
   }
-  const normalized = filters.flatMap((e) => normalizeFilter(e) ?? []);
+  const normalized = (Array.isArray(filters) ? filters : [filters]).flatMap(
+    (e) => normalizeFilter(e) ?? []
+  );
   return normalized.length > 0 ? normalized : null;
 }
