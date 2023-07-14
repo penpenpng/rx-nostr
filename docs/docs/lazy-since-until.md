@@ -1,4 +1,4 @@
-# Lazy since/until
+# Lazy since/until (v1.2.0+)
 
 [First Step](./first-step.md) でも説明したように、`RxReq` から `RxNostr` に向かって `ReqPacket` を送出するためには原則として `rxReq.emit()` を使います (Oneshot Strategy においては代わりに `createOneshotRxReq()` の引数を使います)。この引数は Nostr 標準の Filter オブジェクトとほぼ同一の型を持ちますが、`since` または `until` に数値の代わりに `() => number` 型の関数を渡すこともできます。
 
