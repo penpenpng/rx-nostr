@@ -49,6 +49,7 @@ export default defineUserConfig({
           children: [
             "/docs/req-strategy.md",
             "/docs/relay-configuration.md",
+            "/docs/lazy-since-until.md",
             "/docs/sending-event.md",
             "/docs/monitoring-connections.md",
             "/docs/error-handling.md",

@@ -19,7 +19,7 @@ export async function getSignedEvent(
     ...params,
     pubkey: params.pubkey ?? (await getPubkey()),
     tags: params.tags ?? [],
-    created_at: params.created_at ?? now(),
+    created_at: params.created_at ?? Math.floor(new Date().getTime() / 1000),
   };
 
   if (ensureRequiredFields(params)) {
@@ -125,11 +125,6 @@ export function ensureRequiredFields(
   }
 
   return true;
-}
-
-/** Return current time that can be used for `created_at`. */
-export function now() {
-  return Math.floor(new Date().getTime() / 1000);
 }
 
 /** Return an event that has earlier `created_at`. */

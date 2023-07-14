@@ -12,7 +12,7 @@ import {
   timer,
 } from "rxjs";
 
-import { ConnectionState, MessagePacket } from "./packet";
+import { ConnectionState, LazyFilter, LazyREQ, MessagePacket } from "./packet";
 
 export class RxNostrWebSocket {
   private socket: WebSocket | null = null;
@@ -21,7 +21,7 @@ export class RxNostrWebSocket {
   private connectionState$ = new Subject<ConnectionState>();
   private connectionState: ConnectionState = "not-started";
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
-  private reqs: Map<string /* subId */, Nostr.ToRelayMessage.REQ> = new Map();
+  private reqs: Map<string /* subId */, LazyREQ> = new Map();
 
   constructor(public url: string, private backoffConfig: BackoffConfig) {
     this.connectionState$.next("not-started");
@@ -53,11 +53,11 @@ export class RxNostrWebSocket {
       this.setConnectionState("ongoing");
       resolve();
       for (const event of this.queuedEvents) {
-        this.send(event);
+        this.sendEVENT(event);
       }
       this.queuedEvents = [];
       for (const req of this.reqs.values()) {
-        this.send(req);
+        this.sendREQ(req);
       }
     };
     const onmessage = ({ data }: MessageEvent) => {
@@ -166,24 +166,40 @@ export class RxNostrWebSocket {
     return this.error$.asObservable();
   }
 
-  send(message: Nostr.ToRelayMessage.Any) {
+  sendREQ(message: LazyREQ) {
     if (this.connectionState === "terminated") {
       return;
     }
 
-    const type = message[0];
-    if (type === "REQ") {
-      const subId = message[1];
-      this.reqs.set(subId, message);
+    const subId = message[1];
+    this.reqs.set(subId, message);
+
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(evalREQ(message)));
     }
-    if (type === "CLOSE") {
-      const subId = message[1];
-      this.reqs.delete(subId);
+  }
+
+  sendCLOSE(message: Nostr.ToRelayMessage.CLOSE) {
+    if (this.connectionState === "terminated") {
+      return;
+    }
+
+    const subId = message[1];
+    this.reqs.delete(subId);
+
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(message));
+    }
+  }
+
+  sendEVENT(message: Nostr.ToRelayMessage.EVENT) {
+    if (this.connectionState === "terminated") {
+      return;
     }
 
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
-    } else if (type === "EVENT") {
+    } else {
       if (this.socket?.readyState === WebSocket.CONNECTING) {
         // Enqueue
         this.queuedEvents.push(message);
@@ -215,12 +231,6 @@ export class RxNostrWebSocket {
           }
         }, 10 * 1000);
       }
-    } else {
-      // Currently rx-nostr only sends REQ, CLOSE, and EVENT,
-      // so this branch is for REQ or CLOSE when connection is down.
-      // Nothing needs to be done here,
-      // as the REQ will be reconstituted based on the `reqs`
-      // when the connection is established again.
     }
   }
 
@@ -308,6 +318,22 @@ function backoffSignal(
   } else {
     return EMPTY;
   }
+}
+
+function evalREQ([type, subId, ...filters]: LazyREQ): Nostr.ToRelayMessage.REQ {
+  return [type, subId, ...filters.map(evalFilter)];
+}
+
+function evalFilter(filter: LazyFilter): Nostr.Filter {
+  return {
+    ...filter,
+    since: filter.since ? evalLazyNumber(filter.since) : undefined,
+    until: filter.until ? evalLazyNumber(filter.until) : undefined,
+  };
+}
+
+function evalLazyNumber(lazyNumber: number | (() => number)): number {
+  return typeof lazyNumber === "number" ? lazyNumber : lazyNumber();
 }
 
 class WebSocketError extends Error {

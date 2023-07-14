@@ -6,7 +6,18 @@ import Nostr from "nostr-typedef";
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
  * When null is sent, the subscription is suspended.
  */
-export type ReqPacket = Nostr.Filter[] | null;
+export type ReqPacket = LazyFilter[] | null;
+
+/**
+ * Filter object, but allows parameters since/until to be function.
+ * If so, values will be evaluated just before submission.
+ */
+export type LazyFilter = Omit<Nostr.Filter, "since" | "until"> & {
+  since?: number | (() => number);
+  until?: number | (() => number);
+};
+
+export type LazyREQ = ["REQ", string, ...LazyFilter[]];
 
 /**
  * Packets from websocket that represents an EVENT.

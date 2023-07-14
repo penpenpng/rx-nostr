@@ -1,7 +1,7 @@
 import Nostr from "nostr-typedef";
 import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
-import { ReqPacket } from "./packet";
+import { LazyFilter, ReqPacket } from "./packet";
 import type { Override } from "./util";
 
 /**
@@ -28,7 +28,7 @@ export type RxReqStrategy = "forward" | "backward" | "oneshot";
  */
 export interface RxReqController {
   /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: Nostr.Filter | Nostr.Filter[] | null): void;
+  emit(filters: LazyFilter | LazyFilter[] | null): void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.
@@ -77,7 +77,7 @@ abstract class RxReqBase implements RxReq {
     return this.filters$.asObservable();
   }
 
-  emit(filters: Nostr.Filter | Nostr.Filter[] | null) {
+  emit(filters: LazyFilter | LazyFilter[] | null) {
     const normalized = normalizeFilters(filters);
 
     if (normalized) {
@@ -192,14 +192,14 @@ class RxForwardReq extends RxReqBase implements RxReqController {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#oneshot-strategy).
  */
 export function createRxOneshotReq(req: {
-  filters: Nostr.Filter | Nostr.Filter[];
+  filters: LazyFilter | LazyFilter[];
   subId?: string;
 }): RxReq<"oneshot"> {
   return new RxOneshotReq(req);
 }
 
 class RxOneshotReq extends RxReqBase {
-  constructor(req: { filters: Nostr.Filter | Nostr.Filter[]; subId?: string }) {
+  constructor(req: { filters: LazyFilter | LazyFilter[]; subId?: string }) {
     super(req?.subId);
     this.emit(req.filters);
   }
@@ -232,17 +232,21 @@ function getRandomDigitsString() {
   return `${Math.floor(Math.random() * 1000000)}`;
 }
 
-function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
-  const res: Nostr.Filter = {};
+function normalizeFilter(filter: LazyFilter): LazyFilter | null {
+  const res: LazyFilter = {};
   const isTagName = (s: string): s is Nostr.TagName => /^#[a-zA-Z]$/.test(s);
 
   for (const key of Object.keys(filter)) {
-    if (
-      (key === "since" || key === "until" || key === "limit") &&
-      (filter[key] ?? -1) >= 0
-    ) {
+    if (key === "limit" && (filter[key] ?? -1) >= 0) {
       res[key] = filter[key];
       continue;
+    }
+    if (key === "since" || key === "until") {
+      const f = filter[key];
+      if (typeof f !== "number" || (f ?? -1) >= 0) {
+        res[key] = f;
+        continue;
+      }
     }
     if (
       (isTagName(key) || key === "ids" || key === "authors") &&
@@ -262,7 +266,10 @@ function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
     }
   }
 
-  const timeRangeIsValid = !res.since || !res.until || res.since <= res.until;
+  const timeRangeIsValid =
+    typeof res.since !== "number" ||
+    typeof res.until !== "number" ||
+    res.since <= res.until;
   if (!timeRangeIsValid) {
     return null;
   }
@@ -275,8 +282,8 @@ function normalizeFilter(filter: Nostr.Filter): Nostr.Filter | null {
 }
 
 function normalizeFilters(
-  filters: Nostr.Filter | Nostr.Filter[] | null
-): Nostr.Filter[] | null {
+  filters: LazyFilter | LazyFilter[] | null
+): LazyFilter[] | null {
   if (!filters) {
     return null;
   }

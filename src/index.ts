@@ -1,3 +1,4 @@
+export * from "./helper";
 export { toHex } from "./nostr/bech32";
 export {
   compareEvents,
@@ -7,7 +8,6 @@ export {
   getSignature,
   getSignedEvent,
   laterEvent,
-  now,
 } from "./nostr/event";
 export { isFiltered } from "./nostr/filter";
 export { fetchRelayInfo } from "./nostr/nip11";
