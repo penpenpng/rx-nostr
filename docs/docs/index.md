@@ -20,7 +20,7 @@ rxNostr.use(rxReq).subscribe((packet) => {
   console.log(packet);
 });
 
-rxReq.emit([{ kinds: [1] }]);
+rxReq.emit({ kinds: [1] });
 ```
 
 また、rx-nostr は RxJS 以外のフレームワークに依存しません。これは rx-nostr を任意のフロンエンドフレームと組み合わせて Web フロントエンドアプリケーションに利用することも、あるいは任意の Node.js ライブラリと組み合わせて bot や CLI アプリケーションを構築することも可能であることを意味します。

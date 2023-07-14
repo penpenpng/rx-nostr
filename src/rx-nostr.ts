@@ -32,6 +32,8 @@ import type {
   ConnectionStatePacket,
   ErrorPacket,
   EventPacket,
+  LazyFilter,
+  LazyREQ,
   MessagePacket,
   OkPacket,
 } from "./packet";
@@ -431,7 +433,7 @@ class RxNostrImpl implements RxNostr {
     const finalizeReq = this.finalizeReq.bind(this);
 
     const subId$ = rxReq.getReqObservable().pipe(
-      filter((filters): filters is Nostr.Filter[] => filters !== null),
+      filter((filters): filters is LazyFilter[] => filters !== null),
       strategy === "oneshot" ? first() : identity,
       attachSubId(),
       strategy === "forward" ? manageActiveForwardReq() : identity,
@@ -474,10 +476,7 @@ class RxNostrImpl implements RxNostr {
       return subId$.pipe(map(createEoseManagedEventObservable), mergeAll());
     }
 
-    function attachSubId(): OperatorFunction<
-      Nostr.Filter[],
-      Nostr.ToRelayMessage.REQ
-    > {
+    function attachSubId(): OperatorFunction<LazyFilter[], LazyREQ> {
       const makeId = (index?: number) => makeSubId({ rxReqId, index });
 
       switch (strategy) {
@@ -488,8 +487,8 @@ class RxNostrImpl implements RxNostr {
           return map((filters) => ["REQ", makeId(), ...filters]);
       }
     }
-    function manageActiveForwardReq(): MonoTypeOperatorFunction<Nostr.ToRelayMessage.REQ> {
-      const recordActiveReq = (req: Nostr.ToRelayMessage.REQ) => {
+    function manageActiveForwardReq(): MonoTypeOperatorFunction<LazyREQ> {
+      const recordActiveReq = (req: LazyREQ) => {
         const subId = req[1];
         ongoings.set(subId, {
           req,
@@ -501,7 +500,7 @@ class RxNostrImpl implements RxNostr {
       };
 
       return tap({
-        next: (req: Nostr.ToRelayMessage.REQ) => {
+        next: (req: LazyREQ) => {
           recordActiveReq(req);
         },
         finalize: () => {
@@ -625,7 +624,7 @@ class RxNostrImpl implements RxNostr {
       }
 
       for (const url of urls) {
-        this.relays.get(url)?.websocket.send(["EVENT", event]);
+        this.relays.get(url)?.websocket.sendEVENT(["EVENT", event]);
       }
     });
 
@@ -649,7 +648,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   private ensureReq(
-    req: Nostr.ToRelayMessage.REQ,
+    req: LazyREQ,
     options?: { relays?: string[] | null; overwrite?: boolean }
   ) {
     const subId = req[1];
@@ -664,7 +663,7 @@ class RxNostrImpl implements RxNostr {
         continue;
       }
 
-      relay.websocket.send(req);
+      relay.websocket.sendREQ(req);
       relay.activeSubIds.add(subId);
     }
   }
@@ -680,7 +679,7 @@ class RxNostrImpl implements RxNostr {
       const subIds = subId ? [subId] : Array.from(relay.activeSubIds);
       for (const subId of subIds) {
         if (relay.activeSubIds.has(subId)) {
-          relay.websocket.send(["CLOSE", subId]);
+          relay.websocket.sendCLOSE(["CLOSE", subId]);
         }
         relay.activeSubIds.delete(subId);
       }
@@ -703,7 +702,7 @@ interface RelayState {
 }
 
 interface OngoingReq {
-  req: Nostr.ToRelayMessage.REQ;
+  req: LazyREQ;
   scope?: string[];
 }
 

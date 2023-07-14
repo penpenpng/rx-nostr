@@ -19,7 +19,7 @@ rxNostr
   .pipe(filterBy({ authors: MY_FOLLOWEES }))
   .subscribe(console.log);
 
-rxReq.emit([{ kinds: [1], since: now() }]);
+rxReq.emit({ kinds: [1], since: now() });
 ```
 
 ## Subscribe to the latest 100 notes of the timeline
@@ -43,7 +43,7 @@ rxNostr.use(rxReq).pipe(
   timeline(100)
 ).subscribe(console.log);
 
-rxReq.emit([{ kinds: [1], since: now() }]);
+rxReq.emit({ kinds: [1], since: now() });
 ```
 
 ## Get the latest profile of the author of each post in the timeline
@@ -70,11 +70,11 @@ rxNostr
   .pipe(
     // Emit each time a packet is received
     tap(({ event }) => {
-      profileReq.emit([{
+      profileReq.emit({
         kinds: [0],
         authors: [event.pubkey],
         limit: 1,
-      }]);
+      });
     })
   )
   .subscribe((packet) => console.log("kind1", packet));
@@ -93,7 +93,7 @@ rxNostr
   )
   .subscribe((packet) => console.log("kind0", packet));
 
-timelineReq.emit([{ kinds: [1], since: now() }]);
+timelineReq.emit({ kinds: [1], since: now() });
 ```
 
 ## Await a note with specific note ID

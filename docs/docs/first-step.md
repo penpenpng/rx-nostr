@@ -67,7 +67,7 @@ const subscription = observable.subscribe((packet) => {
 });
 
 // Send REQ message to listen kind1 events
-rxReq.emit([{ kinds: [1] }]);
+rxReq.emit({ kinds: [1] });
 ```
 
 17, 18 行目を追加しました。さほど不思議なコードではないはずです。
@@ -96,7 +96,7 @@ const subscription = observable.subscribe((packet) => {
 });
 
 // Send REQ message to listen kind1 events
-rxReq.emit([{ kinds: [1] }]);
+rxReq.emit({ kinds: [1] });
 
 // Send CLOSE message in 10 seconds
 setTimeout(() => {

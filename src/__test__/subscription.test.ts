@@ -93,6 +93,32 @@ describe("Basic subscription behavior (single relay)", () => {
     await expect(relay).toReceiveEVENT();
   });
 
+  test("[forward] since/until is reevaluated when a lazy REQ is resubmitted.", async () => {
+    const req = createRxForwardReq("sub");
+    rxNostr.use(req).subscribe();
+
+    let since = 0;
+
+    req.emit({ ...faker.filter(), since: () => since++ });
+    await expect(relay).toReceiveREQ([
+      "sub:0",
+      { ...faker.filter(), since: 0 },
+    ]);
+
+    // Emulate an abnormal disconnection of a relay.
+    const socket = await relay.getSocket(0);
+    socket.close({
+      code: WebSocketCloseCode.ABNORMAL_CLOSURE,
+      reason: "Relay's internal error",
+      wasClean: true,
+    });
+
+    await expect(relay).toReceiveREQ([
+      "sub:0",
+      { ...faker.filter(), since: 1 },
+    ]);
+  });
+
   test("[backward] After receiving EOSE, CLOSE is sent out.", async () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).pipe().subscribe();

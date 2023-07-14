@@ -22,7 +22,7 @@ import {
 import { compareEvents, verify as _verify } from "./nostr/event";
 import { isFiltered } from "./nostr/filter";
 import { MatchFilterOptions } from "./nostr/filter";
-import { EventPacket, MessagePacket, ReqPacket } from "./packet";
+import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet";
 
 // --------------------- //
 // EventPacket operators //
@@ -152,8 +152,8 @@ export function batch(
  * It is useful to avoid to send large REQ filter.
  */
 export function chunk(
-  predicate: (f: Nostr.Filter[]) => boolean,
-  toChunk: (f: Nostr.Filter[]) => Nostr.Filter[][]
+  predicate: (f: LazyFilter[]) => boolean,
+  toChunk: (f: LazyFilter[]) => LazyFilter[][]
 ): MonoTypeOperatorFunction<ReqPacket> {
   return mergeMap((f) =>
     f !== null && predicate(f) ? of(...toChunk(f)) : of(f)
@@ -186,14 +186,8 @@ export function completeOnTimeout<T>(
 // Other stuff //
 // ----------- //
 
-export type MergeFilter = (
-  a: Nostr.Filter[],
-  b: Nostr.Filter[]
-) => Nostr.Filter[];
+export type MergeFilter = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
 
-function defaultMergeFilter(
-  a: Nostr.Filter[],
-  b: Nostr.Filter[]
-): Nostr.Filter[] {
+function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
 }

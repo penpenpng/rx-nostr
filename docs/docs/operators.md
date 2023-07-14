@@ -30,7 +30,7 @@ rxNostr
 const authors = [];
 const addAuthor = (author) => {
   authors.push(author);
-  rxReq.emit([{ kinds: [1], authors }]);
+  rxReq.emit({ kinds: [1], authors });
 };
 
 // For example, even if a large amount of author pubkey is brought
