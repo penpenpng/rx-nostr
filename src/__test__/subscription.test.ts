@@ -149,6 +149,29 @@ describe("Basic subscription behavior (single relay)", () => {
     ]);
   });
 
+  test("[forward] Reject EVENTs that do not match the given filters.", async () => {
+    const req = createRxForwardReq("sub");
+    const spy = spyEvent();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit({ kinds: [1] });
+    await expect(relay).toReceiveREQ("sub:0");
+
+    relay.emitEVENT("sub:0", faker.event({ kind: 1, content: "pass" }));
+    await expect(spy).toSeeEVENT([
+      "sub:0",
+      faker.event({ kind: 1, content: "pass" }),
+    ]);
+
+    relay.emitEVENT("sub:0", faker.event({ kind: 0, content: "rejected" }));
+
+    relay.emitEVENT("sub:0", faker.event({ kind: 1, content: "pass" }));
+    await expect(spy).toSeeEVENT([
+      "sub:0",
+      faker.event({ kind: 1, content: "pass" }),
+    ]);
+  });
+
   test("[backward] After receiving EOSE, CLOSE is sent out.", async () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).pipe().subscribe();

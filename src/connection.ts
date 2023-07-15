@@ -1,8 +1,10 @@
 import Nostr from "nostr-typedef";
 import {
   EMPTY,
+  filter,
   identity,
   mergeMap,
+  MonoTypeOperatorFunction,
   Observable,
   ObservableInput,
   of,
@@ -12,7 +14,8 @@ import {
   timer,
 } from "rxjs";
 
-import { evalFilters } from ".";
+import { evalFilters } from "./helper";
+import { isFiltered } from "./nostr/filter";
 import { ConnectionState, LazyREQ, MessagePacket } from "./packet";
 
 export class Connection {
@@ -143,6 +146,8 @@ export class Connection {
   }
 
   getMessageObservable(): Observable<MessagePacket> {
+    const reqs = this.reqs;
+
     return this.message$.asObservable().pipe(
       mergeMap((data) => {
         if (data instanceof WebSocketError) {
@@ -171,8 +176,28 @@ export class Connection {
         error: () => {
           this.setConnectionState("error");
         },
-      })
+      }),
+      rejectFilterUnmatchEvents()
     );
+
+    function rejectFilterUnmatchEvents(): MonoTypeOperatorFunction<MessagePacket> {
+      return filter((packet) => {
+        const [type, subId, event] = packet.message;
+
+        if (type !== "EVENT") {
+          return true;
+        }
+
+        const req = reqs.get(subId);
+        if (!req) {
+          return true;
+        }
+
+        const [, , ...filters] = req.actual;
+
+        return isFiltered(event, filters);
+      });
+    }
   }
 
   getConnectionStateObservable() {
