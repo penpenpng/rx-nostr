@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
 import { createRxNostr, RxNostr } from "..";
-import { WebSocketCloseCode } from "../websocket";
+import { WebSocketCloseCode } from "../connection";
 import { faker, spySub } from "./helper";
 
 describe("Basic sending behavior", () => {
