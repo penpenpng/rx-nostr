@@ -39,7 +39,7 @@ import type {
   OkPacket,
 } from "./packet";
 import type { RxReq } from "./req";
-import { defineDefaultOptions, normalizeRelayUrl, unnull } from "./util";
+import { defineDefaultOptions, normalizeRelayUrl } from "./util";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays
@@ -208,7 +208,7 @@ export type AcceptableRelaysConfig =
 
 class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
-  private relays: Map<string, RelayState> = new Map();
+  private connections: Map<string, Connection> = new Map();
   private ongoings: Map<string, OngoingReq> = new Map();
   private message$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
@@ -222,15 +222,21 @@ class RxNostrImpl implements RxNostr {
   }
 
   getRelays(): RelayConfig[] {
-    return Array.from(this.relays.values()).map(({ url, read, write }) => ({
-      url,
-      read,
-      write,
-    }));
+    return Array.from(this.connections.values()).map(
+      ({ url, read, write }) => ({
+        url,
+        read,
+        write,
+      })
+    );
   }
 
-  private createConnection(url: string): Connection {
-    const connection = new Connection(url, this.options.retry);
+  private createConnection({ url, read, write }: RelayConfig): Connection {
+    const connection = new Connection(url, {
+      backoff: this.options.retry,
+      read,
+      write,
+    });
 
     connection.getConnectionStateObservable().subscribe((state) => {
       this.status$.next({
@@ -245,7 +251,6 @@ class RxNostrImpl implements RxNostr {
       .getMessageObservable()
       .pipe(
         catchError((reason: unknown) => {
-          this.relays.get(url)?.activeSubIds.clear();
           this.error$.next({ from: url, reason });
           return EMPTY;
         })
@@ -258,71 +263,44 @@ class RxNostrImpl implements RxNostr {
   }
 
   async switchRelays(config: AcceptableRelaysConfig): Promise<void> {
-    const createConnection = this.createConnection.bind(this);
-    const prevRelays = this.relays;
-    const nextRelays = getNextRelayState(prevRelays, config);
+    const nextConns: Map<string, Connection> = new Map();
+    for (const { url, read, write } of normalizeRelaysConfig(config)) {
+      // pop a connection if exists
+      const prevConn = this.connections.get(url);
+      this.connections.delete(url);
 
-    const prevReadableUrls = getReadableUrls(Array.from(prevRelays.values()));
-    const nextReadableUrls = getReadableUrls(Array.from(nextRelays.values()));
-
-    // Clean up -- Finalize no longer needed subscriptions.
-    const urlsNoLongerRead = subtract(prevReadableUrls, nextReadableUrls);
-    for (const url of urlsNoLongerRead) {
-      this.finalizeReq({ url });
-      prevRelays.get(url)?.connection.stop();
+      if (prevConn) {
+        prevConn.read = read;
+        prevConn.write = write;
+        nextConns.set(url, prevConn);
+      } else {
+        nextConns.set(url, this.createConnection({ url, read, write }));
+      }
     }
 
-    const urlsNoLongerUsed = subtract(
-      Array.from(prevRelays.keys()),
-      Array.from(nextRelays.keys())
-    );
-    for (const url of urlsNoLongerUsed) {
-      prevRelays.get(url)?.connection.dispose();
+    // connections that are no longer used
+    for (const conn of this.connections.values()) {
+      conn.dispose();
     }
 
-    // Set up -- Initialize subscriptions on new relay set.
-    this.relays = nextRelays;
+    const ensureConns: Promise<unknown>[] = [];
+    for (const conn of nextConns.values()) {
+      if (conn.read) {
+        ensureConns.push(conn.start());
+      } else {
+        conn.stop();
+      }
+    }
 
-    const urlsToBeRead = subtract(nextReadableUrls, prevReadableUrls);
-    await Promise.all(
-      urlsToBeRead.map((url) => nextRelays.get(url)?.connection.start())
-    );
+    await Promise.all(ensureConns);
+
+    this.connections = nextConns;
+
     for (const { req, scope } of this.ongoings.values()) {
-      this.ensureReq(req, {
-        relays: scope
-          ? urlsToBeRead.filter((url) => scope.includes(url))
-          : null,
-      });
+      this.ensureReq(req, { scope });
     }
 
     // --- scoped untility pure functions ---
-    function getReadableUrls(relays: RelayConfig[]): string[] {
-      return Array.from(relays)
-        .filter((e) => e.read)
-        .map((e) => e.url);
-    }
-    function getNextRelayState(
-      prev: Map<string, RelayState>,
-      config: AcceptableRelaysConfig
-    ): Map<string, RelayState> {
-      const next: Map<string, RelayState> = new Map();
-
-      for (const relay of normalizeRelaysConfig(config)) {
-        const url = relay.url;
-        const prevState = prev.get(url);
-
-        const connection = prevState?.connection ?? createConnection(url);
-        const activeSubIds = prevState?.activeSubIds ?? new Set();
-
-        next.set(relay.url, {
-          ...relay,
-          connection,
-          activeSubIds,
-        });
-      }
-
-      return next;
-    }
     function normalizeRelaysConfig(
       config: AcceptableRelaysConfig
     ): RelayConfig[] {
@@ -346,9 +324,6 @@ class RxNostrImpl implements RxNostr {
           ...flags,
         }));
       }
-    }
-    function subtract<T>(a: T[], b: T[]): T[] {
-      return a.filter((e) => !b.includes(e));
     }
   }
   async addRelay(relay: string | RelayConfig): Promise<void> {
@@ -379,7 +354,7 @@ class RxNostrImpl implements RxNostr {
     Record<string, Nostr.Nip11.RelayInfo | null>
   > {
     const entries = await Promise.all(
-      Array.from(this.relays.keys()).map(
+      Array.from(this.connections.keys()).map(
         async (url): Promise<[string, Nostr.Nip11.RelayInfo | null]> => [
           url,
           await fetchRelayInfo(url).catch(() => null),
@@ -391,23 +366,23 @@ class RxNostrImpl implements RxNostr {
 
   getAllRelayState(): Record<string, ConnectionState> {
     return Object.fromEntries(
-      Array.from(this.relays.values()).map((e) => [
+      Array.from(this.connections.values()).map((e) => [
         e.url,
         this.getRelayState(e.url),
       ])
     );
   }
   getRelayState(url: string): ConnectionState {
-    const relay = this.relays.get(normalizeRelayUrl(url));
-    if (!relay) {
+    const conn = this.connections.get(normalizeRelayUrl(url));
+    if (!conn) {
       throw new Error("RelayConfig not found");
     }
     // this.relays[url] may be set before this.relays[url].websocket is initialized
-    return relay.connection?.getConnectionState() ?? "not-started";
+    return conn?.getConnectionState() ?? "not-started";
   }
   reconnect(url: string): void {
     if (this.canReadRelay(url)) {
-      this.relays.get(normalizeRelayUrl(url))?.connection.start();
+      this.connections.get(normalizeRelayUrl(url))?.start();
     }
   }
 
@@ -436,7 +411,7 @@ class RxNostrImpl implements RxNostr {
       attachSubId(),
       strategy === "forward" ? manageActiveForwardReq() : identity,
       tap((req) => {
-        ensureReq(req, { overwrite: strategy === "forward", relays: scope });
+        ensureReq(req, { overwrite: strategy === "forward", scope });
       }),
       map(([, subId]) => subId)
     );
@@ -599,10 +574,10 @@ class RxNostrImpl implements RxNostr {
     const { seckey, scope: _scope } = makeRxNostrSendOptions(options);
     const scope = _scope?.map(normalizeRelayUrl);
 
-    const urls = this.getWritableUrls().filter(
-      (url) => !scope || scope.includes(url)
+    const writableConns = Array.from(this.connections.values()).filter(
+      (conn) => (!scope || scope.includes(conn.url)) && conn.write
     );
-    const subject = new ReplaySubject<OkPacket>(urls.length);
+    const subject = new ReplaySubject<OkPacket>(writableConns.length);
     let subscription: Subscription | null = null;
 
     getSignedEvent(params, seckey).then((event) => {
@@ -621,13 +596,13 @@ class RxNostrImpl implements RxNostr {
         );
       }
 
-      for (const url of urls) {
-        this.relays.get(url)?.connection.sendEVENT(["EVENT", event]);
+      for (const conn of writableConns) {
+        conn.sendEVENT(["EVENT", event]);
       }
     });
 
     return subject.pipe(
-      take(urls.length),
+      take(writableConns.length),
       timeout(30 * 1000),
       finalize(() => {
         subject.complete();
@@ -640,29 +615,23 @@ class RxNostrImpl implements RxNostr {
   dispose(): void {
     this.message$.complete();
     this.error$.complete();
-    for (const relay of this.relays.values()) {
-      relay.connection.dispose();
+    for (const conn of this.connections.values()) {
+      conn.dispose();
     }
   }
 
   private ensureReq(
     req: LazyREQ,
-    options?: { relays?: string[] | null; overwrite?: boolean }
+    options?: { scope?: string[] | null; overwrite?: boolean }
   ) {
-    const subId = req[1];
-
-    for (const url of options?.relays ?? this.relays.keys()) {
-      const relay = this.relays.get(url);
-      if (
-        !relay ||
-        !relay.read ||
-        (!options?.overwrite && relay.activeSubIds.has(subId))
-      ) {
+    const scope = options?.scope;
+    for (const url of this.connections.keys()) {
+      const conn = this.connections.get(url);
+      if (!conn || !conn.read || (scope && !scope.includes(url))) {
         continue;
       }
 
-      relay.connection.sendREQ(req);
-      relay.activeSubIds.add(subId);
+      conn.ensureReq(req, { overwrite: options?.overwrite });
     }
   }
 
@@ -672,31 +641,14 @@ class RxNostrImpl implements RxNostr {
       throw new Error();
     }
 
-    const relays = url ? [unnull(this.relays.get(url))] : this.relays.values();
-    for (const relay of relays) {
-      const subIds = subId ? [subId] : Array.from(relay.activeSubIds);
-      for (const subId of subIds) {
-        if (relay.activeSubIds.has(subId)) {
-          relay.connection.sendCLOSE(["CLOSE", subId]);
-        }
-        relay.activeSubIds.delete(subId);
+    if (url) {
+      this.connections.get(url)?.finalizeReq(subId);
+    } else {
+      for (const conn of this.connections.values()) {
+        conn.finalizeReq(subId);
       }
     }
   }
-
-  private getWritableUrls(relays?: RelayConfig[]): string[] {
-    return Array.from(relays ?? this.relays.values())
-      .filter((e) => e.write)
-      .map((e) => e.url);
-  }
-}
-
-interface RelayState {
-  url: string;
-  read: boolean;
-  write: boolean;
-  activeSubIds: Set<string>;
-  connection: Connection;
 }
 
 interface OngoingReq {

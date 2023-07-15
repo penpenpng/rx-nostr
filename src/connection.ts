@@ -22,9 +22,22 @@ export class Connection {
   private connectionState$ = new Subject<ConnectionState>();
   private connectionState: ConnectionState = "not-started";
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
-  private reqs: Map<string /* subId */, LazyREQ> = new Map();
+  private reqs: Map<string /* subId */, ActiveReq> = new Map();
 
-  constructor(public url: string, private backoffConfig: BackoffConfig) {
+  get read() {
+    return this.config.read;
+  }
+  set read(v) {
+    this.config.read = v;
+  }
+  get write() {
+    return this.config.write;
+  }
+  set write(v) {
+    this.config.write = v;
+  }
+
+  constructor(public url: string, private config: ConnectionConfig) {
     this.connectionState$.next("not-started");
   }
 
@@ -45,6 +58,13 @@ export class Connection {
       return Promise.resolve();
     }
 
+    if (this.connectionState === "not-started") {
+      this.setConnectionState("starting");
+    } else {
+      this.setConnectionState("reconnecting");
+    }
+
+    // TODO: If connection is not established, it will never resolve. Fix it.
     let resolve: () => void;
     const resolveOnOpen = new Promise<void>((_resolve) => {
       resolve = _resolve;
@@ -58,7 +78,10 @@ export class Connection {
       }
       this.queuedEvents = [];
       for (const req of this.reqs.values()) {
-        this.sendREQ(req);
+        this.ensureReq(req.original, {
+          // force activate because this is a new connection
+          overwrite: true,
+        });
       }
     };
     const onmessage = ({ data }: MessageEvent) => {
@@ -105,6 +128,7 @@ export class Connection {
   }
 
   stop() {
+    this.finalizeReq();
     this.socket?.close(WebSocketCloseCode.DESIRED_BY_RX_NOSTR);
   }
 
@@ -114,6 +138,7 @@ export class Connection {
 
   getMessageObservable(): Observable<MessagePacket> {
     return this.message$.asObservable().pipe(
+      // TODO: Maybe wrong. Test that retry maxCount works.
       tap((data) => {
         if (
           data instanceof WebSocketError &&
@@ -135,21 +160,15 @@ export class Connection {
       }),
       tap({
         subscribe: () => {
-          if (this.connectionState === "not-started") {
-            this.setConnectionState("starting");
-          } else {
-            this.setConnectionState("reconnecting");
-          }
-
           this.start();
         },
       }),
-      this.backoffConfig.strategy === "off"
+      this.config.backoff.strategy === "off"
         ? identity
         : retry({
             delay: (_, retryCount) =>
-              backoffSignal(this.backoffConfig, retryCount),
-            count: this.backoffConfig.maxCount,
+              backoffSignal(this.config.backoff, retryCount),
+            count: this.config.backoff.maxCount,
           }),
       tap({
         error: () => {
@@ -167,29 +186,50 @@ export class Connection {
     return this.error$.asObservable();
   }
 
-  sendREQ(message: LazyREQ) {
+  ensureReq(req: LazyREQ, options?: { overwrite?: boolean }) {
+    const subId = req[1];
+
     if (this.connectionState === "terminated") {
       return;
     }
-
-    const subId = message[1];
-    this.reqs.set(subId, message);
-
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(evalREQ(message)));
+    if (!this.read) {
+      // REQ is not allowed.
+      return;
     }
-  }
-
-  sendCLOSE(message: Nostr.ToRelayMessage.CLOSE) {
-    if (this.connectionState === "terminated") {
+    if (this.reqs.has(subId) && !options?.overwrite) {
+      // REQ is already ongoing.
       return;
     }
 
-    const subId = message[1];
-    this.reqs.delete(subId);
+    const message = evalREQ(req);
+    this.reqs.set(subId, {
+      original: req,
+      actual: message,
+    });
 
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
+    }
+  }
+
+  finalizeReq(subId?: string) {
+    if (this.connectionState === "terminated") {
+      return;
+    }
+
+    const subIds = subId === undefined ? Array.from(this.reqs.keys()) : [subId];
+
+    for (const subId of subIds) {
+      if (!this.reqs.has(subId)) {
+        continue;
+      }
+
+      this.reqs.delete(subId);
+
+      const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify(message));
+      }
     }
   }
 
@@ -236,6 +276,7 @@ export class Connection {
   }
 
   dispose() {
+    this.finalizeReq();
     this.setConnectionState("terminated");
 
     if (
@@ -245,6 +286,8 @@ export class Connection {
       this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
     }
     this.socket = null;
+
+    this.reqs.clear();
 
     this.message$.complete();
     this.message$.unsubscribe();
@@ -279,6 +322,12 @@ export const WebSocketCloseCode = {
   DISPOSED_BY_RX_NOSTR: 4538,
 } as const;
 
+export interface ConnectionConfig {
+  backoff: BackoffConfig;
+  read: boolean;
+  write: boolean;
+}
+
 export type BackoffConfig =
   | {
       // Exponential backoff and jitter strategy
@@ -301,6 +350,11 @@ export type BackoffConfig =
       // Won't retry
       strategy: "off";
     };
+
+interface ActiveReq {
+  original: LazyREQ;
+  actual: Nostr.ToRelayMessage.REQ;
+}
 
 function backoffSignal(
   config: BackoffConfig,
