@@ -264,6 +264,10 @@ function normalizeFilter(filter: LazyFilter): LazyFilter | null {
       res[key] = filter[key];
       continue;
     }
+    if (key === "search" && filter[key] !== undefined) {
+      res[key] = filter[key];
+      continue;
+    }
   }
 
   const timeRangeIsValid =
