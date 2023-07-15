@@ -9,7 +9,7 @@ export interface MatchFilterOptions {
 
 const makeMatchFilterOptions = defineDefaultOptions<MatchFilterOptions>({
   sinceInclusive: true,
-  untilInclusive: false,
+  untilInclusive: true,
 });
 
 /**
