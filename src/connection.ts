@@ -64,15 +64,14 @@ export class Connection {
       this.setConnectionState("reconnecting");
     }
 
-    // TODO: If connection is not established, it will never resolve. Fix it.
-    let resolve: () => void;
-    const resolveOnOpen = new Promise<void>((_resolve) => {
-      resolve = _resolve;
+    let completeStartingProcess: () => void;
+    const succeededOrFailed = new Promise<void>((_resolve) => {
+      completeStartingProcess = _resolve;
     });
 
     const onopen = () => {
       this.setConnectionState("ongoing");
-      resolve();
+      completeStartingProcess();
       for (const event of this.queuedEvents) {
         this.sendEVENT(event);
       }
@@ -94,6 +93,9 @@ export class Connection {
         this.error$.next(err);
       }
     };
+    const onerror = () => {
+      completeStartingProcess();
+    };
     const onclose = ({ code }: CloseEvent) => {
       if (
         code === WebSocketCloseCode.DISPOSED_BY_RX_NOSTR ||
@@ -104,6 +106,7 @@ export class Connection {
 
       websocket.removeEventListener("open", onopen);
       websocket.removeEventListener("message", onmessage);
+      websocket.removeEventListener("error", onerror);
       websocket.removeEventListener("close", onclose);
 
       if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
@@ -111,8 +114,10 @@ export class Connection {
       } else if (code === WebSocketCloseCode.DONT_RETRY) {
         this.setConnectionState("rejected");
         this.message$.next(new WebSocketError(code));
+        completeStartingProcess();
       } else {
         this.message$.next(new WebSocketError(code));
+        completeStartingProcess();
       }
     };
 
@@ -120,11 +125,12 @@ export class Connection {
 
     websocket.addEventListener("open", onopen);
     websocket.addEventListener("message", onmessage);
+    websocket.addEventListener("error", onerror);
     websocket.addEventListener("close", onclose);
 
     this.socket = websocket;
 
-    return resolveOnOpen;
+    return succeededOrFailed;
   }
 
   stop() {
@@ -235,6 +241,9 @@ export class Connection {
 
   sendEVENT(message: Nostr.ToRelayMessage.EVENT) {
     if (this.connectionState === "terminated") {
+      return;
+    }
+    if (!this.write) {
       return;
     }
 
