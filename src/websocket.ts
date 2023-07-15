@@ -1,7 +1,6 @@
 import Nostr from "nostr-typedef";
 import {
   EMPTY,
-  filter,
   identity,
   mergeMap,
   Observable,
