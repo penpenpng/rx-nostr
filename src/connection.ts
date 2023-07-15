@@ -144,15 +144,6 @@ export class Connection {
 
   getMessageObservable(): Observable<MessagePacket> {
     return this.message$.asObservable().pipe(
-      // TODO: Maybe wrong. Test that retry maxCount works.
-      tap((data) => {
-        if (
-          data instanceof WebSocketError &&
-          data.code !== WebSocketCloseCode.DONT_RETRY
-        ) {
-          this.start();
-        }
-      }),
       mergeMap((data) => {
         if (data instanceof WebSocketError) {
           if (data.code === WebSocketCloseCode.DONT_RETRY) {
