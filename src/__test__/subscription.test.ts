@@ -8,7 +8,7 @@ import {
   createRxOneshotReq,
   RxNostr,
 } from "..";
-import { WebSocketCloseCode } from "../websocket";
+import { WebSocketCloseCode } from "../connection";
 import { faker, spyEvent, spySub } from "./helper";
 
 describe("Basic subscription behavior (single relay)", () => {

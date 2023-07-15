@@ -15,7 +15,7 @@ import {
 import { evalFilters } from ".";
 import { ConnectionState, LazyREQ, MessagePacket } from "./packet";
 
-export class RxNostrWebSocket {
+export class Connection {
   private socket: WebSocket | null = null;
   private message$ = new Subject<MessagePacket | WebSocketError>();
   private error$ = new Subject<unknown>();
