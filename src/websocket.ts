@@ -1,6 +1,7 @@
 import Nostr from "nostr-typedef";
 import {
   EMPTY,
+  filter,
   identity,
   mergeMap,
   Observable,
@@ -12,7 +13,8 @@ import {
   timer,
 } from "rxjs";
 
-import { ConnectionState, LazyFilter, LazyREQ, MessagePacket } from "./packet";
+import { evalFilters } from ".";
+import { ConnectionState, LazyREQ, MessagePacket } from "./packet";
 
 export class RxNostrWebSocket {
   private socket: WebSocket | null = null;
@@ -321,19 +323,7 @@ function backoffSignal(
 }
 
 function evalREQ([type, subId, ...filters]: LazyREQ): Nostr.ToRelayMessage.REQ {
-  return [type, subId, ...filters.map(evalFilter)];
-}
-
-function evalFilter(filter: LazyFilter): Nostr.Filter {
-  return {
-    ...filter,
-    since: filter.since ? evalLazyNumber(filter.since) : undefined,
-    until: filter.until ? evalLazyNumber(filter.until) : undefined,
-  };
-}
-
-function evalLazyNumber(lazyNumber: number | (() => number)): number {
-  return typeof lazyNumber === "number" ? lazyNumber : lazyNumber();
+  return [type, subId, ...evalFilters(filters)];
 }
 
 class WebSocketError extends Error {

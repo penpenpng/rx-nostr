@@ -19,10 +19,12 @@ import {
   TimeoutError,
 } from "rxjs";
 
+import { evalFilters } from "./helper";
 import { compareEvents, verify as _verify } from "./nostr/event";
 import { isFiltered } from "./nostr/filter";
 import { MatchFilterOptions } from "./nostr/filter";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet";
+import { defineDefaultOptions } from "./util";
 
 // --------------------- //
 // EventPacket operators //
@@ -81,10 +83,15 @@ export function filterKind<K extends Nostr.Kind>(
  * Filter events based on a REQ filter object.
  */
 export function filterBy(
-  filters: Nostr.Filter | Nostr.Filter[],
-  options?: MatchFilterOptions
+  filters: LazyFilter | LazyFilter[],
+  options?: MatchFilterOptions & FilterByOptions
 ): MonoTypeOperatorFunction<EventPacket> {
-  return filter(({ event }) => isFiltered(event, filters, options));
+  const { not } = makeFilterByOptions(options);
+  const evaledFilter = evalFilters(filters);
+  return filter(({ event }) => {
+    const match = isFiltered(event, evaledFilter, options);
+    return not ? !match : match;
+  });
 }
 
 /**
@@ -191,3 +198,10 @@ export type MergeFilter = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
 function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
 }
+
+export interface FilterByOptions {
+  not: boolean;
+}
+const makeFilterByOptions = defineDefaultOptions<FilterByOptions>({
+  not: false,
+});
