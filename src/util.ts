@@ -21,13 +21,6 @@ export type Override<T extends object, U extends object> = {
     : never;
 };
 
-export function unnull<T>(v: T | null | undefined): T {
-  if (v === null || v === undefined) {
-    throw new Error();
-  }
-  return v;
-}
-
 export function normalizeRelayUrl(url: string) {
   return normalizeUrl(url, {
     normalizeProtocol: false,
