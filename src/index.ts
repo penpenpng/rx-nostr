@@ -1,5 +1,5 @@
-export * from "./helper";
-export { toHex } from "./nostr/bech32";
+export * from "./helper.js";
+export { toHex } from "./nostr/bech32.js";
 export {
   compareEvents,
   earlierEvent,
@@ -8,10 +8,10 @@ export {
   getSignature,
   getSignedEvent,
   laterEvent,
-} from "./nostr/event";
-export { isFiltered } from "./nostr/filter";
-export { fetchRelayInfo } from "./nostr/nip11";
-export * from "./operator";
-export * from "./packet";
-export * from "./req";
-export * from "./rx-nostr";
+} from "./nostr/event.js";
+export { isFiltered } from "./nostr/filter.js";
+export { fetchRelayInfo } from "./nostr/nip11.js";
+export * from "./operator.js";
+export * from "./packet.js";
+export * from "./req.js";
+export * from "./rx-nostr.js";

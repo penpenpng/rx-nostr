@@ -1,6 +1,6 @@
 import * as Nostr from "nostr-typedef";
 
-import { defineDefaultOptions } from "../util";
+import { defineDefaultOptions } from "../util.js";
 
 export interface MatchFilterOptions {
   sinceInclusive: boolean;

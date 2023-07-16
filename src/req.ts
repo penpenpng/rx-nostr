@@ -1,8 +1,8 @@
 import Nostr from "nostr-typedef";
 import { BehaviorSubject, Observable, OperatorFunction } from "rxjs";
 
-import { LazyFilter, ReqPacket } from "./packet";
-import type { Override } from "./util";
+import { LazyFilter, ReqPacket } from "./packet.js";
+import type { Override } from "./util.js";
 
 /**
  * The RxReq interface that is provided for RxNostr (**not for users**).

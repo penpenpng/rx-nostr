@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
-import { createRxNostr, RxNostr } from "..";
-import { WebSocketCloseCode } from "../connection";
-import { faker, spySub } from "./helper";
+import { WebSocketCloseCode } from "../connection.js";
+import { createRxNostr, RxNostr } from "../index.js";
+import { faker, spySub } from "./helper.js";
 
 describe("Basic sending behavior", () => {
   const RELAY_URL1 = "ws://localhost:1234";

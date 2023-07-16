@@ -24,10 +24,10 @@ import {
   Unsubscribable,
 } from "rxjs";
 
-import { BackoffConfig, Connection } from "./connection";
-import { getSignedEvent } from "./nostr/event";
-import { fetchRelayInfo } from "./nostr/nip11";
-import { completeOnTimeout } from "./operator";
+import { BackoffConfig, Connection } from "./connection.js";
+import { getSignedEvent } from "./nostr/event.js";
+import { fetchRelayInfo } from "./nostr/nip11.js";
+import { completeOnTimeout } from "./operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -37,9 +37,9 @@ import type {
   LazyREQ,
   MessagePacket,
   OkPacket,
-} from "./packet";
-import type { RxReq } from "./req";
-import { defineDefaultOptions, normalizeRelayUrl } from "./util";
+} from "./packet.js";
+import type { RxReq } from "./req.js";
+import { defineDefaultOptions, normalizeRelayUrl } from "./util.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays

@@ -1,15 +1,15 @@
 import { afterEach, assert, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
+import { WebSocketCloseCode } from "../connection.js";
 import {
   createRxBackwardReq,
   createRxForwardReq,
   createRxNostr,
   createRxOneshotReq,
   RxNostr,
-} from "..";
-import { WebSocketCloseCode } from "../connection";
-import { faker, spyEvent, spySub } from "./helper";
+} from "../index.js";
+import { faker, spyEvent, spySub } from "./helper.js";
 
 describe("Basic subscription behavior (single relay)", () => {
   const RELAY_URL = "ws://localhost:1234";
