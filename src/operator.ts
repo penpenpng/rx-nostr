@@ -19,12 +19,12 @@ import {
   TimeoutError,
 } from "rxjs";
 
-import { evalFilters } from "./helper";
-import { compareEvents, verify as _verify } from "./nostr/event";
-import { isFiltered } from "./nostr/filter";
-import { MatchFilterOptions } from "./nostr/filter";
-import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet";
-import { defineDefaultOptions } from "./util";
+import { evalFilters } from "./helper.js";
+import { compareEvents, verify as _verify } from "./nostr/event.js";
+import { isFiltered } from "./nostr/filter.js";
+import { MatchFilterOptions } from "./nostr/filter.js";
+import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
+import { defineDefaultOptions } from "./util.js";
 
 // --------------------- //
 // EventPacket operators //

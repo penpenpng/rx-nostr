@@ -4,7 +4,7 @@ import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { createClientSpy, faker as _faker } from "vitest-nostr";
 
-import { EventPacket, MessagePacket } from "../packet";
+import { EventPacket, MessagePacket } from "../packet.js";
 
 export function testScheduler() {
   return new TestScheduler((a, b) => expect(a).toEqual(b));

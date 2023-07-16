@@ -14,9 +14,9 @@ import {
   timer,
 } from "rxjs";
 
-import { evalFilters } from "./helper";
-import { isFiltered } from "./nostr/filter";
-import { ConnectionState, LazyREQ, MessagePacket } from "./packet";
+import { evalFilters } from "./helper.js";
+import { isFiltered } from "./nostr/filter.js";
+import { ConnectionState, LazyREQ, MessagePacket } from "./packet.js";
 
 export class Connection {
   private socket: WebSocket | null = null;

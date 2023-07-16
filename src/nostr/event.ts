@@ -3,7 +3,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import Nostr from "nostr-typedef";
 
-import { toHex } from "./bech32";
+import { toHex } from "./bech32.js";
 
 const utf8Encoder = new TextEncoder();
 
