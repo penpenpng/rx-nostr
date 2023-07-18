@@ -73,7 +73,7 @@ export function verify(): MonoTypeOperatorFunction<EventPacket> {
 /**
  * Only events with given kind are allowed to pass.
  */
-export function filterKind<K extends Nostr.Kind>(
+export function filterKind<K extends number>(
   kind: K
 ): MonoTypeOperatorFunction<EventPacket> {
   return filter<EventPacket>(({ event }) => event.kind === kind);
