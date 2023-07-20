@@ -1,5 +1,5 @@
 import Nostr from "nostr-typedef";
-import { MonoTypeOperatorFunction, tap } from "rxjs";
+import { type MonoTypeOperatorFunction, tap } from "rxjs";
 import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { createClientSpy, faker as _faker } from "vitest-nostr";

@@ -10,10 +10,10 @@ import {
   merge,
   mergeAll,
   mergeMap,
-  MonoTypeOperatorFunction,
+  type MonoTypeOperatorFunction,
   Observable,
   of,
-  OperatorFunction,
+  type OperatorFunction,
   ReplaySubject,
   Subject,
   Subscription,
@@ -21,7 +21,7 @@ import {
   takeUntil,
   tap,
   timeout,
-  Unsubscribable,
+  type Unsubscribable,
 } from "rxjs";
 
 import { BackoffConfig, Connection } from "./connection.js";

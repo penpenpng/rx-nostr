@@ -9,10 +9,10 @@ import {
   map,
   mergeAll,
   mergeMap,
-  MonoTypeOperatorFunction,
-  ObservableInput,
+  type MonoTypeOperatorFunction,
+  type ObservableInput,
   of,
-  OperatorFunction,
+  type OperatorFunction,
   pipe,
   scan,
   timeout,
@@ -21,8 +21,7 @@ import {
 
 import { evalFilters } from "./helper.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
-import { isFiltered } from "./nostr/filter.js";
-import { MatchFilterOptions } from "./nostr/filter.js";
+import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
 import { defineDefaultOptions } from "./util.js";
 
