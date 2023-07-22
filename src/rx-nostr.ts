@@ -91,6 +91,14 @@ export interface RxNostr {
    */
   reconnect(url: string): void;
 
+  // TODO: document
+  /**
+   * Set or unset a pipe to be applied to all EventPackets.
+   */
+  setGlobalEventPacketPipe(
+    pipe: MonoTypeOperatorFunction<EventPacket> | null
+  ): void;
+
   /**
    * Associate RxReq with RxNostr.
    * When the associated RxReq is manipulated,
@@ -210,9 +218,42 @@ class RxNostrImpl implements RxNostr {
   private options: RxNostrOptions;
   private connections: Map<string, Connection> = new Map();
   private ongoings: Map<string, OngoingReq> = new Map();
-  private message$: Subject<MessagePacket> = new Subject();
+  private messageIn$: Subject<MessagePacket> = new Subject();
   private error$: Subject<ErrorPacket> = new Subject();
   private status$: Subject<ConnectionStatePacket> = new Subject();
+  private globalEventPacketPipe: MonoTypeOperatorFunction<EventPacket> | null =
+    null;
+
+  private get messageOut$() {
+    return this.messageIn$.pipe(
+      mergeMap((packet) => {
+        const pipe = this.globalEventPacketPipe;
+
+        if (!pipe) {
+          return of(packet);
+        }
+
+        const message = packet.message;
+        if (message[0] !== "EVENT") {
+          return of(packet);
+        }
+
+        return of({
+          from: packet.from,
+          subId: message[1],
+          event: message[2],
+        }).pipe(
+          pipe,
+          map(
+            ({ from, subId, event }): MessagePacket => ({
+              from,
+              message: ["EVENT", subId, event],
+            })
+          )
+        );
+      })
+    );
+  }
 
   constructor(options?: Partial<RxNostrOptions>) {
     const opt = makeRxNostrOptions(options);
@@ -256,7 +297,7 @@ class RxNostrImpl implements RxNostr {
         })
       )
       .subscribe((v) => {
-        this.message$.next(v);
+        this.messageIn$.next(v);
       });
 
     return connection;
@@ -386,6 +427,10 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
+  setGlobalEventPacketPipe(pipe: MonoTypeOperatorFunction<EventPacket> | null) {
+    this.globalEventPacketPipe = pipe;
+  }
+
   use(
     rxReq: RxReq,
     options?: Partial<RxNostrUseOptions>
@@ -396,7 +441,7 @@ class RxNostrImpl implements RxNostr {
     const TIMEOUT = this.options.timeout;
     const strategy = rxReq.strategy;
     const rxReqId = rxReq.rxReqId;
-    const message$ = this.message$;
+    const message$ = this.messageOut$;
     const ongoings = this.ongoings;
 
     const getAllRelayState = this.getAllRelayState.bind(this);
@@ -547,21 +592,19 @@ class RxNostrImpl implements RxNostr {
     }
   }
   createAllEventObservable(): Observable<EventPacket> {
-    return this.message$
-      .asObservable()
-      .pipe(
-        mergeMap(({ from, message }) =>
-          message[0] === "EVENT"
-            ? of({ from, subId: message[1], event: message[2] })
-            : EMPTY
-        )
-      );
+    return this.messageOut$.pipe(
+      mergeMap(({ from, message }) =>
+        message[0] === "EVENT"
+          ? of({ from, subId: message[1], event: message[2] })
+          : EMPTY
+      )
+    );
   }
   createAllErrorObservable(): Observable<ErrorPacket> {
     return this.error$.asObservable();
   }
   createAllMessageObservable(): Observable<MessagePacket> {
-    return this.message$.asObservable();
+    return this.messageOut$;
   }
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
     return this.status$.asObservable();
@@ -613,7 +656,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   dispose(): void {
-    this.message$.complete();
+    this.messageIn$.complete();
     this.error$.complete();
     for (const conn of this.connections.values()) {
       conn.dispose();
