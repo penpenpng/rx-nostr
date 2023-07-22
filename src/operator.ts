@@ -41,6 +41,42 @@ export function uniq(
 }
 
 /**
+ * Create a customizable uniq operator.
+ *
+ * If `keyFn()` returns a non-null key, the key is stored in `Set`.
+ * The operator filters packets with keys already stored.
+ *
+ * The `Set` returned in the second value of the tuple
+ * can be manipulated externally or in optional event handlers.
+ * For example, you can call `Set#clear()` to forget all keys.
+ */
+export function createUniq<T>(
+  keyFn: (packet: EventPacket) => T | null,
+  options?: CreateUniqOptions<T>
+): [MonoTypeOperatorFunction<EventPacket>, Set<T>] {
+  const cache = new Set<T>();
+
+  return [
+    filter((packet) => {
+      const key = keyFn(packet);
+      if (key === null) {
+        return true;
+      }
+
+      if (cache.has(key)) {
+        options?.onHit?.(packet, cache);
+        return false;
+      } else {
+        cache.add(key);
+        options?.onCache?.(packet, cache);
+        return true;
+      }
+    }),
+    cache,
+  ];
+}
+
+/**
  * Only the latest events are allowed to pass.
  */
 export function latest(): MonoTypeOperatorFunction<EventPacket> {
@@ -235,6 +271,11 @@ export type MergeFilter = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
 
 function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
+}
+
+export interface CreateUniqOptions<T> {
+  onCache?: (packet: EventPacket, cache: Set<T>) => void;
+  onHit?: (packet: EventPacket, cache: Set<T>) => void;
 }
 
 export interface FilterByOptions {
