@@ -5,7 +5,7 @@ import {
   createRxBackwardReq,
   createRxForwardReq,
   createRxNostr,
-} from "../src/index";
+} from "../src/index.js";
 
 document.getElementById("send")?.addEventListener("click", async () => {
   const input = document.getElementById("input") as HTMLInputElement;

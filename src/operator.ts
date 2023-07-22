@@ -1,6 +1,7 @@
 import Nostr from "nostr-typedef";
 import {
   catchError,
+  delay,
   distinct,
   distinctUntilChanged,
   EMPTY,
@@ -15,6 +16,7 @@ import {
   type OperatorFunction,
   pipe,
   scan,
+  tap,
   timeout,
   TimeoutError,
 } from "rxjs";
@@ -110,6 +112,16 @@ export function timeline(
   }, []);
 }
 
+export function sortEvents(
+  bufferTime: number,
+  compareFn?: (a: EventPacket, b: EventPacket) => number
+): MonoTypeOperatorFunction<EventPacket> {
+  return sort(
+    bufferTime,
+    compareFn ?? ((a, b) => compareEvents(a.event, b.event))
+  );
+}
+
 // ----------------------- //
 // MessagePacket operators //
 // ----------------------- //
@@ -184,6 +196,33 @@ export function completeOnTimeout<T>(
       } else {
         throw error;
       }
+    })
+  );
+}
+
+/**
+ * Buffer the received values for a specified time
+ * and return the values in sorted order as possible.
+ */
+export function sort<T>(
+  bufferTime: number,
+  compareFn: (a: T, b: T) => number
+): MonoTypeOperatorFunction<T> {
+  const buffer: T[] = [];
+
+  return pipe(
+    tap((v) => {
+      buffer.push(v);
+      buffer.sort(compareFn);
+    }),
+    delay(bufferTime),
+    map(() => {
+      if (buffer.length <= 0) {
+        throw new Error("Logic Error: This is rx-nostr's internal bug.");
+      }
+      // Non-null is valid because the lenght has been checked.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      return buffer.shift()!;
     })
   );
 }
