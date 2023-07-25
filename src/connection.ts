@@ -25,7 +25,7 @@ export class Connection {
   private connectionState$ = new Subject<ConnectionState>();
   private connectionState: ConnectionState = "not-started";
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
-  private reqs: Map<string /* subId */, ActiveReq> = new Map();
+  private reqs: Map<string /* subId */, ReqState> = new Map();
 
   get read() {
     return this.config.read;
@@ -79,12 +79,8 @@ export class Connection {
         this.sendEVENT(event);
       }
       this.queuedEvents = [];
-      for (const req of this.reqs.values()) {
-        this.ensureReq(req.original, {
-          // force activate because this is a new connection
-          overwrite: true,
-        });
-      }
+
+      this.ensureReqs();
     };
     const onmessage = ({ data }: MessageEvent) => {
       if (this.connectionState === "terminated") {
@@ -112,6 +108,10 @@ export class Connection {
       websocket.removeEventListener("error", onerror);
       websocket.removeEventListener("close", onclose);
 
+      for (const req of this.reqs.values()) {
+        req.isOngoing = false;
+      }
+
       if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
         this.setConnectionState("not-started");
       } else if (code === WebSocketCloseCode.DONT_RETRY) {
@@ -137,7 +137,7 @@ export class Connection {
   }
 
   stop() {
-    this.finalizeReq();
+    this.finalizeAllReqs();
     this.socket?.close(WebSocketCloseCode.DESIRED_BY_RX_NOSTR);
   }
 
@@ -218,41 +218,83 @@ export class Connection {
       // REQ is not allowed.
       return;
     }
-    if (this.reqs.has(subId) && !options?.overwrite) {
-      // REQ is already ongoing.
-      return;
+    if (!options?.overwrite) {
+      if (this.reqs.get(subId)?.isOngoing) {
+        // REQ is already ongoing
+        return;
+      }
+      if (
+        this.reqs.has(subId) &&
+        !isConcurrentAllowed(subId, this.reqs, this.config.maxConcurrentReqs)
+      ) {
+        // REQ is already queued
+        return;
+      }
     }
 
     const message = evalREQ(req);
+
+    // enqueue or overwrite
     this.reqs.set(subId, {
       original: req,
       actual: message,
+      isOngoing: false,
     });
 
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(message));
+    if (isConcurrentAllowed(subId, this.reqs, this.config.maxConcurrentReqs)) {
+      const req = this.reqs.get(subId);
+      if (req && this.socket?.readyState === WebSocket.OPEN) {
+        req.isOngoing = true;
+        this.socket.send(JSON.stringify(message));
+      }
     }
   }
 
-  finalizeReq(subId?: string) {
+  private ensureReqs() {
+    const reqs = Array.from(this.reqs.values()).slice(
+      0,
+      this.config.maxConcurrentReqs
+    );
+    for (const req of reqs) {
+      this.ensureReq(req.original);
+    }
+  }
+
+  finalizeReq(subId: string) {
     if (this.connectionState === "terminated") {
       return;
     }
 
-    const subIds = subId === undefined ? Array.from(this.reqs.keys()) : [subId];
+    const req = this.reqs.get(subId);
+    if (!req) {
+      return;
+    }
 
-    for (const subId of subIds) {
-      if (!this.reqs.has(subId)) {
-        continue;
+    this.reqs.delete(subId);
+
+    if (req.isOngoing) {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
+        this.socket.send(JSON.stringify(message));
       }
 
-      this.reqs.delete(subId);
+      this.ensureReqs();
+    }
+  }
 
-      const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
+  finalizeAllReqs() {
+    if (this.connectionState === "terminated") {
+      return;
+    }
+
+    for (const subId of this.reqs.keys()) {
       if (this.socket?.readyState === WebSocket.OPEN) {
+        const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
         this.socket.send(JSON.stringify(message));
       }
     }
+
+    this.reqs.clear();
   }
 
   sendEVENT(message: Nostr.ToRelayMessage.EVENT) {
@@ -301,7 +343,7 @@ export class Connection {
   }
 
   dispose() {
-    this.finalizeReq();
+    this.finalizeAllReqs();
     this.setConnectionState("terminated");
 
     if (
@@ -351,6 +393,7 @@ export interface ConnectionConfig {
   backoff: BackoffConfig;
   read: boolean;
   write: boolean;
+  maxConcurrentReqs?: number;
 }
 
 export type BackoffConfig =
@@ -376,9 +419,10 @@ export type BackoffConfig =
       strategy: "off";
     };
 
-interface ActiveReq {
+interface ReqState {
   original: LazyREQ;
   actual: Nostr.ToRelayMessage.REQ;
+  isOngoing: boolean;
 }
 
 function backoffSignal(
@@ -402,6 +446,24 @@ function backoffSignal(
 
 function evalREQ([type, subId, ...filters]: LazyREQ): Nostr.ToRelayMessage.REQ {
   return [type, subId, ...evalFilters(filters)];
+}
+
+function isConcurrentAllowed(
+  subId: string,
+  reqs: Map<string, ReqState>,
+  concurrent: number | undefined
+): boolean {
+  if (concurrent === undefined) {
+    return true;
+  }
+
+  const reqOrdinal = Array.from(reqs.keys()).findIndex((e) => e === subId);
+
+  if (reqOrdinal === undefined) {
+    return false;
+  }
+
+  return reqOrdinal < concurrent;
 }
 
 class WebSocketError extends Error {
