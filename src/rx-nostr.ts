@@ -213,7 +213,6 @@ export interface RelayConfig {
   /** If true, rxNostr can send EVENTs. */
   write: boolean;
   disableAutoFetchNip11Limitations?: boolean;
-  maxConcurrentReqsFallback?: number;
 }
 
 /** Parameter of `rxNostr.switchRelays()` */
@@ -284,7 +283,6 @@ class RxNostrImpl implements RxNostr {
     read,
     write,
     disableAutoFetchNip11Limitations,
-    maxConcurrentReqsFallback,
   }: RelayConfig): Connection {
     const connection = new Connection(url, {
       backoff: this.options.retry,
@@ -294,7 +292,6 @@ class RxNostrImpl implements RxNostr {
         disableAutoFetchNip11Limitations ??
         this.options.globalRelayConfig?.disableAutoFetchNip11Limitations,
       maxConcurrentReqsFallback:
-        maxConcurrentReqsFallback ??
         this.options.globalRelayConfig?.maxConcurrentReqsFallback,
     });
 
