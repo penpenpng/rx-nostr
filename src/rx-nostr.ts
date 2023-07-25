@@ -685,10 +685,19 @@ class RxNostrImpl implements RxNostr {
     }
 
     if (url) {
-      this.connections.get(url)?.finalizeReq(subId);
+      const conn = this.connections.get(url);
+      if (subId) {
+        conn?.finalizeReq(subId);
+      } else {
+        conn?.finalizeAllReqs();
+      }
     } else {
       for (const conn of this.connections.values()) {
-        conn.finalizeReq(subId);
+        if (subId) {
+          conn?.finalizeReq(subId);
+        } else {
+          conn?.finalizeAllReqs();
+        }
       }
     }
   }
