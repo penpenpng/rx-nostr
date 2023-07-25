@@ -484,3 +484,55 @@ describe("Basic subscription behavior (multiple relays)", () => {
     await expect(relay2).toReceiveCLOSE("sub:0");
   });
 });
+
+describe("Under limited REQ concurency (single relay)", () => {
+  const RELAY_URL = "ws://localhost:1234";
+  let rxNostr: RxNostr;
+  let relay: MockRelay;
+
+  beforeEach(async () => {
+    relay = createMockRelay(RELAY_URL);
+
+    rxNostr = createRxNostr({
+      retry: { strategy: "immediately", maxCount: 1 },
+      globalRelayConfig: {
+        disableAutoFetchNip11Limitations: true,
+        maxConcurrentReqsFallback: 1,
+      },
+    });
+    await rxNostr.switchRelays([RELAY_URL]);
+
+    await relay.connected;
+  });
+
+  afterEach(() => {
+    rxNostr.dispose();
+    relay.close({
+      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      reason: "Clean up on afterEach()",
+      wasClean: true,
+    });
+  });
+
+  test("[backward] Overflowed REQs will be enqueued.", async () => {
+    const req = createRxBackwardReq("sub");
+    rxNostr.use(req).pipe().subscribe();
+
+    req.emit(faker.filters());
+    req.emit(faker.filters());
+    req.emit(faker.filters());
+
+    await expect(relay).toReceiveREQ("sub:0");
+
+    relay.emitEOSE("sub:0");
+    await expect(relay).toReceiveCLOSE("sub:0");
+    await expect(relay).toReceiveREQ("sub:1");
+
+    relay.emitEOSE("sub:1");
+    await expect(relay).toReceiveCLOSE("sub:1");
+    await expect(relay).toReceiveREQ("sub:2");
+
+    relay.emitEOSE("sub:2");
+    await expect(relay).toReceiveCLOSE("sub:2");
+  });
+});
