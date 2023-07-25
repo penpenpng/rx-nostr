@@ -15,6 +15,7 @@ import {
 } from "rxjs";
 
 import { evalFilters } from "./helper.js";
+import { fetchRelayInfo } from "./index.js";
 import { isFiltered } from "./nostr/filter.js";
 import { ConnectionState, LazyREQ, MessagePacket } from "./packet.js";
 
@@ -26,6 +27,7 @@ export class Connection {
   private connectionState: ConnectionState = "not-started";
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
   private reqs: Map<string /* subId */, ReqState> = new Map();
+  private serverLimitations: Nostr.Nip11.ServerLimitations | null = null;
 
   get read() {
     return this.config.read;
@@ -38,6 +40,13 @@ export class Connection {
   }
   set write(v) {
     this.config.write = v;
+  }
+  get maxConcurrentReqs(): number | null {
+    return (
+      this.serverLimitations?.max_subscriptions ??
+      this.config.maxConcurrentReqsFallback ??
+      null
+    );
   }
 
   constructor(public url: string, private config: ConnectionConfig) {
@@ -53,7 +62,22 @@ export class Connection {
     this.connectionState$.next(state);
   }
 
-  start() {
+  private async fetchServerLimitationsIfNeeded() {
+    if (
+      this.config.disableAutoFetchNip11Limitations ||
+      this.serverLimitations
+    ) {
+      return;
+    }
+    try {
+      const info = await fetchRelayInfo(this.url);
+      this.serverLimitations = info.limitation ?? null;
+    } catch {
+      // do nothing
+    }
+  }
+
+  async start() {
     if (
       this.socket?.readyState === WebSocket.OPEN ||
       this.socket?.readyState === WebSocket.CONNECTING
@@ -66,6 +90,8 @@ export class Connection {
     } else {
       this.setConnectionState("reconnecting");
     }
+
+    await this.fetchServerLimitationsIfNeeded();
 
     let completeStartingProcess: () => void;
     const succeededOrFailed = new Promise<void>((_resolve) => {
@@ -107,6 +133,7 @@ export class Connection {
       websocket.removeEventListener("message", onmessage);
       websocket.removeEventListener("error", onerror);
       websocket.removeEventListener("close", onclose);
+      this.socket = null;
 
       for (const req of this.reqs.values()) {
         req.isOngoing = false;
@@ -225,7 +252,7 @@ export class Connection {
       }
       if (
         this.reqs.has(subId) &&
-        !isConcurrentAllowed(subId, this.reqs, this.config.maxConcurrentReqs)
+        !isConcurrentAllowed(subId, this.reqs, this.maxConcurrentReqs)
       ) {
         // REQ is already queued
         return;
@@ -241,7 +268,7 @@ export class Connection {
       isOngoing: false,
     });
 
-    if (isConcurrentAllowed(subId, this.reqs, this.config.maxConcurrentReqs)) {
+    if (isConcurrentAllowed(subId, this.reqs, this.maxConcurrentReqs)) {
       const req = this.reqs.get(subId);
       if (req && this.socket?.readyState === WebSocket.OPEN) {
         req.isOngoing = true;
@@ -253,7 +280,7 @@ export class Connection {
   private ensureReqs() {
     const reqs = Array.from(this.reqs.values()).slice(
       0,
-      this.config.maxConcurrentReqs
+      this.maxConcurrentReqs ?? undefined
     );
     for (const req of reqs) {
       this.ensureReq(req.original);
@@ -282,7 +309,7 @@ export class Connection {
     }
   }
 
-  finalizeAllReqs() {
+  private finalizeAllReqs() {
     if (this.connectionState === "terminated") {
       return;
     }
@@ -393,7 +420,8 @@ export interface ConnectionConfig {
   backoff: BackoffConfig;
   read: boolean;
   write: boolean;
-  maxConcurrentReqs?: number;
+  disableAutoFetchNip11Limitations?: boolean;
+  maxConcurrentReqsFallback?: number;
 }
 
 export type BackoffConfig =
@@ -451,9 +479,9 @@ function evalREQ([type, subId, ...filters]: LazyREQ): Nostr.ToRelayMessage.REQ {
 function isConcurrentAllowed(
   subId: string,
   reqs: Map<string, ReqState>,
-  concurrent: number | undefined
+  concurrent: number | null
 ): boolean {
-  if (concurrent === undefined) {
+  if (concurrent === null) {
     return true;
   }
 
