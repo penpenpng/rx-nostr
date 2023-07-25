@@ -173,6 +173,10 @@ export interface RxNostrOptions {
    * during which no new events are available.
    */
   timeout: number;
+  globalRelayConfig?: {
+    disableAutoFetchNip11Limitations?: boolean;
+    maxConcurrentReqsFallback?: number;
+  };
 }
 const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
   retry: {
@@ -181,6 +185,7 @@ const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
     initialDelay: 1000,
   },
   timeout: 10000,
+  globalRelayConfig: undefined,
 });
 
 export interface RxNostrUseOptions {
@@ -207,6 +212,8 @@ export interface RelayConfig {
   read: boolean;
   /** If true, rxNostr can send EVENTs. */
   write: boolean;
+  disableAutoFetchNip11Limitations?: boolean;
+  maxConcurrentReqsFallback?: number;
 }
 
 /** Parameter of `rxNostr.switchRelays()` */
@@ -272,11 +279,23 @@ class RxNostrImpl implements RxNostr {
     );
   }
 
-  private createConnection({ url, read, write }: RelayConfig): Connection {
+  private createConnection({
+    url,
+    read,
+    write,
+    disableAutoFetchNip11Limitations,
+    maxConcurrentReqsFallback,
+  }: RelayConfig): Connection {
     const connection = new Connection(url, {
       backoff: this.options.retry,
       read,
       write,
+      disableAutoFetchNip11Limitations:
+        disableAutoFetchNip11Limitations ??
+        this.options.globalRelayConfig?.disableAutoFetchNip11Limitations,
+      maxConcurrentReqsFallback:
+        maxConcurrentReqsFallback ??
+        this.options.globalRelayConfig?.maxConcurrentReqsFallback,
     });
 
     connection.getConnectionStateObservable().subscribe((state) => {
@@ -678,7 +697,7 @@ class RxNostrImpl implements RxNostr {
     }
   }
 
-  private finalizeReq(params: { subId?: string; url?: string }) {
+  private finalizeReq(params: { subId: string; url?: string }) {
     const { subId, url } = params;
     if (subId === undefined && url === undefined) {
       throw new Error();
@@ -686,18 +705,10 @@ class RxNostrImpl implements RxNostr {
 
     if (url) {
       const conn = this.connections.get(url);
-      if (subId) {
-        conn?.finalizeReq(subId);
-      } else {
-        conn?.finalizeAllReqs();
-      }
+      conn?.finalizeReq(subId);
     } else {
       for (const conn of this.connections.values()) {
-        if (subId) {
-          conn?.finalizeReq(subId);
-        } else {
-          conn?.finalizeAllReqs();
-        }
+        conn?.finalizeReq(subId);
       }
     }
   }

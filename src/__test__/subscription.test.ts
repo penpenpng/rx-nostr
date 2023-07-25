@@ -21,6 +21,9 @@ describe("Basic subscription behavior (single relay)", () => {
 
     rxNostr = createRxNostr({
       retry: { strategy: "immediately", maxCount: 1 },
+      globalRelayConfig: {
+        disableAutoFetchNip11Limitations: true,
+      },
     });
     await rxNostr.switchRelays([RELAY_URL]);
 
@@ -316,7 +319,11 @@ describe("Basic subscription behavior (multiple relays)", () => {
     relay2 = createMockRelay(RELAY_URL2);
     relay3 = createMockRelay(RELAY_URL3);
 
-    rxNostr = createRxNostr();
+    rxNostr = createRxNostr({
+      globalRelayConfig: {
+        disableAutoFetchNip11Limitations: true,
+      },
+    });
     await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
 
     await relay1.connected;
