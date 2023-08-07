@@ -157,6 +157,9 @@ export class Connection {
       }
     };
 
+    if (this.connectionState === "terminated") {
+      return Promise.resolve();
+    }
     const websocket = new WebSocket(this.url);
 
     websocket.addEventListener("open", onopen);
@@ -379,12 +382,7 @@ export class Connection {
     this.finalizeAllReqs();
     this.setConnectionState("terminated");
 
-    if (
-      this.socket?.readyState === WebSocket.OPEN ||
-      this.socket?.readyState === WebSocket.CONNECTING
-    ) {
-      this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
-    }
+    this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
     this.socket = null;
 
     this.reqs.clear();
