@@ -229,6 +229,7 @@ class RxNostrImpl implements RxNostr {
   private status$: Subject<ConnectionStatePacket> = new Subject();
   private globalEventPacketPipe: MonoTypeOperatorFunction<EventPacket> | null =
     null;
+  private disposed = false;
 
   private get messageOut$() {
     return this.messageIn$.pipe(
@@ -352,6 +353,13 @@ class RxNostrImpl implements RxNostr {
     await Promise.all(ensureConns);
 
     this.connections = nextConns;
+    // If disposed during switchRelay processing
+    if (this.disposed) {
+      for (const conn of this.connections.values()) {
+        conn.dispose();
+      }
+      return;
+    }
 
     for (const { req, scope } of this.ongoings.values()) {
       this.ensureReq(req, { scope });
@@ -672,6 +680,7 @@ class RxNostrImpl implements RxNostr {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.messageIn$.complete();
     this.error$.complete();
     for (const conn of this.connections.values()) {
