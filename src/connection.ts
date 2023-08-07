@@ -28,6 +28,7 @@ export class Connection {
   private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
   private reqs: Map<string /* subId */, ReqState> = new Map();
   private serverLimitations: Nostr.Nip11.ServerLimitations | null = null;
+  private canRetry = false;
 
   get read() {
     return this.config.read;
@@ -79,11 +80,14 @@ export class Connection {
 
   async start() {
     if (
-      this.socket?.readyState === WebSocket.OPEN ||
-      this.socket?.readyState === WebSocket.CONNECTING
+      !this.canRetry &&
+      (this.connectionState === "reconnecting" ||
+        this.connectionState === "starting" ||
+        this.connectionState === "ongoing")
     ) {
       return Promise.resolve();
     }
+    this.canRetry = false;
 
     if (this.connectionState === "not-started") {
       this.setConnectionState("starting");
@@ -133,6 +137,7 @@ export class Connection {
       websocket.removeEventListener("message", onmessage);
       websocket.removeEventListener("error", onerror);
       websocket.removeEventListener("close", onclose);
+      websocket.close();
       this.socket = null;
 
       for (const req of this.reqs.values()) {
@@ -146,6 +151,7 @@ export class Connection {
         this.message$.next(new WebSocketError(code));
         completeStartingProcess();
       } else {
+        this.canRetry = true;
         this.message$.next(new WebSocketError(code));
         completeStartingProcess();
       }
