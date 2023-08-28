@@ -229,6 +229,7 @@ class RxNostrImpl implements RxNostr {
   private status$: Subject<ConnectionStatePacket> = new Subject();
   private globalEventPacketPipe: MonoTypeOperatorFunction<EventPacket> | null =
     null;
+  private dispose$ = new Subject<void>();
   private disposed = false;
 
   private get messageOut$() {
@@ -512,10 +513,15 @@ class RxNostrImpl implements RxNostr {
             }
             finalizeReq({ subId });
           },
-        })
+        }),
+        takeUntil(this.dispose$)
       );
     } else {
-      return subId$.pipe(map(createEoseManagedEventObservable), mergeAll());
+      return subId$.pipe(
+        map(createEoseManagedEventObservable),
+        mergeAll(),
+        takeUntil(this.dispose$)
+      );
     }
 
     function attachSubId(): OperatorFunction<LazyFilter[], LazyREQ> {
@@ -670,6 +676,7 @@ class RxNostrImpl implements RxNostr {
 
     return subject.pipe(
       take(writableConns.length),
+      takeUntil(this.dispose$),
       timeout(30 * 1000),
       finalize(() => {
         subject.complete();
@@ -686,6 +693,9 @@ class RxNostrImpl implements RxNostr {
     for (const conn of this.connections.values()) {
       conn.dispose();
     }
+
+    this.dispose$.next();
+    this.dispose$.complete();
   }
 
   private ensureReq(
