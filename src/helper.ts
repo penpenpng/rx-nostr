@@ -4,7 +4,7 @@ import Nostr from "nostr-typedef";
 import { LazyFilter } from "./packet.js";
 
 export function now(): number {
-  return Math.floor(new Date().getTime() / 1000);
+  return Math.floor(Date.now() / 1000);
 }
 
 export function evalFilters(
