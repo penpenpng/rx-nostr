@@ -217,7 +217,7 @@ export interface RelayConfig {
 
 /** Parameter of `rxNostr.switchRelays()` */
 export type AcceptableRelaysConfig =
-  | (string | RelayConfig)[]
+  | (string | string[] | RelayConfig)[]
   | Nostr.Nip07.GetRelayResult;
 
 class RxNostrImpl implements RxNostr {
@@ -378,6 +378,16 @@ class RxNostrImpl implements RxNostr {
                   url: urlOrConfig,
                   read: true,
                   write: true,
+                }
+              : Array.isArray(urlOrConfig)
+              ? {
+                  url: urlOrConfig[1],
+                  read:
+                    urlOrConfig.at(2) === undefined ||
+                    urlOrConfig[2] === "read",
+                  write:
+                    urlOrConfig.at(2) === undefined ||
+                    urlOrConfig[2] === "write",
                 }
               : urlOrConfig;
           relay.url = normalizeRelayUrl(relay.url);
