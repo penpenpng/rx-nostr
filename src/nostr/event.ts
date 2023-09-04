@@ -19,7 +19,7 @@ export async function getSignedEvent(
     ...params,
     pubkey: params.pubkey ?? (await getPubkey()),
     tags: params.tags ?? [],
-    created_at: params.created_at ?? Math.floor(new Date().getTime() / 1000),
+    created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
 
   if (ensureRequiredFields(params)) {
