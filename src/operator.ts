@@ -256,7 +256,7 @@ export function sort<T>(
       if (buffer.length <= 0) {
         throw new Error("Logic Error: This is rx-nostr's internal bug.");
       }
-      // Non-null is valid because the lenght has been checked.
+      // Non-null is valid because the length has been checked.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return buffer.shift()!;
     })

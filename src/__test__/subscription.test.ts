@@ -485,7 +485,7 @@ describe("Basic subscription behavior (multiple relays)", () => {
   });
 });
 
-describe("Under limited REQ concurency (single relay)", () => {
+describe("Under limited REQ concurrency (single relay)", () => {
   const RELAY_URL = "ws://localhost:1234";
   let rxNostr: RxNostr;
   let relay: MockRelay;
