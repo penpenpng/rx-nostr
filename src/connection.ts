@@ -354,7 +354,7 @@ export class Connection {
           socket.send(JSON.stringify(message));
         });
 
-        // Close the temporary socket after receiveing OK or timed out.
+        // Close the temporary socket after receiving OK or timed out.
         socket.addEventListener("message", ({ data }) => {
           try {
             const response: Nostr.ToClientMessage.Any = JSON.parse(data);

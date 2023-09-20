@@ -14,6 +14,6 @@ features:
   - title: Highly Expressive
     details: Take full advantage of RxJS's highly expressive declarative notation.
   - title: Framework Free
-    details: Independ on any front-end or back-end framework.
+    details: Independent on any front-end or back-end framework.
 footer: 2023 penpenpng
 ---
