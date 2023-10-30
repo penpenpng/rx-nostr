@@ -27,7 +27,7 @@ import {
 import { BackoffConfig, Connection } from "./connection.js";
 import { getSignedEvent } from "./nostr/event.js";
 import { fetchRelayInfo } from "./nostr/nip11.js";
-import { completeOnTimeout } from "./operator.js";
+import { completeOnTimeout, filterType } from "./operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -297,15 +297,14 @@ class RxNostrImpl implements RxNostr {
         this.options.globalRelayConfig?.maxConcurrentReqsFallback,
     });
 
-    connection.getConnectionStateObservable().subscribe((state) => {
-      this.status$.next({
-        from: url,
-        state,
-      });
-    });
-    connection.getErrorObservable().subscribe((reason) => {
-      this.error$.next({ from: url, reason });
-    });
+    connection
+      .getConnectionStateObservable()
+      .pipe(map((state) => ({ from: url, state })))
+      .subscribe(this.status$);
+    connection
+      .getErrorObservable()
+      .pipe(map((reason) => ({ from: url, reason })))
+      .subscribe(this.error$);
     connection
       .getMessageObservable()
       .pipe(
@@ -314,9 +313,7 @@ class RxNostrImpl implements RxNostr {
           return EMPTY;
         })
       )
-      .subscribe((v) => {
-        this.messageIn$.next(v);
-      });
+      .subscribe(this.messageIn$);
 
     return connection;
   }
@@ -372,27 +369,29 @@ class RxNostrImpl implements RxNostr {
     ): RelayConfig[] {
       if (Array.isArray(config)) {
         return config.map((urlOrConfig) => {
-          const relay: RelayConfig =
-            typeof urlOrConfig === "string"
-              ? {
-                  url: urlOrConfig,
-                  read: true,
-                  write: true,
-                }
-              : Array.isArray(urlOrConfig)
-              ? {
-                  url: urlOrConfig[1],
-                  read:
-                    urlOrConfig.at(2) === undefined ||
-                    urlOrConfig[2] === "read",
-                  write:
-                    urlOrConfig.at(2) === undefined ||
-                    urlOrConfig[2] === "write",
-                }
-              : urlOrConfig;
-          relay.url = normalizeRelayUrl(relay.url);
+          let url = "";
+          let read = false;
+          let write = false;
+          if (typeof urlOrConfig === "string") {
+            url = urlOrConfig;
+            read = true;
+            write = true;
+          } else if (Array.isArray(urlOrConfig)) {
+            const mode = urlOrConfig[2];
+            url = urlOrConfig[1];
+            read = !mode || mode === "read";
+            write = !mode || mode === "write";
+          } else {
+            url = urlOrConfig.url;
+            read = urlOrConfig.read;
+            write = urlOrConfig.write;
+          }
 
-          return relay;
+          return {
+            url: normalizeRelayUrl(url),
+            read,
+            write,
+          };
         });
       } else {
         return Object.entries(config).map(([url, flags]) => ({
@@ -512,9 +511,7 @@ class RxNostrImpl implements RxNostr {
             resource.push(
               message$
                 .pipe(filterBySubId(subId), pickEvents())
-                .subscribe((v) => {
-                  subject.next(v);
-                })
+                .subscribe(subject)
             );
           },
           finalize: () => {
@@ -574,24 +571,24 @@ class RxNostrImpl implements RxNostr {
       subId: string
     ): Observable<EventPacket> {
       const eose$ = new Subject<void>();
-      const complete$ = new Subject<void>();
+      const complete$ = new Subject<unknown>();
       const eoseRelays = new Set<string>();
-      const manageCompletion = merge(
-        eose$,
-        createConnectionStateObservable()
-      ).subscribe(() => {
-        const status = getAllRelayState();
-        const shouldComplete = Object.entries(status).every(
-          ([url, state]) =>
-            (scope && !scope.includes(url)) ||
-            state === "error" ||
-            state === "terminated" ||
-            (state === "ongoing" && eoseRelays.has(url))
-        );
-        if (shouldComplete) {
-          complete$.next();
-        }
-      });
+      const manageCompletion = merge(eose$, createConnectionStateObservable())
+        .pipe(
+          filter(() => {
+            const status = getAllRelayState();
+            const shouldComplete = Object.entries(status).every(
+              ([url, state]) =>
+                (scope && !scope.includes(url)) ||
+                state === "error" ||
+                state === "terminated" ||
+                (state === "ongoing" && eoseRelays.has(url))
+            );
+
+            return shouldComplete;
+          })
+        )
+        .subscribe(complete$);
 
       return message$.pipe(
         takeUntil(complete$),
@@ -665,18 +662,12 @@ class RxNostrImpl implements RxNostr {
 
     getSignedEvent(params, seckey).then((event) => {
       if (!subject.closed) {
-        subscription = this.createAllMessageObservable().subscribe(
-          ({ from, message }) => {
-            if (message[0] !== "OK") {
-              return;
-            }
-            subject.next({
-              from,
-              id: event.id,
-              ok: message[2],
-            });
-          }
-        );
+        subscription = this.createAllMessageObservable()
+          .pipe(
+            filterType("OK"),
+            map(({ from, message }) => ({ from, id: event.id, ok: message[2] }))
+          )
+          .subscribe(subject);
       }
 
       for (const conn of writableConns) {
