@@ -1,398 +1,771 @@
 import Nostr from "nostr-typedef";
 import {
+  BehaviorSubject,
+  combineLatest,
+  distinctUntilChanged,
   EMPTY,
   filter,
   identity,
+  map,
+  merge,
   mergeMap,
   type MonoTypeOperatorFunction,
   Observable,
   type ObservableInput,
   of,
+  type OperatorFunction,
   retry,
   Subject,
   tap,
   timer,
+  type Unsubscribable,
 } from "rxjs";
 
-import { evalFilters } from "./helper.js";
-import { fetchRelayInfo } from "./index.js";
+import {
+  RxNostrAlreadyDisposedError,
+  RxNostrLogicError,
+  RxNostrWebSocketError,
+} from "./error.js";
+import { evalFilters } from "./lazy-filter.js";
 import { isFiltered } from "./nostr/filter.js";
-import { ConnectionState, LazyREQ, MessagePacket } from "./packet.js";
+import { fetchRelayInfo } from "./nostr/nip11.js";
+import {
+  ConnectionState,
+  ConnectionStatePacket,
+  ErrorPacket,
+  LazyREQ,
+  MessagePacket,
+} from "./packet.js";
+import { defineDefaultOptions, normalizeRelayUrl } from "./util.js";
 
-export class Connection {
-  private socket: WebSocket | null = null;
-  private message$ = new Subject<MessagePacket | WebSocketError>();
-  private error$ = new Subject<unknown>();
-  private connectionState$ = new Subject<ConnectionState>();
-  private connectionState: ConnectionState = "not-started";
-  private queuedEvents: Nostr.ToRelayMessage.EVENT[] = [];
-  private reqs: Map<string /* subId */, ReqState> = new Map();
-  private serverLimitations: Nostr.Nip11.ServerLimitations | null = null;
-  private canRetry = false;
+export interface SubscribeOptions {
+  overwrite: boolean;
+  autoclose: boolean;
+  mode: REQMode;
+}
+export type REQMode = "weak" | "ondemand";
 
-  get read() {
-    return this.config.read;
-  }
-  set read(v) {
-    this.config.read = v;
-  }
-  get write() {
-    return this.config.write;
-  }
-  set write(v) {
-    this.config.write = v;
-  }
-  get maxConcurrentReqs(): number | null {
-    return (
-      this.serverLimitations?.max_subscriptions ??
-      this.config.maxConcurrentReqsFallback ??
-      null
-    );
+const makeSubscribeOptions = defineDefaultOptions<SubscribeOptions>({
+  overwrite: false,
+  autoclose: false,
+  mode: "weak",
+});
+
+export class NostrConnection {
+  private url: string;
+  private relay: RelayConnection;
+  private pubProxy: PublishProxy;
+  private subProxy: SubscribeProxy;
+  private weakSubIds: Set<string> = new Set();
+  private logicalConns = 0;
+  private keepAlive = false;
+  private keepWeakSubs = false;
+  private disposed = false;
+  private toBeUnsubscribed: Unsubscribable[] = [];
+
+  constructor(url: string, config: ConnectionConfig) {
+    this.url = normalizeRelayUrl(url);
+    this.relay = new RelayConnection(this.url, config);
+    this.pubProxy = new PublishProxy(this.relay);
+    this.subProxy = new SubscribeProxy(this.relay);
+
+    const idlingColdSocket = combineLatest([
+      this.pubProxy.getLogicalConnectionSizeObservable(),
+      this.subProxy.getLogicalConnectionSizeObservable(),
+    ])
+      .pipe(map(([pubConns, subConns]) => pubConns + subConns))
+      .subscribe((logicalConns) => {
+        this.logicalConns = logicalConns;
+
+        if (!this.keepAlive && this.logicalConns <= 0) {
+          this.relay.disconnect();
+        }
+      });
+    this.toBeUnsubscribed.push(idlingColdSocket);
   }
 
-  constructor(public url: string, private config: ConnectionConfig) {
-    this.connectionState$.next("not-started");
-  }
-
-  private setConnectionState(state: ConnectionState) {
-    if (this.connectionState === "terminated") {
+  setKeepAlive(flag: boolean): void {
+    if (this.disposed) {
       return;
     }
 
-    this.connectionState = state;
-    this.connectionState$.next(state);
+    this.keepAlive = flag;
+
+    if (!this.keepAlive && this.logicalConns <= 0) {
+      this.relay.disconnect();
+    }
   }
 
-  private async fetchServerLimitationsIfNeeded() {
-    if (
-      this.config.disableAutoFetchNip11Limitations ||
-      this.serverLimitations
-    ) {
+  setKeepWeakSubs(flag: boolean): void {
+    if (this.disposed) {
       return;
     }
-    try {
-      const info = await fetchRelayInfo(this.url);
-      this.serverLimitations = info.limitation ?? null;
-    } catch {
-      // do nothing
+
+    this.keepWeakSubs = flag;
+
+    if (!this.keepWeakSubs) {
+      for (const subId of this.weakSubIds) {
+        this.subProxy.unsubscribe(subId);
+      }
+      this.weakSubIds.clear();
     }
   }
 
-  async start() {
-    if (
-      !this.canRetry &&
-      (this.connectionState === "reconnecting" ||
-        this.connectionState === "starting" ||
-        this.connectionState === "ongoing")
-    ) {
-      return Promise.resolve();
-    }
-    this.canRetry = false;
-
-    if (this.connectionState === "not-started") {
-      this.setConnectionState("starting");
-    } else {
-      this.setConnectionState("reconnecting");
+  publish(event: Nostr.Event<number>): void {
+    if (this.disposed) {
+      return;
     }
 
-    await this.fetchServerLimitationsIfNeeded();
-
-    let completeStartingProcess: () => void;
-    const succeededOrFailed = new Promise<void>((_resolve) => {
-      completeStartingProcess = _resolve;
-    });
-
-    const onopen = () => {
-      this.setConnectionState("ongoing");
-      completeStartingProcess();
-      for (const event of this.queuedEvents) {
-        this.sendEVENT(event);
-      }
-      this.queuedEvents = [];
-
-      this.ensureReqs();
-    };
-    const onmessage = ({ data }: MessageEvent) => {
-      if (this.connectionState === "terminated") {
-        return;
-      }
-      try {
-        this.message$.next({ from: this.url, message: JSON.parse(data) });
-      } catch (err) {
-        this.error$.next(err);
-      }
-    };
-    const onerror = () => {
-      completeStartingProcess();
-    };
-    const onclose = ({ code }: CloseEvent) => {
-      if (
-        code === WebSocketCloseCode.DISPOSED_BY_RX_NOSTR ||
-        this.connectionState === "terminated"
-      ) {
-        return;
-      }
-
-      websocket.removeEventListener("open", onopen);
-      websocket.removeEventListener("message", onmessage);
-      websocket.removeEventListener("error", onerror);
-      websocket.removeEventListener("close", onclose);
-      websocket.close();
-      this.socket = null;
-
-      for (const req of this.reqs.values()) {
-        req.isOngoing = false;
-      }
-
-      if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
-        this.setConnectionState("not-started");
-      } else if (code === WebSocketCloseCode.DONT_RETRY) {
-        this.setConnectionState("rejected");
-        this.message$.next(new WebSocketError(code));
-        completeStartingProcess();
-      } else {
-        this.canRetry = true;
-        this.message$.next(new WebSocketError(code));
-        completeStartingProcess();
-      }
-    };
-
-    if (this.connectionState === "terminated") {
-      return Promise.resolve();
-    }
-    const websocket = new WebSocket(this.url);
-
-    websocket.addEventListener("open", onopen);
-    websocket.addEventListener("message", onmessage);
-    websocket.addEventListener("error", onerror);
-    websocket.addEventListener("close", onclose);
-
-    this.socket = websocket;
-
-    return succeededOrFailed;
+    this.pubProxy.publish(event);
   }
 
-  stop() {
-    this.finalizeAllReqs();
-    this.socket?.close(WebSocketCloseCode.DESIRED_BY_RX_NOSTR);
+  confirmOK(eventId: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.pubProxy.confirmOK(eventId);
   }
 
-  getConnectionState() {
-    return this.connectionState;
+  subscribe(req: LazyREQ, options?: Partial<SubscribeOptions>): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const { mode, overwrite, autoclose } = makeSubscribeOptions(options);
+    const [, subId] = req;
+
+    if (!overwrite && this.subProxy.isOngoingOrQueued(subId)) {
+      return;
+    }
+
+    if (mode === "weak") {
+      this.weakSubIds.add(subId);
+    }
+    this.subProxy.subscribe(req, autoclose);
+  }
+
+  unsubscribe(subId: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.weakSubIds.delete(subId);
+    this.subProxy.unsubscribe(subId);
   }
 
   getMessageObservable(): Observable<MessagePacket> {
-    const reqs = this.reqs;
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
 
-    return this.message$.asObservable().pipe(
-      mergeMap((data) => {
-        if (data instanceof WebSocketError) {
-          if (data.code === WebSocketCloseCode.DONT_RETRY) {
-            return EMPTY;
-          } else {
-            throw data;
-          }
-        } else {
-          return of(data);
-        }
-      }),
-      tap({
-        subscribe: () => {
-          this.start();
-        },
-      }),
-      this.config.backoff.strategy === "off"
-        ? identity
-        : retry({
-            delay: (_, retryCount) =>
-              backoffSignal(this.config.backoff, retryCount),
-            count: this.config.backoff.maxCount,
-          }),
-      tap({
-        error: () => {
-          this.setConnectionState("error");
-        },
-      }),
-      rejectFilterUnmatchEvents()
+    return merge(
+      this.subProxy.getEventObservable(),
+      this.relay
+        .getMessageObservable()
+        .pipe(filter((message) => message[0] !== "EVENT"))
+    ).pipe(
+      map((message) => ({
+        from: this.url,
+        message,
+      }))
     );
+  }
 
-    function rejectFilterUnmatchEvents(): MonoTypeOperatorFunction<MessagePacket> {
-      return filter((packet) => {
-        const [type, subId, event] = packet.message;
+  getConnectionStateObservable(): Observable<ConnectionStatePacket> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
 
-        if (type !== "EVENT") {
-          return true;
+    return this.relay.getConnectionStateObservable().pipe(
+      map((state) => ({
+        from: this.url,
+        state,
+      }))
+    );
+  }
+
+  getErrorObservable(): Observable<ErrorPacket> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.relay.getErrorObservable().pipe(
+      map((reason) => ({
+        from: this.url,
+        reason,
+      }))
+    );
+  }
+
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+
+    this.relay.dispose();
+    this.pubProxy.dispose();
+    this.subProxy.dispose();
+
+    for (const sub of this.toBeUnsubscribed) {
+      sub.unsubscribe();
+    }
+  }
+}
+
+class PublishProxy {
+  private pubs: Set<string> = new Set();
+  private count$ = new CounterSubject(0);
+  private disposed = false;
+  private toBeUnsubscribed: Unsubscribable[] = [];
+
+  constructor(private relay: RelayConnection) {
+    const recovering = this.relay
+      .getReconnectedObservable()
+      .subscribe((toRelayMessage) => {
+        for (const [type, event] of toRelayMessage) {
+          if (type !== "EVENT") {
+            continue;
+          }
+
+          if (this.pubs.has(event.id)) {
+            this.sendEVENT(event);
+          }
         }
+      });
 
-        const req = reqs.get(subId);
-        if (!req) {
-          return true;
+    this.toBeUnsubscribed.push(recovering);
+  }
+
+  publish(event: Nostr.Event<number>): void {
+    if (this.disposed) {
+      return;
+    }
+
+    if (!this.pubs.has(event.id)) {
+      this.pubs.add(event.id);
+      this.count$.increment();
+    }
+
+    this.sendEVENT(event);
+  }
+
+  confirmOK(eventId: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    if (!this.pubs.has(eventId)) {
+      this.pubs.delete(eventId);
+      this.count$.decrement();
+    }
+  }
+
+  getLogicalConnectionSizeObservable(): Observable<number> {
+    return this.count$.asObservable();
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+
+    this.count$.complete();
+    this.count$.unsubscribe();
+
+    for (const sub of this.toBeUnsubscribed) {
+      sub.unsubscribe();
+    }
+  }
+
+  private sendEVENT(event: Nostr.Event) {
+    this.relay.send(["EVENT", event]);
+  }
+}
+
+class SubscribeProxy {
+  // maxSubscriptions: number | null = undefined;
+  // maxFilters: number | null;
+  // maxLimit: number | null;
+  private subs = new Map<string, SubRecord>();
+  private disposed = false;
+  private toBeUnsubscribed: Unsubscribable[] = [];
+  private queue: SubQueue;
+
+  constructor(private relay: RelayConnection) {
+    this.queue = new SubQueue(relay.url);
+
+    const dequeuing = this.queue
+      .getActivationObservable()
+      .subscribe((activated) => {
+        for (const { req } of activated) {
+          this.sendREQ(req);
         }
+      });
+    const recovering = this.relay.getReconnectedObservable().subscribe(() => {
+      for (const { req } of this.queue.ongoings) {
+        this.sendREQ(req);
+      }
+    });
+    const autoClosing = this.relay
+      .getMessageObservable()
+      .pipe(
+        filter((msg): msg is Nostr.ToClientMessage.EOSE => msg[0] === "EOSE"),
+        map((msg) => msg[1])
+      )
+      .subscribe((subId) => {
+        if (this.subs.get(subId)?.autoclose) {
+          this.unsubscribe(subId);
+        }
+      });
 
-        const [, , ...filters] = req.actual;
+    this.toBeUnsubscribed.push(dequeuing);
+    this.toBeUnsubscribed.push(recovering);
+    this.toBeUnsubscribed.push(autoClosing);
+  }
+
+  subscribe(req: LazyREQ, autoclose: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const subId = req[1];
+    const sub: SubRecord = {
+      subId,
+      req,
+      autoclose,
+    };
+
+    this.subs.set(subId, sub);
+    this.queue.enqueue(sub);
+  }
+
+  unsubscribe(subId: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.sendCLOSE(subId);
+    this.subs.delete(subId);
+    this.queue.drop(subId);
+  }
+
+  isOngoingOrQueued(subId: string): boolean {
+    return this.queue.has(subId);
+  }
+
+  getLogicalConnectionSizeObservable(): Observable<number> {
+    return this.queue.getSizeObservable();
+  }
+
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+
+    this.queue.dispose();
+
+    for (const sub of this.toBeUnsubscribed) {
+      sub.unsubscribe();
+    }
+  }
+
+  getEventObservable(): Observable<Nostr.ToClientMessage.EVENT> {
+    return this.relay.getMessageObservable().pipe(
+      filter((msg): msg is Nostr.ToClientMessage.EVENT => msg[0] === "EVENT"),
+      filter(([, subId, event]) => {
+        const filters = this.subs.get(subId)?.filters;
+        if (!filters) {
+          return false;
+        }
 
         return isFiltered(event, filters);
+      })
+    );
+  }
+
+  private sendREQ([, subId, ...lazyFilters]: LazyREQ) {
+    const filters = evalFilters(lazyFilters);
+    const sub = this.subs.get(subId);
+    if (!sub) {
+      return;
+    }
+
+    sub.filters = filters;
+    this.relay.send(["REQ", subId, ...filters]);
+  }
+  private sendCLOSE(subId: string) {
+    this.relay.send(["CLOSE", subId]);
+  }
+}
+
+class RelayConnection {
+  private socket: WebSocket | null = null;
+  private buffer: Nostr.ToRelayMessage.Any[] = [];
+  private unsent: Nostr.ToRelayMessage.Any[] = [];
+  private state$ = new BehaviorSubject<ConnectionState>("initialized");
+  private incoming$ = new Subject<
+    Nostr.ToClientMessage.Any | RxNostrWebSocketError
+  >();
+  private reconnected$ = new Subject<Nostr.ToRelayMessage.Any[]>();
+  private message$ = new Subject<Nostr.ToClientMessage.Any>();
+  private error$ = new Subject<unknown>();
+
+  private toBeUnsubscribed: Unsubscribable[] = [];
+  private disposed = false;
+
+  constructor(public url: string, private config: ConnectionConfig) {
+    // Caching
+    Nip11Registry.get(url);
+
+    const recovering = this.incoming$
+      .pipe(
+        rethrowWebSocketError(),
+        backoff(this.config.backoff),
+        tap({
+          error: () => {
+            this.state$.next("error");
+          },
+        })
+      )
+      .subscribe(this.message$);
+    this.toBeUnsubscribed.push(recovering);
+
+    function backoff<T>(config: BackoffConfig): MonoTypeOperatorFunction<T> {
+      return config.strategy === "off"
+        ? identity
+        : retry({
+            delay: (_, retryCount) => backoffSignal(config, retryCount),
+            count: config.maxCount,
+          });
+    }
+    function rethrowWebSocketError(): OperatorFunction<
+      Nostr.ToClientMessage.Any | RxNostrWebSocketError,
+      Nostr.ToClientMessage.Any
+    > {
+      return mergeMap((event) => {
+        if (event instanceof RxNostrWebSocketError) {
+          throw event;
+        } else {
+          return of(event);
+        }
       });
     }
   }
 
-  getConnectionStateObservable() {
-    return this.connectionState$.asObservable();
+  get state() {
+    return this.state$.getValue();
   }
 
-  getErrorObservable() {
+  connect(reconnect = false) {
+    if (this.state === "terminated") {
+      return;
+    }
+
+    const canConnect =
+      this.state === "initialized" ||
+      this.state === "closed" ||
+      this.state === "error" ||
+      this.state === "rejected" ||
+      reconnect;
+    if (!canConnect) {
+      return;
+    }
+
+    if (reconnect) {
+      this.state$.next("reconnecting");
+    } else {
+      this.state$.next("connecting");
+    }
+
+    this.socket = this.createSocket(reconnect);
+  }
+
+  private createSocket(reconnect: boolean) {
+    const onopen = () => {
+      if (this.state === "terminated") {
+        socket.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
+        return;
+      }
+
+      this.state$.next("connected");
+
+      if (reconnect) {
+        this.reconnected$.next(this.unsent);
+        this.unsent = [];
+      }
+
+      try {
+        for (const message of this.buffer) {
+          this.send(message);
+        }
+      } catch (err) {
+        this.error$.next(err);
+      } finally {
+        this.buffer = [];
+      }
+    };
+    const onmessage = ({ data }: MessageEvent) => {
+      if (this.state === "terminated") {
+        socket.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
+        return;
+      }
+
+      try {
+        this.incoming$.next(JSON.parse(data));
+      } catch (err) {
+        this.error$.next(err);
+      }
+    };
+    const onclose = ({ code }: CloseEvent) => {
+      if (
+        this.state === "terminated" ||
+        code === WebSocketCloseCode.DISPOSED_BY_RX_NOSTR
+      ) {
+        return;
+      }
+
+      socket.removeEventListener("open", onopen);
+      socket.removeEventListener("message", onmessage);
+      socket.removeEventListener("close", onclose);
+      socket.close();
+      this.socket = null;
+
+      if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
+        this.unsent = [];
+        this.buffer = [];
+
+        this.state$.next("closed");
+      } else if (code === WebSocketCloseCode.DONT_RETRY) {
+        this.unsent = [];
+        this.buffer = [];
+
+        this.state$.next("rejected");
+        this.error$.next(new RxNostrWebSocketError(code));
+      } else {
+        this.unsent.push(...this.buffer);
+        this.buffer = [];
+
+        // Don't `this.incoming$.error()` because we will never be able to call `.next()`
+        this.incoming$.next(new RxNostrWebSocketError(code));
+      }
+    };
+
+    const socket = new WebSocket(this.url);
+
+    socket.addEventListener("open", onopen);
+    socket.addEventListener("message", onmessage);
+    socket.addEventListener("close", onclose);
+
+    return socket;
+  }
+
+  disconnect(): void {
+    this.socket?.close(WebSocketCloseCode.DESIRED_BY_RX_NOSTR);
+  }
+
+  send(message: Nostr.ToRelayMessage.Any): void {
+    switch (this.state) {
+      case "terminated":
+      case "rejected": {
+        return;
+      }
+      case "initialized":
+      case "connecting":
+      case "closed": {
+        this.buffer.push(message);
+        this.connect();
+        return;
+      }
+      case "connected": {
+        if (!this.socket) {
+          throw new RxNostrLogicError();
+        }
+
+        this.socket.send(JSON.stringify(message));
+        return;
+      }
+      case "reconnecting":
+      case "error": {
+        this.unsent.push(message);
+        return;
+      }
+    }
+  }
+
+  getMessageObservable(): Observable<Nostr.ToClientMessage.Any> {
+    return this.message$.asObservable();
+  }
+
+  getReconnectedObservable(): Observable<Nostr.ToRelayMessage.Any[]> {
+    return this.reconnected$.asObservable();
+  }
+
+  getConnectionStateObservable(): Observable<ConnectionState> {
+    return this.state$.pipe(distinctUntilChanged());
+  }
+
+  getErrorObservable(): Observable<unknown> {
     return this.error$.asObservable();
   }
 
-  ensureReq(req: LazyREQ, options?: { overwrite?: boolean }) {
-    const subId = req[1];
-
-    if (this.connectionState === "terminated") {
+  dispose(): void {
+    if (this.disposed) {
       return;
     }
-    if (!this.read) {
-      // REQ is not allowed.
-      return;
-    }
-    if (!options?.overwrite) {
-      if (this.reqs.get(subId)?.isOngoing) {
-        // REQ is already ongoing
-        return;
-      }
-      if (
-        this.reqs.has(subId) &&
-        !isConcurrentAllowed(subId, this.reqs, this.maxConcurrentReqs)
-      ) {
-        // REQ is already queued
-        return;
-      }
+
+    this.disposed = true;
+
+    const subjects = [
+      this.state$,
+      this.incoming$,
+      this.message$,
+      this.error$,
+      this.reconnected$,
+    ];
+    for (const sub of subjects) {
+      sub.complete();
+      sub.unsubscribe();
     }
 
-    const message = evalREQ(req);
-
-    // enqueue or overwrite
-    this.reqs.set(subId, {
-      original: req,
-      actual: message,
-      isOngoing: false,
-    });
-
-    if (isConcurrentAllowed(subId, this.reqs, this.maxConcurrentReqs)) {
-      const req = this.reqs.get(subId);
-      if (req && this.socket?.readyState === WebSocket.OPEN) {
-        req.isOngoing = true;
-        this.socket.send(JSON.stringify(message));
-      }
+    for (const sub of this.toBeUnsubscribed) {
+      sub.unsubscribe();
     }
   }
+}
 
-  private ensureReqs() {
-    const reqs = Array.from(this.reqs.values()).slice(
-      0,
-      this.maxConcurrentReqs ?? undefined
-    );
-    for (const req of reqs) {
-      this.ensureReq(req.original);
-    }
+class CounterSubject extends BehaviorSubject<number> {
+  constructor(count?: number) {
+    super(count ?? 0);
   }
-
-  finalizeReq(subId: string) {
-    if (this.connectionState === "terminated") {
-      return;
-    }
-
-    const req = this.reqs.get(subId);
-    if (!req) {
-      return;
-    }
-
-    this.reqs.delete(subId);
-
-    if (req.isOngoing) {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
-        this.socket.send(JSON.stringify(message));
-      }
-
-      this.ensureReqs();
-    }
+  increment() {
+    this.next(this.getValue() + 1);
   }
-
-  private finalizeAllReqs() {
-    if (this.connectionState === "terminated") {
-      return;
-    }
-
-    for (const subId of this.reqs.keys()) {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", subId];
-        this.socket.send(JSON.stringify(message));
-      }
-    }
-
-    this.reqs.clear();
+  decrement() {
+    this.next(this.getValue() - 1);
   }
-
-  sendEVENT(message: Nostr.ToRelayMessage.EVENT) {
-    if (this.connectionState === "terminated") {
-      return;
-    }
-    if (!this.write) {
-      return;
-    }
-
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(message));
+  next(x: ((v: number) => number) | number) {
+    if (typeof x === "number") {
+      super.next(x);
     } else {
-      if (this.socket?.readyState === WebSocket.CONNECTING) {
-        // Enqueue
-        this.queuedEvents.push(message);
-      } else {
-        // Create a temporary socket to send message.
-        const socket = new WebSocket(this.url);
-        socket.addEventListener("open", () => {
-          socket.send(JSON.stringify(message));
-        });
-
-        // Close the temporary socket after receiving OK or timed out.
-        socket.addEventListener("message", ({ data }) => {
-          try {
-            const response: Nostr.ToClientMessage.Any = JSON.parse(data);
-            if (response[0] === "OK") {
-              socket.close();
-            }
-            this.message$.next({ from: this.url, message: response });
-          } catch (err) {
-            this.message$.error(err);
-          }
-        });
-        setTimeout(() => {
-          if (
-            socket.readyState === WebSocket.OPEN ||
-            socket.readyState === WebSocket.CONNECTING
-          ) {
-            socket.close();
-          }
-        }, 10 * 1000);
-      }
+      super.next(x(this.getValue()));
     }
+  }
+}
+
+class SubQueue {
+  private _queuings: SubRecord[] = [];
+  private _ongoings: SubRecord[] = [];
+  private activated$ = new Subject<SubRecord[]>();
+  private count$ = new CounterSubject();
+
+  get queuings(): SubRecord[] {
+    return this._queuings;
+  }
+  private set queuings(v: SubRecord[]) {
+    this._queuings = v;
+  }
+  get ongoings(): SubRecord[] {
+    return this._ongoings;
+  }
+  private set ongoings(v: SubRecord[]) {
+    this._ongoings = v;
+  }
+
+  constructor(private url: string) {}
+
+  enqueue(v: SubRecord): void {
+    this.queuings = [...this.queuings, v];
+    this.count$.increment();
+
+    this.shift();
+  }
+  drop(subId: string): void {
+    const remove = (arr: SubRecord[], subId: string): [SubRecord[], number] => {
+      const prevLength = arr.length;
+      const filtered = arr.filter((e) => e.subId !== subId);
+      const removed = prevLength - filtered.length;
+
+      return [filtered, removed];
+    };
+
+    const [queuings, droppedX] = remove(this.queuings, subId);
+    const [ongoings, droppedY] = remove(this.ongoings, subId);
+    this.queuings = queuings;
+    this.ongoings = ongoings;
+    this.count$.next((v) => v - (droppedX + droppedY));
+
+    this.shift();
+  }
+  has(subId: string) {
+    return (
+      !!this.ongoings.find((e) => e.subId === subId) ||
+      !!this.queuings.find((e) => e.subId === subId)
+    );
+  }
+  getActivationObservable() {
+    return this.activated$.asObservable();
+  }
+  getSizeObservable() {
+    return this.count$.asObservable();
   }
 
   dispose() {
-    this.finalizeAllReqs();
-    this.setConnectionState("terminated");
+    const subjects = [this.activated$, this.count$];
+    for (const sub of subjects) {
+      sub.complete();
+      sub.unsubscribe();
+    }
+  }
 
-    this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
-    this.socket = null;
+  private async shift() {
+    const capacity = await this.capacity();
 
-    this.reqs.clear();
+    const concated = [...this.ongoings, ...this.queuings];
+    const ongoings = concated.slice(0, capacity);
+    const queuings = concated.slice(capacity);
+    const activated = this.queuings.slice(0, capacity - this.ongoings.length);
 
-    this.message$.complete();
-    this.message$.unsubscribe();
-    this.connectionState$.complete();
-    this.connectionState$.unsubscribe();
-    this.error$.complete();
-    this.error$.unsubscribe();
+    this.ongoings = ongoings;
+    this.queuings = queuings;
+
+    if (activated.length > 0) {
+      this.activated$.next(activated);
+    }
+  }
+
+  private async capacity() {
+    const nip11 = await Nip11Registry.get(this.url);
+    return nip11.limitation?.max_subscriptions ?? Infinity;
+  }
+}
+
+export class Nip11Registry {
+  private static cache: Record<string, Promise<Nostr.Nip11.RelayInfo>> = {};
+
+  static async get(url: string): Promise<Nostr.Nip11.RelayInfo> {
+    url = normalizeRelayUrl(url);
+
+    return this.cache[url] ?? this.fetch(url);
+  }
+
+  static set(url: string, nip11: Nostr.Nip11.RelayInfo) {
+    url = normalizeRelayUrl(url);
+
+    this.cache[url] = Promise.resolve(nip11);
+  }
+
+  static async fetch(url: string) {
+    url = normalizeRelayUrl(url);
+
+    this.cache[url] = fetchRelayInfo(url);
+    return this.cache[url];
   }
 }
 
@@ -422,10 +795,6 @@ export const WebSocketCloseCode = {
 
 export interface ConnectionConfig {
   backoff: BackoffConfig;
-  read: boolean;
-  write: boolean;
-  disableAutoFetchNip11Limitations?: boolean;
-  maxConcurrentReqsFallback?: number;
 }
 
 export type BackoffConfig =
@@ -451,10 +820,11 @@ export type BackoffConfig =
       strategy: "off";
     };
 
-interface ReqState {
-  original: LazyREQ;
-  actual: Nostr.ToRelayMessage.REQ;
-  isOngoing: boolean;
+interface SubRecord {
+  subId: string;
+  req: LazyREQ;
+  filters?: Nostr.Filter[];
+  autoclose: boolean;
 }
 
 function backoffSignal(
@@ -473,33 +843,5 @@ function backoffSignal(
     return of(0);
   } else {
     return EMPTY;
-  }
-}
-
-function evalREQ([type, subId, ...filters]: LazyREQ): Nostr.ToRelayMessage.REQ {
-  return [type, subId, ...evalFilters(filters)];
-}
-
-function isConcurrentAllowed(
-  subId: string,
-  reqs: Map<string, ReqState>,
-  concurrent: number | null
-): boolean {
-  if (concurrent === null) {
-    return true;
-  }
-
-  const reqOrdinal = Array.from(reqs.keys()).findIndex((e) => e === subId);
-
-  if (reqOrdinal === undefined) {
-    return false;
-  }
-
-  return reqOrdinal < concurrent;
-}
-
-class WebSocketError extends Error {
-  constructor(public code?: number) {
-    super(`WebSocket Error: Socket was closed with code ${code}`);
   }
 }

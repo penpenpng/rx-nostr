@@ -21,7 +21,8 @@ import {
   TimeoutError,
 } from "rxjs";
 
-import { evalFilters } from "./helper.js";
+import { RxNostrLogicError } from "./error.js";
+import { evalFilters } from "./lazy-filter.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
@@ -254,7 +255,7 @@ export function sort<T>(
     delay(bufferTime),
     map(() => {
       if (buffer.length <= 0) {
-        throw new Error("Logic Error: This is rx-nostr's internal bug.");
+        throw new RxNostrLogicError();
       }
       // Non-null is valid because the length has been checked.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

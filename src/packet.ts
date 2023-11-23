@@ -57,18 +57,20 @@ export interface ConnectionStatePacket {
 /**
  * WebSocket connection state.
  *
- * - `not-started`: Not started yet, or closed by expected ways.
- * - `starting`: Attempting to connect (for reasons other than error recovery).
- * - `ongoing`: Active, but may be temporarily closed as idling.
- * - `reconnecting`: Trying to reconnect for error recovery.
- * - `error`: Inactive because of an unexpected error. You can try to recover by reconnect()
- * - `rejected`: Inactive because of closing code 4000. You can try to reconnect, but should not do.
- * - `terminated`: No longer available because of dispose()
+ * - `initialized`: Initialized.
+ * - `connecting`: Attempting to connect (or reconnect for error recovery).
+ * - `connected`: Connected.
+ * - `closed`: Closed as idling, or desired by user.
+ * - `reconnecting`: Reconnecting.
+ * - `error`: Closed because of an unexpected error. You can try to recover by reconnect()
+ * - `rejected`: Closed because of closing code 4000. You can try to reconnect, but should not do.
+ * - `terminated`: Closed, and no longer available because of dispose()
  */
 export type ConnectionState =
-  | "not-started"
-  | "starting"
-  | "ongoing"
+  | "initialized"
+  | "connecting"
+  | "connected"
+  | "closed"
   | "reconnecting"
   | "error"
   | "rejected"

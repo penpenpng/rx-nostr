@@ -9,8 +9,12 @@ export async function fetchRelayInfo(
   const u = new URL(url);
   u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");
 
-  const res = await fetch(u.toString(), {
-    headers: { Accept: "application/nostr+json" },
-  });
-  return res.json();
+  try {
+    const res = await fetch(u.toString(), {
+      headers: { Accept: "application/nostr+json" },
+    });
+    return res.json();
+  } catch {
+    return {};
+  }
 }

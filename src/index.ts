@@ -1,4 +1,5 @@
-export * from "./helper.js";
+export * from "./error.js";
+export * from "./lazy-filter.js";
 export { toHex } from "./nostr/bech32.js";
 export {
   compareEvents,
@@ -15,3 +16,7 @@ export * from "./operator.js";
 export * from "./packet.js";
 export * from "./req.js";
 export * from "./rx-nostr.js";
+
+export function now(): number {
+  return Math.floor(Date.now() / 1000);
+}

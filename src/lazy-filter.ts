@@ -1,11 +1,6 @@
-/** Return a function that is lazily evaluated for since/until parameters of `LazyFilter`. */
 import Nostr from "nostr-typedef";
 
 import { LazyFilter } from "./packet.js";
-
-export function now(): number {
-  return Math.floor(Date.now() / 1000);
-}
 
 export function evalFilters(
   filters: LazyFilter | LazyFilter[]
