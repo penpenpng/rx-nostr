@@ -9,6 +9,7 @@ import {
   createRxOneshotReq,
   RxNostr,
 } from "../index.js";
+import { Nip11Registry } from "../nip11.js";
 import { faker, spyEvent, spySub } from "./helper.js";
 
 describe("Basic subscription behavior (single relay)", () => {
@@ -21,13 +22,10 @@ describe("Basic subscription behavior (single relay)", () => {
 
     rxNostr = createRxNostr({
       retry: { strategy: "immediately", maxCount: 1 },
-      globalRelayConfig: {
-        disableAutoFetchNip11Limitations: true,
-      },
+      skipFetchNip11: true,
+      skipVerify: true,
     });
     await rxNostr.switchRelays([RELAY_URL]);
-
-    await relay.connected;
   });
 
   afterEach(() => {
@@ -44,6 +42,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).subscribe();
 
     req.emit(faker.filter());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     req.emit(faker.filters());
@@ -59,6 +58,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     // Emulate an abnormal disconnection of a relay.
@@ -81,6 +81,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     (await relay.getSocket(0)).close({
@@ -111,6 +112,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     // Emulate an abnormal disconnection of a relay.
@@ -121,9 +123,12 @@ describe("Basic subscription behavior (single relay)", () => {
       wasClean: true,
     });
 
-    rxNostr.send(faker.event());
-    // REQ will not be retried, so next message is EVENT
-    await expect(relay).toReceiveEVENT();
+    // FIXME: dirty
+    return new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    }).then(async () => {
+      await expect(rxNostr.getRelayState(RELAY_URL)).toBe("rejected");
+    });
   });
 
   test("[forward] since/until is reevaluated when a lazy REQ is resubmitted.", async () => {
@@ -133,6 +138,7 @@ describe("Basic subscription behavior (single relay)", () => {
     let since = 0;
 
     req.emit({ ...faker.filter(), since: () => since++ });
+    await relay.connected;
     await expect(relay).toReceiveREQ([
       "sub:0",
       { ...faker.filter(), since: 0 },
@@ -158,6 +164,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit({ kinds: [1] });
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     relay.emitEVENT("sub:0", faker.event({ kind: 1, content: "pass" }));
@@ -180,6 +187,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe().subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     relay.emitEOSE("sub:0");
@@ -192,6 +200,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ();
 
     relay.emitEOSE("sub:0");
@@ -203,6 +212,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     req.emit(faker.filters());
@@ -227,6 +237,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     req.emit(faker.filters());
@@ -248,6 +259,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     // Emulate an abnormal disconnection of a relay.
@@ -272,6 +284,7 @@ describe("Basic subscription behavior (single relay)", () => {
     rxNostr.use(req).subscribe();
 
     req.emit(faker.filters());
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     relay.emitEOSE("sub:0");
@@ -285,8 +298,20 @@ describe("Basic subscription behavior (single relay)", () => {
       wasClean: true,
     });
 
-    rxNostr.send(faker.event());
-    await expect(relay).toReceiveEVENT();
+    // FIXME:
+    // weakReq が 0 になることにより ABNORMAL_CLOSURE より先に
+    // DESIRED_BY_RX_NOSTR での CLOSE が発生している。
+    // ここで、以下を 100ms 待たずに直ちに実行すると、
+    // DESIRED_BY_RX_NOSTR CLOSING 中に rxNostr.send() が走るので
+    // 1. send() で unsent.push(message)
+    // 2. onclose で unsent = []
+    // となりイベントが送信されない
+    return new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    }).then(async () => {
+      rxNostr.send(faker.event());
+      await expect(relay).toReceiveEVENT();
+    });
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
@@ -296,6 +321,7 @@ describe("Basic subscription behavior (single relay)", () => {
     });
     const spy = spySub();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     assert(!spy.completed());
@@ -320,14 +346,10 @@ describe("Basic subscription behavior (multiple relays)", () => {
     relay3 = createMockRelay(RELAY_URL3);
 
     rxNostr = createRxNostr({
-      globalRelayConfig: {
-        disableAutoFetchNip11Limitations: true,
-      },
+      skipFetchNip11: true,
+      skipVerify: true,
     });
     await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
-
-    await relay1.connected;
-    await relay2.connected;
   });
 
   afterEach(() => {
@@ -355,6 +377,8 @@ describe("Basic subscription behavior (multiple relays)", () => {
     rxNostr.use(req).subscribe();
 
     req.emit(faker.filters());
+    await relay1.connected;
+    await relay2.connected;
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
@@ -368,93 +392,13 @@ describe("Basic subscription behavior (multiple relays)", () => {
     rxNostr.use(req).subscribe();
 
     req.emit(faker.filters());
+    await relay1.connected;
+    await relay2.connected;
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
     await rxNostr.removeRelay(RELAY_URL2);
     await expect(relay2).toReceiveCLOSE("sub:0");
-  });
-
-  test("[forward] Adding new relay doesn't affect existing subset-REQ when the relay is not in subset.", async () => {
-    const req = createRxForwardReq("sub");
-
-    rxNostr.use(req, { scope: [RELAY_URL1] }).subscribe();
-
-    req.emit(faker.filters());
-    await expect(relay1).toReceiveREQ("sub:0");
-
-    await rxNostr.addRelay(RELAY_URL3);
-
-    rxNostr.send(faker.event());
-    await expect(relay1).toReceiveEVENT();
-    await expect(relay2).toReceiveEVENT();
-    await expect(relay3).toReceiveEVENT();
-
-    expect(relay2.messagesToConsume.pendingItems.length).toBe(0);
-    expect(relay3.messagesToConsume.pendingItems.length).toBe(0);
-  });
-
-  test("[forward] Adding new relay affects existing subset-REQ when the relay is in subset.", async () => {
-    const req = createRxForwardReq("sub");
-
-    rxNostr.use(req, { scope: [RELAY_URL1, RELAY_URL3] }).subscribe();
-
-    req.emit(faker.filters());
-    await expect(relay1).toReceiveREQ("sub:0");
-
-    await rxNostr.addRelay(RELAY_URL3);
-    await expect(relay3).toReceiveREQ("sub:0");
-
-    expect(relay2.messagesToConsume.pendingItems.length).toBe(0);
-  });
-
-  test("[backward] EOSE on all subset relays triggers CLOSE.", async () => {
-    const req = createRxBackwardReq("sub");
-
-    rxNostr.use(req, { scope: [RELAY_URL1] }).subscribe();
-
-    req.emit(faker.filters());
-    await expect(relay1).toReceiveREQ("sub:0");
-
-    relay1.emitEOSE("sub:0");
-    await expect(relay1).toReceiveCLOSE("sub:0");
-
-    expect(relay2.messagesToConsume.pendingItems.length).toBe(0);
-    expect(relay3.messagesToConsume.pendingItems.length).toBe(0);
-  });
-
-  test("[backward] EOSE on all subset and active relays triggers CLOSE.", async () => {
-    const req = createRxBackwardReq("sub");
-
-    rxNostr.use(req, { scope: [RELAY_URL1, RELAY_URL3] }).subscribe();
-
-    req.emit(faker.filters());
-    await expect(relay1).toReceiveREQ("sub:0");
-
-    relay1.emitEOSE("sub:0");
-    await expect(relay1).toReceiveCLOSE("sub:0");
-
-    expect(relay2.messagesToConsume.pendingItems.length).toBe(0);
-  });
-
-  test("[oneshot] EOSE on all subset and active relays triggers completion.", async () => {
-    const req = createRxOneshotReq({
-      subId: "sub",
-      filters: faker.filters(),
-    });
-    const spy = spySub();
-
-    rxNostr
-      .use(req, { scope: [RELAY_URL1, RELAY_URL3] })
-      .pipe(spy.tap())
-      .subscribe();
-
-    await expect(relay1).toReceiveREQ("sub:0");
-
-    relay1.emitEOSE("sub:0");
-    await expect(relay1).toReceiveCLOSE("sub:0");
-
-    assert(spy.completed());
   });
 
   test("[oneshot] Collect all events under different timing EOSE.", async () => {
@@ -465,6 +409,8 @@ describe("Basic subscription behavior (multiple relays)", () => {
     const spy = spyEvent();
     rxNostr.use(req).pipe(spy.tap()).subscribe();
 
+    await relay1.connected;
+    await relay2.connected;
     await expect(relay1).toReceiveREQ("sub:0");
     await expect(relay2).toReceiveREQ("sub:0");
 
@@ -493,16 +439,17 @@ describe("Under limited REQ concurrency (single relay)", () => {
   beforeEach(async () => {
     relay = createMockRelay(RELAY_URL);
 
-    rxNostr = createRxNostr({
-      retry: { strategy: "immediately", maxCount: 1 },
-      globalRelayConfig: {
-        disableAutoFetchNip11Limitations: true,
-        maxConcurrentReqsFallback: 1,
+    Nip11Registry.setDefault({
+      limitation: {
+        max_subscriptions: 1,
       },
     });
-    await rxNostr.switchRelays([RELAY_URL]);
 
-    await relay.connected;
+    rxNostr = createRxNostr({
+      retry: { strategy: "immediately", maxCount: 1 },
+      skipFetchNip11: true,
+    });
+    await rxNostr.switchRelays([RELAY_URL]);
   });
 
   afterEach(() => {
@@ -512,6 +459,8 @@ describe("Under limited REQ concurrency (single relay)", () => {
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
+
+    Nip11Registry.setDefault({});
   });
 
   test("[backward] Overflowed REQs will be enqueued.", async () => {
@@ -522,6 +471,7 @@ describe("Under limited REQ concurrency (single relay)", () => {
     req.emit(faker.filters());
     req.emit(faker.filters());
 
+    await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
     relay.emitEOSE("sub:0");

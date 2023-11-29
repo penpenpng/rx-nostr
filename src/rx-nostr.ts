@@ -1,7 +1,5 @@
 import Nostr from "nostr-typedef";
 import {
-  catchError,
-  EMPTY,
   filter,
   finalize,
   first,
@@ -9,14 +7,11 @@ import {
   map,
   merge,
   mergeAll,
-  mergeMap,
-  type MonoTypeOperatorFunction,
   Observable,
-  of,
   type OperatorFunction,
+  pipe,
   ReplaySubject,
   Subject,
-  Subscription,
   take,
   takeUntil,
   tap,
@@ -24,10 +19,11 @@ import {
   type Unsubscribable,
 } from "rxjs";
 
-import { BackoffConfig, Connection } from "./connection.js";
+import { makeRxNostrConfig, type RxNostrConfig } from "./config.js";
+import { NostrConnection } from "./connection.js";
+import { RxNostrAlreadyDisposedError } from "./error.js";
 import { getSignedEvent } from "./nostr/event.js";
-import { fetchRelayInfo } from "./nostr/nip11.js";
-import { completeOnTimeout, filterType } from "./operator.js";
+import { completeOnTimeout } from "./operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -39,7 +35,7 @@ import type {
   OkPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import { defineDefaultOptions, normalizeRelayUrl } from "./util.js";
+import { defineDefault, normalizeRelayUrl, subtract } from "./util.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays
@@ -47,32 +43,40 @@ import { defineDefaultOptions, normalizeRelayUrl } from "./util.js";
  * Use `createRxNostr()` to get the object.
  */
 export interface RxNostr {
+  /** @deprecated Use getDefaultRelays */
+  getRelays(): DefaultRelayConfig[];
+
+  /** @deprecated Use `setDefaultRelays` instead. */
+  switchRelays(config: AcceptableDefaultRelaysConfig): Promise<void>;
+  /** @deprecated Use `addDefaultRelays` instead. */
+  addRelay(relay: string | DefaultRelayConfig): Promise<void>;
+  /** @deprecated Use `removeDefaultRelays` instead. */
+  removeRelay(url: string): Promise<void>;
+
+  /** @deprecated Use `getDefaultRelays` instead. */
+  hasRelay(url: string): boolean;
+  /** @deprecated Use `getDefaultRelays` instead. */
+  canWriteRelay(url: string): boolean;
+  /** @deprecated Use `getDefaultRelays` instead. */
+  canReadRelay(url: string): boolean;
+
   /**
-   * Return a list of relays used by this object.
+   * Return a record of default relays used by this object.
    * The relay URLs are normalised so may not match the URLs set.
    */
-  getRelays(): RelayConfig[];
+  getDefaultRelays(): Record<string, DefaultRelayConfig>;
+  getDefaultRelay(url: string): DefaultRelayConfig | undefined;
 
   /**
    * Set the list of relays.
    * If a REQ subscription already exists, the same REQ is issued for the newly added relay
    * and CLOSE is sent for the removed relay.
    */
-  switchRelays(config: AcceptableRelaysConfig): Promise<void>;
-  /** Utility wrapper for `switchRelays()`. */
-  addRelay(relay: string | RelayConfig): Promise<void>;
-  /** Utility wrapper for `switchRelays()`. */
-  removeRelay(url: string): Promise<void>;
-
-  /** Return true if the given relay is set to rxNostr. */
-  hasRelay(url: string): boolean;
-  /** Return true if the given relay allows to be written. */
-  canWriteRelay(url: string): boolean;
-  /** Return true if the given relay allows to be read. */
-  canReadRelay(url: string): boolean;
-
-  /** Fetch all relays' info based on [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) */
-  fetchAllRelaysInfo(): Promise<Record<string, Nostr.Nip11.RelayInfo | null>>;
+  setDefaultRelays(relays: AcceptableDefaultRelaysConfig): void;
+  /** Utility wrapper for `setDefaultRelays()`. */
+  addDefaultRelays(relays: AcceptableDefaultRelaysConfig): void;
+  /** Utility wrapper for `setDefaultRelays()`. */
+  removeDefaultRelays(urls: string | string[]): void;
 
   /**
    * Return a dictionary in which you can look up connection state.
@@ -90,14 +94,6 @@ export interface RxNostr {
    * If not, do nothing.
    */
   reconnect(url: string): void;
-
-  // TODO: document
-  /**
-   * Set or unset a pipe to be applied to all EventPackets.
-   */
-  setGlobalEventPacketPipe(
-    pipe: MonoTypeOperatorFunction<EventPacket> | null
-  ): void;
 
   /**
    * Associate RxReq with RxNostr.
@@ -160,248 +156,94 @@ export interface RxNostr {
 }
 
 /** Create a RxNostr object. This is the only way to create that. */
-export function createRxNostr(options?: Partial<RxNostrOptions>): RxNostr {
-  return new RxNostrImpl(options);
+export function createRxNostr(config?: Partial<RxNostrConfig>): RxNostr {
+  return new RxNostrImpl(makeRxNostrConfig(config));
 }
 
-export interface RxNostrOptions {
-  /** Auto reconnection strategy. */
-  retry: BackoffConfig;
-  /**
-   * The time in milliseconds to timeout when following the backward strategy.
-   * The observable is terminated when the specified amount of time has elapsed
-   * during which no new events are available.
-   */
-  timeout: number;
-  globalRelayConfig?: {
-    disableAutoFetchNip11Limitations?: boolean;
-    maxConcurrentReqsFallback?: number;
-  };
-}
-const makeRxNostrOptions = defineDefaultOptions<RxNostrOptions>({
-  retry: {
-    strategy: "exponential",
-    maxCount: 5,
-    initialDelay: 1000,
-  },
-  timeout: 10000,
-  globalRelayConfig: undefined,
-});
-
-export interface RxNostrUseOptions {
-  scope?: string[];
-}
-const makeRxNostrUseOptions = defineDefaultOptions<RxNostrUseOptions>({
-  scope: undefined,
-});
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface RxNostrUseOptions {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({});
 
 export interface RxNostrSendOptions {
-  scope?: string[];
   seckey?: string;
 }
-const makeRxNostrSendOptions = defineDefaultOptions<RxNostrSendOptions>({
-  scope: undefined,
+const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
   seckey: undefined,
 });
 
-/** Config object specifying WebSocket behavior. */
-export interface RelayConfig {
+/** Config object specifying default relays' behaviors. */
+export interface DefaultRelayConfig {
   /** WebSocket endpoint URL. */
   url: string;
   /** If true, rxNostr can publish REQ and subscribe EVENTs. */
   read: boolean;
   /** If true, rxNostr can send EVENTs. */
   write: boolean;
-  disableAutoFetchNip11Limitations?: boolean;
 }
+/** @deprecated Use `DefaultRelayConfig` instead.  */
+export type RelayConfig = DefaultRelayConfig;
 
-/** Parameter of `rxNostr.switchRelays()` */
-export type AcceptableRelaysConfig =
-  | (string | string[] | RelayConfig)[]
+/** Parameter of `rxNostr.setDefaultRelays()` */
+export type AcceptableDefaultRelaysConfig =
+  | (
+      | string
+      | string[] /* ["r", url: string, mode?: "read" | "write"] */
+      | DefaultRelayConfig
+    )[]
   | Nostr.Nip07.GetRelayResult;
+/** @deprecated Use `AcceptableDefaultRelaysConfig` instead. */
+export type AcceptableRelaysConfig = AcceptableDefaultRelaysConfig;
 
 class RxNostrImpl implements RxNostr {
-  private options: RxNostrOptions;
-  private connections: Map<string, Connection> = new Map();
-  private ongoings: Map<string, OngoingReq> = new Map();
-  private messageIn$: Subject<MessagePacket> = new Subject();
-  private error$: Subject<ErrorPacket> = new Subject();
-  private status$: Subject<ConnectionStatePacket> = new Subject();
-  private globalEventPacketPipe: MonoTypeOperatorFunction<EventPacket> | null =
-    null;
+  private connections = new Map<string, NostrConnection>();
+  private getConnections(urls: string[]): NostrConnection[] {
+    const conns: NostrConnection[] = [];
+
+    for (const url of new Set(urls.map(normalizeRelayUrl))) {
+      const conn = this.connections.get(url);
+      if (conn) {
+        conns.push(conn);
+      }
+    }
+
+    return conns;
+  }
+
+  private defaultRelays: Record<string, DefaultRelayConfig> = {};
+  private get defaultReadRelays(): string[] {
+    return Object.values(this.defaultRelays)
+      .filter(({ read }) => read)
+      .map(({ url }) => url);
+  }
+  private get defaultWriteRelays(): string[] {
+    return Object.values(this.defaultRelays)
+      .filter(({ write }) => write)
+      .map(({ url }) => url);
+  }
+  private weakReqs: Map<string, LazyREQ> = new Map();
+
+  private event$ = new Subject<MessagePacket<Nostr.ToClientMessage.EVENT>>();
+  private eose$ = new Subject<MessagePacket<Nostr.ToClientMessage.EOSE>>();
+  private ok$ = new Subject<MessagePacket<Nostr.ToClientMessage.OK>>();
+  private other$ = new Subject<MessagePacket<Nostr.ToClientMessage.Any>>();
+
+  private error$ = new Subject<ErrorPacket>();
+  private connectionState$ = new Subject<ConnectionStatePacket>();
+
   private dispose$ = new Subject<void>();
   private disposed = false;
 
-  private get messageOut$() {
-    return this.messageIn$.pipe(
-      mergeMap((packet) => {
-        const pipe = this.globalEventPacketPipe;
+  constructor(private config: RxNostrConfig) {}
 
-        if (!pipe) {
-          return of(packet);
-        }
-
-        const message = packet.message;
-        if (message[0] !== "EVENT") {
-          return of(packet);
-        }
-
-        return of({
-          from: packet.from,
-          subId: message[1],
-          event: message[2],
-        }).pipe(
-          pipe,
-          map(
-            ({ from, subId, event }): MessagePacket => ({
-              from,
-              message: ["EVENT", subId, event],
-            })
-          )
-        );
-      })
-    );
+  getRelays(): DefaultRelayConfig[] {
+    return Object.values(this.getDefaultRelays());
   }
 
-  constructor(options?: Partial<RxNostrOptions>) {
-    const opt = makeRxNostrOptions(options);
-    this.options = {
-      ...opt,
-    };
+  async switchRelays(config: AcceptableDefaultRelaysConfig): Promise<void> {
+    return this.setDefaultRelays(config);
   }
-
-  getRelays(): RelayConfig[] {
-    return Array.from(this.connections.values()).map(
-      ({ url, read, write }) => ({
-        url,
-        read,
-        write,
-      })
-    );
-  }
-
-  private createConnection({
-    url,
-    read,
-    write,
-    disableAutoFetchNip11Limitations,
-  }: RelayConfig): Connection {
-    const connection = new Connection(url, {
-      backoff: this.options.retry,
-      read,
-      write,
-      disableAutoFetchNip11Limitations:
-        disableAutoFetchNip11Limitations ??
-        this.options.globalRelayConfig?.disableAutoFetchNip11Limitations,
-      maxConcurrentReqsFallback:
-        this.options.globalRelayConfig?.maxConcurrentReqsFallback,
-    });
-
-    connection
-      .getConnectionStateObservable()
-      .pipe(map((state) => ({ from: url, state })))
-      .subscribe(this.status$);
-    connection
-      .getErrorObservable()
-      .pipe(map((reason) => ({ from: url, reason })))
-      .subscribe(this.error$);
-    connection
-      .getMessageObservable()
-      .pipe(
-        catchError((reason: unknown) => {
-          this.error$.next({ from: url, reason });
-          return EMPTY;
-        })
-      )
-      .subscribe(this.messageIn$);
-
-    return connection;
-  }
-
-  async switchRelays(config: AcceptableRelaysConfig): Promise<void> {
-    const nextConns: Map<string, Connection> = new Map();
-    for (const { url, read, write } of normalizeRelaysConfig(config)) {
-      // pop a connection if exists
-      const prevConn = this.connections.get(url);
-      this.connections.delete(url);
-
-      if (prevConn) {
-        prevConn.read = read;
-        prevConn.write = write;
-        nextConns.set(url, prevConn);
-      } else {
-        nextConns.set(url, this.createConnection({ url, read, write }));
-      }
-    }
-
-    // connections that are no longer used
-    for (const conn of this.connections.values()) {
-      conn.dispose();
-    }
-
-    const ensureConns: Promise<unknown>[] = [];
-    for (const conn of nextConns.values()) {
-      if (conn.read) {
-        ensureConns.push(conn.start());
-      } else {
-        conn.stop();
-      }
-    }
-
-    await Promise.all(ensureConns);
-
-    this.connections = nextConns;
-    // If disposed during switchRelay processing
-    if (this.disposed) {
-      for (const conn of this.connections.values()) {
-        conn.dispose();
-      }
-      return;
-    }
-
-    for (const { req, scope } of this.ongoings.values()) {
-      this.ensureReq(req, { scope });
-    }
-
-    // --- scoped untility pure functions ---
-    function normalizeRelaysConfig(
-      config: AcceptableRelaysConfig
-    ): RelayConfig[] {
-      if (Array.isArray(config)) {
-        return config.map((urlOrConfig) => {
-          let url = "";
-          let read = false;
-          let write = false;
-          if (typeof urlOrConfig === "string") {
-            url = urlOrConfig;
-            read = true;
-            write = true;
-          } else if (Array.isArray(urlOrConfig)) {
-            const mode = urlOrConfig[2];
-            url = urlOrConfig[1];
-            read = !mode || mode === "read";
-            write = !mode || mode === "write";
-          } else {
-            url = urlOrConfig.url;
-            read = urlOrConfig.read;
-            write = urlOrConfig.write;
-          }
-
-          return {
-            url: normalizeRelayUrl(url),
-            read,
-            write,
-          };
-        });
-      } else {
-        return Object.entries(config).map(([url, flags]) => ({
-          url: normalizeRelayUrl(url),
-          ...flags,
-        }));
-      }
-    }
-  }
-  async addRelay(relay: string | RelayConfig): Promise<void> {
+  async addRelay(relay: string | DefaultRelayConfig): Promise<void> {
     await this.switchRelays([...this.getRelays(), relay]);
   }
   async removeRelay(url: string): Promise<void> {
@@ -412,31 +254,96 @@ class RxNostrImpl implements RxNostr {
       await this.switchRelays(nextRelays);
     }
   }
+
   hasRelay(url: string): boolean {
-    const u = normalizeRelayUrl(url);
-    return this.getRelays().some((relay) => relay.url === u);
-  }
-  canWriteRelay(url: string): boolean {
-    const u = normalizeRelayUrl(url);
-    return this.getRelays().some((relay) => relay.url === u && relay.write);
+    return !!this.getDefaultRelay(url);
   }
   canReadRelay(url: string): boolean {
-    const u = normalizeRelayUrl(url);
-    return this.getRelays().some((relay) => relay.url === u && relay.read);
+    return !!this.getDefaultRelay(url)?.read;
+  }
+  canWriteRelay(url: string): boolean {
+    return !!this.getDefaultRelay(url)?.write;
   }
 
-  async fetchAllRelaysInfo(): Promise<
-    Record<string, Nostr.Nip11.RelayInfo | null>
-  > {
-    const entries = await Promise.all(
-      Array.from(this.connections.keys()).map(
-        async (url): Promise<[string, Nostr.Nip11.RelayInfo | null]> => [
-          url,
-          await fetchRelayInfo(url).catch(() => null),
-        ]
-      )
-    );
-    return Object.fromEntries(entries);
+  getDefaultRelays(): Record<string, DefaultRelayConfig> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.defaultRelays;
+  }
+  getDefaultRelay(url: string): DefaultRelayConfig | undefined {
+    return this.defaultRelays[normalizeRelayUrl(url)];
+  }
+
+  setDefaultRelays(relays: AcceptableDefaultRelaysConfig): void {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    const defaultRelays = normalizeRelaysConfig(relays);
+    for (const url of Object.keys(defaultRelays)) {
+      if (!this.connections.has(url)) {
+        this.connectObservables(url);
+      }
+    }
+
+    const defaultReadRelays = Object.values(defaultRelays)
+      .filter(({ read }) => read)
+      .map(({ url }) => url);
+    this.switchWeakSubs(defaultReadRelays);
+
+    this.defaultRelays = defaultRelays;
+  }
+  private switchWeakSubs(defaultReadRelays: string[]): void {
+    const noLongerNeeded = subtract(this.defaultReadRelays, defaultReadRelays);
+
+    for (const conn of this.getConnections(noLongerNeeded)) {
+      conn.setKeepWeakSubs(false);
+    }
+    for (const conn of this.getConnections(defaultReadRelays)) {
+      conn.setKeepWeakSubs(true);
+      for (const req of this.weakReqs.values()) {
+        conn?.subscribe(req, {
+          mode: "weak",
+          overwrite: false,
+        });
+      }
+    }
+  }
+  private connectObservables(url: string): void {
+    const oldConn = this.connections.get(url);
+    if (oldConn) {
+      oldConn.dispose();
+    }
+
+    const conn = new NostrConnection(url, this.config);
+
+    conn.getEventObservable().subscribe(this.event$);
+    conn.getEoseObservable().subscribe(this.eose$);
+    conn.getOkObservable().subscribe(this.ok$);
+    conn.getOtherObservable().subscribe(this.other$);
+    conn.getConnectionStateObservable().subscribe(this.connectionState$);
+    conn.getErrorObservable().subscribe(this.error$);
+
+    this.connections.set(url, conn);
+  }
+  addDefaultRelays(relays: AcceptableDefaultRelaysConfig): void {
+    const additionalDefaultRelays = normalizeRelaysConfig(relays);
+
+    this.setDefaultRelays({
+      ...this.defaultRelays,
+      ...additionalDefaultRelays,
+    });
+  }
+  removeDefaultRelays(urls: string | string[]): void {
+    const defaultRelays = this.defaultRelays;
+    const targets = Array.isArray(urls) ? urls : [urls];
+    for (const url of targets) {
+      delete defaultRelays[url];
+    }
+
+    this.setDefaultRelays(defaultRelays);
   }
 
   getAllRelayState(): Record<string, ConnectionState> {
@@ -452,290 +359,291 @@ class RxNostrImpl implements RxNostr {
     if (!conn) {
       throw new Error("RelayConfig not found");
     }
-    // this.relays[url] may be set before this.relays[url].websocket is initialized
-    return conn?.getConnectionState() ?? "not-started";
+
+    return conn.connectionState;
   }
+
   reconnect(url: string): void {
     if (this.canReadRelay(url)) {
-      this.connections.get(normalizeRelayUrl(url))?.start();
+      this.connections.get(normalizeRelayUrl(url))?.connectManually();
     }
   }
-
-  setGlobalEventPacketPipe(pipe: MonoTypeOperatorFunction<EventPacket> | null) {
-    this.globalEventPacketPipe = pipe;
-  }
-
   use(
     rxReq: RxReq,
-    options?: Partial<RxNostrUseOptions>
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _options?: Partial<RxNostrUseOptions>
   ): Observable<EventPacket> {
-    const { scope: _scope } = makeRxNostrUseOptions(options);
-    const scope = _scope?.map(normalizeRelayUrl);
+    const targetRelays = this.defaultReadRelays;
+    const mode = "weak";
 
-    const TIMEOUT = this.options.timeout;
-    const strategy = rxReq.strategy;
-    const rxReqId = rxReq.rxReqId;
-    const message$ = this.messageOut$;
-    const ongoings = this.ongoings;
-
-    const getAllRelayState = this.getAllRelayState.bind(this);
-    const createConnectionStateObservable =
-      this.createConnectionStateObservable.bind(this);
-    const ensureReq = this.ensureReq.bind(this);
-    const finalizeReq = this.finalizeReq.bind(this);
-
-    const subId$ = rxReq.getReqObservable().pipe(
+    const req$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is LazyFilter[] => filters !== null),
-      strategy === "oneshot" ? first() : identity,
-      attachSubId(),
-      strategy === "forward" ? manageActiveForwardReq() : identity,
-      tap((req) => {
-        ensureReq(req, { overwrite: strategy === "forward", scope });
-      }),
-      map(([, subId]) => subId)
+      rxReq.strategy === "oneshot" ? first() : identity,
+      makeReq(rxReq)
     );
 
-    if (strategy === "forward") {
+    if (rxReq.strategy === "forward") {
       const subId = makeSubId({
-        rxReqId,
+        rxReqId: rxReq.rxReqId,
       });
 
-      const resource: Unsubscribable[] = [];
-      const subject = new Subject<EventPacket>();
-      resource.push(subject);
+      let x: Unsubscribable | null = null;
 
-      return subject.pipe(
+      // switchAll 使ったほうがいいかも
+      return this.event$.pipe(
+        takeUntil(this.dispose$),
+        pickEvent(subId),
         tap({
           subscribe: () => {
-            resource.push(subId$.subscribe());
-            resource.push(
-              message$
-                .pipe(filterBySubId(subId), pickEvents())
-                .subscribe(subject)
-            );
+            x = req$.subscribe((req) => {
+              if (mode === "weak") {
+                this.weakReqs.set(subId, req);
+              }
+
+              for (const conn of this.getConnections(targetRelays)) {
+                conn.subscribe(req, {
+                  mode,
+                  overwrite: true,
+                });
+              }
+            });
           },
           finalize: () => {
-            for (const r of resource) {
-              r.unsubscribe();
+            if (mode === "weak") {
+              this.weakReqs.delete(subId);
             }
-            finalizeReq({ subId });
+            x?.unsubscribe();
+
+            for (const conn of this.getConnections(targetRelays)) {
+              conn.unsubscribe(subId);
+            }
           },
-        }),
-        takeUntil(this.dispose$)
+        })
       );
     } else {
-      return subId$.pipe(
-        map(createEoseManagedEventObservable),
+      const isDown = (state: ConnectionState): boolean =>
+        state === "error" || state === "rejected" || state === "terminated";
+
+      return req$.pipe(
+        map((req) => {
+          const subId = req[1];
+          const eose$ = new Subject<void>();
+          const complete$ = new Subject<void>();
+          const eoseRelays = new Set<string>();
+          const manageCompletion = merge(
+            eose$,
+            this.connectionState$.asObservable()
+          )
+            .pipe(
+              filter(() => {
+                const shouldComplete = this.getConnections(targetRelays).every(
+                  ({ connectionState, url }) =>
+                    isDown(connectionState) || eoseRelays.has(url)
+                );
+
+                return shouldComplete;
+              })
+            )
+            .subscribe(() => {
+              complete$.next();
+            });
+
+          this.eose$
+            .pipe(filter(({ message }) => message[1] === subId))
+            .subscribe(({ from }) => {
+              eoseRelays.add(from);
+              eose$.next();
+            });
+
+          if (mode === "weak") {
+            this.weakReqs.set(subId, req);
+          }
+          for (const conn of this.getConnections(targetRelays)) {
+            conn.subscribe(req, { overwrite: false, autoclose: true, mode });
+          }
+
+          return this.event$.pipe(
+            takeUntil(complete$),
+            completeOnTimeout(this.config.timeout),
+            finalize(() => {
+              if (mode === "weak") {
+                this.weakReqs.delete(subId);
+              }
+
+              complete$.complete();
+              eose$.complete();
+              manageCompletion.unsubscribe();
+            }),
+            filter((e) => !eoseRelays.has(e.from)),
+            pickEvent(subId)
+          );
+        }),
         mergeAll(),
         takeUntil(this.dispose$)
       );
     }
-
-    function attachSubId(): OperatorFunction<LazyFilter[], LazyREQ> {
-      const makeId = (index?: number) => makeSubId({ rxReqId, index });
-
-      switch (strategy) {
-        case "backward":
-          return map((filters, index) => ["REQ", makeId(index), ...filters]);
-        case "forward":
-        case "oneshot":
-          return map((filters) => ["REQ", makeId(), ...filters]);
-      }
-    }
-    function manageActiveForwardReq(): MonoTypeOperatorFunction<LazyREQ> {
-      const recordActiveReq = (req: LazyREQ) => {
-        const subId = req[1];
-        ongoings.set(subId, {
-          req,
-          scope,
-        });
-      };
-      const forgetActiveReq = (subId: string) => {
-        ongoings.delete(subId);
-      };
-
-      return tap({
-        next: (req: LazyREQ) => {
-          recordActiveReq(req);
-        },
-        finalize: () => {
-          forgetActiveReq(
-            makeSubId({
-              rxReqId,
-            })
-          );
-        },
-      });
-    }
-    function createEoseManagedEventObservable(
-      subId: string
-    ): Observable<EventPacket> {
-      const eose$ = new Subject<void>();
-      const complete$ = new Subject<unknown>();
-      const eoseRelays = new Set<string>();
-      const manageCompletion = merge(eose$, createConnectionStateObservable())
-        .pipe(
-          filter(() => {
-            const status = getAllRelayState();
-            const shouldComplete = Object.entries(status).every(
-              ([url, state]) =>
-                (scope && !scope.includes(url)) ||
-                state === "error" ||
-                state === "terminated" ||
-                (state === "ongoing" && eoseRelays.has(url))
-            );
-
-            return shouldComplete;
-          })
-        )
-        .subscribe(complete$);
-
-      return message$.pipe(
-        takeUntil(complete$),
-        completeOnTimeout(TIMEOUT),
-        filterBySubId(subId),
-        filter((e) => !eoseRelays.has(e.from)),
-        tap((e) => {
-          if (e.message[0] === "EOSE") {
-            eoseRelays.add(e.from);
-            finalizeReq({ subId, url: e.from });
-            eose$.next();
-          }
-        }),
-        pickEvents(),
-        finalize(() => {
-          finalizeReq({ subId });
-          complete$.unsubscribe();
-          eose$.unsubscribe();
-          manageCompletion.unsubscribe();
-        })
-      );
-    }
-    function filterBySubId(
-      subId: string
-    ): MonoTypeOperatorFunction<MessagePacket> {
-      return filter(
-        (packet) =>
-          (packet.message[0] === "EVENT" || packet.message[0] === "EOSE") &&
-          packet.message[1] === subId
-      );
-    }
-    function pickEvents(): OperatorFunction<MessagePacket, EventPacket> {
-      return mergeMap(({ from, message }) =>
-        message[0] === "EVENT"
-          ? of({ from, subId: message[1], event: message[2] })
-          : EMPTY
-      );
-    }
   }
+
   createAllEventObservable(): Observable<EventPacket> {
-    return this.messageOut$.pipe(
-      mergeMap(({ from, message }) =>
-        message[0] === "EVENT"
-          ? of({ from, subId: message[1], event: message[2] })
-          : EMPTY
-      )
+    return this.event$.pipe(
+      map(({ from, message }) => ({
+        from,
+        subId: message[1],
+        event: message[2],
+      }))
     );
   }
   createAllErrorObservable(): Observable<ErrorPacket> {
     return this.error$.asObservable();
   }
   createAllMessageObservable(): Observable<MessagePacket> {
-    return this.messageOut$;
+    return merge(
+      this.event$.asObservable(),
+      this.eose$.asObservable(),
+      this.ok$.asObservable(),
+      this.other$.asObservable()
+    );
   }
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
-    return this.status$.asObservable();
+    return this.connectionState$.asObservable();
   }
 
   send(
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions
   ): Observable<OkPacket> {
-    const { seckey, scope: _scope } = makeRxNostrSendOptions(options);
-    const scope = _scope?.map(normalizeRelayUrl);
+    const { seckey } = makeRxNostrSendOptions(options);
 
-    const writableConns = Array.from(this.connections.values()).filter(
-      (conn) => (!scope || scope.includes(conn.url)) && conn.write
-    );
-    const subject = new ReplaySubject<OkPacket>(writableConns.length);
-    let subscription: Subscription | null = null;
+    const targetRelays = this.defaultWriteRelays;
+    const subject = new ReplaySubject<OkPacket>(targetRelays.length);
 
     getSignedEvent(params, seckey).then((event) => {
-      if (!subject.closed) {
-        subscription = this.createAllMessageObservable()
-          .pipe(
-            filterType("OK"),
-            map(({ from, message }) => ({ from, id: event.id, ok: message[2] }))
-          )
-          .subscribe(subject);
+      if (subject.closed) {
+        return;
       }
 
-      for (const conn of writableConns) {
-        conn.sendEVENT(["EVENT", event]);
+      this.ok$
+        .pipe(
+          filter(({ message: [, eventId] }) => eventId === event.id),
+          map(({ from, message: [, id, ok] }) => ({ from, id, ok }))
+        )
+        .subscribe(subject);
+
+      for (const conn of this.getConnections(targetRelays)) {
+        conn.publish(event);
       }
     });
 
     return subject.pipe(
-      take(writableConns.length),
+      take(targetRelays.length),
       takeUntil(this.dispose$),
+      // TODO: config
       timeout(30 * 1000),
       finalize(() => {
-        subject.complete();
-        subject.unsubscribe();
-        subscription?.unsubscribe();
+        if (!subject.closed) {
+          subject.complete();
+        }
       })
     );
   }
 
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
     this.disposed = true;
-    this.messageIn$.complete();
-    this.error$.complete();
+
     for (const conn of this.connections.values()) {
       conn.dispose();
+    }
+    this.connections.clear();
+
+    const subjects = [
+      this.event$,
+      this.ok$,
+      this.eose$,
+      this.other$,
+      this.connectionState$,
+      this.error$,
+    ];
+    for (const sub of subjects) {
+      sub.complete();
     }
 
     this.dispose$.next();
     this.dispose$.complete();
   }
-
-  private ensureReq(
-    req: LazyREQ,
-    options?: { scope?: string[] | null; overwrite?: boolean }
-  ) {
-    const scope = options?.scope;
-    for (const url of this.connections.keys()) {
-      const conn = this.connections.get(url);
-      if (!conn || !conn.read || (scope && !scope.includes(url))) {
-        continue;
-      }
-
-      conn.ensureReq(req, { overwrite: options?.overwrite });
-    }
-  }
-
-  private finalizeReq(params: { subId: string; url?: string }) {
-    const { subId, url } = params;
-    if (subId === undefined && url === undefined) {
-      throw new Error();
-    }
-
-    if (url) {
-      const conn = this.connections.get(url);
-      conn?.finalizeReq(subId);
-    } else {
-      for (const conn of this.connections.values()) {
-        conn?.finalizeReq(subId);
-      }
-    }
-  }
-}
-
-interface OngoingReq {
-  req: LazyREQ;
-  scope?: string[];
 }
 
 function makeSubId(params: { rxReqId: string; index?: number }): string {
   return `${params.rxReqId}:${params.index ?? 0}`;
+}
+
+function makeReq({
+  rxReqId,
+  strategy,
+}: RxReq): OperatorFunction<LazyFilter[], LazyREQ> {
+  const makeId = (index?: number) => makeSubId({ rxReqId, index });
+
+  switch (strategy) {
+    case "backward":
+      return map((filters, index) => ["REQ", makeId(index), ...filters]);
+    case "forward":
+    case "oneshot":
+      return map((filters) => ["REQ", makeId(), ...filters]);
+  }
+}
+
+function pickEvent(
+  subId: string
+): OperatorFunction<MessagePacket<Nostr.ToClientMessage.EVENT>, EventPacket> {
+  return pipe(
+    filter(({ message }) => message[1] === subId),
+    map(({ from, message }) => ({
+      from,
+      subId: message[1],
+      event: message[2],
+    }))
+  );
+}
+
+function normalizeRelaysConfig(
+  config: AcceptableDefaultRelaysConfig
+): Record<string, DefaultRelayConfig> {
+  if (Array.isArray(config)) {
+    const arr = config.map((urlOrConfig) => {
+      let url = "";
+      let read = false;
+      let write = false;
+      if (typeof urlOrConfig === "string") {
+        url = urlOrConfig;
+        read = true;
+        write = true;
+      } else if (Array.isArray(urlOrConfig)) {
+        const mode = urlOrConfig[2];
+        url = urlOrConfig[1];
+        read = !mode || mode === "read";
+        write = !mode || mode === "write";
+      } else {
+        url = urlOrConfig.url;
+        read = urlOrConfig.read;
+        write = urlOrConfig.write;
+      }
+
+      return {
+        url: normalizeRelayUrl(url),
+        read,
+        write,
+      };
+    });
+
+    return Object.fromEntries(arr.map((e) => [e.url, e]));
+  } else {
+    const arr = Object.entries(config).map(([url, flags]) => ({
+      url: normalizeRelayUrl(url),
+      ...flags,
+    }));
+
+    return Object.fromEntries(arr.map((e) => [e.url, e]));
+  }
 }

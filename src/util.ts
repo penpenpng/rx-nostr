@@ -1,7 +1,7 @@
 import normalizeUrl from "normalize-url";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function defineDefaultOptions<T extends Record<string, any>>(
+export function defineDefault<T extends Record<string, any>>(
   defaultParams: T
 ): (givenParams?: Partial<T>) => T {
   return (givenParams) =>
@@ -26,4 +26,8 @@ export function normalizeRelayUrl(url: string) {
     normalizeProtocol: false,
     removeTrailingSlash: true,
   });
+}
+
+export function subtract<T extends string | number>(x: T[], y: T[]): T[] {
+  return x.filter((e) => !y.includes(e));
 }

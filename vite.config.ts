@@ -14,4 +14,7 @@ export default defineConfig({
     },
     sourcemap: true,
   },
+  test: {
+    hookTimeout: 1000,
+  },
 });

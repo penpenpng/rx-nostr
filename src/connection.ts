@@ -5,30 +5,26 @@ import {
   distinctUntilChanged,
   EMPTY,
   filter,
-  identity,
   map,
-  merge,
-  mergeMap,
-  type MonoTypeOperatorFunction,
   Observable,
-  type ObservableInput,
   of,
   type OperatorFunction,
   retry,
   Subject,
-  tap,
+  Subscription,
   timer,
-  type Unsubscribable,
 } from "rxjs";
 
+import type { RetryConfig, RxNostrConfig } from "./config.js";
 import {
   RxNostrAlreadyDisposedError,
   RxNostrLogicError,
   RxNostrWebSocketError,
 } from "./error.js";
 import { evalFilters } from "./lazy-filter.js";
+import { Nip11Registry } from "./nip11.js";
+import { verify } from "./nostr/event.js";
 import { isFiltered } from "./nostr/filter.js";
-import { fetchRelayInfo } from "./nostr/nip11.js";
 import {
   ConnectionState,
   ConnectionStatePacket,
@@ -36,7 +32,7 @@ import {
   LazyREQ,
   MessagePacket,
 } from "./packet.js";
-import { defineDefaultOptions, normalizeRelayUrl } from "./util.js";
+import { defineDefault, normalizeRelayUrl } from "./util.js";
 
 export interface SubscribeOptions {
   overwrite: boolean;
@@ -45,14 +41,13 @@ export interface SubscribeOptions {
 }
 export type REQMode = "weak" | "ondemand";
 
-const makeSubscribeOptions = defineDefaultOptions<SubscribeOptions>({
+const makeSubscribeOptions = defineDefault<SubscribeOptions>({
   overwrite: false,
   autoclose: false,
   mode: "weak",
 });
 
 export class NostrConnection {
-  private url: string;
   private relay: RelayConnection;
   private pubProxy: PublishProxy;
   private subProxy: SubscribeProxy;
@@ -61,15 +56,20 @@ export class NostrConnection {
   private keepAlive = false;
   private keepWeakSubs = false;
   private disposed = false;
-  private toBeUnsubscribed: Unsubscribable[] = [];
+  private _url: string;
 
-  constructor(url: string, config: ConnectionConfig) {
-    this.url = normalizeRelayUrl(url);
+  get url() {
+    return this._url;
+  }
+
+  constructor(url: string, config: RxNostrConfig) {
+    this._url = normalizeRelayUrl(url);
     this.relay = new RelayConnection(this.url, config);
     this.pubProxy = new PublishProxy(this.relay);
-    this.subProxy = new SubscribeProxy(this.relay);
+    this.subProxy = new SubscribeProxy(this.relay, config);
 
-    const idlingColdSocket = combineLatest([
+    // Idling cold sockets
+    combineLatest([
       this.pubProxy.getLogicalConnectionSizeObservable(),
       this.subProxy.getLogicalConnectionSizeObservable(),
     ])
@@ -81,7 +81,6 @@ export class NostrConnection {
           this.relay.disconnect();
         }
       });
-    this.toBeUnsubscribed.push(idlingColdSocket);
   }
 
   setKeepAlive(flag: boolean): void {
@@ -95,7 +94,6 @@ export class NostrConnection {
       this.relay.disconnect();
     }
   }
-
   setKeepWeakSubs(flag: boolean): void {
     if (this.disposed) {
       return;
@@ -118,7 +116,6 @@ export class NostrConnection {
 
     this.pubProxy.publish(event);
   }
-
   confirmOK(eventId: string): void {
     if (this.disposed) {
       return;
@@ -126,7 +123,6 @@ export class NostrConnection {
 
     this.pubProxy.confirmOK(eventId);
   }
-
   subscribe(req: LazyREQ, options?: Partial<SubscribeOptions>): void {
     if (this.disposed) {
       return;
@@ -144,7 +140,6 @@ export class NostrConnection {
     }
     this.subProxy.subscribe(req, autoclose);
   }
-
   unsubscribe(subId: string): void {
     if (this.disposed) {
       return;
@@ -154,22 +149,42 @@ export class NostrConnection {
     this.subProxy.unsubscribe(subId);
   }
 
-  getMessageObservable(): Observable<MessagePacket> {
+  getEventObservable(): Observable<MessagePacket<Nostr.ToClientMessage.EVENT>> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return merge(
-      this.subProxy.getEventObservable(),
-      this.relay
-        .getMessageObservable()
-        .pipe(filter((message) => message[0] !== "EVENT"))
-    ).pipe(
-      map((message) => ({
-        from: this.url,
-        message,
-      }))
-    );
+    return this.subProxy.getEventObservable().pipe(this.pack());
+  }
+  getEoseObservable(): Observable<MessagePacket<Nostr.ToClientMessage.EOSE>> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.relay.getEOSEObservable().pipe(this.pack());
+  }
+  getOkObservable(): Observable<MessagePacket<Nostr.ToClientMessage.OK>> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.relay.getOKObservable().pipe(this.pack());
+  }
+  getOtherObservable(): Observable<MessagePacket<Nostr.ToClientMessage.Any>> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.relay.getOtherObservable().pipe(this.pack());
+  }
+  private pack<T extends Nostr.ToClientMessage.Any>(): OperatorFunction<
+    T,
+    MessagePacket<T>
+  > {
+    return map((message) => ({
+      from: this.url,
+      message,
+    }));
   }
 
   getConnectionStateObservable(): Observable<ConnectionStatePacket> {
@@ -183,6 +198,9 @@ export class NostrConnection {
         state,
       }))
     );
+  }
+  get connectionState(): ConnectionState {
+    return this.relay.state;
   }
 
   getErrorObservable(): Observable<ErrorPacket> {
@@ -198,6 +216,10 @@ export class NostrConnection {
     );
   }
 
+  connectManually() {
+    this.relay.connect();
+  }
+
   dispose() {
     if (this.disposed) {
       return;
@@ -208,10 +230,6 @@ export class NostrConnection {
     this.relay.dispose();
     this.pubProxy.dispose();
     this.subProxy.dispose();
-
-    for (const sub of this.toBeUnsubscribed) {
-      sub.unsubscribe();
-    }
   }
 }
 
@@ -219,24 +237,20 @@ class PublishProxy {
   private pubs: Set<string> = new Set();
   private count$ = new CounterSubject(0);
   private disposed = false;
-  private toBeUnsubscribed: Unsubscribable[] = [];
 
   constructor(private relay: RelayConnection) {
-    const recovering = this.relay
-      .getReconnectedObservable()
-      .subscribe((toRelayMessage) => {
-        for (const [type, event] of toRelayMessage) {
-          if (type !== "EVENT") {
-            continue;
-          }
-
-          if (this.pubs.has(event.id)) {
-            this.sendEVENT(event);
-          }
+    // Recovering
+    this.relay.getReconnectedObservable().subscribe((toRelayMessage) => {
+      for (const [type, event] of toRelayMessage) {
+        if (type !== "EVENT") {
+          continue;
         }
-      });
 
-    this.toBeUnsubscribed.push(recovering);
+        if (this.pubs.has(event.id)) {
+          this.sendEVENT(event);
+        }
+      }
+    });
   }
 
   publish(event: Nostr.Event<number>): void {
@@ -276,10 +290,6 @@ class PublishProxy {
 
     this.count$.complete();
     this.count$.unsubscribe();
-
-    for (const sub of this.toBeUnsubscribed) {
-      sub.unsubscribe();
-    }
   }
 
   private sendEVENT(event: Nostr.Event) {
@@ -293,39 +303,31 @@ class SubscribeProxy {
   // maxLimit: number | null;
   private subs = new Map<string, SubRecord>();
   private disposed = false;
-  private toBeUnsubscribed: Unsubscribable[] = [];
   private queue: SubQueue;
 
-  constructor(private relay: RelayConnection) {
-    this.queue = new SubQueue(relay.url);
+  constructor(private relay: RelayConnection, private config: RxNostrConfig) {
+    this.queue = new SubQueue(relay.url, config);
 
-    const dequeuing = this.queue
-      .getActivationObservable()
-      .subscribe((activated) => {
-        for (const { req } of activated) {
-          this.sendREQ(req);
-        }
-      });
-    const recovering = this.relay.getReconnectedObservable().subscribe(() => {
+    // Dequeuing
+    this.queue.getActivationObservable().subscribe((activated) => {
+      for (const { req } of activated) {
+        this.sendREQ(req);
+      }
+    });
+
+    // Recovering
+    this.relay.getReconnectedObservable().subscribe(() => {
       for (const { req } of this.queue.ongoings) {
         this.sendREQ(req);
       }
     });
-    const autoClosing = this.relay
-      .getMessageObservable()
-      .pipe(
-        filter((msg): msg is Nostr.ToClientMessage.EOSE => msg[0] === "EOSE"),
-        map((msg) => msg[1])
-      )
-      .subscribe((subId) => {
-        if (this.subs.get(subId)?.autoclose) {
-          this.unsubscribe(subId);
-        }
-      });
 
-    this.toBeUnsubscribed.push(dequeuing);
-    this.toBeUnsubscribed.push(recovering);
-    this.toBeUnsubscribed.push(autoClosing);
+    // Auto closing
+    this.relay.getEOSEObservable().subscribe(([, subId]) => {
+      if (this.subs.get(subId)?.autoclose) {
+        this.unsubscribe(subId);
+      }
+    });
   }
 
   subscribe(req: LazyREQ, autoclose: boolean): void {
@@ -343,7 +345,6 @@ class SubscribeProxy {
     this.subs.set(subId, sub);
     this.queue.enqueue(sub);
   }
-
   unsubscribe(subId: string): void {
     if (this.disposed) {
       return;
@@ -358,6 +359,22 @@ class SubscribeProxy {
     return this.queue.has(subId);
   }
 
+  getEventObservable(): Observable<Nostr.ToClientMessage.EVENT> {
+    return this.relay.getEVENTObservable().pipe(
+      filter(([, subId, event]) => {
+        const filters = this.subs.get(subId)?.filters;
+        if (!filters) {
+          return false;
+        }
+
+        return (
+          (this.config.skipValidateFilterMatching ||
+            isFiltered(event, filters)) &&
+          (this.config.skipVerify || verify(event))
+        );
+      })
+    );
+  }
   getLogicalConnectionSizeObservable(): Observable<number> {
     return this.queue.getSizeObservable();
   }
@@ -370,24 +387,6 @@ class SubscribeProxy {
     this.disposed = true;
 
     this.queue.dispose();
-
-    for (const sub of this.toBeUnsubscribed) {
-      sub.unsubscribe();
-    }
-  }
-
-  getEventObservable(): Observable<Nostr.ToClientMessage.EVENT> {
-    return this.relay.getMessageObservable().pipe(
-      filter((msg): msg is Nostr.ToClientMessage.EVENT => msg[0] === "EVENT"),
-      filter(([, subId, event]) => {
-        const filters = this.subs.get(subId)?.filters;
-        if (!filters) {
-          return false;
-        }
-
-        return isFiltered(event, filters);
-      })
-    );
   }
 
   private sendREQ([, subId, ...lazyFilters]: LazyREQ) {
@@ -409,94 +408,64 @@ class RelayConnection {
   private socket: WebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
-  private state$ = new BehaviorSubject<ConnectionState>("initialized");
-  private incoming$ = new Subject<
-    Nostr.ToClientMessage.Any | RxNostrWebSocketError
-  >();
   private reconnected$ = new Subject<Nostr.ToRelayMessage.Any[]>();
   private message$ = new Subject<Nostr.ToClientMessage.Any>();
   private error$ = new Subject<unknown>();
+  private retryTimer: Subscription | null = null;
 
-  private toBeUnsubscribed: Unsubscribable[] = [];
   private disposed = false;
 
-  constructor(public url: string, private config: ConnectionConfig) {
+  private state$ = new Subject<ConnectionState>();
+  private _state: ConnectionState = "initialized";
+  get state(): ConnectionState {
+    return this._state;
+  }
+  private setState(state: ConnectionState) {
+    this._state = state;
+    this.state$.next(state);
+  }
+
+  constructor(public url: string, private config: RxNostrConfig) {
     // Caching
-    Nip11Registry.get(url);
-
-    const recovering = this.incoming$
-      .pipe(
-        rethrowWebSocketError(),
-        backoff(this.config.backoff),
-        tap({
-          error: () => {
-            this.state$.next("error");
-          },
-        })
-      )
-      .subscribe(this.message$);
-    this.toBeUnsubscribed.push(recovering);
-
-    function backoff<T>(config: BackoffConfig): MonoTypeOperatorFunction<T> {
-      return config.strategy === "off"
-        ? identity
-        : retry({
-            delay: (_, retryCount) => backoffSignal(config, retryCount),
-            count: config.maxCount,
-          });
-    }
-    function rethrowWebSocketError(): OperatorFunction<
-      Nostr.ToClientMessage.Any | RxNostrWebSocketError,
-      Nostr.ToClientMessage.Any
-    > {
-      return mergeMap((event) => {
-        if (event instanceof RxNostrWebSocketError) {
-          throw event;
-        } else {
-          return of(event);
-        }
-      });
+    if (!config.skipFetchNip11) {
+      Nip11Registry.fetch(url);
     }
   }
 
-  get state() {
-    return this.state$.getValue();
-  }
-
-  connect(reconnect = false) {
+  connect(retryCount?: number) {
     if (this.state === "terminated") {
       return;
     }
+    const isRetry = typeof retryCount === "number";
 
     const canConnect =
       this.state === "initialized" ||
       this.state === "closed" ||
       this.state === "error" ||
       this.state === "rejected" ||
-      reconnect;
+      retry;
     if (!canConnect) {
       return;
     }
 
-    if (reconnect) {
-      this.state$.next("reconnecting");
+    if (isRetry) {
+      this.setState("reconnecting");
     } else {
-      this.state$.next("connecting");
+      this.setState("connecting");
     }
 
-    this.socket = this.createSocket(reconnect);
+    this.socket = this.createSocket(retryCount ?? 0);
   }
-
-  private createSocket(reconnect: boolean) {
+  private createSocket(retryCount: number) {
     const onopen = () => {
       if (this.state === "terminated") {
         socket.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
         return;
       }
 
-      this.state$.next("connected");
+      this.setState("connected");
 
-      if (reconnect) {
+      if (retryCount) {
         this.reconnected$.next(this.unsent);
         this.unsent = [];
       }
@@ -513,17 +482,23 @@ class RelayConnection {
     };
     const onmessage = ({ data }: MessageEvent) => {
       if (this.state === "terminated") {
-        socket.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
         return;
       }
 
       try {
-        this.incoming$.next(JSON.parse(data));
+        this.message$.next(JSON.parse(data));
       } catch (err) {
         this.error$.next(err);
       }
     };
     const onclose = ({ code }: CloseEvent) => {
+      socket.removeEventListener("open", onopen);
+      socket.removeEventListener("message", onmessage);
+      socket.removeEventListener("close", onclose);
+      if (this.socket === socket) {
+        this.socket = null;
+      }
+
       if (
         this.state === "terminated" ||
         code === WebSocketCloseCode.DISPOSED_BY_RX_NOSTR
@@ -531,29 +506,46 @@ class RelayConnection {
         return;
       }
 
-      socket.removeEventListener("open", onopen);
-      socket.removeEventListener("message", onmessage);
-      socket.removeEventListener("close", onclose);
-      socket.close();
-      this.socket = null;
-
       if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
+        // TODO: unsent と buffer に何か残っている場合は再送を試みる
         this.unsent = [];
         this.buffer = [];
 
-        this.state$.next("closed");
+        this.setState("closed");
       } else if (code === WebSocketCloseCode.DONT_RETRY) {
         this.unsent = [];
         this.buffer = [];
 
-        this.state$.next("rejected");
+        this.setState("rejected");
         this.error$.next(new RxNostrWebSocketError(code));
       } else {
-        this.unsent.push(...this.buffer);
-        this.buffer = [];
+        const nextRetry = retryCount + 1;
+        const shouldRetry =
+          this.config.retry.strategy !== "off" &&
+          nextRetry <= this.config.retry.maxCount;
 
-        // Don't `this.incoming$.error()` because we will never be able to call `.next()`
-        this.incoming$.next(new RxNostrWebSocketError(code));
+        if (shouldRetry) {
+          this.unsent.push(...this.buffer);
+          this.buffer = [];
+
+          this.setState("waiting-for-reconnection");
+
+          this.retryTimer?.unsubscribe();
+          this.retryTimer = retryTimer(this.config.retry, nextRetry).subscribe(
+            () => {
+              if (!this.disposed) {
+                this.connect(nextRetry);
+              }
+            }
+          );
+        } else {
+          this.unsent = [];
+          this.buffer = [];
+
+          this.setState("error");
+        }
+
+        this.error$.next(new RxNostrWebSocketError(code));
       }
     };
 
@@ -588,9 +580,14 @@ class RelayConnection {
           throw new RxNostrLogicError();
         }
 
-        this.socket.send(JSON.stringify(message));
+        if (this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify(message));
+        } else {
+          this.unsent.push(message);
+        }
         return;
       }
+      case "waiting-for-reconnection":
       case "reconnecting":
       case "error": {
         this.unsent.push(message);
@@ -599,18 +596,33 @@ class RelayConnection {
     }
   }
 
-  getMessageObservable(): Observable<Nostr.ToClientMessage.Any> {
-    return this.message$.asObservable();
+  getEVENTObservable(): Observable<Nostr.ToClientMessage.EVENT> {
+    return this.message$.pipe(
+      filter((msg): msg is Nostr.ToClientMessage.EVENT => msg[0] === "EVENT")
+    );
+  }
+  getEOSEObservable(): Observable<Nostr.ToClientMessage.EOSE> {
+    return this.message$.pipe(
+      filter((msg): msg is Nostr.ToClientMessage.EOSE => msg[0] === "EOSE")
+    );
+  }
+  getOKObservable(): Observable<Nostr.ToClientMessage.OK> {
+    return this.message$.pipe(
+      filter((msg): msg is Nostr.ToClientMessage.OK => msg[0] === "OK")
+    );
+  }
+  getOtherObservable(): Observable<Nostr.ToClientMessage.Any> {
+    return this.message$.pipe(
+      filter(([type]) => type !== "EVENT" && type !== "EOSE" && type !== "OK")
+    );
   }
 
   getReconnectedObservable(): Observable<Nostr.ToRelayMessage.Any[]> {
     return this.reconnected$.asObservable();
   }
-
   getConnectionStateObservable(): Observable<ConnectionState> {
     return this.state$.pipe(distinctUntilChanged());
   }
-
   getErrorObservable(): Observable<unknown> {
     return this.error$.asObservable();
   }
@@ -619,23 +631,22 @@ class RelayConnection {
     if (this.disposed) {
       return;
     }
-
     this.disposed = true;
+    this.setState("terminated");
+
+    this.retryTimer?.unsubscribe();
+
+    this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
+    this.socket = null;
 
     const subjects = [
       this.state$,
-      this.incoming$,
       this.message$,
       this.error$,
       this.reconnected$,
     ];
     for (const sub of subjects) {
       sub.complete();
-      sub.unsubscribe();
-    }
-
-    for (const sub of this.toBeUnsubscribed) {
-      sub.unsubscribe();
     }
   }
 }
@@ -644,6 +655,7 @@ class CounterSubject extends BehaviorSubject<number> {
   constructor(count?: number) {
     super(count ?? 0);
   }
+
   increment() {
     this.next(this.getValue() + 1);
   }
@@ -678,7 +690,7 @@ class SubQueue {
     this._ongoings = v;
   }
 
-  constructor(private url: string) {}
+  constructor(private url: string, private config: RxNostrConfig) {}
 
   enqueue(v: SubRecord): void {
     this.queuings = [...this.queuings, v];
@@ -709,6 +721,7 @@ class SubQueue {
       !!this.queuings.find((e) => e.subId === subId)
     );
   }
+
   getActivationObservable() {
     return this.activated$.asObservable();
   }
@@ -720,7 +733,6 @@ class SubQueue {
     const subjects = [this.activated$, this.count$];
     for (const sub of subjects) {
       sub.complete();
-      sub.unsubscribe();
     }
   }
 
@@ -741,31 +753,10 @@ class SubQueue {
   }
 
   private async capacity() {
-    const nip11 = await Nip11Registry.get(this.url);
+    const nip11 = this.config.skipFetchNip11
+      ? await Nip11Registry.getOrDefault(this.url)
+      : await Nip11Registry.getOrFetch(this.url);
     return nip11.limitation?.max_subscriptions ?? Infinity;
-  }
-}
-
-export class Nip11Registry {
-  private static cache: Record<string, Promise<Nostr.Nip11.RelayInfo>> = {};
-
-  static async get(url: string): Promise<Nostr.Nip11.RelayInfo> {
-    url = normalizeRelayUrl(url);
-
-    return this.cache[url] ?? this.fetch(url);
-  }
-
-  static set(url: string, nip11: Nostr.Nip11.RelayInfo) {
-    url = normalizeRelayUrl(url);
-
-    this.cache[url] = Promise.resolve(nip11);
-  }
-
-  static async fetch(url: string) {
-    url = normalizeRelayUrl(url);
-
-    this.cache[url] = fetchRelayInfo(url);
-    return this.cache[url];
   }
 }
 
@@ -793,33 +784,6 @@ export const WebSocketCloseCode = {
   DISPOSED_BY_RX_NOSTR: 4538,
 } as const;
 
-export interface ConnectionConfig {
-  backoff: BackoffConfig;
-}
-
-export type BackoffConfig =
-  | {
-      // Exponential backoff and jitter strategy
-      strategy: "exponential";
-      maxCount: number;
-      initialDelay: number;
-    }
-  | {
-      // Retry at regular intervals
-      strategy: "linear";
-      maxCount: number;
-      interval: number;
-    }
-  | {
-      // Retry immediately
-      strategy: "immediately";
-      maxCount: number;
-    }
-  | {
-      // Won't retry
-      strategy: "off";
-    };
-
 interface SubRecord {
   subId: string;
   req: LazyREQ;
@@ -827,21 +791,20 @@ interface SubRecord {
   autoclose: boolean;
 }
 
-function backoffSignal(
-  config: BackoffConfig,
-  count: number
-): ObservableInput<unknown> {
-  if (config.strategy === "exponential") {
-    const time = Math.max(
-      config.initialDelay * 2 ** (count - 1) + (Math.random() - 0.5) * 1000,
-      1000
-    );
-    return timer(time);
-  } else if (config.strategy === "linear") {
-    return timer(config.interval);
-  } else if (config.strategy === "immediately") {
-    return of(0);
-  } else {
-    return EMPTY;
+function retryTimer(config: RetryConfig, count: number) {
+  switch (config.strategy) {
+    case "exponential": {
+      const time = Math.max(
+        config.initialDelay * 2 ** (count - 1) + (Math.random() - 0.5) * 1000,
+        1000
+      );
+      return timer(time);
+    }
+    case "immediately":
+      return of(0);
+    case "linear":
+      return timer(config.interval);
+    case "off":
+      return EMPTY;
   }
 }

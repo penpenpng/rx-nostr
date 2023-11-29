@@ -1,13 +1,13 @@
 import * as Nostr from "nostr-typedef";
 
-import { defineDefaultOptions } from "../util.js";
+import { defineDefault } from "../util.js";
 
 export interface MatchFilterOptions {
   sinceInclusive: boolean;
   untilInclusive: boolean;
 }
 
-const makeMatchFilterOptions = defineDefaultOptions<MatchFilterOptions>({
+const makeMatchFilterOptions = defineDefault<MatchFilterOptions>({
   sinceInclusive: true,
   untilInclusive: true,
 });

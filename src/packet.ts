@@ -61,7 +61,7 @@ export interface ConnectionStatePacket {
  * - `connecting`: Attempting to connect (or reconnect for error recovery).
  * - `connected`: Connected.
  * - `closed`: Closed as idling, or desired by user.
- * - `reconnecting`: Reconnecting.
+ * - `reconnecting`: Reconnecting for error recovery
  * - `error`: Closed because of an unexpected error. You can try to recover by reconnect()
  * - `rejected`: Closed because of closing code 4000. You can try to reconnect, but should not do.
  * - `terminated`: Closed, and no longer available because of dispose()
@@ -71,6 +71,7 @@ export type ConnectionState =
   | "connecting"
   | "connected"
   | "closed"
+  | "waiting-for-reconnection"
   | "reconnecting"
   | "error"
   | "rejected"

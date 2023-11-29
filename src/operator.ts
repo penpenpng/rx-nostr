@@ -26,7 +26,7 @@ import { evalFilters } from "./lazy-filter.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
-import { defineDefaultOptions } from "./util.js";
+import { defineDefault } from "./util.js";
 
 // --------------------- //
 // EventPacket operators //
@@ -282,6 +282,6 @@ export interface CreateUniqOptions<T> {
 export interface FilterByOptions {
   not: boolean;
 }
-const makeFilterByOptions = defineDefaultOptions<FilterByOptions>({
+const makeFilterByOptions = defineDefault<FilterByOptions>({
   not: false,
 });
