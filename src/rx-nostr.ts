@@ -39,12 +39,7 @@ import type {
   OkPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import {
-  defineDefault,
-  inlineThrow,
-  normalizeRelayUrl,
-  subtract,
-} from "./util.js";
+import { defineDefault, inlineThrow, subtract, UrlMap } from "./util.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays
@@ -218,28 +213,17 @@ export type AcceptableDefaultRelaysConfig =
 export type AcceptableRelaysConfig = AcceptableDefaultRelaysConfig;
 
 class RxNostrImpl implements RxNostr {
-  private connections = new Map<string, NostrConnection>();
-  private getConnections(urls: string[]): NostrConnection[] {
-    const conns: NostrConnection[] = [];
-
-    for (const url of new Set(urls.map(normalizeRelayUrl))) {
-      const conn = this.connections.get(url);
-      if (conn) {
-        conns.push(conn);
-      }
-    }
-
-    return conns;
-  }
-
-  private defaultRelays: Record<string, DefaultRelayConfig> = {};
+  private connections = new UrlMap<NostrConnection>();
+  private defaultRelays = new UrlMap<DefaultRelayConfig>();
   private get defaultReadRelays(): string[] {
-    return Object.values(this.defaultRelays)
+    return this.defaultRelays
+      .toValues()
       .filter(({ read }) => read)
       .map(({ url }) => url);
   }
   private get defaultWriteRelays(): string[] {
-    return Object.values(this.defaultRelays)
+    return this.defaultRelays
+      .toValues()
       .filter(({ write }) => write)
       .map(({ url }) => url);
   }
@@ -258,31 +242,33 @@ class RxNostrImpl implements RxNostr {
 
   constructor(private config: RxNostrConfig) {}
 
+  /** @deprecated */
   getRelays(): DefaultRelayConfig[] {
-    return Object.values(this.getDefaultRelays());
+    return this.defaultRelays.toValues();
   }
 
+  /** @deprecated */
   async switchRelays(config: AcceptableDefaultRelaysConfig): Promise<void> {
-    return this.setDefaultRelays(config);
+    this.setDefaultRelays(config);
   }
+  /** @deprecated */
   async addRelay(relay: string | DefaultRelayConfig): Promise<void> {
-    await this.switchRelays([...this.getRelays(), relay]);
+    this.addDefaultRelays([relay]);
   }
+  /** @deprecated */
   async removeRelay(url: string): Promise<void> {
-    const u = normalizeRelayUrl(url);
-    const currentRelays = this.getRelays();
-    const nextRelays = currentRelays.filter((relay) => relay.url !== u);
-    if (currentRelays.length !== nextRelays.length) {
-      await this.switchRelays(nextRelays);
-    }
+    this.removeDefaultRelays(url);
   }
 
+  /** @deprecated */
   hasRelay(url: string): boolean {
     return !!this.getDefaultRelay(url);
   }
+  /** @deprecated */
   canReadRelay(url: string): boolean {
     return !!this.getDefaultRelay(url)?.read;
   }
+  /** @deprecated */
   canWriteRelay(url: string): boolean {
     return !!this.getDefaultRelay(url)?.write;
   }
@@ -292,10 +278,10 @@ class RxNostrImpl implements RxNostr {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.defaultRelays;
+    return this.defaultRelays.toObject();
   }
   getDefaultRelay(url: string): DefaultRelayConfig | undefined {
-    return this.defaultRelays[normalizeRelayUrl(url)];
+    return this.defaultRelays.get(url);
   }
 
   setDefaultRelays(relays: AcceptableDefaultRelaysConfig): void {
@@ -303,14 +289,15 @@ class RxNostrImpl implements RxNostr {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    const defaultRelays = normalizeRelaysConfig(relays);
-    for (const url of Object.keys(defaultRelays)) {
+    const defaultRelays = new UrlMap(normalizeRelaysConfig(relays));
+    for (const url of defaultRelays.keys()) {
       if (!this.connections.has(url)) {
         this.connectObservables(url);
       }
     }
 
-    const defaultReadRelays = Object.values(defaultRelays)
+    const defaultReadRelays = defaultRelays
+      .toValues()
       .filter(({ read }) => read)
       .map(({ url }) => url);
     this.switchWeakSubs(defaultReadRelays);
@@ -320,10 +307,10 @@ class RxNostrImpl implements RxNostr {
   private switchWeakSubs(defaultReadRelays: string[]): void {
     const noLongerNeeded = subtract(this.defaultReadRelays, defaultReadRelays);
 
-    for (const conn of this.getConnections(noLongerNeeded)) {
+    for (const conn of this.connections.getMany(noLongerNeeded)) {
       conn.setKeepWeakSubs(false);
     }
-    for (const conn of this.getConnections(defaultReadRelays)) {
+    for (const conn of this.connections.getMany(defaultReadRelays)) {
       conn.setKeepWeakSubs(true);
       for (const req of this.weakReqs.values()) {
         conn?.subscribe(req, {
@@ -354,18 +341,18 @@ class RxNostrImpl implements RxNostr {
     const additionalDefaultRelays = normalizeRelaysConfig(relays);
 
     this.setDefaultRelays({
-      ...this.defaultRelays,
+      ...this.defaultRelays.toObject(),
       ...additionalDefaultRelays,
     });
   }
   removeDefaultRelays(urls: string | string[]): void {
-    const defaultRelays = this.defaultRelays;
+    const defaultRelays = this.defaultRelays.copy();
     const targets = Array.isArray(urls) ? urls : [urls];
     for (const url of targets) {
-      delete defaultRelays[url];
+      defaultRelays.delete(url);
     }
 
-    this.setDefaultRelays(defaultRelays);
+    this.setDefaultRelays(defaultRelays.toObject());
   }
 
   getAllRelayState(): Record<string, ConnectionState> {
@@ -377,7 +364,7 @@ class RxNostrImpl implements RxNostr {
     );
   }
   getRelayState(url: string): ConnectionState | undefined {
-    const conn = this.connections.get(normalizeRelayUrl(url));
+    const conn = this.connections.get(url);
     if (!conn) {
       return undefined;
     }
@@ -398,7 +385,7 @@ class RxNostrImpl implements RxNostr {
       );
     }
 
-    const conn = this.connections.get(normalizeRelayUrl(url));
+    const conn = this.connections.get(url);
     if (!conn) {
       throw new RxNostrLogicError();
     }
@@ -441,7 +428,7 @@ class RxNostrImpl implements RxNostr {
                 this.weakReqs.set(subId, req);
               }
 
-              for (const conn of this.getConnections(targetRelays)) {
+              for (const conn of this.connections.getMany(targetRelays)) {
                 conn.subscribe(req, {
                   mode,
                   overwrite: true,
@@ -455,7 +442,7 @@ class RxNostrImpl implements RxNostr {
             }
             x?.unsubscribe();
 
-            for (const conn of this.getConnections(targetRelays)) {
+            for (const conn of this.connections.getMany(targetRelays)) {
               conn.unsubscribe(subId);
             }
           },
@@ -477,10 +464,12 @@ class RxNostrImpl implements RxNostr {
           )
             .pipe(
               filter(() => {
-                const shouldComplete = this.getConnections(targetRelays).every(
-                  ({ connectionState, url }) =>
-                    isDown(connectionState) || eoseRelays.has(url)
-                );
+                const shouldComplete = this.connections
+                  .getMany(targetRelays)
+                  .every(
+                    ({ connectionState, url }) =>
+                      isDown(connectionState) || eoseRelays.has(url)
+                  );
 
                 return shouldComplete;
               })
@@ -499,7 +488,7 @@ class RxNostrImpl implements RxNostr {
           if (mode === "weak") {
             this.weakReqs.set(subId, req);
           }
-          for (const conn of this.getConnections(targetRelays)) {
+          for (const conn of this.connections.getMany(targetRelays)) {
             conn.subscribe(req, { overwrite: false, autoclose: true, mode });
           }
 
@@ -577,7 +566,7 @@ class RxNostrImpl implements RxNostr {
           )
           .subscribe(subject);
 
-        for (const conn of this.getConnections(targetRelays)) {
+        for (const conn of this.connections.getMany(targetRelays)) {
           conn.publish(event);
         }
       })
@@ -682,7 +671,7 @@ function normalizeRelaysConfig(
       }
 
       return {
-        url: normalizeRelayUrl(url),
+        url,
         read,
         write,
       };
@@ -691,7 +680,7 @@ function normalizeRelaysConfig(
     return Object.fromEntries(arr.map((e) => [e.url, e]));
   } else {
     const arr = Object.entries(config).map(([url, flags]) => ({
-      url: normalizeRelayUrl(url),
+      url,
       ...flags,
     }));
 
