@@ -55,31 +55,40 @@ export interface RxNostr {
   /** @deprecated Use getDefaultRelays */
   getRelays(): DefaultRelayConfig[];
 
-  /** @deprecated Use `setDefaultRelays` instead. */
+  /** @deprecated Use `setDefaultRelays()` instead. */
   switchRelays(config: AcceptableDefaultRelaysConfig): Promise<void>;
-  /** @deprecated Use `addDefaultRelays` instead. */
+  /** @deprecated Use `addDefaultRelays()` instead. */
   addRelay(relay: string | DefaultRelayConfig): Promise<void>;
-  /** @deprecated Use `removeDefaultRelays` instead. */
+  /** @deprecated Use `removeDefaultRelays()` instead. */
   removeRelay(url: string): Promise<void>;
 
-  /** @deprecated Use `getDefaultRelays` instead. */
+  /** @deprecated Use `getDefaultRelay(url) !== undefined` instead. */
   hasRelay(url: string): boolean;
-  /** @deprecated Use `getDefaultRelays` instead. */
+  /** @deprecated Use `getDefaultRelay(url)?.write` instead. */
   canWriteRelay(url: string): boolean;
-  /** @deprecated Use `getDefaultRelays` instead. */
+  /** @deprecated Use `getDefaultRelay(url)?.read` instead. */
   canReadRelay(url: string): boolean;
 
   /**
-   * Return a record of default relays used by this object.
+   * Return config objects of the default relays used by this object.
    * The relay URLs are normalised so may not match the URLs set.
+   *
+   * **NOTE**:
+   * The record's keys are **normalized** URL, so may be different from ones you set.
+   * Use `getDefaultRelay(url)` instead to ensure that you get the value associated with a given URL.
    */
   getDefaultRelays(): Record<string, DefaultRelayConfig>;
+  /**
+   * Return a config object of the given relay if it exists.
+   */
   getDefaultRelay(url: string): DefaultRelayConfig | undefined;
 
   /**
-   * Set the list of relays.
-   * If a REQ subscription already exists, the same REQ is issued for the newly added relay
-   * and CLOSE is sent for the removed relay.
+   * Set the list of default relays. Existing default relays **will be overwritten**.
+   *
+   * If a REQ subscription for default relays already exists,
+   * the same REQ will be issued for the newly added relay
+   * and CLOSE will be sent for the removed relay.
    */
   setDefaultRelays(relays: AcceptableDefaultRelaysConfig): void;
   /** Utility wrapper for `setDefaultRelays()`. */
@@ -88,29 +97,31 @@ export interface RxNostr {
   removeDefaultRelays(urls: string | string[]): void;
 
   /**
-   * Return a dictionary in which you can look up connection state.
+   * Return connection status of all default relays and all relays that RxNostr has used temporary.
    *
-   * **NOTE**: Keys are **normalized** URL, so may be different from one you set.
+   * **NOTE**:
+   * Keys are **normalized** URL, so may be different from ones you set.
+   * Use `getRelayState(url)` instead to ensure that you get the value associated with a given URL.
    */
   getAllRelayState(): Record<string, ConnectionState>;
   /**
-   * Return connection state of the given relay.
-   * Throw if unknown URL is given.
+   * Return connection state of the given relay if it exists.
    */
   getRelayState(url: string): ConnectionState | undefined;
   /**
-   * Attempt to reconnect the WebSocket if its state is `error` or `rejected`.
+   * Attempt to reconnect manually if its connection state is `error` or `rejected`.
+   *
    * If not, do nothing.
    */
   reconnect(url: string): void;
 
   /**
    * Associate RxReq with RxNostr.
-   * When the associated RxReq is manipulated,
-   * the RxNostr issues a new REQ to all relays allowed to be read.
-   * The method returns an Observable that issues EventPackets
-   * when an EVENT is received that is subscribed by RxReq.
-   * You can unsubscribe the Observable to CLOSE.
+   *
+   * When the associated RxReq is manipulated, the RxNostr sends a new REQ to relays.
+   * This method returns an Observable that emits the REQ query's responses.
+   *
+   * You can unsubscribe the Observable to send CLOSE.
    */
   use(
     rxReq: RxReq,
@@ -124,8 +135,8 @@ export interface RxNostr {
   createAllEventObservable(): Observable<EventPacket>;
   /**
    * Create an Observable that receives all errors from all websocket connections.
-   * Note that an Observable is terminated when it receives any error,
-   * so this method is the only way to receive errors arising from multiplexed websocket connections
+   *
+   * Note that this method is the only way to receive errors arising from multiplexed websocket connections.
    * (It means that Observables returned by `use()` never throw error).
    *
    * Nothing happens when this Observable is unsubscribed.
@@ -145,7 +156,8 @@ export interface RxNostr {
   createConnectionStateObservable(): Observable<ConnectionStatePacket>;
 
   /**
-   * Attempt to send events to all relays that are allowed to write.
+   * Attempt to send events to relays.
+   *
    * The `seckey` option accepts both nsec format and hex format,
    * and if omitted NIP-07 will be automatically used.
    */
@@ -156,6 +168,7 @@ export interface RxNostr {
 
   /**
    * Release all resources held by the RxNostr object.
+   *
    * Any Observable resulting from this RxNostr will be in the completed state
    * and will never receive messages again.
    * RxReq used by this object is not affected; in other words, if the RxReq is used
@@ -389,8 +402,12 @@ class RxNostrImpl implements RxNostr {
     if (!conn) {
       throw new RxNostrLogicError();
     }
-
-    conn.connectManually();
+    if (
+      conn.connectionState === "error" ||
+      conn.connectionState === "rejected"
+    ) {
+      conn.connectManually();
+    }
   }
   use(
     rxReq: RxReq,
