@@ -1,7 +1,7 @@
 import { afterEach, assert, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
-import { WebSocketCloseCode } from "../connection.js";
+import { WebSocketCloseCode } from "../connection/index.js";
 import {
   createRxBackwardReq,
   createRxForwardReq,

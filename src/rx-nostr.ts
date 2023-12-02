@@ -20,7 +20,7 @@ import {
 } from "rxjs";
 
 import { makeRxNostrConfig, type RxNostrConfig } from "./config.js";
-import { NostrConnection } from "./connection.js";
+import { NostrConnection } from "./connection/index.js";
 import { RxNostrAlreadyDisposedError } from "./error.js";
 import { getSignedEvent } from "./nostr/event.js";
 import { completeOnTimeout } from "./operator.js";
