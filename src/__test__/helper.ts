@@ -1,10 +1,18 @@
 import Nostr from "nostr-typedef";
-import { type MonoTypeOperatorFunction, tap } from "rxjs";
+import {
+  first,
+  firstValueFrom,
+  type MonoTypeOperatorFunction,
+  tap,
+  timeout,
+} from "rxjs";
 import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
-import { createClientSpy, faker as _faker } from "vitest-nostr";
+import { createClientSpy, faker as _faker, type MockRelay } from "vitest-nostr";
 
-import { EventPacket, MessagePacket } from "../packet.js";
+import { WebSocketCloseCode } from "../connection/relay.js";
+import { ConnectionState, EventPacket, MessagePacket } from "../packet.js";
+import { RxNostr } from "../rx-nostr.js";
 
 export function testScheduler() {
   return new TestScheduler((a, b) => expect(a).toEqual(b));
@@ -34,7 +42,7 @@ export const faker = {
   },
 };
 
-export function spySub(): {
+export function spySubscription(): {
   completed: () => boolean;
   error: () => boolean;
   count: () => number;
@@ -97,4 +105,43 @@ export function spyEvent(): {
       }),
     ...spy,
   };
+}
+
+export async function closeSocket(relay: MockRelay, code: number, index = 0) {
+  const socket = await relay.getSocket(index);
+  socket.close({
+    code: code,
+    reason: "For test",
+    wasClean: true,
+  });
+}
+
+export function disposeMockRelay(relay: MockRelay) {
+  relay.close({
+    code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
+    reason: "Clean up on afterEach()",
+    wasClean: true,
+  });
+}
+
+export async function stateWillBe(
+  rxNostr: RxNostr,
+  url: string,
+  state: ConnectionState
+): Promise<boolean> {
+  if (rxNostr.getRelayState(url) === state) {
+    return true;
+  }
+
+  const state$ = rxNostr.createConnectionStateObservable().pipe(
+    first((packet) => packet.from === url && packet.state === state),
+    timeout(100)
+  );
+
+  try {
+    await firstValueFrom(state$);
+    return true;
+  } catch {
+    return false;
+  }
 }
