@@ -12,6 +12,9 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   skipFetchNip11: false,
 });
 
+/**
+ * Configuration object for a RxNostr instance.
+ */
 export interface RxNostrConfig {
   /** Auto reconnection strategy. */
   retry: RetryConfig;
@@ -28,25 +31,33 @@ export interface RxNostrConfig {
 /** @deprecated Use `RxNostrConfig` instead. */
 export type RxNostrOptions = RxNostrConfig;
 
+/**
+ * Auto reconnection strategy.
+ *
+ * `strategy` can be one of the followings:
+ *
+ * - `"exponential"`: Exponential backoff and jitter strategy.
+ * - `"linear"`: Retry at regular intervals.
+ * - `"immediately"`: Retry immediately.
+ * - `"off"`: Won't retry.
+ *
+ * `maxCount` specifies the maximum number of consecutive retry attempts.
+ */
 export type RetryConfig =
   | {
-      // Exponential backoff and jitter strategy
       strategy: "exponential";
       maxCount: number;
       initialDelay: number;
     }
   | {
-      // Retry at regular intervals
       strategy: "linear";
       maxCount: number;
       interval: number;
     }
   | {
-      // Retry immediately
       strategy: "immediately";
       maxCount: number;
     }
   | {
-      // Won't retry
       strategy: "off";
     };

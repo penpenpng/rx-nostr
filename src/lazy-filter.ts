@@ -2,6 +2,9 @@ import Nostr from "nostr-typedef";
 
 import { LazyFilter } from "./packet.js";
 
+/**
+ * Evaluate one or more `LazyFilter`s and return `Nostr.Filter[]`.
+ */
 export function evalFilters(
   filters: LazyFilter | LazyFilter[]
 ): Nostr.Filter[] {
