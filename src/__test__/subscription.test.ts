@@ -31,7 +31,7 @@ describe("Basic subscription behavior (single relay)", () => {
   afterEach(() => {
     rxNostr.dispose();
     relay.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
@@ -298,20 +298,8 @@ describe("Basic subscription behavior (single relay)", () => {
       wasClean: true,
     });
 
-    // FIXME:
-    // weakReq が 0 になることにより ABNORMAL_CLOSURE より先に
-    // DESIRED_BY_RX_NOSTR での CLOSE が発生している。
-    // ここで、以下を 100ms 待たずに直ちに実行すると、
-    // DESIRED_BY_RX_NOSTR CLOSING 中に rxNostr.send() が走るので
-    // 1. send() で unsent.push(message)
-    // 2. onclose で unsent = []
-    // となりイベントが送信されない
-    return new Promise((resolve) => {
-      setTimeout(resolve, 100);
-    }).then(async () => {
-      rxNostr.send(faker.event());
-      await expect(relay).toReceiveEVENT();
-    });
+    rxNostr.send(faker.event());
+    await expect(relay).toReceiveEVENT();
   });
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
@@ -355,17 +343,17 @@ describe("Basic subscription behavior (multiple relays)", () => {
   afterEach(() => {
     rxNostr.dispose();
     relay1.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
     relay2.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
     relay3.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
@@ -455,7 +443,7 @@ describe("Under limited REQ concurrency (single relay)", () => {
   afterEach(() => {
     rxNostr.dispose();
     relay.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });

@@ -12,7 +12,7 @@ import {
 } from "../packet.js";
 import { defineDefault, normalizeRelayUrl } from "../util.js";
 import { PublishProxy } from "./publish.js";
-import { RelayConnection } from "./relay.js";
+import { RelayConnection, WebSocketCloseCode } from "./relay.js";
 import { SubscribeProxy } from "./subscribe.js";
 
 export interface SubscribeOptions {
@@ -59,7 +59,7 @@ export class NostrConnection {
         this.logicalConns = logicalConns;
 
         if (!this.keepAlive && this.logicalConns <= 0) {
-          this.relay.disconnect();
+          this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
         }
       });
   }
@@ -72,7 +72,7 @@ export class NostrConnection {
     this.keepAlive = flag;
 
     if (!this.keepAlive && this.logicalConns <= 0) {
-      this.relay.disconnect();
+      this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
     }
   }
   setKeepWeakSubs(flag: boolean): void {

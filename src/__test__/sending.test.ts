@@ -29,17 +29,17 @@ describe("Basic sending behavior", () => {
   afterEach(() => {
     rxNostr.dispose();
     relay1.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
     relay2.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });
     relay3.close({
-      code: WebSocketCloseCode.DISPOSED_BY_RX_NOSTR,
+      code: WebSocketCloseCode.RX_NOSTR_DISPOSED,
       reason: "Clean up on afterEach()",
       wasClean: true,
     });

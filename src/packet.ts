@@ -17,6 +17,7 @@ export type LazyFilter = Omit<Nostr.Filter, "since" | "until"> & {
   until?: number | (() => number);
 };
 
+/** @internal */
 export type LazyREQ = ["REQ", string, ...LazyFilter[]];
 
 /**
@@ -55,24 +56,25 @@ export interface ConnectionStatePacket {
 }
 
 /**
- * WebSocket connection state.
+ * State of a WebSocket connection established with a relay.
  *
- * - `initialized`: Initialized.
- * - `connecting`: Attempting to connect (or reconnect for error recovery).
+ * - `initialized`: Initialization has been completed and the connection can now be made.
+ * - `connecting`: Attempting to connect for reasons other than auto-retry.
  * - `connected`: Connected.
- * - `closed`: Closed as idling, or desired by user.
- * - `reconnecting`: Reconnecting for error recovery
- * - `error`: Closed because of an unexpected error. You can try to recover by reconnect()
- * - `rejected`: Closed because of closing code 4000. You can try to reconnect, but should not do.
- * - `terminated`: Closed, and no longer available because of dispose()
+ * - `waiting-for-retrying`: Closed unexpectedly and the next auto-retry is scheduled.
+ * - `retrying`: Attempting to connect because of auto-retry.
+ * - `dormant`: Closed temporary because there is no acitve messaging.
+ * - `error`: Closed unexpectedly after the maximum number of retries. You can try to `reconnect()` manually.
+ * - `rejected`: Closed by a relay with closing code 4000. You can try to reconnect, but should not do.
+ * - `terminated`: Closed because of `dispose()`. Never reconnect.
  */
 export type ConnectionState =
   | "initialized"
   | "connecting"
   | "connected"
-  | "closed"
-  | "waiting-for-reconnection"
-  | "reconnecting"
+  | "waiting-for-retrying"
+  | "retrying"
+  | "dormant"
   | "error"
   | "rejected"
   | "terminated";

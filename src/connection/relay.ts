@@ -57,7 +57,7 @@ export class RelayConnection {
     const isRetry = typeof retryCount === "number";
     const canConnect =
       this.state === "initialized" ||
-      this.state === "closed" ||
+      this.state === "dormant" ||
       this.state === "error" ||
       this.state === "rejected" ||
       isRetry;
@@ -65,24 +65,27 @@ export class RelayConnection {
       return;
     }
 
-    if (isRetry) {
-      this.setState("reconnecting");
+    this.socket = this.createSocket(retryCount ?? 0);
+  }
+  private createSocket(retryCount: number) {
+    const isAutoRetry = retryCount > 0;
+    const isManualRetry = this.state === "error" || this.state === "rejected";
+
+    if (isAutoRetry) {
+      this.setState("retrying");
     } else {
       this.setState("connecting");
     }
 
-    this.socket = this.createSocket(retryCount ?? 0);
-  }
-  private createSocket(retryCount: number) {
     const onopen = () => {
       if (this.state === "terminated") {
-        socket.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
+        socket.close(WebSocketCloseCode.RX_NOSTR_DISPOSED);
         return;
       }
 
       this.setState("connected");
 
-      if (retryCount) {
+      if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
         this.unsent = [];
       }
@@ -118,34 +121,38 @@ export class RelayConnection {
 
       if (
         this.state === "terminated" ||
-        code === WebSocketCloseCode.DISPOSED_BY_RX_NOSTR
+        code === WebSocketCloseCode.RX_NOSTR_DISPOSED
       ) {
+        this.unsent = [];
+        this.buffer = [];
         return;
       }
 
-      if (code === WebSocketCloseCode.DESIRED_BY_RX_NOSTR) {
-        // TODO: unsent と buffer に何か残っている場合は再送を試みる
-        this.unsent = [];
-        this.buffer = [];
+      if (code === WebSocketCloseCode.RX_NOSTR_IDLE) {
+        this.setState("dormant");
 
-        this.setState("closed");
+        if (this.buffer.length > 0) {
+          this.connect();
+        }
       } else if (code === WebSocketCloseCode.DONT_RETRY) {
         this.unsent = [];
         this.buffer = [];
 
-        this.setState("rejected");
         this.error$.next(new RxNostrWebSocketError(code));
+        this.setState("rejected");
       } else {
+        this.unsent.push(...this.buffer);
+        this.buffer = [];
+
+        this.error$.next(new RxNostrWebSocketError(code));
+
         const nextRetry = retryCount + 1;
         const shouldRetry =
           this.config.retry.strategy !== "off" &&
           nextRetry <= this.config.retry.maxCount;
 
         if (shouldRetry) {
-          this.unsent.push(...this.buffer);
-          this.buffer = [];
-
-          this.setState("waiting-for-reconnection");
+          this.setState("waiting-for-retrying");
 
           this.retryTimer?.unsubscribe();
           this.retryTimer = retryTimer(this.config.retry, nextRetry).subscribe(
@@ -156,13 +163,8 @@ export class RelayConnection {
             }
           );
         } else {
-          this.unsent = [];
-          this.buffer = [];
-
           this.setState("error");
         }
-
-        this.error$.next(new RxNostrWebSocketError(code));
       }
     };
 
@@ -175,8 +177,8 @@ export class RelayConnection {
     return socket;
   }
 
-  disconnect(): void {
-    this.socket?.close(WebSocketCloseCode.DESIRED_BY_RX_NOSTR);
+  disconnect(code: WebSocketCloseCode): void {
+    this.socket?.close(code);
   }
 
   send(message: Nostr.ToRelayMessage.Any): void {
@@ -187,7 +189,7 @@ export class RelayConnection {
       }
       case "initialized":
       case "connecting":
-      case "closed": {
+      case "dormant": {
         this.buffer.push(message);
         this.connect();
         return;
@@ -200,12 +202,12 @@ export class RelayConnection {
         if (this.socket.readyState === WebSocket.OPEN) {
           this.socket.send(JSON.stringify(message));
         } else {
-          this.unsent.push(message);
+          this.buffer.push(message);
         }
         return;
       }
-      case "waiting-for-reconnection":
-      case "reconnecting":
+      case "waiting-for-retrying":
+      case "retrying":
       case "error": {
         this.unsent.push(message);
         return;
@@ -253,7 +255,7 @@ export class RelayConnection {
 
     this.retryTimer?.unsubscribe();
 
-    this.socket?.close(WebSocketCloseCode.DISPOSED_BY_RX_NOSTR);
+    this.socket?.close(WebSocketCloseCode.RX_NOSTR_DISPOSED);
     this.socket = null;
 
     const subjects = [
@@ -305,7 +307,10 @@ export const WebSocketCloseCode = {
    */
   DONT_RETRY: 4000,
   /** @internal rx-nostr uses it internally. */
-  DESIRED_BY_RX_NOSTR: 4537,
+  RX_NOSTR_IDLE: 4537,
   /** @internal rx-nostr uses it internally. */
-  DISPOSED_BY_RX_NOSTR: 4538,
+  RX_NOSTR_DISPOSED: 4538,
 } as const;
+
+type WebSocketCloseCode =
+  (typeof WebSocketCloseCode)[keyof typeof WebSocketCloseCode];
