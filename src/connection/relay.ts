@@ -42,20 +42,25 @@ export class RelayConnection {
     if (!config.skipFetchNip11) {
       Nip11Registry.fetch(url);
     }
+
+    this.setState("initialized");
   }
 
-  connect(retryCount?: number) {
+  connectManually() {
+    this.connect();
+  }
+  private connect(retryCount?: number) {
     if (this.state === "terminated") {
       return;
     }
-    const isRetry = typeof retryCount === "number";
 
+    const isRetry = typeof retryCount === "number";
     const canConnect =
       this.state === "initialized" ||
       this.state === "closed" ||
       this.state === "error" ||
       this.state === "rejected" ||
-      retry;
+      isRetry;
     if (!canConnect) {
       return;
     }

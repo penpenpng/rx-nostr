@@ -198,7 +198,7 @@ export class NostrConnection {
   }
 
   connectManually() {
-    this.relay.connect();
+    this.relay.connectManually();
   }
 
   dispose() {

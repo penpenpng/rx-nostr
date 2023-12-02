@@ -31,3 +31,7 @@ export function normalizeRelayUrl(url: string) {
 export function subtract<T extends string | number>(x: T[], y: T[]): T[] {
   return x.filter((e) => !y.includes(e));
 }
+
+export function inlineThrow(err: Error): never {
+  throw err;
+}

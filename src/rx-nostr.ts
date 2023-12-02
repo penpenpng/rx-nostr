@@ -21,7 +21,11 @@ import {
 
 import { makeRxNostrConfig, type RxNostrConfig } from "./config.js";
 import { NostrConnection } from "./connection/index.js";
-import { RxNostrAlreadyDisposedError } from "./error.js";
+import {
+  RxNostrAlreadyDisposedError,
+  RxNostrInvalidUsageError,
+  RxNostrLogicError,
+} from "./error.js";
 import { getSignedEvent } from "./nostr/event.js";
 import { completeOnTimeout } from "./operator.js";
 import type {
@@ -35,7 +39,12 @@ import type {
   OkPacket,
 } from "./packet.js";
 import type { RxReq } from "./req.js";
-import { defineDefault, normalizeRelayUrl, subtract } from "./util.js";
+import {
+  defineDefault,
+  inlineThrow,
+  normalizeRelayUrl,
+  subtract,
+} from "./util.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays
@@ -88,7 +97,7 @@ export interface RxNostr {
    * Return connection state of the given relay.
    * Throw if unknown URL is given.
    */
-  getRelayState(url: string): ConnectionState;
+  getRelayState(url: string): ConnectionState | undefined;
   /**
    * Attempt to reconnect the WebSocket if its state is `error` or `rejected`.
    * If not, do nothing.
@@ -350,23 +359,38 @@ class RxNostrImpl implements RxNostr {
     return Object.fromEntries(
       Array.from(this.connections.values()).map((e) => [
         e.url,
-        this.getRelayState(e.url),
+        this.getRelayState(e.url) ?? inlineThrow(new RxNostrLogicError()),
       ])
     );
   }
-  getRelayState(url: string): ConnectionState {
+  getRelayState(url: string): ConnectionState | undefined {
     const conn = this.connections.get(normalizeRelayUrl(url));
     if (!conn) {
-      throw new Error("RelayConfig not found");
+      return undefined;
     }
 
     return conn.connectionState;
   }
 
   reconnect(url: string): void {
-    if (this.canReadRelay(url)) {
-      this.connections.get(normalizeRelayUrl(url))?.connectManually();
+    const relay = this.getDefaultRelay(url);
+    if (!relay) {
+      throw new RxNostrInvalidUsageError(
+        `The relay (${url}) is not a default relay. \`reconnect()\` can be used only for a readable default relay.`
+      );
     }
+    if (!relay.read) {
+      throw new RxNostrInvalidUsageError(
+        `The relay (${url}) is not readable. \`reconnect()\` can be used only for a readable default relay.`
+      );
+    }
+
+    const conn = this.connections.get(normalizeRelayUrl(url));
+    if (!conn) {
+      throw new RxNostrLogicError();
+    }
+
+    conn.connectManually();
   }
   use(
     rxReq: RxReq,
@@ -517,33 +541,43 @@ class RxNostrImpl implements RxNostr {
     const targetRelays = this.defaultWriteRelays;
     const subject = new ReplaySubject<OkPacket>(targetRelays.length);
 
-    getSignedEvent(params, seckey).then((event) => {
-      if (subject.closed) {
-        return;
+    const teardown = () => {
+      if (!subject.closed) {
+        subject.complete();
       }
+    };
 
-      this.ok$
-        .pipe(
-          filter(({ message: [, eventId] }) => eventId === event.id),
-          map(({ from, message: [, id, ok] }) => ({ from, id, ok }))
-        )
-        .subscribe(subject);
+    getSignedEvent(params, seckey)
+      .then((event) => {
+        if (subject.closed) {
+          return;
+        }
 
-      for (const conn of this.getConnections(targetRelays)) {
-        conn.publish(event);
-      }
-    });
+        this.ok$
+          .pipe(
+            filter(({ message: [, eventId] }) => eventId === event.id),
+            map(({ from, message: [, id, ok] }) => ({ from, id, ok }))
+          )
+          .subscribe(subject);
+
+        for (const conn of this.getConnections(targetRelays)) {
+          conn.publish(event);
+        }
+      })
+      .catch((err) => {
+        teardown();
+
+        throw new RxNostrInvalidUsageError(
+          err instanceof Error ? err.message : "Failed to sign the given event"
+        );
+      });
 
     return subject.pipe(
       take(targetRelays.length),
       takeUntil(this.dispose$),
       // TODO: config
       timeout(30 * 1000),
-      finalize(() => {
-        if (!subject.closed) {
-          subject.complete();
-        }
-      })
+      finalize(teardown)
     );
   }
 
