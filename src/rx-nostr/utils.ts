@@ -1,12 +1,6 @@
-import Nostr from "nostr-typedef";
-import { filter, map, type OperatorFunction, pipe } from "rxjs";
+import { filter, type OperatorFunction } from "rxjs";
 
-import type {
-  EventPacket,
-  LazyFilter,
-  LazyREQ,
-  MessagePacket,
-} from "../packet.js";
+import type { LazyFilter, LazyREQ, MessagePacket } from "../packet.js";
 import type { RxReq } from "../req.js";
 import type {
   AcceptableDefaultRelaysConfig,
@@ -30,19 +24,6 @@ export function makeLazyREQ(params: {
   const { rxReq, filters, index } = params;
 
   return ["REQ", makeSubId({ rxReq, index }), ...filters];
-}
-
-export function pickEvent(
-  subId: string
-): OperatorFunction<MessagePacket<Nostr.ToClientMessage.EVENT>, EventPacket> {
-  return pipe(
-    filter(({ message }) => message[1] === subId),
-    map(({ from, message }) => ({
-      from,
-      subId: message[1],
-      event: message[2],
-    }))
-  );
 }
 
 export function normalizeRelaysConfig(

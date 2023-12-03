@@ -21,12 +21,58 @@ export type LazyFilter = Omit<Nostr.Filter, "since" | "until"> & {
 export type LazyREQ = ["REQ", string, ...LazyFilter[]];
 
 /**
+ * Packets from websocket that represents all raw incoming messages.
+ */
+export type MessagePacket =
+  | EventPacket
+  | EosePacket
+  | OkPacket
+  | NoticePacket
+  | AuthPacket
+  | CountPacket;
+
+export interface MessagePacketBase<
+  T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type
+> {
+  from: string;
+  type: T;
+  message: Nostr.ToClientMessage.Message<T>;
+}
+
+/**
  * Packets from websocket that represents an EVENT.
  */
-export interface EventPacket {
-  from: string;
+export interface EventPacket extends MessagePacketBase<"EVENT"> {
   subId: string;
   event: Nostr.Event;
+}
+
+export interface EosePacket extends MessagePacketBase<"EOSE"> {
+  subId: string;
+}
+
+/**
+ * Packets represents OK messages associated with an EVENT submission.
+ */
+export interface OkPacket extends MessagePacketBase<"OK"> {
+  /** @deprecated Use `eventId` instead. */
+  id: string;
+  eventId: string;
+  ok: boolean;
+  notice?: string;
+}
+
+export interface NoticePacket extends MessagePacketBase<"NOTICE"> {
+  notice: string;
+}
+
+export interface AuthPacket extends MessagePacketBase<"AUTH"> {
+  challengeMessage: string;
+}
+
+export interface CountPacket extends MessagePacketBase<"COUNT"> {
+  subId: string;
+  count: Nostr.ToClientMessage.CountResponse;
 }
 
 /**
@@ -35,16 +81,6 @@ export interface EventPacket {
 export interface ErrorPacket {
   from: string;
   reason: unknown;
-}
-
-/**
- * Packets from websocket that represents all raw incoming messages.
- */
-export interface MessagePacket<
-  M extends Nostr.ToClientMessage.Any = Nostr.ToClientMessage.Any
-> {
-  from: string;
-  message: M;
 }
 
 /**
@@ -78,12 +114,3 @@ export type ConnectionState =
   | "error"
   | "rejected"
   | "terminated";
-
-/**
- * Packets represents OK messages associated with an EVENT submission.
- */
-export interface OkPacket {
-  from: string;
-  id: string;
-  ok: boolean;
-}
