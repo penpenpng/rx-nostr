@@ -1,7 +1,7 @@
 import { map, of } from "rxjs";
 import { test } from "vitest";
 
-import { filterType, latestEach } from "../operator.js";
+import { dropExpiredEvents, filterType, latestEach } from "../operator.js";
 import { EventPacket, MessagePacket } from "../packet.js";
 import { faker, testScheduler } from "./helper.js";
 
@@ -41,5 +41,26 @@ test("filterType()", async () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expectObservable(packet$).toEqual(of<any[]>(packets[0], packets[3]));
+  });
+});
+
+test("dropExpiredEvents()", async () => {
+  testScheduler().run((helpers) => {
+    const { expectObservable } = helpers;
+
+    const packets: EventPacket[] = [
+      faker.eventPacket({ id: "1", tags: [["expiration", "1000"]] }),
+      faker.eventPacket({ id: "1", tags: [["expiration", "2000"]] }),
+      faker.eventPacket({ id: "1", tags: [["expiration", "3001"]] }),
+      faker.eventPacket({ id: "1", tags: [["expiration", "2000"]] }),
+      faker.eventPacket({ id: "1", tags: [["expiration", "10000"]] }),
+    ];
+
+    const packet$ = of(...packets).pipe(
+      dropExpiredEvents(new Date(3000 * 1000))
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expectObservable(packet$).toEqual(of<any[]>(packets[2], packets[4]));
   });
 });
