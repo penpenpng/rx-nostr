@@ -1,6 +1,7 @@
 import { defineDefault } from "./utils.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
+  keepAliveDefaultRelayConnections: false,
   retry: {
     strategy: "exponential",
     maxCount: 5,
@@ -17,6 +18,17 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
  * Configuration object for a RxNostr instance.
  */
 export interface RxNostrConfig {
+  /**
+   * If true, default relays don't get to `"dormant"` state.
+   *
+   * Normally, rx-nostr will temporarily close a WebSocket connection on relays
+   * when there is no more active communication going on over it.
+   * This option disables this behavior **only for default relays**.
+   *
+   * Temporary relays specified within `use()`'s options get `"dormant"`
+   * when they are no longer used.
+   */
+  keepAliveDefaultRelayConnections: boolean;
   /**
    * Auto reconnection strategy.
    */

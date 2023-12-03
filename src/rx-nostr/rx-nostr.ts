@@ -153,6 +153,7 @@ class RxNostrImpl implements RxNostr {
 
     for (const { read, url } of nextDefaultRelays.values()) {
       const conn = this.ensureNostrConnection(url);
+      conn.setKeepAlive(this.config.keepAliveDefaultRelayConnections);
 
       if (read) {
         nextReadableConnections.push(conn);
@@ -171,6 +172,7 @@ class RxNostrImpl implements RxNostr {
     }
 
     conn = new NostrConnection(url, this.config);
+
     this.attachNostrConnection(conn);
     this.connections.set(url, conn);
 

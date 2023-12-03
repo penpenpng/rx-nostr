@@ -16,7 +16,6 @@ describe("", () => {
     anotherRelay = createMockRelay(ANOTHER_RELAY);
 
     rxNostr = createRxNostr({
-      retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
       skipVerify: true,
     });
