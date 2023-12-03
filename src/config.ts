@@ -6,7 +6,8 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
     maxCount: 5,
     initialDelay: 1000,
   },
-  timeout: 10000,
+  eoseTimeout: 30 * 1000,
+  okTimeout: 30 * 1000,
   skipVerify: false,
   skipValidateFilterMatching: false,
   skipFetchNip11: false,
@@ -16,16 +17,35 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
  * Configuration object for a RxNostr instance.
  */
 export interface RxNostrConfig {
-  /** Auto reconnection strategy. */
+  /**
+   * Auto reconnection strategy.
+   */
   retry: RetryConfig;
   /**
-   * The time in milliseconds to timeout when following the backward strategy.
-   * The observable is terminated when the specified amount of time has elapsed
-   * during which no new events are available.
+   * Specify how long rx-nostr waits for EOSE messages in `use()` following backward strategy (milliseconds).
+   *
+   * If EOSE doesn't come after waiting for this amount of time,
+   * rx-nostr is considered to get EOSE.
    */
-  timeout: number;
+  eoseTimeout: number;
+  /**
+   * Specify how long rx-nostr waits for OK messages in `send()` (milliseconds).
+   *
+   * If OK doesn't come after waiting for this amount of time,
+   * rx-nostr stops listening OK and the Observable come from `send()` finishes with TimeoutError.
+   */
+  okTimeout: number;
+  /**
+   * If true, skip filtering EVENTs based on signature verification.
+   */
   skipVerify: boolean;
+  /**
+   * If true, skip filtering EVENTs based on matching with REQ filter.
+   */
   skipValidateFilterMatching: boolean;
+  /**
+   * If true, skip automatic fetching NIP-11 relay information.
+   */
   skipFetchNip11: boolean;
 }
 /** @deprecated Use `RxNostrConfig` instead. */

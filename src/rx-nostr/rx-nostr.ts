@@ -399,7 +399,7 @@ class RxNostrImpl implements RxNostr {
 
     return this.event$.pipe(
       takeUntil(complete$),
-      completeOnTimeout(this.config.timeout),
+      completeOnTimeout(this.config.eoseTimeout),
       finalize(() => {
         complete$.complete();
         eose$.complete();
@@ -515,8 +515,7 @@ class RxNostrImpl implements RxNostr {
     return subject.pipe(
       take(targetRelays.length),
       takeUntil(this.dispose$),
-      // TODO: config
-      timeout(30 * 1000),
+      timeout(this.config.okTimeout),
       finalize(teardown)
     );
   }
