@@ -13,14 +13,20 @@ import {
 import type { RetryConfig, RxNostrConfig } from "../config.js";
 import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
-import { ConnectionState } from "../packet.js";
+import {
+  ConnectionState,
+  EosePacket,
+  EventPacket,
+  MessagePacket,
+  OkPacket,
+} from "../packet.js";
 
 export class RelayConnection {
   private socket: WebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
   private reconnected$ = new Subject<Nostr.ToRelayMessage.Any[]>();
-  private message$ = new Subject<Nostr.ToClientMessage.Any>();
+  private message$ = new Subject<MessagePacket>();
   private error$ = new Subject<unknown>();
   private retryTimer: Subscription | null = null;
 
@@ -105,7 +111,7 @@ export class RelayConnection {
       }
 
       try {
-        this.message$.next(JSON.parse(data));
+        this.message$.next(this.pack(JSON.parse(data)));
       } catch (err) {
         this.error$.next(err);
       }
@@ -175,6 +181,60 @@ export class RelayConnection {
 
     return socket;
   }
+  private pack(message: Nostr.ToClientMessage.Any): MessagePacket {
+    const type = message[0];
+    const from = this.url;
+
+    switch (type) {
+      case "EVENT":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          event: message[2],
+        };
+      case "EOSE":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+        };
+      case "OK":
+        return {
+          from,
+          type,
+          message,
+          eventId: message[1],
+          id: message[1],
+          ok: message[2],
+          notice: message[3],
+        };
+      case "NOTICE":
+        return {
+          from,
+          type,
+          message,
+          notice: message[1],
+        };
+      case "AUTH":
+        return {
+          from,
+          type,
+          message,
+          challengeMessage: message[1],
+        };
+      case "COUNT":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          count: message[2],
+        };
+    }
+  }
 
   disconnect(code: WebSocketCloseCode): void {
     this.socket?.close(code);
@@ -214,24 +274,22 @@ export class RelayConnection {
     }
   }
 
-  getEVENTObservable(): Observable<Nostr.ToClientMessage.EVENT> {
+  getEVENTObservable(): Observable<EventPacket> {
     return this.message$.pipe(
-      filter((msg): msg is Nostr.ToClientMessage.EVENT => msg[0] === "EVENT")
+      filter((p): p is EventPacket => p.type === "EVENT")
     );
   }
-  getEOSEObservable(): Observable<Nostr.ToClientMessage.EOSE> {
+  getEOSEObservable(): Observable<EosePacket> {
     return this.message$.pipe(
-      filter((msg): msg is Nostr.ToClientMessage.EOSE => msg[0] === "EOSE")
+      filter((p): p is EosePacket => p.type === "EOSE")
     );
   }
-  getOKObservable(): Observable<Nostr.ToClientMessage.OK> {
-    return this.message$.pipe(
-      filter((msg): msg is Nostr.ToClientMessage.OK => msg[0] === "OK")
-    );
+  getOKObservable(): Observable<OkPacket> {
+    return this.message$.pipe(filter((p): p is OkPacket => p.type === "OK"));
   }
-  getOtherObservable(): Observable<Nostr.ToClientMessage.Any> {
+  getOtherObservable(): Observable<MessagePacket> {
     return this.message$.pipe(
-      filter(([type]) => type !== "EVENT" && type !== "EOSE" && type !== "OK")
+      filter((p) => p.type !== "EVENT" && p.type !== "EOSE" && p.type !== "OK")
     );
   }
 

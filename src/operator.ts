@@ -182,17 +182,20 @@ export function dropExpiredEvents(
 
 export function filterByType<T extends Nostr.ToClientMessage.Type>(
   type: T
-): OperatorFunction<
-  MessagePacket,
-  MessagePacket<Nostr.ToClientMessage.Message<T>>
-> {
+): OperatorFunction<MessagePacket, MessagePacket & { type: T }> {
   return filter(
-    (packet): packet is MessagePacket<Nostr.ToClientMessage.Message<T>> =>
+    (packet): packet is MessagePacket & { type: T } =>
       packet.message[0] === type
   );
 }
 /** @deprecated Renamed. Use `filterByType` instead. */
 export const filterType = filterByType;
+
+export function filterBySubId<P extends MessagePacket & { subId: string }>(
+  subId: string
+): OperatorFunction<P, P> {
+  return filter((packet) => packet.subId === subId);
+}
 
 // ------------------- //
 // ReqPacket operators //

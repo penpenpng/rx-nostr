@@ -7,7 +7,7 @@ import { Nip11Registry } from "../nip11.js";
 import { verify } from "../nostr/event.js";
 import { isFiltered } from "../nostr/filter.js";
 import { isExpired } from "../nostr/nip40.js";
-import { LazyREQ } from "../packet.js";
+import { EventPacket, LazyREQ } from "../packet.js";
 import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
 
@@ -37,7 +37,7 @@ export class SubscribeProxy {
     });
 
     // Auto closing
-    this.relay.getEOSEObservable().subscribe(([, subId]) => {
+    this.relay.getEOSEObservable().subscribe(({ subId }) => {
       if (this.subs.get(subId)?.autoclose) {
         this.unsubscribe(subId);
       }
@@ -75,9 +75,9 @@ export class SubscribeProxy {
     return this.queue.has(subId);
   }
 
-  getEventObservable(): Observable<Nostr.ToClientMessage.EVENT> {
+  getEventObservable(): Observable<EventPacket> {
     return this.relay.getEVENTObservable().pipe(
-      filter(([, subId, event]) => {
+      filter(({ subId, event }) => {
         const filters = this.subs.get(subId)?.filters;
         if (!filters) {
           return false;

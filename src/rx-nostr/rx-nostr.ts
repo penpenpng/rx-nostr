@@ -25,10 +25,11 @@ import {
   RxNostrLogicError,
 } from "../error.js";
 import { getSignedEvent } from "../nostr/event.js";
-import { completeOnTimeout } from "../operator.js";
+import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
+  EosePacket,
   ErrorPacket,
   EventPacket,
   LazyFilter,
@@ -47,12 +48,7 @@ import {
   type RxNostrSendOptions,
   type RxNostrUseOptions,
 } from "./interface.js";
-import {
-  makeLazyREQ,
-  makeSubId,
-  normalizeRelaysConfig,
-  pickEvent,
-} from "./utils.js";
+import { makeLazyREQ, makeSubId, normalizeRelaysConfig } from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
 export function createRxNostr(config?: Partial<RxNostrConfig>): RxNostr {
@@ -85,10 +81,10 @@ class RxNostrImpl implements RxNostr {
   private weakSubscriptions: Map<string, { req: LazyREQ; autoclose: boolean }> =
     new Map();
 
-  private event$ = new Subject<MessagePacket<Nostr.ToClientMessage.EVENT>>();
-  private eose$ = new Subject<MessagePacket<Nostr.ToClientMessage.EOSE>>();
-  private ok$ = new Subject<MessagePacket<Nostr.ToClientMessage.OK>>();
-  private other$ = new Subject<MessagePacket<Nostr.ToClientMessage.Any>>();
+  private event$ = new Subject<EventPacket>();
+  private eose$ = new Subject<EosePacket>();
+  private ok$ = new Subject<OkPacket>();
+  private other$ = new Subject<MessagePacket>();
 
   private error$ = new Subject<ErrorPacket>();
   private connectionState$ = new Subject<ConnectionStatePacket>();
@@ -362,7 +358,7 @@ class RxNostrImpl implements RxNostr {
     const { req } = params;
     const subId = req[1];
 
-    return this.event$.pipe(pickEvent(subId));
+    return this.event$.pipe(filterBySubId(subId));
   }
   private createBackwardEventObservable(params: {
     req: LazyREQ;
@@ -392,12 +388,10 @@ class RxNostrImpl implements RxNostr {
         complete$.next();
       });
 
-    this.eose$
-      .pipe(filter(({ message }) => message[1] === subId))
-      .subscribe(({ from }) => {
-        eoseRelays.add(from);
-        eose$.next();
-      });
+    this.eose$.pipe(filterBySubId(subId)).subscribe(({ from }) => {
+      eoseRelays.add(from);
+      eose$.next();
+    });
 
     return this.event$.pipe(
       takeUntil(complete$),
@@ -408,7 +402,7 @@ class RxNostrImpl implements RxNostr {
         manageCompletion.unsubscribe();
       }),
       filter((e) => !eoseRelays.has(e.from)),
-      pickEvent(subId)
+      filterBySubId(subId)
     );
   }
   private startSubscription(params: {
@@ -450,13 +444,7 @@ class RxNostrImpl implements RxNostr {
 
   // #region createObservable
   createAllEventObservable(): Observable<EventPacket> {
-    return this.event$.pipe(
-      map(({ from, message }) => ({
-        from,
-        subId: message[1],
-        event: message[2],
-      }))
-    );
+    return this.event$.asObservable();
   }
   createAllErrorObservable(): Observable<ErrorPacket> {
     return this.error$.asObservable();
@@ -499,10 +487,7 @@ class RxNostrImpl implements RxNostr {
         }
 
         this.ok$
-          .pipe(
-            filter(({ message: [, eventId] }) => eventId === event.id),
-            map(({ from, message: [, id, ok] }) => ({ from, id, ok }))
-          )
+          .pipe(filter(({ eventId }) => eventId === event.id))
           .subscribe(subject);
 
         for (const conn of targetRelays) {

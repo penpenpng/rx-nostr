@@ -1,14 +1,17 @@
 import Nostr from "nostr-typedef";
-import { combineLatest, map, Observable, type OperatorFunction } from "rxjs";
+import { combineLatest, map, Observable } from "rxjs";
 
 import type { RxNostrConfig } from "../config.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
   ConnectionState,
   ConnectionStatePacket,
+  EosePacket,
   ErrorPacket,
+  EventPacket,
   LazyREQ,
   MessagePacket,
+  OkPacket,
 } from "../packet.js";
 import { defineDefault, normalizeRelayUrl } from "../utils.js";
 import { PublishProxy } from "./publish.js";
@@ -37,7 +40,7 @@ export class NostrConnection {
   private relay: RelayConnection;
   private pubProxy: PublishProxy;
   private subProxy: SubscribeProxy;
-  private weakSubIds: Set<string> = new Set();
+  private weakSubscriptionIds: Set<string> = new Set();
   private logicalConns = 0;
   private keepAlive = false;
   private keepWeakSubscriptions = false;
@@ -88,10 +91,10 @@ export class NostrConnection {
     this.keepWeakSubscriptions = flag;
 
     if (!this.keepWeakSubscriptions) {
-      for (const subId of this.weakSubIds) {
+      for (const subId of this.weakSubscriptionIds) {
         this.subProxy.unsubscribe(subId);
       }
-      this.weakSubIds.clear();
+      this.weakSubscriptionIds.clear();
     }
   }
 
@@ -125,7 +128,7 @@ export class NostrConnection {
     }
 
     if (mode === "weak") {
-      this.weakSubIds.add(subId);
+      this.weakSubscriptionIds.add(subId);
     }
     this.subProxy.subscribe(req, autoclose);
   }
@@ -134,46 +137,37 @@ export class NostrConnection {
       return;
     }
 
-    this.weakSubIds.delete(subId);
+    this.weakSubscriptionIds.delete(subId);
     this.subProxy.unsubscribe(subId);
   }
 
-  getEventObservable(): Observable<MessagePacket<Nostr.ToClientMessage.EVENT>> {
+  getEventObservable(): Observable<EventPacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.subProxy.getEventObservable().pipe(this.pack());
+    return this.subProxy.getEventObservable();
   }
-  getEoseObservable(): Observable<MessagePacket<Nostr.ToClientMessage.EOSE>> {
+  getEoseObservable(): Observable<EosePacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getEOSEObservable().pipe(this.pack());
+    return this.relay.getEOSEObservable();
   }
-  getOkObservable(): Observable<MessagePacket<Nostr.ToClientMessage.OK>> {
+  getOkObservable(): Observable<OkPacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getOKObservable().pipe(this.pack());
+    return this.relay.getOKObservable();
   }
-  getOtherObservable(): Observable<MessagePacket<Nostr.ToClientMessage.Any>> {
+  getOtherObservable(): Observable<MessagePacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getOtherObservable().pipe(this.pack());
-  }
-  private pack<T extends Nostr.ToClientMessage.Any>(): OperatorFunction<
-    T,
-    MessagePacket<T>
-  > {
-    return map((message) => ({
-      from: this.url,
-      message,
-    }));
+    return this.relay.getOtherObservable();
   }
 
   getConnectionStateObservable(): Observable<ConnectionStatePacket> {
