@@ -6,6 +6,7 @@ import {
   distinctUntilChanged,
   EMPTY,
   filter,
+  from,
   groupBy,
   map,
   mergeAll,
@@ -36,10 +37,10 @@ import { defineDefault } from "./utils.js";
 /**
  * Remove the events once seen.
  */
-export function uniq(
+export function uniq<P extends EventPacket>(
   flushes?: ObservableInput<unknown>
-): MonoTypeOperatorFunction<EventPacket> {
-  return distinct<EventPacket, string>(({ event }) => event.id, flushes);
+): MonoTypeOperatorFunction<P> {
+  return distinct<P, string>(({ event }) => event.id, flushes);
 }
 
 /**
@@ -52,10 +53,10 @@ export function uniq(
  * can be manipulated externally or in optional event handlers.
  * For example, you can call `Set#clear()` to forget all keys.
  */
-export function createUniq<T>(
-  keyFn: (packet: EventPacket) => T | null,
+export function createUniq<P extends EventPacket, T>(
+  keyFn: (packet: P) => T | null,
   options?: CreateUniqOptions<T>
-): [MonoTypeOperatorFunction<EventPacket>, Set<T>] {
+): [MonoTypeOperatorFunction<P>, Set<T>] {
   const cache = new Set<T>();
 
   return [
@@ -79,11 +80,57 @@ export function createUniq<T>(
 }
 
 /**
+ * Drop the event if it has already been seen,
+ * then record on which relay the event was seen.
+ */
+export function tie<P extends EventPacket>(
+  flushes?: ObservableInput<unknown>
+): OperatorFunction<P, P & { seenOn: Set<string> }> {
+  const [fn, memo] = createTie<P>();
+
+  if (flushes) {
+    from(flushes).subscribe(() => {
+      memo.clear();
+    });
+  }
+
+  return fn;
+}
+
+/**
+ * Create a customizable tie operator.
+ */
+export function createTie<P extends EventPacket>(): [
+  OperatorFunction<P, P & { seenOn: Set<string> }>,
+  Map<string, Set<string>>
+] {
+  const memo = new Map<string, Set<string>>();
+
+  return [
+    pipe(
+      filter((packet) => !memo.get(packet.event.id)?.has(packet.from)),
+      map((packet) => {
+        const seenOn = memo.get(packet.event.id) ?? new Set<string>();
+
+        seenOn.add(packet.from);
+        memo.set(packet.event.id, seenOn);
+
+        return {
+          ...packet,
+          seenOn,
+        };
+      })
+    ),
+    memo,
+  ];
+}
+
+/**
  * Only the latest events are allowed to pass.
  */
-export function latest(): MonoTypeOperatorFunction<EventPacket> {
+export function latest<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
   return pipe(
-    scan<EventPacket>((acc, packet) =>
+    scan((acc, packet) =>
       compareEvents(acc.event, packet.event) < 0 ? packet : acc
     ),
     distinctUntilChanged(
@@ -96,26 +143,26 @@ export function latest(): MonoTypeOperatorFunction<EventPacket> {
 /**
  * For each key, only the latest events are allowed to pass.
  */
-export function latestEach<K>(
-  key: (packet: EventPacket) => K
-): MonoTypeOperatorFunction<EventPacket> {
+export function latestEach<P extends EventPacket, K>(
+  key: (packet: P) => K
+): MonoTypeOperatorFunction<P> {
   return pipe(groupBy(key), map(pipe(latest())), mergeAll());
 }
 
 /**
  * Only events with a valid signature are allowed to pass.
  */
-export function verify(): MonoTypeOperatorFunction<EventPacket> {
-  return filter<EventPacket>(({ event }) => _verify(event));
+export function verify<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
+  return filter(({ event }) => _verify(event));
 }
 
 /**
  * Only events with given kind are allowed to pass.
  */
-export function filterByKind<K extends number>(
+export function filterByKind<P extends EventPacket, K extends number>(
   kind: K
-): MonoTypeOperatorFunction<EventPacket> {
-  return filter<EventPacket>(({ event }) => event.kind === kind);
+): MonoTypeOperatorFunction<P> {
+  return filter(({ event }) => event.kind === kind);
 }
 /** @deprecated Renamed. Use `filterByKind` instead. */
 export const filterKind = filterByKind;
@@ -123,10 +170,10 @@ export const filterKind = filterByKind;
 /**
  * Filter events based on a REQ filter object.
  */
-export function filterBy(
+export function filterBy<P extends EventPacket>(
   filters: LazyFilter | LazyFilter[],
   options?: MatchFilterOptions & FilterByOptions
-): MonoTypeOperatorFunction<EventPacket> {
+): MonoTypeOperatorFunction<P> {
   const { not } = makeFilterByOptions(options);
   const evaledFilter = evalFilters(filters);
   return filter(({ event }) => {
@@ -138,10 +185,10 @@ export function filterBy(
 /**
  * Accumulate latest events in order of new arrival (based on `created_at`).
  */
-export function timeline(
+export function timeline<P extends EventPacket>(
   limit?: number
-): OperatorFunction<EventPacket, EventPacket[]> {
-  return scan<EventPacket, EventPacket[]>((acc, packet) => {
+): OperatorFunction<P, P[]> {
+  return scan<P, P[]>((acc, packet) => {
     const next = [...acc, packet].sort(
       (a, b) => -1 * compareEvents(a.event, b.event)
     );
@@ -152,10 +199,10 @@ export function timeline(
   }, []);
 }
 
-export function sortEvents(
+export function sortEvents<P extends EventPacket>(
   bufferTime: number,
-  compareFn?: (a: EventPacket, b: EventPacket) => number
-): MonoTypeOperatorFunction<EventPacket> {
+  compareFn?: (a: P, b: P) => number
+): MonoTypeOperatorFunction<P> {
   return sort(
     bufferTime,
     compareFn ?? ((a, b) => compareEvents(a.event, b.event))
@@ -165,9 +212,9 @@ export function sortEvents(
 /**
  * Remove expired events. See also [NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md).
  */
-export function dropExpiredEvents(
+export function dropExpiredEvents<P extends EventPacket>(
   now?: Date
-): MonoTypeOperatorFunction<EventPacket> {
+): MonoTypeOperatorFunction<P> {
   let refTime: number | undefined = undefined;
   if (now) {
     refTime = Math.floor(now?.getTime() / 1000);
