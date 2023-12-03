@@ -93,22 +93,27 @@ test("tie()", async () => {
         {
           ...packets[0],
           seenOn: ["wss://aaa.example.com"],
+          isNew: true,
         },
         {
           ...packets[2],
           seenOn: ["wss://aaa.example.com"],
+          isNew: true,
         },
         {
           ...packets[3],
           seenOn: ["wss://aaa.example.com"],
+          isNew: true,
         },
         {
           ...packets[4],
           seenOn: ["wss://aaa.example.com", "wss://bbb.example.com"],
+          isNew: false,
         },
         {
           ...packets[5],
           seenOn: ["wss://aaa.example.com", "wss://bbb.example.com"],
+          isNew: false,
         },
         {
           ...packets[6],
@@ -117,6 +122,7 @@ test("tie()", async () => {
             "wss://bbb.example.com",
             "wss://ccc.example.com",
           ],
+          isNew: false,
         }
       )
     );

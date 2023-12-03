@@ -101,7 +101,7 @@ export function tie<P extends EventPacket>(
  * Create a customizable tie operator.
  */
 export function createTie<P extends EventPacket>(): [
-  OperatorFunction<P, P & { seenOn: Set<string> }>,
+  OperatorFunction<P, P & { seenOn: Set<string>; isNew: boolean }>,
   Map<string, Set<string>>
 ] {
   const memo = new Map<string, Set<string>>();
@@ -111,6 +111,7 @@ export function createTie<P extends EventPacket>(): [
       filter((packet) => !memo.get(packet.event.id)?.has(packet.from)),
       map((packet) => {
         const seenOn = memo.get(packet.event.id) ?? new Set<string>();
+        const isNew = seenOn.size <= 0;
 
         seenOn.add(packet.from);
         memo.set(packet.event.id, seenOn);
@@ -118,6 +119,7 @@ export function createTie<P extends EventPacket>(): [
         return {
           ...packet,
           seenOn,
+          isNew,
         };
       })
     ),
