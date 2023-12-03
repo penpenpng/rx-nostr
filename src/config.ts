@@ -93,3 +93,5 @@ export type RetryConfig =
   | {
       strategy: "off";
     };
+/** @deprecated Use `RxNostrConfig` instead. */
+export type BackoffConfig = RetryConfig;

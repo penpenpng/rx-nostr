@@ -55,3 +55,12 @@ test("send() doesn't wait for OK from default relays added later.", async () => 
   relay1.emitOK("*", true);
   expect(spy.completed()).toBe(true);
 });
+
+test("temporary relay option works in send().", async () => {
+  rxNostr.send(faker.event(), { relays: [RELAY_URL3] });
+
+  await relay3.connected;
+  await expect(relay3).toReceiveEVENT();
+
+  expect(relay1.messagesToConsume.pendingItems.length).toBe(0);
+});

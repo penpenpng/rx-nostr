@@ -18,7 +18,7 @@ import { defineDefault } from "../utils.js";
  * Use `createRxNostr()` to get the object.
  */
 export interface RxNostr {
-  /** @deprecated Use getDefaultRelays */
+  /** @deprecated Use getDefaultRelays() */
   getRelays(): DefaultRelayConfig[];
 
   /** @deprecated Use `setDefaultRelays()` instead. */
@@ -155,9 +155,11 @@ export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
 
 export interface RxNostrSendOptions {
   seckey?: string;
+  relays?: string[];
 }
 export const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
   seckey: undefined,
+  relays: undefined,
 });
 
 /** Config object specifying default relays' behaviors. */

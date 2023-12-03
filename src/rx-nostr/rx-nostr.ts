@@ -478,9 +478,12 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions
   ): Observable<OkPacket> {
-    const { seckey } = makeRxNostrSendOptions(options);
+    const { seckey, relays } = makeRxNostrSendOptions(options);
 
-    const targetRelays = this.defaultWritables;
+    const targetRelays =
+      relays === undefined
+        ? this.defaultWritables
+        : relays.map((url) => this.ensureNostrConnection(url));
     const subject = new ReplaySubject<OkPacket>(targetRelays.length);
 
     const teardown = () => {
@@ -502,7 +505,7 @@ class RxNostrImpl implements RxNostr {
           )
           .subscribe(subject);
 
-        for (const conn of this.defaultWritables) {
+        for (const conn of targetRelays) {
           conn.publish(event);
         }
       })
