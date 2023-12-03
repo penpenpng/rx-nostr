@@ -12,6 +12,7 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   skipVerify: false,
   skipValidateFilterMatching: false,
   skipFetchNip11: false,
+  skipExpirationCheck: false,
 });
 
 /**
@@ -59,6 +60,10 @@ export interface RxNostrConfig {
    * If true, skip automatic fetching NIP-11 relay information.
    */
   skipFetchNip11: boolean;
+  /**
+   * If true, skip automatic expiration check based on NIP-40.
+   */
+  skipExpirationCheck: boolean;
 }
 /** @deprecated Use `RxNostrConfig` instead. */
 export type RxNostrOptions = RxNostrConfig;

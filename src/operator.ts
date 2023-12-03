@@ -25,6 +25,7 @@ import { RxNostrLogicError } from "./error.js";
 import { evalFilters } from "./lazy-filter.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
+import { isExpired } from "./nostr/nip40.js";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
 import { defineDefault } from "./utils.js";
 
@@ -161,6 +162,20 @@ export function sortEvents(
   );
 }
 
+/**
+ * Remove expired events. See also [NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md).
+ */
+export function dropExpiredEvents(
+  now?: Date
+): MonoTypeOperatorFunction<EventPacket> {
+  let refTime: number | undefined = undefined;
+  if (now) {
+    refTime = Math.floor(now?.getTime() / 1000);
+  }
+
+  return filter(({ event }) => !isExpired(event, refTime));
+}
+
 // ----------------------- //
 // MessagePacket operators //
 // ----------------------- //
@@ -177,7 +192,7 @@ export function filterByType<T extends Nostr.ToClientMessage.Type>(
   );
 }
 /** @deprecated Renamed. Use `filterByType` instead. */
-export const filterType = filterByKind;
+export const filterType = filterByType;
 
 // ------------------- //
 // ReqPacket operators //
