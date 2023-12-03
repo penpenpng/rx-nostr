@@ -89,6 +89,19 @@ describe("Under a single relay", () => {
     await expect(relay).toReceiveCLOSE("sub:0");
   });
 
+  test("[backward] When Observable is unsubscribed, CLOSE is sent out.", async () => {
+    const req = createRxBackwardReq("sub");
+    const spy = spyEvent();
+    const sub = rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit({ kinds: [1] });
+    await relay.connected;
+    await expect(relay).toReceiveREQ("sub:0");
+
+    sub.unsubscribe();
+    await expect(relay).toReceiveCLOSE("sub:0");
+  });
+
   test("[backward] After receiving EOSE, CLOSE is sent out.", async () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).pipe().subscribe();

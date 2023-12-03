@@ -12,7 +12,7 @@ import { createClientSpy, faker as _faker, type MockRelay } from "vitest-nostr";
 
 import { WebSocketCloseCode } from "../connection/relay.js";
 import { ConnectionState, EventPacket, MessagePacket } from "../packet.js";
-import { RxNostr } from "../rx-nostr.js";
+import { RxNostr } from "../rx-nostr/rx-nostr.js";
 
 export function testScheduler() {
   return new TestScheduler((a, b) => expect(a).toEqual(b));

@@ -8,7 +8,7 @@ import { verify } from "../nostr/event.js";
 import { isFiltered } from "../nostr/filter.js";
 import { LazyREQ } from "../packet.js";
 import { RelayConnection } from "./relay.js";
-import { CounterSubject } from "./util.js";
+import { CounterSubject } from "./utils.js";
 
 export class SubscribeProxy {
   // maxSubscriptions: number | null = undefined;
@@ -63,7 +63,9 @@ export class SubscribeProxy {
       return;
     }
 
-    this.sendCLOSE(subId);
+    if (this.subs.has(subId)) {
+      this.sendCLOSE(subId);
+    }
     this.subs.delete(subId);
     this.queue.drop(subId);
   }

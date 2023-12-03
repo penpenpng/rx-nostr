@@ -2,7 +2,7 @@ import Nostr from "nostr-typedef";
 import { Observable } from "rxjs";
 
 import { RelayConnection } from "./relay.js";
-import { CounterSubject } from "./util.js";
+import { CounterSubject } from "./utils.js";
 
 export class PublishProxy {
   private pubs: Set<string> = new Set();

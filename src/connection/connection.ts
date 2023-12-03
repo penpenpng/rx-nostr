@@ -10,7 +10,7 @@ import {
   LazyREQ,
   MessagePacket,
 } from "../packet.js";
-import { defineDefault, normalizeRelayUrl } from "../util.js";
+import { defineDefault, normalizeRelayUrl } from "../utils.js";
 import { PublishProxy } from "./publish.js";
 import { RelayConnection, WebSocketCloseCode } from "./relay.js";
 import { SubscribeProxy } from "./subscribe.js";

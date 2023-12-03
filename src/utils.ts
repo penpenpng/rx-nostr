@@ -84,7 +84,7 @@ export class UrlMap<T> extends Map<string, T> {
   }
 }
 
-export function subtract<T extends string | number>(x: T[], y: T[]): T[] {
+export function subtract<T>(x: T[], y: T[]): T[] {
   return x.filter((e) => !y.includes(e));
 }
 

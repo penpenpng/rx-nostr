@@ -15,7 +15,7 @@ export { fetchRelayInfo } from "./nostr/nip11.js";
 export * from "./operator.js";
 export * from "./packet.js";
 export * from "./req.js";
-export * from "./rx-nostr.js";
+export * from "./rx-nostr/index.js";
 
 export function now(): number {
   return Math.floor(Date.now() / 1000);

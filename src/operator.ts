@@ -26,7 +26,7 @@ import { evalFilters } from "./lazy-filter.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
-import { defineDefault } from "./util.js";
+import { defineDefault } from "./utils.js";
 
 // --------------------- //
 // EventPacket operators //

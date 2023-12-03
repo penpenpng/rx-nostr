@@ -1,4 +1,4 @@
-import { defineDefault } from "./util.js";
+import { defineDefault } from "./utils.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   retry: {
