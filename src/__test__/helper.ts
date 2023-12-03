@@ -28,17 +28,73 @@ export const faker = {
         }
     >
   ): EventPacket {
+    const message: Nostr.ToClientMessage.EVENT = [
+      "EVENT",
+      packetOrEvent?.subId ?? "*",
+      faker.event(packetOrEvent?.event ?? packetOrEvent),
+    ];
+
     return {
       from: packetOrEvent?.from ?? "*",
       subId: packetOrEvent?.subId ?? "*",
       event: faker.event(packetOrEvent?.event ?? packetOrEvent),
+      message,
+      type: "EVENT",
     };
   },
   messagePacket(message: Nostr.ToClientMessage.Any): MessagePacket {
-    return {
-      from: "*",
-      message,
-    };
+    const from = "*";
+    const type = message[0];
+
+    switch (type) {
+      case "EVENT":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          event: message[2],
+        };
+      case "EOSE":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+        };
+      case "OK":
+        return {
+          from,
+          type,
+          message,
+          eventId: message[1],
+          id: message[1],
+          ok: message[2],
+          notice: message[3],
+        };
+      case "NOTICE":
+        return {
+          from,
+          type,
+          message,
+          notice: message[1],
+        };
+      case "AUTH":
+        return {
+          from,
+          type,
+          message,
+          challengeMessage: message[1],
+        };
+      case "COUNT":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          count: message[2],
+        };
+    }
   },
 };
 

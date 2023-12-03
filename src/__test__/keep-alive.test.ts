@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
 import { createRxForwardReq, createRxNostr, RxNostr } from "../index.js";
-import { disposeMockRelay, faker, spyEvent, stateWillBe } from "./helper.js";
+import { disposeMockRelay, faker, stateWillBe } from "./helper.js";
 
 describe("", () => {
   const DEFAULT_RELAY = "ws://localhost:1234";

@@ -87,8 +87,8 @@ test("tie()", async () => {
       }))
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expectObservable(packet$).toEqual(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       of<any[]>(
         {
           ...packets[0],

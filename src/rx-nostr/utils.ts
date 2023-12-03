@@ -1,6 +1,4 @@
-import { filter, type OperatorFunction } from "rxjs";
-
-import type { LazyFilter, LazyREQ, MessagePacket } from "../packet.js";
+import type { LazyFilter, LazyREQ } from "../packet.js";
 import type { RxReq } from "../req.js";
 import type {
   AcceptableDefaultRelaysConfig,
