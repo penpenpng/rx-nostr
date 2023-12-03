@@ -1,7 +1,7 @@
 import { map, of } from "rxjs";
 import { test } from "vitest";
 
-import { dropExpiredEvents, filterType, latestEach } from "../operator.js";
+import { dropExpiredEvents, filterType, latestEach, tie } from "../operator.js";
 import { EventPacket, MessagePacket } from "../packet.js";
 import { faker, testScheduler } from "./helper.js";
 
@@ -62,5 +62,63 @@ test("dropExpiredEvents()", async () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expectObservable(packet$).toEqual(of<any[]>(packets[2], packets[4]));
+  });
+});
+
+test("tie()", async () => {
+  testScheduler().run((helpers) => {
+    const { expectObservable } = helpers;
+
+    const packets: EventPacket[] = [
+      faker.eventPacket({ id: "1", from: "wss://aaa.example.com" }),
+      faker.eventPacket({ id: "1", from: "wss://aaa.example.com" }),
+      faker.eventPacket({ id: "2", from: "wss://aaa.example.com" }),
+      faker.eventPacket({ id: "3", from: "wss://aaa.example.com" }),
+      faker.eventPacket({ id: "1", from: "wss://bbb.example.com" }),
+      faker.eventPacket({ id: "2", from: "wss://bbb.example.com" }),
+      faker.eventPacket({ id: "1", from: "wss://ccc.example.com" }),
+    ];
+
+    const packet$ = of(...packets).pipe(
+      tie(),
+      map((e) => ({
+        ...e,
+        seenOn: [...e.seenOn].sort(),
+      }))
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expectObservable(packet$).toEqual(
+      of<any[]>(
+        {
+          ...packets[0],
+          seenOn: ["wss://aaa.example.com"],
+        },
+        {
+          ...packets[2],
+          seenOn: ["wss://aaa.example.com"],
+        },
+        {
+          ...packets[3],
+          seenOn: ["wss://aaa.example.com"],
+        },
+        {
+          ...packets[4],
+          seenOn: ["wss://aaa.example.com", "wss://bbb.example.com"],
+        },
+        {
+          ...packets[5],
+          seenOn: ["wss://aaa.example.com", "wss://bbb.example.com"],
+        },
+        {
+          ...packets[6],
+          seenOn: [
+            "wss://aaa.example.com",
+            "wss://bbb.example.com",
+            "wss://ccc.example.com",
+          ],
+        }
+      )
+    );
   });
 });
