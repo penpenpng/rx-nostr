@@ -18,7 +18,7 @@ import {
 } from "rxjs";
 
 import { makeRxNostrConfig, type RxNostrConfig } from "../config.js";
-import { NostrConnection } from "../connection/index.js";
+import { NostrConnection, type REQMode } from "../connection/index.js";
 import {
   RxNostrAlreadyDisposedError,
   RxNostrInvalidUsageError,
@@ -42,6 +42,7 @@ import {
   type AcceptableDefaultRelaysConfig,
   type DefaultRelayConfig,
   makeRxNostrSendOptions,
+  makeRxNostrUseOptions,
   type RxNostr,
   type RxNostrSendOptions,
   type RxNostrUseOptions,
@@ -151,13 +152,7 @@ class RxNostrImpl implements RxNostr {
     const nextReadableConnections: NostrConnection[] = [];
 
     for (const { read, url } of nextDefaultRelays.values()) {
-      let conn = this.connections.get(url);
-
-      if (!conn) {
-        conn = new NostrConnection(url, this.config);
-        this.attachNostrConnection(conn);
-        this.connections.set(url, conn);
-      }
+      const conn = this.ensureNostrConnection(url);
 
       if (read) {
         nextReadableConnections.push(conn);
@@ -167,6 +162,19 @@ class RxNostrImpl implements RxNostr {
     this.updateWeakSubscriptions(nextReadableConnections);
 
     this.defaultRelays = nextDefaultRelays;
+  }
+  private ensureNostrConnection(url: string): NostrConnection {
+    let conn = this.connections.get(url);
+
+    if (conn) {
+      return conn;
+    }
+
+    conn = new NostrConnection(url, this.config);
+    this.attachNostrConnection(conn);
+    this.connections.set(url, conn);
+
+    return conn;
   }
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
@@ -185,10 +193,10 @@ class RxNostrImpl implements RxNostr {
     );
 
     for (const conn of noLongerNeededConnections) {
-      conn.setKeepWeakSubs(false);
+      conn.setKeepWeakSubscriptions(false);
     }
     for (const conn of nextReadableConnections) {
-      conn.setKeepWeakSubs(true);
+      conn.setKeepWeakSubscriptions(true);
       for (const { req, autoclose } of this.weakSubscriptions.values()) {
         conn?.subscribe(req, {
           mode: "weak",
@@ -264,11 +272,19 @@ class RxNostrImpl implements RxNostr {
   // #region use
   use(
     rxReq: RxReq,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _options?: Partial<RxNostrUseOptions>
+    options?: Partial<RxNostrUseOptions>
   ): Observable<EventPacket> {
-    const targetConnections = this.defaultReadables;
-    const mode = "weak";
+    const { relays } = makeRxNostrUseOptions(options);
+
+    let mode: REQMode;
+    let targetConnections: NostrConnection[];
+    if (relays === undefined) {
+      mode = "weak";
+      targetConnections = this.defaultReadables;
+    } else {
+      mode = "normal";
+      targetConnections = relays.map((url) => this.ensureNostrConnection(url));
+    }
 
     const req$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is LazyFilter[] => filters !== null),
@@ -396,7 +412,7 @@ class RxNostrImpl implements RxNostr {
   private startSubscription(params: {
     req: LazyREQ;
     targetConnections: NostrConnection[];
-    mode: "weak";
+    mode: REQMode;
     overwrite: boolean;
     autoclose: boolean;
   }) {
@@ -417,7 +433,7 @@ class RxNostrImpl implements RxNostr {
   private teardownSubscription(params: {
     subId: string;
     targetConnections: NostrConnection[];
-    mode: "weak";
+    mode: REQMode;
   }): void {
     const { subId, targetConnections, mode } = params;
 

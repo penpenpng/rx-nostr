@@ -20,7 +20,12 @@ export interface SubscribeOptions {
   autoclose: boolean;
   mode: REQMode;
 }
-export type REQMode = "weak" | "ondemand";
+
+/**
+ * - `"weak"`: Subscriptions are active only while `keepWeakSubscriptions` is true.
+ * - `"normal"`: Subscriptions are always active.
+ */
+export type REQMode = "weak" | "normal";
 
 const makeSubscribeOptions = defineDefault<SubscribeOptions>({
   overwrite: false,
@@ -35,7 +40,7 @@ export class NostrConnection {
   private weakSubIds: Set<string> = new Set();
   private logicalConns = 0;
   private keepAlive = false;
-  private keepWeakSubs = false;
+  private keepWeakSubscriptions = false;
   private disposed = false;
   private _url: string;
 
@@ -75,14 +80,14 @@ export class NostrConnection {
       this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
     }
   }
-  setKeepWeakSubs(flag: boolean): void {
+  setKeepWeakSubscriptions(flag: boolean): void {
     if (this.disposed) {
       return;
     }
 
-    this.keepWeakSubs = flag;
+    this.keepWeakSubscriptions = flag;
 
-    if (!this.keepWeakSubs) {
+    if (!this.keepWeakSubscriptions) {
       for (const subId of this.weakSubIds) {
         this.subProxy.unsubscribe(subId);
       }
@@ -112,6 +117,9 @@ export class NostrConnection {
     const { mode, overwrite, autoclose } = makeSubscribeOptions(options);
     const [, subId] = req;
 
+    if (mode === "weak" && !this.keepWeakSubscriptions) {
+      return;
+    }
     if (!overwrite && this.subProxy.isOngoingOrQueued(subId)) {
       return;
     }

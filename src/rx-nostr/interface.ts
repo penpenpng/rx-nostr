@@ -144,9 +144,14 @@ export interface RxNostr {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface RxNostrUseOptions {}
+export interface RxNostrUseOptions {
+  relays?: string[];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const _makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({});
+export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
+  relays: undefined,
+});
 
 export interface RxNostrSendOptions {
   seckey?: string;
