@@ -111,11 +111,13 @@ export function verify(): MonoTypeOperatorFunction<EventPacket> {
 /**
  * Only events with given kind are allowed to pass.
  */
-export function filterKind<K extends number>(
+export function filterByKind<K extends number>(
   kind: K
 ): MonoTypeOperatorFunction<EventPacket> {
   return filter<EventPacket>(({ event }) => event.kind === kind);
 }
+/** @deprecated Renamed. Use `filterByKind` instead. */
+export const filterKind = filterByKind;
 
 /**
  * Filter events based on a REQ filter object.
@@ -163,7 +165,7 @@ export function sortEvents(
 // MessagePacket operators //
 // ----------------------- //
 
-export function filterType<T extends Nostr.ToClientMessage.Type>(
+export function filterByType<T extends Nostr.ToClientMessage.Type>(
   type: T
 ): OperatorFunction<
   MessagePacket,
@@ -174,6 +176,8 @@ export function filterType<T extends Nostr.ToClientMessage.Type>(
       packet.message[0] === type
   );
 }
+/** @deprecated Renamed. Use `filterByType` instead. */
+export const filterType = filterByKind;
 
 // ------------------- //
 // ReqPacket operators //
