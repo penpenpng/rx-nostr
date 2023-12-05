@@ -3,7 +3,6 @@ import {
   filter,
   finalize,
   first,
-  identity,
   map,
   merge,
   mergeAll,
@@ -287,9 +286,37 @@ class RxNostrImpl implements RxNostr {
       targetConnections = relays.map((url) => this.ensureNostrConnection(url));
     }
 
+    const startSubscription = (req: LazyREQ) => {
+      this.startSubscription({
+        req,
+        targetConnections,
+        mode,
+        overwrite: rxReq.strategy === "forward",
+        autoclose: rxReq.strategy === "backward",
+      });
+    };
+    const teardownSubscription = (subId: string) => {
+      this.teardownSubscription({
+        subId,
+        targetConnections,
+        mode,
+      });
+    };
+    const createEventObservable = (req: LazyREQ) => {
+      if (rxReq.strategy === "forward") {
+        return this.createForwardEventObservable({
+          req,
+        });
+      } else {
+        return this.createBackwardEventObservable({
+          req,
+          targetConnections,
+        });
+      }
+    };
+
     const req$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is LazyFilter[] => filters !== null),
-      rxReq.strategy === "oneshot" ? first() : identity,
       map((filters, index) => makeLazyREQ({ rxReq, filters, index })),
       takeUntil(this.dispose$)
     );
@@ -301,53 +328,21 @@ class RxNostrImpl implements RxNostr {
       });
 
       return req$.pipe(
-        tap((req) => {
-          this.startSubscription({
-            req,
-            targetConnections,
-            mode,
-            overwrite: true,
-            autoclose: false,
-          });
-        }),
-        map((req) =>
-          this.createForwardEventObservable({
-            req,
-          })
-        ),
-        switchAll(),
+        tap(startSubscription),
+        map(createEventObservable),
         finalize(() => {
-          this.teardownSubscription({
-            subId,
-            targetConnections,
-            mode,
-          });
-        })
+          teardownSubscription(subId);
+        }),
+        switchAll()
       );
     } else {
       return req$.pipe(
-        tap((req) => {
-          this.startSubscription({
-            req,
-            targetConnections,
-            mode,
-            overwrite: false,
-            autoclose: true,
-          });
-        }),
+        tap(startSubscription),
         map((req) =>
-          this.createBackwardEventObservable({
-            req,
-            targetConnections,
-          }).pipe(
+          createEventObservable(req).pipe(
             finalize(() => {
               const subId = req[1];
-
-              this.teardownSubscription({
-                subId,
-                targetConnections,
-                mode,
-              });
+              teardownSubscription(subId);
             })
           )
         ),
@@ -368,44 +363,33 @@ class RxNostrImpl implements RxNostr {
     targetConnections: NostrConnection[];
   }): Observable<EventPacket> {
     const { req, targetConnections } = params;
+    const subId = req[1];
+    const eoseRelays = new Set<string>();
 
     const isDown = (state: ConnectionState): boolean =>
       state === "error" || state === "rejected" || state === "terminated";
+    const shouldComplete = () =>
+      targetConnections.every(
+        ({ connectionState, url }) =>
+          isDown(connectionState) || eoseRelays.has(url)
+      );
 
-    const subId = req[1];
-    const eose$ = new Subject<void>();
-    const complete$ = new Subject<void>();
-    const eoseRelays = new Set<string>();
-    const manageCompletion = merge(eose$, this.connectionState$.asObservable())
-      .pipe(
-        filter(() => {
-          const shouldComplete = targetConnections.every(
-            ({ connectionState, url }) =>
-              isDown(connectionState) || eoseRelays.has(url)
-          );
-
-          return shouldComplete;
-        })
-      )
-      .subscribe(() => {
-        complete$.next();
-      });
-
-    this.eose$.pipe(filterBySubId(subId)).subscribe(({ from }) => {
-      eoseRelays.add(from);
-      eose$.next();
-    });
+    const eose$ = this.eose$.pipe(
+      filterBySubId(subId),
+      tap(({ from }) => {
+        eoseRelays.add(from);
+      })
+    );
+    const complete$ = merge(eose$, this.connectionState$.asObservable()).pipe(
+      filter(() => shouldComplete()),
+      first()
+    );
 
     return this.event$.pipe(
       takeUntil(complete$),
       completeOnTimeout(this.config.eoseTimeout),
-      finalize(() => {
-        complete$.complete();
-        eose$.complete();
-        manageCompletion.unsubscribe();
-      }),
-      filter((e) => !eoseRelays.has(e.from)),
-      filterBySubId(subId)
+      filterBySubId(subId),
+      filter((e) => !eoseRelays.has(e.from))
     );
   }
   private startSubscription(params: {

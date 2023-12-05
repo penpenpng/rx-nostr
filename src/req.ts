@@ -1,5 +1,5 @@
 import Nostr from "nostr-typedef";
-import { BehaviorSubject, Observable, type OperatorFunction } from "rxjs";
+import { BehaviorSubject, Observable, of, type OperatorFunction } from "rxjs";
 
 import { LazyFilter, ReqPacket } from "./packet.js";
 import type { Override } from "./utils.js";
@@ -8,10 +8,10 @@ import type { Override } from "./utils.js";
  * The RxReq interface that is provided for RxNostr (**not for users**).
  */
 export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
-  /** @internal User should not use this directly.The RxReq strategy. It is read-only and must not change. */
-  get strategy(): S;
+  /** @internal User should not use this directly. The RxReq strategy. It is read-only and must not change. */
+  strategy: S;
   /** @internal User should not use this directly. Used to construct subId. */
-  get rxReqId(): string;
+  rxReqId: string;
   /** @internal User should not use this directly. Get an Observable of ReqPacket. */
   getReqObservable(): Observable<ReqPacket>;
 }
@@ -21,14 +21,14 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
  *
  * See comments on `createRxForwardReq()`, `createRxBackwardReq()` and `createRxOneshotReq()
  */
-export type RxReqStrategy = "forward" | "backward" | "oneshot";
+export type RxReqStrategy = "forward" | "backward";
 
 /**
  * The RxReq interface that is provided for users (not for RxNostr).
  */
 export interface RxReqController {
-  /** Start new REQ or stop REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: LazyFilter | LazyFilter[] | null): void;
+  /** Start new REQ on the RxNostr with witch the RxReq is associated. */
+  emit(filters: LazyFilter | LazyFilter[]): void;
 
   /**
    * Returns itself overriding only `getReqObservable()`.
@@ -98,33 +98,23 @@ export interface RxReqController {
   ): RxReq;
 }
 
-abstract class RxReqBase implements RxReq {
+class RxReqImpl<S extends RxReqStrategy> implements RxReq {
   protected filters$ = new BehaviorSubject<ReqPacket>(null);
-  private _rxReqId: string;
+  rxReqId: string;
 
-  abstract get strategy(): RxReqStrategy;
-  get rxReqId() {
-    return this._rxReqId;
-  }
-
-  constructor(rxReqId?: string) {
-    this._rxReqId = rxReqId ?? getRandomDigitsString();
+  constructor(public strategy: S, rxReqId?: string) {
+    this.rxReqId = rxReqId ?? getRandomDigitsString();
   }
 
   getReqObservable(): Observable<ReqPacket> {
     return this.filters$.asObservable();
   }
 
-  emit(filters: LazyFilter | LazyFilter[] | null) {
-    const normalized = normalizeFilters(filters);
-
-    if (normalized) {
-      this.filters$.next(normalized);
-    } else {
-      this.filters$.next(null);
-    }
+  emit(filters: LazyFilter | LazyFilter[]) {
+    this.filters$.next(normalizeFilters(filters));
   }
 
+  // #region pipe overloads
   pipe(): RxReq;
   pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
   pipe<A>(
@@ -187,17 +177,14 @@ abstract class RxReqBase implements RxReq {
     op8: OperatorFunction<G, H>,
     op9: OperatorFunction<H, ReqPacket>
   ): RxReq;
+  // #endregion
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipe(...operators: OperatorFunction<any, any>[]): RxReq {
-    const rxReqId = this.rxReqId;
-    const strategy = this.strategy;
+    const { rxReqId, strategy } = this;
+
     return {
-      get rxReqId() {
-        return rxReqId;
-      },
-      get strategy() {
-        return strategy;
-      },
+      rxReqId,
+      strategy,
       getReqObservable: () =>
         this.getReqObservable().pipe(...(operators as [])),
     };
@@ -216,19 +203,9 @@ abstract class RxReqBase implements RxReq {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#backward-strategy).
  */
 export function createRxBackwardReq(
-  subIdBase?: string
+  rxReqId?: string
 ): RxReq<"backward"> & RxReqController {
-  return new RxBackwardReq(subIdBase);
-}
-
-class RxBackwardReq extends RxReqBase implements RxReqController {
-  constructor(rxReqId?: string) {
-    super(rxReqId);
-  }
-
-  override get strategy(): "backward" {
-    return "backward";
-  }
+  return new RxReqImpl("backward", rxReqId);
 }
 
 /**
@@ -244,19 +221,9 @@ class RxBackwardReq extends RxReqBase implements RxReqController {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#forward-strategy).
  */
 export function createRxForwardReq(
-  subId?: string
+  rxReqId?: string
 ): RxReq<"forward"> & RxReqController {
-  return new RxForwardReq(subId);
-}
-
-class RxForwardReq extends RxReqBase implements RxReqController {
-  constructor(rxReqId?: string) {
-    super(rxReqId);
-  }
-
-  override get strategy(): "forward" {
-    return "forward";
-  }
+  return new RxReqImpl("forward", rxReqId);
 }
 
 /**
@@ -266,22 +233,17 @@ class RxForwardReq extends RxReqBase implements RxReqController {
  *
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#oneshot-strategy).
  */
-export function createRxOneshotReq(req: {
+export function createRxOneshotReq(params: {
   filters: LazyFilter | LazyFilter[];
+  /** @deprecated Use `rxReqId` instead */
   subId?: string;
-}): RxReq<"oneshot"> {
-  return new RxOneshotReq(req);
-}
-
-class RxOneshotReq extends RxReqBase {
-  constructor(req: { filters: LazyFilter | LazyFilter[]; subId?: string }) {
-    super(req?.subId);
-    this.emit(req.filters);
-  }
-
-  override get strategy(): "oneshot" {
-    return "oneshot";
-  }
+  rxReqId?: string;
+}): RxReq<"backward"> {
+  return {
+    strategy: "backward",
+    rxReqId: params.rxReqId ?? params.subId ?? getRandomDigitsString(),
+    getReqObservable: () => of(normalizeFilters(params.filters)),
+  };
 }
 
 export interface Mixin<R, T> {
@@ -361,7 +323,7 @@ function normalizeFilter(filter: LazyFilter): LazyFilter | null {
 }
 
 function normalizeFilters(
-  filters: LazyFilter | LazyFilter[] | null
+  filters: LazyFilter | LazyFilter[]
 ): LazyFilter[] | null {
   if (!filters) {
     return null;
