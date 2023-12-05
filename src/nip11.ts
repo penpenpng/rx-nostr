@@ -11,8 +11,51 @@ import { UrlMap } from "./utils.js";
  * rx-nostr will use them instead of fetching even if `skipFetchNip11` is enabled.
  */
 export class Nip11Registry {
-  private static cache = new UrlMap<Promise<Nostr.Nip11.RelayInfo>>();
+  private static cache = new UrlMap<Nostr.Nip11.RelayInfo>();
   private static default: Nostr.Nip11.RelayInfo = {};
+
+  static async getValue<T>(
+    url: string,
+    getter: (data: Nostr.Nip11.RelayInfo) => T,
+    options?: {
+      skipFetch?: boolean;
+      skipCahce?: boolean;
+    }
+  ): Promise<T> {
+    if (!options?.skipCahce) {
+      const v = getter(this.get(url) ?? {});
+      if (v) {
+        return v;
+      }
+    }
+    if (!options?.skipFetch) {
+      const v = getter((await this.fetch(url)) ?? {});
+      if (v) {
+        return v;
+      }
+    }
+
+    return getter(this.default);
+  }
+
+  /**
+   * Return cached or `set()`'ed NIP-11 information.
+   */
+  static get(url: string): Nostr.Nip11.RelayInfo | undefined {
+    return this.cache.get(url);
+  }
+
+  /**
+   * Cache fetched information then return it.
+   */
+  static async fetch(url: string) {
+    const promise = fetchRelayInfo(url);
+    promise.then((v) => {
+      this.cache.set(url, v);
+    });
+
+    return promise;
+  }
 
   /**
    * Return cached or `set()`'ed NIP-11 information,
@@ -23,18 +66,17 @@ export class Nip11Registry {
   }
 
   /**
-   * Return cached or `set()`'ed NIP-11 information,
-   * or return default value.
-   */
-  static async getOrDefault(url: string): Promise<Nostr.Nip11.RelayInfo> {
-    return this.cache.get(url) ?? this.default;
-  }
-
-  /**
    * Set NIP-11 information manually for given relay URL.
    */
   static set(url: string, nip11: Nostr.Nip11.RelayInfo) {
-    this.cache.set(url, Promise.resolve(nip11));
+    this.cache.set(url, nip11);
+  }
+
+  /**
+   * Get NIP-11 information for fallback.
+   */
+  static getDefault(): Nostr.Nip11.RelayInfo {
+    return this.default;
   }
 
   /**
@@ -42,15 +84,6 @@ export class Nip11Registry {
    */
   static setDefault(nip11: Nostr.Nip11.RelayInfo) {
     this.default = nip11;
-  }
-
-  /**
-   * Cache fetched information then return it.
-   */
-  static async fetch(url: string) {
-    const v = fetchRelayInfo(url);
-    this.cache.set(url, v);
-    return v;
   }
 
   /**

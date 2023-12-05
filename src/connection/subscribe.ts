@@ -210,9 +210,13 @@ class SubQueue {
   }
 
   private async capacity() {
-    const nip11 = this.config.skipFetchNip11
-      ? await Nip11Registry.getOrDefault(this.url)
-      : await Nip11Registry.getOrFetch(this.url);
-    return nip11.limitation?.max_subscriptions ?? Infinity;
+    const capacity = await Nip11Registry.getValue(
+      this.url,
+      (data) => data.limitation?.max_subscriptions,
+      {
+        skipFetch: this.config.skipFetchNip11,
+      }
+    );
+    return capacity ?? Infinity;
   }
 }
