@@ -58,6 +58,44 @@ export interface RxReqController {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
+  pipe<A, B, C, D, E>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F, G>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, G>,
+    op8: OperatorFunction<G, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F, G, H>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, G>,
+    op8: OperatorFunction<G, H>,
+    op9: OperatorFunction<H, ReqPacket>
+  ): RxReq;
 }
 
 abstract class RxReqBase implements RxReq {
@@ -111,12 +149,49 @@ abstract class RxReqBase implements RxReq {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
+  pipe<A, B, C, D, E>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F, G>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, G>,
+    op8: OperatorFunction<G, ReqPacket>
+  ): RxReq;
+  pipe<A, B, C, D, E, F, G, H>(
+    op1: OperatorFunction<ReqPacket, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, C>,
+    op4: OperatorFunction<C, D>,
+    op5: OperatorFunction<D, E>,
+    op6: OperatorFunction<E, F>,
+    op7: OperatorFunction<F, G>,
+    op8: OperatorFunction<G, H>,
+    op9: OperatorFunction<H, ReqPacket>
+  ): RxReq;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipe(...operators: OperatorFunction<any, any>[]): RxReq {
     const rxReqId = this.rxReqId;
     const strategy = this.strategy;
     return {
-      ...this,
       get rxReqId() {
         return rxReqId;
       },
