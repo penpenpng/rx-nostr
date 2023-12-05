@@ -2,8 +2,6 @@ import Nostr from "nostr-typedef";
 import {
   filter,
   finalize,
-  first,
-  identity,
   map,
   merge,
   mergeAll,
@@ -289,7 +287,6 @@ class RxNostrImpl implements RxNostr {
 
     const req$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is LazyFilter[] => filters !== null),
-      rxReq.strategy === "oneshot" ? first() : identity,
       map((filters, index) => makeLazyREQ({ rxReq, filters, index })),
       takeUntil(this.dispose$)
     );
