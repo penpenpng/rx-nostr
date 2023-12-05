@@ -91,6 +91,11 @@ export interface ConnectionStatePacket {
   state: ConnectionState;
 }
 
+export interface OutgoingMessagePacket {
+  to: string;
+  message: Nostr.ToRelayMessage.Any;
+}
+
 /**
  * State of a WebSocket connection established with a relay.
  *

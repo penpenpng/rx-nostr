@@ -3,6 +3,7 @@ import {
   distinctUntilChanged,
   EMPTY,
   filter,
+  map,
   Observable,
   of,
   Subject,
@@ -15,10 +16,12 @@ import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
 import {
   ConnectionState,
+  ConnectionStatePacket,
   EosePacket,
   EventPacket,
   MessagePacket,
   OkPacket,
+  OutgoingMessagePacket,
 } from "../packet.js";
 
 export class RelayConnection {
@@ -26,6 +29,7 @@ export class RelayConnection {
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
   private reconnected$ = new Subject<Nostr.ToRelayMessage.Any[]>();
+  private outgoing$ = new Subject<OutgoingMessagePacket>();
   private message$ = new Subject<MessagePacket>();
   private error$ = new Subject<unknown>();
   private retryTimer: Subscription | null = null;
@@ -259,6 +263,7 @@ export class RelayConnection {
         }
 
         if (this.socket.readyState === WebSocket.OPEN) {
+          this.outgoing$.next({ to: this.url, message });
           this.socket.send(JSON.stringify(message));
         } else {
           this.buffer.push(message);
@@ -293,11 +298,20 @@ export class RelayConnection {
     );
   }
 
+  getOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
+    return this.outgoing$.asObservable();
+  }
   getReconnectedObservable(): Observable<Nostr.ToRelayMessage.Any[]> {
     return this.reconnected$.asObservable();
   }
-  getConnectionStateObservable(): Observable<ConnectionState> {
-    return this.state$.pipe(distinctUntilChanged());
+  getConnectionStateObservable(): Observable<ConnectionStatePacket> {
+    return this.state$.pipe(
+      distinctUntilChanged(),
+      map((state) => ({
+        from: this.url,
+        state,
+      }))
+    );
   }
   getErrorObservable(): Observable<unknown> {
     return this.error$.asObservable();
@@ -317,6 +331,7 @@ export class RelayConnection {
 
     const subjects = [
       this.state$,
+      this.outgoing$,
       this.message$,
       this.error$,
       this.reconnected$,
