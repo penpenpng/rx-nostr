@@ -12,6 +12,7 @@ import {
   LazyREQ,
   MessagePacket,
   OkPacket,
+  OutgoingMessagePacket,
 } from "../packet.js";
 import { defineDefault, normalizeRelayUrl } from "../utils.js";
 import { PublishProxy } from "./publish.js";
@@ -170,17 +171,20 @@ export class NostrConnection {
     return this.relay.getOtherObservable();
   }
 
+  getOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
+    if (this.disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+
+    return this.relay.getOutgoingMessageObservable();
+  }
+
   getConnectionStateObservable(): Observable<ConnectionStatePacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getConnectionStateObservable().pipe(
-      map((state) => ({
-        from: this.url,
-        state,
-      }))
-    );
+    return this.relay.getConnectionStateObservable();
   }
   get connectionState(): ConnectionState {
     return this.relay.state;

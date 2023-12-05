@@ -36,6 +36,7 @@ import type {
   LazyREQ,
   MessagePacket,
   OkPacket,
+  OutgoingMessagePacket,
 } from "../packet.js";
 import type { RxReq } from "../req.js";
 import { subtract, UrlMap } from "../utils.js";
@@ -88,6 +89,7 @@ class RxNostrImpl implements RxNostr {
 
   private error$ = new Subject<ErrorPacket>();
   private connectionState$ = new Subject<ConnectionStatePacket>();
+  private outgoing$ = new Subject<OutgoingMessagePacket>();
 
   private dispose$ = new Subject<void>();
   private disposed = false;
@@ -181,6 +183,7 @@ class RxNostrImpl implements RxNostr {
     conn.getOtherObservable().subscribe(this.other$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
     conn.getErrorObservable().subscribe(this.error$);
+    conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
   }
   private updateWeakSubscriptions(
     nextReadableConnections: NostrConnection[]
@@ -460,6 +463,9 @@ class RxNostrImpl implements RxNostr {
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
     return this.connectionState$.asObservable();
   }
+  createOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
+    return this.outgoing$.asObservable();
+  }
   // #endregion
 
   send(
@@ -528,6 +534,7 @@ class RxNostrImpl implements RxNostr {
       this.other$,
       this.connectionState$,
       this.error$,
+      this.outgoing$,
     ];
     for (const sub of subjects) {
       sub.complete();

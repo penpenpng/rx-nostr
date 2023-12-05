@@ -8,6 +8,7 @@ import type {
   EventPacket,
   MessagePacket,
   OkPacket,
+  OutgoingMessagePacket,
 } from "../packet.js";
 import type { RxReq } from "../req.js";
 import { defineDefault } from "../utils.js";
@@ -120,6 +121,12 @@ export interface RxNostr {
    * Nothing happens when this Observable is unsubscribed.
    */
   createConnectionStateObservable(): Observable<ConnectionStatePacket>;
+  /**
+   * Create an Observable that receives all message sent to websocket connections.
+   *
+   * Nothing happens when this Observable is unsubscribed.
+   */
+  createOutgoingMessageObservable(): Observable<OutgoingMessagePacket>;
 
   /**
    * Attempt to send events to relays.
