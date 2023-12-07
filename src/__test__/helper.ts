@@ -72,6 +72,14 @@ export const faker = {
           ok: message[2],
           notice: message[3],
         };
+      case "CLOSED":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          notice: message[2],
+        };
       case "NOTICE":
         return {
           from,

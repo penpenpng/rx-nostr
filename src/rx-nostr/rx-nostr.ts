@@ -26,6 +26,7 @@ import {
 import { getSignedEvent } from "../nostr/event.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
+  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
   EosePacket,
@@ -82,7 +83,7 @@ class RxNostrImpl implements RxNostr {
     new Map();
 
   private event$ = new Subject<EventPacket>();
-  private eose$ = new Subject<EosePacket>();
+  private eoseOrClose$ = new Subject<EosePacket | ClosedPacket>();
   private ok$ = new Subject<OkPacket>();
   private other$ = new Subject<MessagePacket>();
 
@@ -177,7 +178,7 @@ class RxNostrImpl implements RxNostr {
   }
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
-    conn.getEoseObservable().subscribe(this.eose$);
+    conn.getEoseOrClosedObservable().subscribe(this.eoseOrClose$);
     conn.getOkObservable().subscribe(this.ok$);
     conn.getOtherObservable().subscribe(this.other$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
@@ -364,23 +365,26 @@ class RxNostrImpl implements RxNostr {
   }): Observable<EventPacket> {
     const { req, targetConnections } = params;
     const subId = req[1];
-    const eoseRelays = new Set<string>();
+    const finishedRelays = new Set<string>();
 
     const isDown = (state: ConnectionState): boolean =>
       state === "error" || state === "rejected" || state === "terminated";
     const shouldComplete = () =>
       targetConnections.every(
         ({ connectionState, url }) =>
-          isDown(connectionState) || eoseRelays.has(url)
+          isDown(connectionState) || finishedRelays.has(url)
       );
 
-    const eose$ = this.eose$.pipe(
+    const eoseOrClose$ = this.eoseOrClose$.pipe(
       filterBySubId(subId),
       tap(({ from }) => {
-        eoseRelays.add(from);
+        finishedRelays.add(from);
       })
     );
-    const complete$ = merge(eose$, this.connectionState$.asObservable()).pipe(
+    const complete$ = merge(
+      eoseOrClose$,
+      this.connectionState$.asObservable()
+    ).pipe(
       filter(() => shouldComplete()),
       first()
     );
@@ -389,7 +393,7 @@ class RxNostrImpl implements RxNostr {
       takeUntil(complete$),
       completeOnTimeout(this.config.eoseTimeout),
       filterBySubId(subId),
-      filter((e) => !eoseRelays.has(e.from))
+      filter((e) => !finishedRelays.has(e.from))
     );
   }
   private startSubscription(params: {
@@ -439,7 +443,7 @@ class RxNostrImpl implements RxNostr {
   createAllMessageObservable(): Observable<MessagePacket> {
     return merge(
       this.event$.asObservable(),
-      this.eose$.asObservable(),
+      this.eoseOrClose$.asObservable(),
       this.ok$.asObservable(),
       this.other$.asObservable()
     );
@@ -514,7 +518,7 @@ class RxNostrImpl implements RxNostr {
     const subjects = [
       this.event$,
       this.ok$,
-      this.eose$,
+      this.eoseOrClose$,
       this.other$,
       this.connectionState$,
       this.error$,
