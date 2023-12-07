@@ -2,6 +2,7 @@ import Nostr from "nostr-typedef";
 import {
   filter,
   finalize,
+  first,
   map,
   merge,
   mergeAll,
@@ -25,6 +26,7 @@ import {
 import { getSignedEvent } from "../nostr/event.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
+  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
   EosePacket,
@@ -81,7 +83,7 @@ class RxNostrImpl implements RxNostr {
     new Map();
 
   private event$ = new Subject<EventPacket>();
-  private eose$ = new Subject<EosePacket>();
+  private eoseOrClose$ = new Subject<EosePacket | ClosedPacket>();
   private ok$ = new Subject<OkPacket>();
   private other$ = new Subject<MessagePacket>();
 
@@ -176,7 +178,7 @@ class RxNostrImpl implements RxNostr {
   }
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
-    conn.getEoseObservable().subscribe(this.eose$);
+    conn.getEoseOrClosedObservable().subscribe(this.eoseOrClose$);
     conn.getOkObservable().subscribe(this.ok$);
     conn.getOtherObservable().subscribe(this.other$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
@@ -285,6 +287,35 @@ class RxNostrImpl implements RxNostr {
       targetConnections = relays.map((url) => this.ensureNostrConnection(url));
     }
 
+    const startSubscription = (req: LazyREQ) => {
+      this.startSubscription({
+        req,
+        targetConnections,
+        mode,
+        overwrite: rxReq.strategy === "forward",
+        autoclose: rxReq.strategy === "backward",
+      });
+    };
+    const teardownSubscription = (subId: string) => {
+      this.teardownSubscription({
+        subId,
+        targetConnections,
+        mode,
+      });
+    };
+    const createEventObservable = (req: LazyREQ) => {
+      if (rxReq.strategy === "forward") {
+        return this.createForwardEventObservable({
+          req,
+        });
+      } else {
+        return this.createBackwardEventObservable({
+          req,
+          targetConnections,
+        });
+      }
+    };
+
     const req$ = rxReq.getReqObservable().pipe(
       filter((filters): filters is LazyFilter[] => filters !== null),
       map((filters, index) => makeLazyREQ({ rxReq, filters, index })),
@@ -298,53 +329,21 @@ class RxNostrImpl implements RxNostr {
       });
 
       return req$.pipe(
-        tap((req) => {
-          this.startSubscription({
-            req,
-            targetConnections,
-            mode,
-            overwrite: true,
-            autoclose: false,
-          });
-        }),
-        map((req) =>
-          this.createForwardEventObservable({
-            req,
-          })
-        ),
-        switchAll(),
+        tap(startSubscription),
+        map(createEventObservable),
         finalize(() => {
-          this.teardownSubscription({
-            subId,
-            targetConnections,
-            mode,
-          });
-        })
+          teardownSubscription(subId);
+        }),
+        switchAll()
       );
     } else {
       return req$.pipe(
-        tap((req) => {
-          this.startSubscription({
-            req,
-            targetConnections,
-            mode,
-            overwrite: false,
-            autoclose: true,
-          });
-        }),
+        tap(startSubscription),
         map((req) =>
-          this.createBackwardEventObservable({
-            req,
-            targetConnections,
-          }).pipe(
+          createEventObservable(req).pipe(
             finalize(() => {
               const subId = req[1];
-
-              this.teardownSubscription({
-                subId,
-                targetConnections,
-                mode,
-              });
+              teardownSubscription(subId);
             })
           )
         ),
@@ -365,44 +364,36 @@ class RxNostrImpl implements RxNostr {
     targetConnections: NostrConnection[];
   }): Observable<EventPacket> {
     const { req, targetConnections } = params;
+    const subId = req[1];
+    const finishedRelays = new Set<string>();
 
     const isDown = (state: ConnectionState): boolean =>
       state === "error" || state === "rejected" || state === "terminated";
+    const shouldComplete = () =>
+      targetConnections.every(
+        ({ connectionState, url }) =>
+          isDown(connectionState) || finishedRelays.has(url)
+      );
 
-    const subId = req[1];
-    const eose$ = new Subject<void>();
-    const complete$ = new Subject<void>();
-    const eoseRelays = new Set<string>();
-    const manageCompletion = merge(eose$, this.connectionState$.asObservable())
-      .pipe(
-        filter(() => {
-          const shouldComplete = targetConnections.every(
-            ({ connectionState, url }) =>
-              isDown(connectionState) || eoseRelays.has(url)
-          );
-
-          return shouldComplete;
-        })
-      )
-      .subscribe(() => {
-        complete$.next();
-      });
-
-    this.eose$.pipe(filterBySubId(subId)).subscribe(({ from }) => {
-      eoseRelays.add(from);
-      eose$.next();
-    });
+    const eoseOrClose$ = this.eoseOrClose$.pipe(
+      filterBySubId(subId),
+      tap(({ from }) => {
+        finishedRelays.add(from);
+      })
+    );
+    const complete$ = merge(
+      eoseOrClose$,
+      this.connectionState$.asObservable()
+    ).pipe(
+      filter(() => shouldComplete()),
+      first()
+    );
 
     return this.event$.pipe(
       takeUntil(complete$),
       completeOnTimeout(this.config.eoseTimeout),
-      finalize(() => {
-        complete$.complete();
-        eose$.complete();
-        manageCompletion.unsubscribe();
-      }),
-      filter((e) => !eoseRelays.has(e.from)),
-      filterBySubId(subId)
+      filterBySubId(subId),
+      filter((e) => !finishedRelays.has(e.from))
     );
   }
   private startSubscription(params: {
@@ -452,7 +443,7 @@ class RxNostrImpl implements RxNostr {
   createAllMessageObservable(): Observable<MessagePacket> {
     return merge(
       this.event$.asObservable(),
-      this.eose$.asObservable(),
+      this.eoseOrClose$.asObservable(),
       this.ok$.asObservable(),
       this.other$.asObservable()
     );
@@ -527,7 +518,7 @@ class RxNostrImpl implements RxNostr {
     const subjects = [
       this.event$,
       this.ok$,
-      this.eose$,
+      this.eoseOrClose$,
       this.other$,
       this.connectionState$,
       this.error$,

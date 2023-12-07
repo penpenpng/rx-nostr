@@ -27,6 +27,7 @@ export type MessagePacket =
   | EventPacket
   | EosePacket
   | OkPacket
+  | ClosedPacket
   | NoticePacket
   | AuthPacket
   | CountPacket;
@@ -51,6 +52,11 @@ export interface EosePacket extends MessagePacketBase<"EOSE"> {
   subId: string;
 }
 
+export interface ClosedPacket extends MessagePacketBase<"CLOSED"> {
+  subId: string;
+  notice: string;
+}
+
 /**
  * Packets represents OK messages associated with an EVENT submission.
  */
@@ -72,7 +78,7 @@ export interface AuthPacket extends MessagePacketBase<"AUTH"> {
 
 export interface CountPacket extends MessagePacketBase<"COUNT"> {
   subId: string;
-  count: Nostr.ToClientMessage.CountResponse;
+  count: Nostr.CountResponse;
 }
 
 /**

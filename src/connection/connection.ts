@@ -4,6 +4,7 @@ import { combineLatest, map, Observable } from "rxjs";
 import type { RxNostrConfig } from "../config.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
+  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
   EosePacket,
@@ -149,7 +150,7 @@ export class NostrConnection {
 
     return this.subProxy.getEventObservable();
   }
-  getEoseObservable(): Observable<EosePacket> {
+  getEoseOrClosedObservable(): Observable<EosePacket | ClosedPacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }

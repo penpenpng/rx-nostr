@@ -42,6 +42,12 @@ export class SubscribeProxy {
         this.unsubscribe(subId);
       }
     });
+
+    // Mark as closed
+    this.relay.getCLOSEDObservable().subscribe(({ subId }) => {
+      this.subs.delete(subId);
+      this.queue.drop(subId);
+    });
   }
 
   subscribe(req: LazyREQ, autoclose: boolean): void {

@@ -15,6 +15,7 @@ import type { RetryConfig, RxNostrConfig } from "../config.js";
 import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
 import {
+  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
   EosePacket,
@@ -215,6 +216,14 @@ export class RelayConnection {
           ok: message[2],
           notice: message[3],
         };
+      case "CLOSED":
+        return {
+          from,
+          type,
+          message,
+          subId: message[1],
+          notice: message[2],
+        };
       case "NOTICE":
         return {
           from,
@@ -289,12 +298,23 @@ export class RelayConnection {
       filter((p): p is EosePacket => p.type === "EOSE")
     );
   }
+  getCLOSEDObservable(): Observable<ClosedPacket> {
+    return this.message$.pipe(
+      filter((p): p is ClosedPacket => p.type === "CLOSED")
+    );
+  }
   getOKObservable(): Observable<OkPacket> {
     return this.message$.pipe(filter((p): p is OkPacket => p.type === "OK"));
   }
   getOtherObservable(): Observable<MessagePacket> {
     return this.message$.pipe(
-      filter((p) => p.type !== "EVENT" && p.type !== "EOSE" && p.type !== "OK")
+      filter(
+        (p) =>
+          p.type !== "EVENT" &&
+          p.type !== "EOSE" &&
+          p.type !== "OK" &&
+          p.type !== "CLOSED"
+      )
     );
   }
 
