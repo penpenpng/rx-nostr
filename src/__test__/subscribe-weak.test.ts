@@ -246,6 +246,26 @@ describe("Under multiple relays", () => {
     relay2.emitEOSE("sub:0");
     await expect(relay2).toReceiveCLOSE("sub:0");
   });
+
+  test("[forward] Changing default relays affects existing forward REQ.", async () => {
+    const req = createRxForwardReq("sub");
+    rxNostr.use(req).subscribe();
+
+    req.emit(faker.filter({ limit: 1 }));
+    await relay1.connected;
+    await relay2.connected;
+    await expect(relay1).toReceiveREQ(["sub:0", { limit: 1 }]);
+    await expect(relay2).toReceiveREQ(["sub:0", { limit: 1 }]);
+
+    rxNostr.addDefaultRelays([RELAY_URL3]);
+    await relay3.connected;
+    await expect(relay3).toReceiveREQ(["sub:0", { limit: 1 }]);
+
+    req.emit(faker.filter({ limit: 2 }));
+    await expect(relay1).toReceiveREQ(["sub:0", { limit: 2 }]);
+    await expect(relay2).toReceiveREQ(["sub:0", { limit: 2 }]);
+    await expect(relay3).toReceiveREQ(["sub:0", { limit: 2 }]);
+  });
 });
 
 describe("Under a relay which is limited REQ concurrency", () => {
@@ -278,7 +298,7 @@ describe("Under a relay which is limited REQ concurrency", () => {
 
   test("[backward] Overflowed REQs will be enqueued.", async () => {
     const req = createRxBackwardReq("sub");
-    rxNostr.use(req).pipe().subscribe();
+    rxNostr.use(req).subscribe();
 
     req.emit(faker.filters());
     req.emit(faker.filters());
@@ -297,5 +317,21 @@ describe("Under a relay which is limited REQ concurrency", () => {
 
     relay.emitEOSE("sub:2");
     await expect(relay).toReceiveCLOSE("sub:2");
+  });
+
+  test("[backward] CLOSED subscription is dropped from REQ queue.", async () => {
+    const req = createRxBackwardReq("sub");
+    rxNostr.use(req).subscribe();
+
+    req.emit(faker.filters());
+    await relay.connected;
+    await expect(relay).toReceiveREQ("sub:0");
+
+    req.emit(faker.filters());
+    rxNostr.send(faker.event());
+    await expect(relay).toReceiveEVENT();
+
+    relay.emit(["CLOSED", "sub:0"]);
+    await expect(relay).toReceiveREQ("sub:1");
   });
 });
