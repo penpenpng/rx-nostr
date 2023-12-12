@@ -38,7 +38,7 @@ import type {
   OkPacket,
   OutgoingMessagePacket,
 } from "../packet.js";
-import type { RxReq } from "../req.js";
+import type { RxReq } from "../rx-req.js";
 import { subtract, UrlMap } from "../utils.js";
 import {
   type AcceptableDefaultRelaysConfig,

@@ -10,7 +10,7 @@ import type {
   OkPacket,
   OutgoingMessagePacket,
 } from "../packet.js";
-import type { RxReq } from "../req.js";
+import type { RxReq } from "../rx-req.js";
 import { defineDefault } from "../utils.js";
 
 /**

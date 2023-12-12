@@ -1,5 +1,5 @@
 import Nostr from "nostr-typedef";
-import { BehaviorSubject, Observable, of, type OperatorFunction } from "rxjs";
+import { Observable, of, type OperatorFunction, Subject } from "rxjs";
 
 import { LazyFilter, ReqPacket } from "./packet.js";
 import type { Override } from "./utils.js";
@@ -24,12 +24,13 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
 export type RxReqStrategy = "forward" | "backward";
 
 /**
+ * @deprecated
+ *
  * The RxReq interface that is provided for users (not for RxNostr).
  */
-export interface RxReqController {
-  /** Start new REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: LazyFilter | LazyFilter[]): void;
+export type RxReqController = RxReqPipeable & RxReqEmittable;
 
+export interface RxReqPipeable {
   /**
    * Returns itself overriding only `getReqObservable()`.
    * It is useful for throttling and other control purposes.
@@ -98,98 +99,38 @@ export interface RxReqController {
   ): RxReq;
 }
 
-class RxReqImpl<S extends RxReqStrategy> implements RxReq {
-  protected filters$ = new BehaviorSubject<ReqPacket>(null);
-  rxReqId: string;
-
-  constructor(public strategy: S, rxReqId?: string) {
-    this.rxReqId = rxReqId ?? getRandomDigitsString();
-  }
-
-  getReqObservable(): Observable<ReqPacket> {
-    return this.filters$.asObservable();
-  }
-
-  emit(filters: LazyFilter | LazyFilter[]) {
-    this.filters$.next(normalizeFilters(filters));
-  }
-
-  // #region pipe overloads
-  pipe(): RxReq;
-  pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
-  pipe<A>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, ReqPacket>
-  ): RxReq;
-  pipe<A, B>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D, E>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, E>,
-    op6: OperatorFunction<E, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D, E, F>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, E>,
-    op6: OperatorFunction<E, F>,
-    op7: OperatorFunction<F, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D, E, F, G>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, E>,
-    op6: OperatorFunction<E, F>,
-    op7: OperatorFunction<F, G>,
-    op8: OperatorFunction<G, ReqPacket>
-  ): RxReq;
-  pipe<A, B, C, D, E, F, G, H>(
-    op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, E>,
-    op6: OperatorFunction<E, F>,
-    op7: OperatorFunction<F, G>,
-    op8: OperatorFunction<G, H>,
-    op9: OperatorFunction<H, ReqPacket>
-  ): RxReq;
-  // #endregion
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pipe(...operators: OperatorFunction<any, any>[]): RxReq {
-    const { rxReqId, strategy } = this;
-
-    return {
-      rxReqId,
-      strategy,
-      getReqObservable: () =>
-        this.getReqObservable().pipe(...(operators as [])),
-    };
-  }
+export interface RxReqEmittable {
+  /** Start new REQ on the RxNostr with witch the RxReq is associated. */
+  emit(filters: LazyFilter | LazyFilter[]): void;
 }
+
+const createRxReq = <S extends RxReqStrategy>(params: {
+  strategy: S;
+  rxReqId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  operators: OperatorFunction<any, any>[];
+}): RxReq<S> & RxReqPipeable & RxReqEmittable => {
+  const { strategy, rxReqId } = params;
+  const filters$ = new Subject<ReqPacket>();
+
+  return {
+    strategy,
+    rxReqId,
+    getReqObservable(): Observable<ReqPacket> {
+      return filters$.pipe(...(params.operators as []));
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pipe(...operators: OperatorFunction<any, any>[]): RxReq {
+      return createRxReq({
+        ...params,
+        operators: [...params.operators, ...operators],
+      });
+    },
+    emit(filters: LazyFilter | LazyFilter[]) {
+      filters$.next(normalizeFilters(filters));
+    },
+  };
+};
 
 /**
  * Create a RxReq instance based on the backward strategy.
@@ -204,8 +145,12 @@ class RxReqImpl<S extends RxReqStrategy> implements RxReq {
  */
 export function createRxBackwardReq(
   rxReqId?: string
-): RxReq<"backward"> & RxReqController {
-  return new RxReqImpl("backward", rxReqId);
+): RxReq<"backward"> & RxReqPipeable & RxReqEmittable {
+  return createRxReq({
+    strategy: "backward",
+    rxReqId: rxReqId ?? getRandomDigitsString(),
+    operators: [],
+  });
 }
 
 /**
@@ -222,8 +167,12 @@ export function createRxBackwardReq(
  */
 export function createRxForwardReq(
   rxReqId?: string
-): RxReq<"forward"> & RxReqController {
-  return new RxReqImpl("forward", rxReqId);
+): RxReq<"forward"> & RxReqPipeable & RxReqEmittable {
+  return createRxReq({
+    strategy: "forward",
+    rxReqId: rxReqId ?? getRandomDigitsString(),
+    operators: [],
+  });
 }
 
 /**
