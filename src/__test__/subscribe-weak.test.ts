@@ -1,4 +1,4 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
 import {
@@ -124,7 +124,7 @@ describe("Under a single relay", () => {
     await expect(relay).toReceiveREQ();
 
     relay.emitEOSE("sub:0");
-    assert(!spy.completed());
+    await expect(spy.willComplete()).resolves.toBe(false);
   });
 
   test("[backward] Each EOSE CLOSEs the REQ in the order of arrival.", async () => {
@@ -173,6 +173,22 @@ describe("Under a single relay", () => {
     await expect(relay).toReceiveCLOSE("sub:0");
   });
 
+  test("[backward] Overred stream can be completed.", async () => {
+    const req = createRxBackwardReq("sub");
+    const spy = spySubscription();
+    rxNostr.use(req).pipe(spy.tap()).subscribe();
+
+    req.emit(faker.filter());
+    await relay.connected;
+    await expect(relay).toReceiveREQ("sub:0");
+
+    req.over();
+    relay.emitEOSE("sub:0");
+
+    relay.emitEOSE("sub:0");
+    await expect(spy.willComplete()).resolves.toBe(true);
+  });
+
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
     const req = createRxOneshotReq({
       subId: "sub",
@@ -183,10 +199,8 @@ describe("Under a single relay", () => {
     await relay.connected;
     await expect(relay).toReceiveREQ("sub:0");
 
-    assert(!spy.completed());
-
     relay.emitEOSE("sub:0");
-    assert(spy.completed());
+    await expect(spy.willComplete()).resolves.toBe(true);
   });
 });
 

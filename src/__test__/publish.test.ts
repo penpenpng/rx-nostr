@@ -53,7 +53,7 @@ test("send() doesn't wait for OK from default relays added later.", async () => 
   expect(relay3.messagesToConsume.pendingItems.length).toBe(0);
 
   relay1.emitOK("*", true);
-  expect(spy.completed()).toBe(true);
+  await expect(spy.willComplete()).resolves.toBe(true);
 });
 
 test("temporary relay option works in send().", async () => {

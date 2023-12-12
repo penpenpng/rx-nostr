@@ -49,7 +49,7 @@ import {
   type RxNostrSendOptions,
   type RxNostrUseOptions,
 } from "./interface.js";
-import { makeLazyREQ, makeSubId, normalizeRelaysConfig } from "./utils.js";
+import { makeLazyREQ, normalizeRelaysConfig } from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
 export function createRxNostr(config?: Partial<RxNostrConfig>): RxNostr {
