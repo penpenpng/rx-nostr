@@ -5,8 +5,14 @@ import Nostr from "nostr-typedef";
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
  * When null is sent, the subscription is suspended.
+ *
+ * **NOTE**: The internal structure of ReqPacket is subject to change.
+ * Do NOT create RxPackets directly, but issue RxPackets through RxReq instead.
  */
-export type ReqPacket = LazyFilter[] | null;
+export interface ReqPacket {
+  filters: LazyFilter[];
+  relays?: string[];
+}
 
 /**
  * Filter object, but allows parameters since/until to be function.
