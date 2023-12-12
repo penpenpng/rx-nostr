@@ -107,32 +107,49 @@ export const faker = {
 };
 
 export function spySubscription(): {
-  completed: () => boolean;
-  error: () => boolean;
-  count: () => number;
-  subscribed: () => boolean;
-  unsubscribed: () => boolean;
+  willComplete: () => Promise<boolean>;
+  willError: () => Promise<boolean>;
+  willSubscribe: () => Promise<boolean>;
+  willUnsubscribe: () => Promise<boolean>;
   tap: <T>() => MonoTypeOperatorFunction<T>;
 } {
-  let completed = false;
-  let error = false;
-  let count = 0;
-  let subscribed = false;
-  let unsubscribed = false;
+  const timeout = (time: number): Promise<void> =>
+    new Promise((_, reject) => {
+      setTimeout(reject, time);
+    });
+  const withTimeout = (promise: Promise<void>) =>
+    Promise.race([promise, timeout(50)])
+      .then(() => true)
+      .catch(() => false);
+
+  let complete: () => void;
+  const promiseComplete = new Promise<void>((resolve) => {
+    complete = resolve;
+  });
+  let error: () => void;
+  const promiseError = new Promise<void>((resolve) => {
+    error = resolve;
+  });
+  let subscribe: () => void;
+  const promiseSubscribe = new Promise<void>((resolve) => {
+    subscribe = resolve;
+  });
+  let unsubscribe: () => void;
+  const promiseUnsubscribe = new Promise<void>((resolve) => {
+    unsubscribe = resolve;
+  });
 
   return {
-    completed: () => completed,
-    error: () => error,
-    count: () => count,
-    subscribed: () => subscribed,
-    unsubscribed: () => unsubscribed,
+    willComplete: () => withTimeout(promiseComplete),
+    willError: () => withTimeout(promiseError),
+    willSubscribe: () => withTimeout(promiseSubscribe),
+    willUnsubscribe: () => withTimeout(promiseUnsubscribe),
     tap: () =>
       tap({
-        complete: () => void (completed = true),
-        error: () => void (error = true),
-        next: () => void count++,
-        subscribe: () => void (subscribed = true),
-        unsubscribe: () => void (unsubscribed = true),
+        complete,
+        error,
+        subscribe,
+        unsubscribe,
       }),
   };
 }

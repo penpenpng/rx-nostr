@@ -99,21 +99,34 @@ export interface RxReqPipeable {
   ): RxReq;
 }
 
-/** Start new REQ on the RxNostr with witch the RxReq is associated. */
 export type RxReqEmittable<O = void> = O extends void
   ? {
+      /** Start new REQ on the RxNostr with which the RxReq is associated. */
       emit(filters: LazyFilter | LazyFilter[]): void;
     }
   : {
+      /** Start new REQ on the RxNostr with which the RxReq is associated. */
       emit(filters: LazyFilter | LazyFilter[], options?: O): void;
     };
+
+/**
+ * Notify RxNostr that it does not intend to send any more REQs.
+ * The Observable that returned by `use()` is complete
+ * when all REQs that have already been sent have been completed.
+ */
+export interface RxReqOverable {
+  over(): void;
+}
 
 const createRxReq = <S extends RxReqStrategy>(params: {
   strategy: S;
   rxReqId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   operators?: OperatorFunction<any, any>[];
-}): RxReq<S> & RxReqEmittable<{ relays: string[] }> & RxReqPipeable => {
+}): RxReq<S> &
+  RxReqEmittable<{ relays: string[] }> &
+  RxReqOverable &
+  RxReqPipeable => {
   const { strategy } = params;
   const _operators = params.operators ?? [];
   const rxReqId = params.rxReqId ?? getRandomDigitsString();
@@ -137,6 +150,9 @@ const createRxReq = <S extends RxReqStrategy>(params: {
     emit(filters: LazyFilter | LazyFilter[], options?: { relays: string[] }) {
       filters$.next({ filters: normalizeFilters(filters), ...(options ?? {}) });
     },
+    over() {
+      filters$.complete();
+    },
   };
 };
 
@@ -153,7 +169,10 @@ const createRxReq = <S extends RxReqStrategy>(params: {
  */
 export function createRxBackwardReq(
   rxReqId?: string
-): RxReq<"backward"> & RxReqEmittable<{ relays: string[] }> & RxReqPipeable {
+): RxReq<"backward"> &
+  RxReqEmittable<{ relays: string[] }> &
+  RxReqOverable &
+  RxReqPipeable {
   return createRxReq({
     strategy: "backward",
     rxReqId,
