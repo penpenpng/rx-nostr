@@ -13,8 +13,15 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
   /** @internal User should not use this directly. Used to construct subId. */
   rxReqId: string;
   /** @internal User should not use this directly. Get an Observable of ReqPacket. */
-  getReqObservable(): Observable<ReqPacket>;
+  getReqPacketObservable(): Observable<ReqPacket>;
 }
+
+/**
+ * @deprecated
+ *
+ * The RxReq interface that is provided for users (not for RxNostr).
+ */
+export type RxReqController = RxReqPipeable & RxReqEmittable<RxReqStrategy>;
 
 /**
  * REQ strategy.
@@ -22,13 +29,6 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
  * See comments on `createRxForwardReq()`, `createRxBackwardReq()` and `createRxOneshotReq()
  */
 export type RxReqStrategy = "forward" | "backward";
-
-/**
- * @deprecated
- *
- * The RxReq interface that is provided for users (not for RxNostr).
- */
-export type RxReqController = RxReqPipeable & RxReqEmittable;
 
 export interface RxReqPipeable {
   /**
@@ -99,35 +99,43 @@ export interface RxReqPipeable {
   ): RxReq;
 }
 
-export interface RxReqEmittable {
-  /** Start new REQ on the RxNostr with witch the RxReq is associated. */
-  emit(filters: LazyFilter | LazyFilter[]): void;
-}
+/** Start new REQ on the RxNostr with witch the RxReq is associated. */
+export type RxReqEmittable<O = void> = O extends void
+  ? {
+      emit(filters: LazyFilter | LazyFilter[]): void;
+    }
+  : {
+      emit(filters: LazyFilter | LazyFilter[], options?: O): void;
+    };
 
 const createRxReq = <S extends RxReqStrategy>(params: {
   strategy: S;
-  rxReqId: string;
+  rxReqId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  operators: OperatorFunction<any, any>[];
-}): RxReq<S> & RxReqPipeable & RxReqEmittable => {
-  const { strategy, rxReqId } = params;
+  operators?: OperatorFunction<any, any>[];
+}): RxReq<S> & RxReqEmittable<{ relays: string[] }> & RxReqPipeable => {
+  const { strategy } = params;
+  const _operators = params.operators ?? [];
+  const rxReqId = params.rxReqId ?? getRandomDigitsString();
+
   const filters$ = new Subject<ReqPacket>();
 
   return {
     strategy,
     rxReqId,
-    getReqObservable(): Observable<ReqPacket> {
-      return filters$.pipe(...(params.operators as []));
+    getReqPacketObservable(): Observable<ReqPacket> {
+      return filters$.pipe(...(_operators as []));
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     pipe(...operators: OperatorFunction<any, any>[]): RxReq {
       return createRxReq({
-        ...params,
-        operators: [...params.operators, ...operators],
+        strategy,
+        rxReqId,
+        operators: [..._operators, ...operators],
       });
     },
-    emit(filters: LazyFilter | LazyFilter[]) {
-      filters$.next(normalizeFilters(filters));
+    emit(filters: LazyFilter | LazyFilter[], options?: { relays: string[] }) {
+      filters$.next({ filters: normalizeFilters(filters), ...(options ?? {}) });
     },
   };
 };
@@ -145,11 +153,10 @@ const createRxReq = <S extends RxReqStrategy>(params: {
  */
 export function createRxBackwardReq(
   rxReqId?: string
-): RxReq<"backward"> & RxReqPipeable & RxReqEmittable {
+): RxReq<"backward"> & RxReqEmittable<{ relays: string[] }> & RxReqPipeable {
   return createRxReq({
     strategy: "backward",
-    rxReqId: rxReqId ?? getRandomDigitsString(),
-    operators: [],
+    rxReqId,
   });
 }
 
@@ -167,11 +174,10 @@ export function createRxBackwardReq(
  */
 export function createRxForwardReq(
   rxReqId?: string
-): RxReq<"forward"> & RxReqPipeable & RxReqEmittable {
+): RxReq<"forward"> & RxReqEmittable & RxReqPipeable {
   return createRxReq({
     strategy: "forward",
-    rxReqId: rxReqId ?? getRandomDigitsString(),
-    operators: [],
+    rxReqId,
   });
 }
 
@@ -191,7 +197,8 @@ export function createRxOneshotReq(params: {
   return {
     strategy: "backward",
     rxReqId: params.rxReqId ?? params.subId ?? getRandomDigitsString(),
-    getReqObservable: () => of(normalizeFilters(params.filters)),
+    getReqPacketObservable: () =>
+      of({ filters: normalizeFilters(params.filters) }),
   };
 }
 
@@ -264,21 +271,11 @@ function normalizeFilter(filter: LazyFilter): LazyFilter | null {
     return null;
   }
 
-  if (Object.keys(res).length <= 0) {
-    return null;
-  }
-
   return res;
 }
 
-function normalizeFilters(
-  filters: LazyFilter | LazyFilter[]
-): LazyFilter[] | null {
-  if (!filters) {
-    return null;
-  }
-  const normalized = (Array.isArray(filters) ? filters : [filters]).flatMap(
-    (e) => normalizeFilter(e) ?? []
-  );
-  return normalized.length > 0 ? normalized : null;
+function normalizeFilters(filters: LazyFilter | LazyFilter[]): LazyFilter[] {
+  return (Array.isArray(filters) ? filters : [filters])
+    .map((e) => normalizeFilter(e))
+    .filter((e): e is LazyFilter => e !== null);
 }

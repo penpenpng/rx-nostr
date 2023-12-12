@@ -32,11 +32,11 @@ import type {
   EosePacket,
   ErrorPacket,
   EventPacket,
-  LazyFilter,
   LazyREQ,
   MessagePacket,
   OkPacket,
   OutgoingMessagePacket,
+  ReqPacket,
 } from "../packet.js";
 import type { RxReq } from "../rx-req.js";
 import { subtract, UrlMap } from "../utils.js";
@@ -275,19 +275,42 @@ class RxNostrImpl implements RxNostr {
     rxReq: RxReq,
     options?: Partial<RxNostrUseOptions>
   ): Observable<EventPacket> {
-    const { relays } = makeRxNostrUseOptions(options);
+    const { relays: useScopeRelays } = makeRxNostrUseOptions(options);
 
-    let mode: REQMode;
-    let targetConnections: NostrConnection[];
-    if (relays === undefined) {
-      mode = "weak";
-      targetConnections = this.defaultReadables;
-    } else {
-      mode = "normal";
-      targetConnections = relays.map((url) => this.ensureNostrConnection(url));
+    interface OrderPacket {
+      subId: string;
+      req: LazyREQ;
+      targetConnections: NostrConnection[];
+      mode: REQMode;
     }
 
-    const startSubscription = (req: LazyREQ) => {
+    const makeOrderPacket = (
+      { filters, relays }: ReqPacket,
+      index: number
+    ): OrderPacket => {
+      const emitScopeRelays =
+        rxReq.strategy === "backward" ? relays : undefined;
+      const req = makeLazyREQ({ rxReq, filters, index });
+      const subId = req[1];
+
+      return {
+        subId,
+        req,
+        targetConnections:
+          (emitScopeRelays ?? useScopeRelays)?.map((url) =>
+            this.ensureNostrConnection(url)
+          ) ?? this.defaultReadables,
+        mode:
+          emitScopeRelays === undefined && useScopeRelays === undefined
+            ? "weak"
+            : "normal",
+      };
+    };
+    const startSubscription = ({
+      req,
+      targetConnections,
+      mode,
+    }: OrderPacket) => {
       this.startSubscription({
         req,
         targetConnections,
@@ -296,14 +319,18 @@ class RxNostrImpl implements RxNostr {
         autoclose: rxReq.strategy === "backward",
       });
     };
-    const teardownSubscription = (subId: string) => {
+    const teardownSubscription = ({
+      subId,
+      targetConnections,
+      mode,
+    }: OrderPacket) => {
       this.teardownSubscription({
         subId,
         targetConnections,
         mode,
       });
     };
-    const createEventObservable = (req: LazyREQ) => {
+    const createEventObservable = ({ req, targetConnections }: OrderPacket) => {
       if (rxReq.strategy === "forward") {
         return this.createForwardEventObservable({
           req,
@@ -316,34 +343,37 @@ class RxNostrImpl implements RxNostr {
       }
     };
 
-    const req$ = rxReq.getReqObservable().pipe(
-      filter((filters): filters is LazyFilter[] => filters !== null),
-      map((filters, index) => makeLazyREQ({ rxReq, filters, index })),
+    const order$ = rxReq.getReqPacketObservable().pipe(
+      filter(({ filters }) => filters.length > 0),
+      map(makeOrderPacket),
       takeUntil(this.dispose$)
     );
 
     if (rxReq.strategy === "forward") {
-      const subId = makeSubId({
-        rxReq,
-        index: 0,
-      });
+      let firstOrder: OrderPacket | undefined;
 
-      return req$.pipe(
+      return order$.pipe(
+        tap((order) => {
+          firstOrder = order;
+        }),
         tap(startSubscription),
         map(createEventObservable),
         finalize(() => {
-          teardownSubscription(subId);
+          if (!firstOrder) {
+            return;
+          }
+          // Because subId, targetConnections and mode keeps their value under forward strategy
+          teardownSubscription(firstOrder);
         }),
         switchAll()
       );
     } else {
-      return req$.pipe(
+      return order$.pipe(
         tap(startSubscription),
-        map((req) =>
-          createEventObservable(req).pipe(
+        map((order) =>
+          createEventObservable(order).pipe(
             finalize(() => {
-              const subId = req[1];
-              teardownSubscription(subId);
+              teardownSubscription(order);
             })
           )
         ),
