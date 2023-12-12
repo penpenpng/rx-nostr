@@ -1,5 +1,5 @@
 import type { LazyFilter, LazyREQ } from "../packet.js";
-import type { RxReq } from "../req.js";
+import type { RxReq } from "../rx-req.js";
 import type {
   AcceptableDefaultRelaysConfig,
   DefaultRelayConfig,
