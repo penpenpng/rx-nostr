@@ -16,7 +16,6 @@ export { isExpired } from "./nostr/nip40.js";
 export * from "./operator.js";
 export * from "./packet.js";
 export * from "./rx-nostr/index.js";
-export * from "./rx-req.js";
 
 export function now(): number {
   return Math.floor(Date.now() / 1000);

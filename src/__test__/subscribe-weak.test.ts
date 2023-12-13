@@ -184,8 +184,6 @@ describe("Under a single relay", () => {
 
     req.over();
     relay.emitEOSE("sub:0");
-
-    relay.emitEOSE("sub:0");
     await expect(spy.willComplete()).resolves.toBe(true);
   });
 

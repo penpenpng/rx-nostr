@@ -10,8 +10,8 @@ import type {
   OkPacket,
   OutgoingMessagePacket,
 } from "../packet.js";
-import type { RxReq } from "../rx-req.js";
 import { defineDefault } from "../utils.js";
+import type { RxReq } from "./rx-req.js";
 
 /**
  * The core object of rx-nostr, which holds a connection to relays

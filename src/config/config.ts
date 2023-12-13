@@ -1,4 +1,4 @@
-import { defineDefault } from "./utils.js";
+import { defineDefault } from "../utils.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   keepAliveDefaultRelayConnections: false,
