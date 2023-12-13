@@ -11,7 +11,7 @@ import {
   timer,
 } from "rxjs";
 
-import type { RetryConfig, RxNostrConfig } from "../config.js";
+import type { RetryConfig, RxNostrConfig } from "../config/index.js";
 import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
 import {

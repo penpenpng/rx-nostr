@@ -1,7 +1,7 @@
 import Nostr from "nostr-typedef";
 import { combineLatest, map, Observable } from "rxjs";
 
-import type { RxNostrConfig } from "../config.js";
+import type { RxNostrConfig } from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
   ClosedPacket,

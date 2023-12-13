@@ -1,7 +1,7 @@
 import Nostr from "nostr-typedef";
 import { filter, Observable, Subject } from "rxjs";
 
-import type { RxNostrConfig } from "../config.js";
+import type { RxNostrConfig } from "../config/index.js";
 import { evalFilters } from "../lazy-filter.js";
 import { Nip11Registry } from "../nip11.js";
 import { verify } from "../nostr/event.js";

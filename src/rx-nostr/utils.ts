@@ -1,9 +1,9 @@
 import type { LazyFilter, LazyREQ } from "../packet.js";
-import type { RxReq } from "../rx-req.js";
 import type {
   AcceptableDefaultRelaysConfig,
   DefaultRelayConfig,
 } from "./interface.js";
+import type { RxReq } from "./rx-req.js";
 
 export function makeSubId(params: { rxReq: RxReq; index: number }): string {
   const { rxReq, index } = params;

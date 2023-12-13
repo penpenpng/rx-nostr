@@ -16,7 +16,7 @@ import {
   timeout,
 } from "rxjs";
 
-import { makeRxNostrConfig, type RxNostrConfig } from "../config.js";
+import { makeRxNostrConfig, type RxNostrConfig } from "../config/index.js";
 import { NostrConnection, type REQMode } from "../connection/index.js";
 import {
   RxNostrAlreadyDisposedError,
@@ -38,7 +38,6 @@ import type {
   OutgoingMessagePacket,
   ReqPacket,
 } from "../packet.js";
-import type { RxReq } from "../rx-req.js";
 import { subtract, UrlMap } from "../utils.js";
 import {
   type AcceptableDefaultRelaysConfig,
@@ -49,6 +48,7 @@ import {
   type RxNostrSendOptions,
   type RxNostrUseOptions,
 } from "./interface.js";
+import type { RxReq } from "./rx-req.js";
 import { makeLazyREQ, normalizeRelaysConfig } from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
