@@ -1,6 +1,10 @@
 import { defineDefault } from "../utils.js";
+import { EventSigner, nip07Signer } from "./signer.js";
+import { EventVerifier, verifier } from "./verifier.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
+  signer: nip07Signer(),
+  verifier: verifier,
   keepAliveDefaultRelayConnections: false,
   retry: {
     strategy: "exponential",
@@ -19,6 +23,14 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
  * Configuration object for a RxNostr instance.
  */
 export interface RxNostrConfig {
+  /**
+   * Default signer, which is used to convert event parameters into signed event.
+   */
+  signer: EventSigner;
+  /**
+   * Default verifier, which is used to verify event's signature.
+   */
+  verifier: EventVerifier;
   /**
    * If true, default relays don't get to `"dormant"` state.
    *

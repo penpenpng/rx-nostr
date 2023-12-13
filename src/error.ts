@@ -27,6 +27,17 @@ export class RxNostrInvalidUsageError extends RxNostrError {
 }
 
 /**
+ * This is usually thrown when rx-nostr is used properly
+ * but an error occurs due to external environmental causes.
+ */
+export class RxNostrEnvironmentError extends RxNostrError {
+  constructor(message: string) {
+    super(`RxNostrEnvironmentError: ${message}`);
+    this.name = "RxNostrEnvironmentError";
+  }
+}
+
+/**
  * This is thrown only by a bug inside rx-nostr.
  *
  * Normally, you should not catch the exception.

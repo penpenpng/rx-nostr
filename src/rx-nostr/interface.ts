@@ -1,6 +1,7 @@
 import Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 
+import type { EventSigner } from "../config/signer.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -161,6 +162,8 @@ export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
 });
 
 export interface RxNostrSendOptions {
+  signer?: EventSigner;
+  /** @deprecated Use `signer` instead */
   seckey?: string;
   relays?: string[];
 }
