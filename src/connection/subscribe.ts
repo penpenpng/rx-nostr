@@ -92,7 +92,7 @@ export class SubscribeProxy {
         return (
           (this.config.skipValidateFilterMatching ||
             isFiltered(event, filters)) &&
-          (this.config.skipVerify || verify(event)) &&
+          (this.config.skipVerify || this.config.verifier(event)) &&
           (this.config.skipExpirationCheck || !isExpired(event))
         );
       })

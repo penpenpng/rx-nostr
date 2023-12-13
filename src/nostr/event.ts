@@ -22,7 +22,7 @@ export async function getSignedEvent(
     created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
 
-  if (ensureRequiredFields(params)) {
+  if (ensureEventFields(params)) {
     return params;
   } else if (seckey) {
     const id = event.id ?? getEventHash(event);
@@ -108,7 +108,7 @@ export function verify(event: Nostr.Event): boolean {
   }
 }
 
-function ensureRequiredFields(
+export function ensureEventFields(
   event: Partial<Nostr.Event>
 ): event is Nostr.Event {
   if (typeof event.id !== "string") return false;

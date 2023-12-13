@@ -16,14 +16,18 @@ import {
   timeout,
 } from "rxjs";
 
-import { makeRxNostrConfig, type RxNostrConfig } from "../config/index.js";
+import {
+  type EventSigner,
+  makeRxNostrConfig,
+  type RxNostrConfig,
+  seckeySigner,
+} from "../config/index.js";
 import { NostrConnection, type REQMode } from "../connection/index.js";
 import {
   RxNostrAlreadyDisposedError,
   RxNostrInvalidUsageError,
   RxNostrLogicError,
 } from "../error.js";
-import { getSignedEvent } from "../nostr/event.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
   ClosedPacket,
@@ -491,6 +495,10 @@ class RxNostrImpl implements RxNostr {
     options?: RxNostrSendOptions
   ): Observable<OkPacket> {
     const { seckey, relays } = makeRxNostrSendOptions(options);
+    const signer: EventSigner =
+      options?.signer ??
+      (seckey ? seckeySigner(seckey) : undefined) ??
+      this.config.signer;
 
     const targetRelays =
       relays === undefined
@@ -504,7 +512,7 @@ class RxNostrImpl implements RxNostr {
       }
     };
 
-    getSignedEvent(params, seckey)
+    signer(params)
       .then((event) => {
         if (subject.closed) {
           return;
