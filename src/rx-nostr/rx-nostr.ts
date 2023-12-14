@@ -87,7 +87,7 @@ class RxNostrImpl implements RxNostr {
     new Map();
 
   private event$ = new Subject<EventPacket>();
-  private eoseOrClose$ = new Subject<EosePacket | ClosedPacket>();
+  private eoseOrClosed$ = new Subject<EosePacket | ClosedPacket>();
   private ok$ = new Subject<OkPacket>();
   private other$ = new Subject<MessagePacket>();
 
@@ -182,7 +182,7 @@ class RxNostrImpl implements RxNostr {
   }
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
-    conn.getEoseOrClosedObservable().subscribe(this.eoseOrClose$);
+    conn.getEoseOrClosedObservable().subscribe(this.eoseOrClosed$);
     conn.getOkObservable().subscribe(this.ok$);
     conn.getOtherObservable().subscribe(this.other$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
@@ -409,14 +409,14 @@ class RxNostrImpl implements RxNostr {
           isDown(connectionState) || finishedRelays.has(url)
       );
 
-    const eoseOrClose$ = this.eoseOrClose$.pipe(
+    const eoseOrClosed$ = this.eoseOrClosed$.pipe(
       filterBySubId(subId),
       tap(({ from }) => {
         finishedRelays.add(from);
       })
     );
     const complete$ = merge(
-      eoseOrClose$,
+      eoseOrClosed$,
       this.connectionState$.asObservable()
     ).pipe(
       filter(() => shouldComplete()),
@@ -477,7 +477,7 @@ class RxNostrImpl implements RxNostr {
   createAllMessageObservable(): Observable<MessagePacket> {
     return merge(
       this.event$.asObservable(),
-      this.eoseOrClose$.asObservable(),
+      this.eoseOrClosed$.asObservable(),
       this.ok$.asObservable(),
       this.other$.asObservable()
     );
@@ -505,18 +505,26 @@ class RxNostrImpl implements RxNostr {
         ? this.defaultWritables
         : relays.map((url) => this.ensureNostrConnection(url));
     const subject = new ReplaySubject<OkPacket>(targetRelays.length);
+    let eventId = "";
 
     const teardown = () => {
       if (!subject.closed) {
         subject.complete();
       }
+
+      for (const conn of targetRelays) {
+        conn.confirmOK(eventId);
+      }
     };
 
-    signer(params)
+    signer
+      .signEvent(params)
       .then((event) => {
         if (subject.closed) {
           return;
         }
+
+        eventId = event.id;
 
         this.ok$
           .pipe(filter(({ eventId }) => eventId === event.id))
@@ -556,7 +564,7 @@ class RxNostrImpl implements RxNostr {
     const subjects = [
       this.event$,
       this.ok$,
-      this.eoseOrClose$,
+      this.eoseOrClosed$,
       this.other$,
       this.connectionState$,
       this.error$,
