@@ -22,6 +22,11 @@ export class PublishProxy {
         }
       }
     });
+
+    // Mark as closed
+    this.relay.getOKObservable().subscribe(({ eventId }) => {
+      this.confirmOK(eventId);
+    });
   }
 
   publish(event: Nostr.Event<number>): void {
