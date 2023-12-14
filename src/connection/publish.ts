@@ -1,15 +1,23 @@
 import Nostr from "nostr-typedef";
-import { Observable } from "rxjs";
+import { Observable, Subject } from "rxjs";
 
+import { OkPacket, OkPacketAgainstEvent } from "../packet.js";
+import { AuthProxy } from "./auth.js";
 import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
 
 export class PublishProxy {
-  private pubs: Set<string> = new Set();
+  private pubs = new Map<string, Nostr.Event>();
+  private relay: RelayConnection;
+  private authProxy: AuthProxy | null;
   private count$ = new CounterSubject(0);
+  private ok$ = new Subject<OkPacketAgainstEvent>();
   private disposed = false;
 
-  constructor(private relay: RelayConnection) {
+  constructor(params: { relay: RelayConnection; authProxy: AuthProxy | null }) {
+    this.relay = params.relay;
+    this.authProxy = params.authProxy;
+
     // Recovering
     this.relay.getReconnectedObservable().subscribe((toRelayMessage) => {
       for (const [type, event] of toRelayMessage) {
@@ -23,19 +31,53 @@ export class PublishProxy {
       }
     });
 
-    // Mark as closed
-    this.relay.getOKObservable().subscribe(({ eventId }) => {
-      this.confirmOK(eventId);
+    // Handle OKs.
+    // If auth is required and it can be done,
+    // set a flag on OkPacket and try to resend EVENT after done.
+    this.relay.getOKObservable().subscribe(async (packet) => {
+      const { eventId, notice } = packet;
+      const event = this.pubs.get(eventId);
+      if (!event) {
+        return;
+      }
+
+      if (!this.authProxy || !notice?.startsWith("auth-required:")) {
+        this.ok$.next({
+          ...packet,
+          authProgress: !this.authProxy ? "no-authenticator" : "unneeded",
+          done: true,
+        });
+        this.confirmOK(eventId);
+        return;
+      }
+
+      this.ok$.next({ ...packet, authProgress: "requesting", done: false });
+
+      let authOk: OkPacket;
+      try {
+        authOk = await this.authProxy.nextAuth();
+      } catch {
+        this.ok$.next({ ...packet, authProgress: "timeout", done: true });
+        this.confirmOK(eventId);
+        return;
+      }
+
+      if (authOk.ok) {
+        this.sendEVENT(event);
+      } else {
+        this.ok$.next({ ...packet, authProgress: "failed", done: true });
+        this.confirmOK(eventId);
+      }
     });
   }
 
-  publish(event: Nostr.Event<number>): void {
+  publish(event: Nostr.Event): void {
     if (this.disposed) {
       return;
     }
 
     if (!this.pubs.has(event.id)) {
-      this.pubs.add(event.id);
+      this.pubs.set(event.id, event);
       this.count$.increment();
     }
 
@@ -53,6 +95,10 @@ export class PublishProxy {
     }
   }
 
+  getOkAgainstEventObservable(): Observable<OkPacketAgainstEvent> {
+    return this.ok$.asObservable();
+  }
+
   getLogicalConnectionSizeObservable(): Observable<number> {
     return this.count$.asObservable();
   }
@@ -66,6 +112,8 @@ export class PublishProxy {
 
     this.count$.complete();
     this.count$.unsubscribe();
+    this.ok$.complete();
+    this.ok$.unsubscribe();
   }
 
   private sendEVENT(event: Nostr.Event) {

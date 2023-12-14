@@ -8,7 +8,7 @@ import type {
   ErrorPacket,
   EventPacket,
   MessagePacket,
-  OkPacket,
+  OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
 import { defineDefault } from "../utils.js";
@@ -138,7 +138,7 @@ export interface RxNostr {
   send(
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions
-  ): Observable<OkPacket>;
+  ): Observable<OkPacketAgainstEvent>;
 
   /**
    * Release all resources held by the RxNostr object.

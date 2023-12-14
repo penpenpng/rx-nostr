@@ -7,11 +7,10 @@ import {
   merge,
   mergeAll,
   Observable,
-  ReplaySubject,
   Subject,
   switchAll,
-  take,
   takeUntil,
+  takeWhile,
   tap,
   timeout,
 } from "rxjs";
@@ -39,6 +38,7 @@ import type {
   LazyREQ,
   MessagePacket,
   OkPacket,
+  OkPacketAgainstEvent,
   OutgoingMessagePacket,
   ReqPacket,
 } from "../packet.js";
@@ -88,8 +88,8 @@ class RxNostrImpl implements RxNostr {
 
   private event$ = new Subject<EventPacket>();
   private eoseOrClosed$ = new Subject<EosePacket | ClosedPacket>();
-  private ok$ = new Subject<OkPacket>();
-  private other$ = new Subject<MessagePacket>();
+  private ok$ = new Subject<OkPacketAgainstEvent>();
+  private all$ = new Subject<MessagePacket>();
 
   private error$ = new Subject<ErrorPacket>();
   private connectionState$ = new Subject<ConnectionStatePacket>();
@@ -183,8 +183,8 @@ class RxNostrImpl implements RxNostr {
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
     conn.getEoseOrClosedObservable().subscribe(this.eoseOrClosed$);
-    conn.getOkObservable().subscribe(this.ok$);
-    conn.getOtherObservable().subscribe(this.other$);
+    conn.getOkAgainstEventObservable().subscribe(this.ok$);
+    conn.getAllMessageObservable().subscribe(this.all$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
     conn.getErrorObservable().subscribe(this.error$);
     conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
@@ -475,12 +475,7 @@ class RxNostrImpl implements RxNostr {
     return this.error$.asObservable();
   }
   createAllMessageObservable(): Observable<MessagePacket> {
-    return merge(
-      this.event$.asObservable(),
-      this.eoseOrClosed$.asObservable(),
-      this.ok$.asObservable(),
-      this.other$.asObservable()
-    );
+    return this.all$.asObservable();
   }
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
     return this.connectionState$.asObservable();
@@ -493,7 +488,7 @@ class RxNostrImpl implements RxNostr {
   send(
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions
-  ): Observable<OkPacket> {
+  ): Observable<OkPacketAgainstEvent> {
     const { seckey, relays } = makeRxNostrSendOptions(options);
     const signer: EventSigner =
       options?.signer ??
@@ -504,7 +499,8 @@ class RxNostrImpl implements RxNostr {
       relays === undefined
         ? this.defaultWritables
         : relays.map((url) => this.ensureNostrConnection(url));
-    const subject = new ReplaySubject<OkPacket>(targetRelays.length);
+    const subject = new Subject<OkPacketAgainstEvent>();
+    const finishedRelays = new Set<string>();
     let eventId = "";
 
     const teardown = () => {
@@ -543,7 +539,12 @@ class RxNostrImpl implements RxNostr {
       });
 
     return subject.pipe(
-      take(targetRelays.length),
+      takeWhile(({ from, done }) => {
+        if (done) {
+          finishedRelays.add(from);
+        }
+        return finishedRelays.size < targetRelays.length;
+      }, true),
       takeUntil(this.dispose$),
       timeout(this.config.okTimeout),
       finalize(teardown)
@@ -565,7 +566,7 @@ class RxNostrImpl implements RxNostr {
       this.event$,
       this.ok$,
       this.eoseOrClosed$,
-      this.other$,
+      this.all$,
       this.connectionState$,
       this.error$,
       this.outgoing$,

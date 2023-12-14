@@ -15,6 +15,7 @@ import type { RetryConfig, RxNostrConfig } from "../config/index.js";
 import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
 import {
+  AuthPacket,
   ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
@@ -26,6 +27,8 @@ import {
 } from "../packet.js";
 
 export class RelayConnection {
+  public onConnected?: () => void;
+
   private socket: WebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
@@ -94,6 +97,7 @@ export class RelayConnection {
       }
 
       this.setState("connected");
+      this.onConnected?.();
 
       if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
@@ -306,16 +310,13 @@ export class RelayConnection {
   getOKObservable(): Observable<OkPacket> {
     return this.message$.pipe(filter((p): p is OkPacket => p.type === "OK"));
   }
-  getOtherObservable(): Observable<MessagePacket> {
+  getAUTHObservable(): Observable<AuthPacket> {
     return this.message$.pipe(
-      filter(
-        (p) =>
-          p.type !== "EVENT" &&
-          p.type !== "EOSE" &&
-          p.type !== "OK" &&
-          p.type !== "CLOSED"
-      )
+      filter((p): p is AuthPacket => p.type === "AUTH")
     );
+  }
+  getAllMessageObservable(): Observable<MessagePacket> {
+    return this.message$.asObservable();
   }
 
   getOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
