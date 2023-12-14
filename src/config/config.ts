@@ -1,10 +1,12 @@
 import { defineDefault } from "../utils.js";
+import { Authenticator } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
 import { EventVerifier, verifier } from "./verifier.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   signer: nip07Signer(),
   verifier: verifier,
+  authenticator: undefined,
   keepAliveDefaultRelayConnections: false,
   retry: {
     strategy: "exponential",
@@ -13,6 +15,7 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   },
   eoseTimeout: 30 * 1000,
   okTimeout: 30 * 1000,
+  authTimeout: 30 * 1000,
   skipVerify: false,
   skipValidateFilterMatching: false,
   skipFetchNip11: false,
@@ -31,6 +34,7 @@ export interface RxNostrConfig {
    * Default verifier, which is used to verify event's signature.
    */
   verifier: EventVerifier;
+  authenticator: Authenticator | ((relay: string) => Authenticator) | undefined;
   /**
    * If true, default relays don't get to `"dormant"` state.
    *
@@ -60,6 +64,7 @@ export interface RxNostrConfig {
    * rx-nostr stops listening OK and the Observable come from `send()` finishes with TimeoutError.
    */
   okTimeout: number;
+  authTimeout: number;
   /**
    * If true, skip filtering EVENTs based on signature verification.
    */

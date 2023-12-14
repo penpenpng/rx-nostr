@@ -74,6 +74,18 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
   notice?: string;
 }
 
+export interface OkPacketAgainstEvent extends OkPacket {
+  done: boolean;
+  authProgress: AuthProgressOnSending;
+}
+
+export type AuthProgressOnSending =
+  | "requesting"
+  | "timeout"
+  | "failed"
+  | "no-authenticator"
+  | "unneeded";
+
 export interface NoticePacket extends MessagePacketBase<"NOTICE"> {
   notice: string;
 }

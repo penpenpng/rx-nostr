@@ -1,7 +1,7 @@
 import Nostr from "nostr-typedef";
 import { combineLatest, map, Observable } from "rxjs";
 
-import type { RxNostrConfig } from "../config/index.js";
+import type { Authenticator, RxNostrConfig } from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
   ClosedPacket,
@@ -12,10 +12,11 @@ import {
   EventPacket,
   LazyREQ,
   MessagePacket,
-  OkPacket,
+  OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
 import { defineDefault, normalizeRelayUrl } from "../utils.js";
+import { AuthProxy } from "./auth.js";
 import { PublishProxy } from "./publish.js";
 import { RelayConnection, WebSocketCloseCode } from "./relay.js";
 import { SubscribeProxy } from "./subscribe.js";
@@ -40,6 +41,7 @@ const makeSubscribeOptions = defineDefault<SubscribeOptions>({
 
 export class NostrConnection {
   private relay: RelayConnection;
+  private authProxy: AuthProxy | null;
   private pubProxy: PublishProxy;
   private subProxy: SubscribeProxy;
   private weakSubscriptionIds: Set<string> = new Set();
@@ -55,9 +57,18 @@ export class NostrConnection {
 
   constructor(url: string, config: RxNostrConfig) {
     this._url = normalizeRelayUrl(url);
-    this.relay = new RelayConnection(this.url, config);
-    this.pubProxy = new PublishProxy(this.relay);
-    this.subProxy = new SubscribeProxy(this.relay, config);
+    const authenticator = getAuthenticator(url, config);
+
+    const relay = new RelayConnection(this.url, config);
+    const authProxy = authenticator
+      ? new AuthProxy({ relay, config, authenticator })
+      : null;
+    const pubProxy = new PublishProxy({ relay, authProxy });
+    const subProxy = new SubscribeProxy({ relay, authProxy, config });
+    this.relay = relay;
+    this.authProxy = authProxy;
+    this.pubProxy = pubProxy;
+    this.subProxy = subProxy;
 
     // Idling cold sockets
     combineLatest([
@@ -157,19 +168,19 @@ export class NostrConnection {
 
     return this.relay.getEOSEObservable();
   }
-  getOkObservable(): Observable<OkPacket> {
+  getOkAgainstEventObservable(): Observable<OkPacketAgainstEvent> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getOKObservable();
+    return this.pubProxy.getOkAgainstEventObservable();
   }
-  getOtherObservable(): Observable<MessagePacket> {
+  getAllMessageObservable(): Observable<MessagePacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getOtherObservable();
+    return this.relay.getAllMessageObservable();
   }
 
   getOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
@@ -220,3 +231,8 @@ export class NostrConnection {
     this.subProxy.dispose();
   }
 }
+
+function getAuthenticator(
+  url: string,
+  config: RxNostrConfig
+): Authenticator | undefined {}
