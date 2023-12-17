@@ -111,6 +111,7 @@ export function spySubscription(): {
   willError: () => Promise<boolean>;
   willSubscribe: () => Promise<boolean>;
   willUnsubscribe: () => Promise<boolean>;
+  getLastValue: () => unknown;
   tap: <T>() => MonoTypeOperatorFunction<T>;
 } {
   const timeout = (time: number): Promise<void> =>
@@ -138,14 +139,19 @@ export function spySubscription(): {
   const promiseUnsubscribe = new Promise<void>((resolve) => {
     unsubscribe = resolve;
   });
+  let lastValue: unknown;
 
   return {
     willComplete: () => withTimeout(promiseComplete),
     willError: () => withTimeout(promiseError),
     willSubscribe: () => withTimeout(promiseSubscribe),
     willUnsubscribe: () => withTimeout(promiseUnsubscribe),
+    getLastValue: () => lastValue,
     tap: () =>
       tap({
+        next: (v) => {
+          lastValue = v;
+        },
         complete,
         error,
         subscribe,
