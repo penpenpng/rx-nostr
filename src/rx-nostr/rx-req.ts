@@ -123,6 +123,7 @@ const createRxReq = <S extends RxReqStrategy>(params: {
   rxReqId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   operators?: OperatorFunction<any, any>[];
+  subject?: Subject<ReqPacket>;
 }): RxReq<S> &
   RxReqEmittable<{ relays: string[] }> &
   RxReqOverable &
@@ -131,7 +132,7 @@ const createRxReq = <S extends RxReqStrategy>(params: {
   const _operators = params.operators ?? [];
   const rxReqId = params.rxReqId ?? getRandomDigitsString();
 
-  const filters$ = new Subject<ReqPacket>();
+  const filters$ = params.subject ?? new Subject<ReqPacket>();
 
   return {
     strategy,
@@ -145,6 +146,7 @@ const createRxReq = <S extends RxReqStrategy>(params: {
         strategy,
         rxReqId,
         operators: [..._operators, ...operators],
+        subject: filters$,
       });
     },
     emit(filters: LazyFilter | LazyFilter[], options?: { relays: string[] }) {
