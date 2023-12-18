@@ -336,12 +336,12 @@ class RxNostrImpl implements RxNostr {
       if (rxReq.strategy === "forward") {
         return this.createForwardEventObservable({
           req,
-        });
+        }).pipe(takeUntil(this.dispose$));
       } else {
         return this.createBackwardEventObservable({
           req,
           targetConnections,
-        });
+        }).pipe(takeUntil(this.dispose$));
       }
     };
 
