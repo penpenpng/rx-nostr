@@ -28,7 +28,7 @@ export class AuthProxy {
     this.authenticator = params.authenticator;
 
     this.pubkey
-      .then((pubkey) => this.authenticator.store.get?.(pubkey, this.relay.url))
+      .then((pubkey) => this.authenticator.store?.get?.(pubkey, this.relay.url))
       .then((challenge) => {
         if (challenge) {
           this.updateChallenge(challenge);
@@ -91,7 +91,7 @@ export class AuthProxy {
     };
     this.challenge$.next(challengeMessage);
 
-    this.authenticator.store.save?.(
+    this.authenticator.store?.save?.(
       await this.pubkey,
       this.relay.url,
       challengeMessage

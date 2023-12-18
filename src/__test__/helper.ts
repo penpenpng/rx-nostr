@@ -10,6 +10,7 @@ import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { createClientSpy, faker as _faker, type MockRelay } from "vitest-nostr";
 
+import { ChallengeStore, EventSigner, EventVerifier } from "../config/index.js";
 import { WebSocketCloseCode } from "../connection/relay.js";
 import { ConnectionState, EventPacket, MessagePacket } from "../packet.js";
 import { RxNostr } from "../rx-nostr/index.js";
@@ -231,4 +232,68 @@ export async function stateWillBe(
   } catch (err) {
     return false;
   }
+}
+
+const fakeSig = "__fake_sig__";
+
+export function fakeSigner(idPrefix?: string): EventSigner {
+  let count = -1;
+
+  return {
+    async signEvent(params) {
+      count++;
+
+      return {
+        id: `${idPrefix ?? "id"}:${count}`,
+        sig: fakeSig,
+        kind: params.kind,
+        tags: params.tags ?? [],
+        pubkey: params.pubkey ?? "*",
+        content: params.content,
+        created_at: params.created_at ?? 0,
+      };
+    },
+    async getPublicKey() {
+      return "*";
+    },
+  };
+}
+
+export function fakeVerifier(): EventVerifier {
+  return (params) => params.sig === fakeSig;
+}
+
+export interface ChallengeStoreMock extends ChallengeStore {
+  getLastChallenge: () => string | undefined;
+}
+
+export function challengeStoreMock(initial?: string): ChallengeStoreMock {
+  let lastChallenge: string | undefined = initial;
+
+  return {
+    async get() {
+      return lastChallenge;
+    },
+    save(_pubkey, _relay, challenge) {
+      lastChallenge = challenge;
+    },
+    getLastChallenge() {
+      return lastChallenge;
+    },
+  };
+}
+
+export function expectedChallengeEvent(
+  id: string,
+  relay: string,
+  challenge: string
+): Partial<Nostr.Event<Nostr.Kind.ClientAuthentication>> {
+  return {
+    id,
+    kind: 22242,
+    tags: [
+      ["relay", relay],
+      ["challenge", challenge],
+    ],
+  };
 }
