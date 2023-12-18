@@ -1,8 +1,8 @@
 import { EventSigner } from "./signer.js";
 
 export interface Authenticator {
-  store: ChallengeStore;
   strategy: AuthStrategy;
+  store?: ChallengeStore;
   signer?: EventSigner;
 }
 
@@ -14,13 +14,6 @@ export interface ChallengeStore {
 }
 
 export function localStorageChallengeStore(): ChallengeStore {
-  return {
-    get() {},
-    save() {},
-  };
-}
-
-export function inmemoryChallengeStore(): ChallengeStore {
   return {
     get() {},
     save() {},
