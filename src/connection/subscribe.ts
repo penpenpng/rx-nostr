@@ -6,20 +6,38 @@ import { evalFilters } from "../lazy-filter.js";
 import { Nip11Registry } from "../nip11.js";
 import { isFiltered } from "../nostr/filter.js";
 import { isExpired } from "../nostr/nip40.js";
-import { EventPacket, LazyREQ } from "../packet.js";
+import { EventPacket, LazyREQ, OkPacket } from "../packet.js";
+import { AuthProxy } from "./auth.js";
 import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
+
+export interface FinPacket {
+  from: string;
+  subId: string;
+}
 
 export class SubscribeProxy {
   // maxSubscriptions: number | null = undefined;
   // maxFilters: number | null;
   // maxLimit: number | null;
+  private relay: RelayConnection;
+  private authProxy: AuthProxy | null;
+  private config: RxNostrConfig;
   private subs = new Map<string, SubRecord>();
+  private fin$ = new Subject<FinPacket>();
   private disposed = false;
   private queue: SubQueue;
 
-  constructor(private relay: RelayConnection, private config: RxNostrConfig) {
-    this.queue = new SubQueue(relay.url, config);
+  constructor(params: {
+    relay: RelayConnection;
+    authProxy: AuthProxy | null;
+    config: RxNostrConfig;
+  }) {
+    this.relay = params.relay;
+    this.authProxy = params.authProxy;
+    this.config = params.config;
+
+    this.queue = new SubQueue(this.relay.url, this.config);
 
     // Dequeuing
     this.queue.getActivationObservable().subscribe((activated) => {
@@ -43,9 +61,31 @@ export class SubscribeProxy {
     });
 
     // Mark as closed
-    this.relay.getCLOSEDObservable().subscribe(({ subId }) => {
-      this.subs.delete(subId);
-      this.queue.drop(subId);
+    this.relay.getCLOSEDObservable().subscribe(async ({ subId, notice }) => {
+      const sub = this.subs.get(subId);
+      if (!sub) {
+        return;
+      }
+
+      if (!this.authProxy || !notice?.startsWith("auth-required:")) {
+        this.fin(subId);
+        return;
+      }
+
+      let authResult: OkPacket;
+      try {
+        authResult = await this.authProxy.nextAuth();
+      } catch {
+        this.fin(subId);
+        return;
+      }
+
+      const req = this.subs.get(subId)?.req;
+      if (authResult.ok && req) {
+        this.sendREQ(req);
+      } else {
+        this.fin(subId);
+      }
     });
   }
 
@@ -72,12 +112,11 @@ export class SubscribeProxy {
     if (this.subs.has(subId)) {
       this.sendCLOSE(subId);
     }
-    this.subs.delete(subId);
-    this.queue.drop(subId);
+    this.fin(subId);
   }
 
   isOngoingOrQueued(subId: string): boolean {
-    return this.queue.has(subId);
+    return this.subs.has(subId);
   }
 
   getEventObservable(): Observable<EventPacket> {
@@ -97,6 +136,9 @@ export class SubscribeProxy {
       })
     );
   }
+  getFinObservable(): Observable<FinPacket> {
+    return this.fin$.asObservable();
+  }
   getLogicalConnectionSizeObservable(): Observable<number> {
     return this.queue.getSizeObservable();
   }
@@ -107,6 +149,11 @@ export class SubscribeProxy {
     }
 
     this.disposed = true;
+
+    const subjects = [this.fin$];
+    for (const sub of subjects) {
+      sub.complete();
+    }
 
     this.queue.dispose();
   }
@@ -123,6 +170,14 @@ export class SubscribeProxy {
   }
   private sendCLOSE(subId: string) {
     this.relay.send(["CLOSE", subId]);
+  }
+  private fin(subId: string) {
+    this.subs.delete(subId);
+    this.queue.drop(subId);
+    this.fin$.next({
+      from: this.relay.url,
+      subId,
+    });
   }
 }
 
@@ -177,12 +232,6 @@ class SubQueue {
 
     this.shift();
   }
-  has(subId: string) {
-    return (
-      !!this.ongoings.find((e) => e.subId === subId) ||
-      !!this.queuings.find((e) => e.subId === subId)
-    );
-  }
 
   getActivationObservable() {
     return this.activated$.asObservable();
@@ -193,6 +242,7 @@ class SubQueue {
 
   dispose() {
     const subjects = [this.activated$, this.count$];
+
     for (const sub of subjects) {
       sub.complete();
     }

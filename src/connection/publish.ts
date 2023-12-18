@@ -7,9 +7,9 @@ import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
 
 export class PublishProxy {
-  private pubs = new Map<string, Nostr.Event>();
   private relay: RelayConnection;
   private authProxy: AuthProxy | null;
+  private pubs = new Map<string, Nostr.Event>();
   private count$ = new CounterSubject(0);
   private ok$ = new Subject<OkPacketAgainstEvent>();
   private disposed = false;
@@ -53,16 +53,16 @@ export class PublishProxy {
 
       this.ok$.next({ ...packet, authProgress: "requesting", done: false });
 
-      let authOk: OkPacket;
+      let authResult: OkPacket;
       try {
-        authOk = await this.authProxy.nextAuth();
+        authResult = await this.authProxy.nextAuth();
       } catch {
         this.ok$.next({ ...packet, authProgress: "timeout", done: true });
         this.confirmOK(eventId);
         return;
       }
 
-      if (authOk.ok) {
+      if (authResult.ok) {
         this.sendEVENT(event);
       } else {
         this.ok$.next({ ...packet, authProgress: "failed", done: true });
@@ -110,10 +110,10 @@ export class PublishProxy {
 
     this.disposed = true;
 
-    this.count$.complete();
-    this.count$.unsubscribe();
-    this.ok$.complete();
-    this.ok$.unsubscribe();
+    const subjects = [this.count$, this.ok$];
+    for (const sub of subjects) {
+      sub.complete();
+    }
   }
 
   private sendEVENT(event: Nostr.Event) {

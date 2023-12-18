@@ -240,7 +240,7 @@ export function filterByType<T extends Nostr.ToClientMessage.Type>(
 /** @deprecated Renamed. Use `filterByType` instead. */
 export const filterType = filterByType;
 
-export function filterBySubId<P extends MessagePacket & { subId: string }>(
+export function filterBySubId<P extends { subId: string }>(
   subId: string
 ): OperatorFunction<P, P> {
   return filter((packet) => packet.subId === subId);
