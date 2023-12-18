@@ -22,6 +22,7 @@ import {
   seckeySigner,
 } from "../config/index.js";
 import { NostrConnection, type REQMode } from "../connection/index.js";
+import { FinPacket } from "../connection/index.js";
 import {
   RxNostrAlreadyDisposedError,
   RxNostrInvalidUsageError,
@@ -29,15 +30,12 @@ import {
 } from "../error.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
-  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
-  EosePacket,
   ErrorPacket,
   EventPacket,
   LazyREQ,
   MessagePacket,
-  OkPacket,
   OkPacketAgainstEvent,
   OutgoingMessagePacket,
   ReqPacket,
@@ -87,7 +85,7 @@ class RxNostrImpl implements RxNostr {
     new Map();
 
   private event$ = new Subject<EventPacket>();
-  private eoseOrClosed$ = new Subject<EosePacket | ClosedPacket>();
+  private fin$ = new Subject<FinPacket>();
   private ok$ = new Subject<OkPacketAgainstEvent>();
   private all$ = new Subject<MessagePacket>();
 
@@ -182,7 +180,7 @@ class RxNostrImpl implements RxNostr {
   }
   private attachNostrConnection(conn: NostrConnection): void {
     conn.getEventObservable().subscribe(this.event$);
-    conn.getEoseOrClosedObservable().subscribe(this.eoseOrClosed$);
+    conn.getFinObservable().subscribe(this.fin$);
     conn.getOkAgainstEventObservable().subscribe(this.ok$);
     conn.getAllMessageObservable().subscribe(this.all$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
@@ -409,16 +407,13 @@ class RxNostrImpl implements RxNostr {
           isDown(connectionState) || finishedRelays.has(url)
       );
 
-    const eoseOrClosed$ = this.eoseOrClosed$.pipe(
+    const fin$ = this.fin$.pipe(
       filterBySubId(subId),
       tap(({ from }) => {
         finishedRelays.add(from);
       })
     );
-    const complete$ = merge(
-      eoseOrClosed$,
-      this.connectionState$.asObservable()
-    ).pipe(
+    const complete$ = merge(fin$, this.connectionState$.asObservable()).pipe(
       filter(() => shouldComplete()),
       first()
     );
@@ -565,7 +560,7 @@ class RxNostrImpl implements RxNostr {
     const subjects = [
       this.event$,
       this.ok$,
-      this.eoseOrClosed$,
+      this.fin$,
       this.all$,
       this.connectionState$,
       this.error$,

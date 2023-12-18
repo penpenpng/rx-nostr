@@ -1,3 +1,4 @@
+import Nostr from "nostr-typedef";
 import { firstValueFrom, Subject, timeout } from "rxjs";
 
 import type { Authenticator, RxNostrConfig } from "../config/index.js";
@@ -9,14 +10,13 @@ export interface Authentication {
   result: OkPacket | undefined;
 }
 
-import Nostr from "nostr-typedef";
-
 export class AuthProxy {
   private relay: RelayConnection;
   private config: RxNostrConfig;
   private authenticator: Authenticator;
   private auth: Authentication | null = null;
   private challenge$ = new Subject<string>();
+  private disposed = false;
 
   constructor(params: {
     relay: RelayConnection;
@@ -100,5 +100,18 @@ export class AuthProxy {
 
   private get pubkey() {
     return (this.authenticator.signer ?? this.config.signer).getPublicKey();
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+
+    const subjects = [this.challenge$];
+    for (const sub of subjects) {
+      sub.complete();
+    }
   }
 }

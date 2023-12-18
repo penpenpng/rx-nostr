@@ -4,10 +4,8 @@ import { combineLatest, map, Observable } from "rxjs";
 import type { Authenticator, RxNostrConfig } from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
-  ClosedPacket,
   ConnectionState,
   ConnectionStatePacket,
-  EosePacket,
   ErrorPacket,
   EventPacket,
   LazyREQ,
@@ -19,7 +17,7 @@ import { defineDefault, normalizeRelayUrl } from "../utils.js";
 import { AuthProxy } from "./auth.js";
 import { PublishProxy } from "./publish.js";
 import { RelayConnection, WebSocketCloseCode } from "./relay.js";
-import { SubscribeProxy } from "./subscribe.js";
+import { FinPacket, SubscribeProxy } from "./subscribe.js";
 
 export interface SubscribeOptions {
   overwrite: boolean;
@@ -161,12 +159,12 @@ export class NostrConnection {
 
     return this.subProxy.getEventObservable();
   }
-  getEoseOrClosedObservable(): Observable<EosePacket | ClosedPacket> {
+  getFinObservable(): Observable<FinPacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.relay.getEOSEObservable();
+    return this.subProxy.getFinObservable();
   }
   getOkAgainstEventObservable(): Observable<OkPacketAgainstEvent> {
     if (this.disposed) {
