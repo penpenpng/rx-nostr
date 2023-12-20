@@ -27,7 +27,13 @@ import { evalFilters } from "./lazy-filter.js";
 import { compareEvents, verify as _verify } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { isExpired } from "./nostr/nip40.js";
-import { EventPacket, LazyFilter, MessagePacket, ReqPacket } from "./packet.js";
+import {
+  EventPacket,
+  LazyFilter,
+  MessagePacket,
+  OkPacket,
+  ReqPacket,
+} from "./packet.js";
 import { defineDefault } from "./utils.js";
 
 // --------------------- //
@@ -244,6 +250,19 @@ export function filterBySubId<P extends { subId: string }>(
   subId: string
 ): OperatorFunction<P, P> {
   return filter((packet) => packet.subId === subId);
+}
+
+// ----------------------- //
+// OkPacket operators //
+// ----------------------- //
+
+/**
+ * Only events with given kind are allowed to pass.
+ */
+export function filterByEventId<P extends OkPacket>(
+  eventId: string
+): MonoTypeOperatorFunction<P> {
+  return filter((p) => p.eventId === eventId);
 }
 
 // ------------------- //

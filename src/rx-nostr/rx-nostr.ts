@@ -30,6 +30,7 @@ import {
 } from "../error.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
+  AuthStatePacket,
   ConnectionState,
   ConnectionStatePacket,
   ErrorPacket,
@@ -46,6 +47,7 @@ import {
   type DefaultRelayConfig,
   makeRxNostrSendOptions,
   makeRxNostrUseOptions,
+  RelayStatus,
   type RxNostr,
   type RxNostrSendOptions,
   type RxNostrUseOptions,
@@ -91,6 +93,7 @@ class RxNostrImpl implements RxNostr {
 
   private error$ = new Subject<ErrorPacket>();
   private connectionState$ = new Subject<ConnectionStatePacket>();
+  private authState$ = new Subject<AuthStatePacket>();
   private outgoing$ = new Subject<OutgoingMessagePacket>();
 
   private dispose$ = new Subject<void>();
@@ -128,6 +131,24 @@ class RxNostrImpl implements RxNostr {
   /** @deprecated */
   canWriteRelay(url: string): boolean {
     return !!this.getDefaultRelay(url)?.write;
+  }
+  /** @deprecated */
+  getAllRelayState(): Record<string, ConnectionState> {
+    return Object.fromEntries(
+      Array.from(this.connections.values()).map((e) => [
+        e.url,
+        e.connectionState,
+      ])
+    );
+  }
+  /** @deprecated */
+  getRelayState(url: string): ConnectionState | undefined {
+    const conn = this.connections.get(url);
+    if (!conn) {
+      return undefined;
+    }
+
+    return conn.connectionState;
   }
   // #endregion
 
@@ -184,6 +205,7 @@ class RxNostrImpl implements RxNostr {
     conn.getOkAgainstEventObservable().subscribe(this.ok$);
     conn.getAllMessageObservable().subscribe(this.all$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
+    conn.getAuthStateObservable()?.subscribe(this.authState$);
     conn.getErrorObservable().subscribe(this.error$);
     conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
   }
@@ -229,21 +251,21 @@ class RxNostrImpl implements RxNostr {
   // #endregion
 
   // #region connection state getter
-  getAllRelayState(): Record<string, ConnectionState> {
+  getAllRelayStatus(): Record<string, RelayStatus> {
     return Object.fromEntries(
       Array.from(this.connections.values()).map((e) => [
         e.url,
-        e.connectionState,
+        { connection: e.connectionState, auth: e.authState },
       ])
     );
   }
-  getRelayState(url: string): ConnectionState | undefined {
+  getRelayStatus(url: string): RelayStatus | undefined {
     const conn = this.connections.get(url);
     if (!conn) {
       return undefined;
     }
 
-    return conn.connectionState;
+    return { connection: conn.connectionState, auth: conn.authState };
   }
   // #endregion
 
@@ -475,6 +497,9 @@ class RxNostrImpl implements RxNostr {
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
     return this.connectionState$.asObservable();
   }
+  createAuthStateObservable(): Observable<AuthStatePacket> {
+    return this.authState$.asObservable();
+  }
   createOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
     return this.outgoing$.asObservable();
   }
@@ -563,6 +588,7 @@ class RxNostrImpl implements RxNostr {
       this.fin$,
       this.all$,
       this.connectionState$,
+      this.authState$,
       this.error$,
       this.outgoing$,
     ];

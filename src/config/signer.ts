@@ -11,13 +11,17 @@ import {
 import { inlineThrow } from "../utils.js";
 
 export interface EventSigner {
-  signEvent(params: Nostr.EventParameters): Promise<Nostr.Event>;
+  signEvent<K extends number>(
+    params: Nostr.EventParameters<K>
+  ): Promise<Nostr.Event<K>>;
   getPublicKey(): Promise<string>;
 }
 
 export function nip07Signer(): EventSigner {
   return {
-    async signEvent(params) {
+    async signEvent<K extends number>(
+      params: Nostr.EventParameters<K>
+    ): Promise<Nostr.Event<K>> {
       const event = {
         ...params,
         pubkey:
