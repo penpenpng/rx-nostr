@@ -27,7 +27,7 @@ import {
 } from "../packet.js";
 
 export class RelayConnection {
-  public onConnected?: () => void;
+  public onConnected?: () => void | Promise<void>;
 
   private socket: WebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
@@ -90,14 +90,14 @@ export class RelayConnection {
       this.setState("connecting");
     }
 
-    const onopen = () => {
+    const onopen = async () => {
       if (this.state === "terminated") {
         socket.close(WebSocketCloseCode.RX_NOSTR_DISPOSED);
         return;
       }
 
       this.setState("connected");
-      this.onConnected?.();
+      await this.onConnected?.();
 
       if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
@@ -240,7 +240,7 @@ export class RelayConnection {
           from,
           type,
           message,
-          challengeMessage: message[1],
+          challenge: message[1],
         };
       case "COUNT":
         return {

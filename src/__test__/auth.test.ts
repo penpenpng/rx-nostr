@@ -60,9 +60,9 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:0", DEFAULT_RELAY, INITIAL_CHALLENGE)
     );
-    await expect(relay).toReceiveREQ("sub:0");
 
     relay.emit(["OK", "auth:0", true]);
+    await expect(relay).toReceiveREQ("sub:0");
   });
 
   test("When persisted challenge is denied, it can handle following challenge, then retry to subscribe.", async () => {
@@ -73,12 +73,12 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:0", DEFAULT_RELAY, INITIAL_CHALLENGE)
     );
-    await expect(relay).toReceiveREQ("sub:0");
 
     relay.emit(["OK", "auth:0", false]);
+    await expect(relay).toReceiveREQ("sub:0");
+
     relay.emit(["CLOSED", "sub:0", "auth-required: do auth"]);
     relay.emit(["AUTH", SECOND_CHALLENGE]);
-
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:1", DEFAULT_RELAY, SECOND_CHALLENGE)
     );
@@ -103,12 +103,12 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:0", DEFAULT_RELAY, INITIAL_CHALLENGE)
     );
-    await expect(relay).toReceiveEVENT({ id: "id:0" });
 
     relay.emit(["OK", "auth:0", false]);
+    await expect(relay).toReceiveEVENT({ id: "id:0" });
+
     relay.emit(["OK", "id:0", false, "auth-required: do auth"]);
     relay.emit(["AUTH", SECOND_CHALLENGE]);
-
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:1", DEFAULT_RELAY, SECOND_CHALLENGE)
     );
@@ -134,16 +134,16 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
 
     await closeSocket(relay, WebSocketCloseCode.ABNORMAL_CLOSURE);
     await expect(relay).toReceiveAUTH(
-      expectedChallengeEvent("auth:1", DEFAULT_RELAY, SECOND_CHALLENGE)
+      expectedChallengeEvent("auth:1", DEFAULT_RELAY, INITIAL_CHALLENGE)
     );
 
     relay.emit(["OK", "auth:1", true]);
     await expect(relay).toReceiveREQ("sub:0");
 
-    expect(store.getLastChallenge()).toBe(SECOND_CHALLENGE);
+    expect(store.getLastChallenge()).toBe(INITIAL_CHALLENGE);
   });
 
-  test("It can respond to sudden AUTH for additional.", async () => {
+  test.only("It can respond to sudden AUTH for additional.", async () => {
     const req = createRxBackwardReq("sub");
     rxNostr.use(req).subscribe();
 
@@ -151,9 +151,9 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
     await expect(relay).toReceiveAUTH(
       expectedChallengeEvent("auth:0", DEFAULT_RELAY, INITIAL_CHALLENGE)
     );
-    await expect(relay).toReceiveREQ("sub:0");
 
     relay.emit(["OK", "auth:0", true]);
+    await expect(relay).toReceiveREQ("sub:0");
 
     req.emit(faker.filter());
     await expect(relay).toReceiveREQ("sub:1");

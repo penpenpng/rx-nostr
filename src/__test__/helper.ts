@@ -93,7 +93,7 @@ export const faker = {
           from,
           type,
           message,
-          challengeMessage: message[1],
+          challenge: message[1],
         };
       case "COUNT":
         return {

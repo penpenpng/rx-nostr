@@ -91,7 +91,7 @@ export interface NoticePacket extends MessagePacketBase<"NOTICE"> {
 }
 
 export interface AuthPacket extends MessagePacketBase<"AUTH"> {
-  challengeMessage: string;
+  challenge: string;
 }
 
 export interface CountPacket extends MessagePacketBase<"COUNT"> {
@@ -143,3 +143,18 @@ export type ConnectionState =
   | "error"
   | "rejected"
   | "terminated";
+
+/**
+ * Packets emitted when auth phase is changed.
+ */
+export interface AuthStatePacket {
+  from: string;
+  state: AuthState;
+}
+
+export type AuthState =
+  | "no-challenge"
+  | "ready-for-challenge"
+  | "challenging"
+  | "succeeded"
+  | "failed";

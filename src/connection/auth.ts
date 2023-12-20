@@ -1,21 +1,56 @@
 import Nostr from "nostr-typedef";
-import { firstValueFrom, Subject, timeout } from "rxjs";
+import { first, firstValueFrom, map, Observable, Subject, timeout } from "rxjs";
 
 import type { Authenticator, RxNostrConfig } from "../config/index.js";
-import { OkPacket } from "../packet.js";
+import { AuthState, AuthStatePacket, OkPacket } from "../packet.js";
 import type { RelayConnection } from "./relay.js";
 
-export interface Authentication {
-  challenge: string;
-  result: OkPacket | undefined;
-}
+type AuthPhase =
+  | {
+      state: "no-challenge";
+    }
+  | {
+      state: "ready-for-challenge";
+      challenge: string;
+    }
+  | {
+      state: "challenging";
+      challenge: string;
+      eventId: string;
+    }
+  | {
+      state: "succeeded";
+      challenge: string;
+      eventId: string;
+      result: OkPacket;
+    }
+  | {
+      state: "failed";
+      challenge: string;
+      eventId: string;
+      result: OkPacket;
+    };
 
 export class AuthProxy {
   private relay: RelayConnection;
   private config: RxNostrConfig;
   private authenticator: Authenticator;
-  private auth: Authentication | null = null;
-  private challenge$ = new Subject<string>();
+
+  private queued = false;
+
+  private phase$ = new Subject<AuthPhase>();
+  private _phase: AuthPhase = { state: "no-challenge" };
+  private get phase(): AuthPhase {
+    return this._phase;
+  }
+  get state(): AuthState {
+    return this.phase.state;
+  }
+  private setPhase(state: AuthPhase) {
+    this._phase = state;
+    this.phase$.next(state);
+  }
+
   private disposed = false;
 
   constructor(params: {
@@ -27,79 +62,139 @@ export class AuthProxy {
     this.config = params.config;
     this.authenticator = params.authenticator;
 
-    this.pubkey
+    this.setPhase({ state: "no-challenge" });
+
+    this.signer
+      .getPublicKey()
       .then((pubkey) => this.authenticator.store?.get?.(pubkey, this.relay.url))
       .then((challenge) => {
         if (challenge) {
           this.updateChallenge(challenge);
+          this.storeChallenge(challenge);
         }
       });
 
     if (this.authenticator.strategy === "aggressive") {
-      this.relay.onConnected = () => {
+      this.relay.onConnected = async () => {
         this.challenge();
+        await this.nextAuth();
       };
     }
 
-    // Recovering
     this.relay.getReconnectedObservable().subscribe(() => {
-      this.challenge();
+      if (this.phase.state === "no-challenge") {
+        this.setPhase({ state: "no-challenge" });
+      } else {
+        this.setPhase({
+          state: "ready-for-challenge",
+          challenge: this.phase.challenge,
+        });
+      }
     });
 
-    this.relay.getAUTHObservable().subscribe(({ challengeMessage }) => {
-      this.updateChallenge(challengeMessage);
+    this.relay.getOKObservable().subscribe((result) => {
+      const { eventId, ok } = result;
+      if (!("eventId" in this.phase) || this.phase.eventId !== eventId) {
+        return;
+      }
 
-      if (this.authenticator.strategy === "aggressive") {
+      this.setPhase({
+        state: ok ? "succeeded" : "failed",
+        eventId,
+        challenge: this.phase.challenge,
+        result,
+      });
+    });
+
+    this.relay.getAUTHObservable().subscribe(({ challenge }) => {
+      this.updateChallenge(challenge);
+      this.storeChallenge(challenge);
+
+      if (this.authenticator.strategy === "aggressive" || this.queued) {
+        this.queued = false;
         this.challenge();
       }
     });
   }
 
   async nextAuth(): Promise<OkPacket> {
-    if (this.auth?.result?.ok) {
-      return this.auth.result;
+    if (this.phase.state === "succeeded") {
+      return this.phase.result;
     }
-    if (this.auth?.challenge && !this.auth?.result) {
-      return this.challenge();
+    if (this.authenticator.strategy === "passive") {
+      if (this.phase.state === "ready-for-challenge") {
+        this.challenge();
+      } else {
+        this.queued = true;
+      }
     }
 
-    // Wait for new challenge
-    await firstValueFrom(
-      this.challenge$.pipe(timeout(this.config.authTimeout))
+    return firstValueFrom(
+      this.phase$.pipe(
+        map((p) => ("result" in p ? p.result : undefined)),
+        first((p): p is OkPacket => !!p),
+        timeout(this.config.authTimeout)
+      )
     );
-
-    return this.challenge();
   }
 
-  private async challenge(): Promise<OkPacket> {
-    // latestChallenge に基づいてチャレンジを投げる
-    // 成功可否を auth にセット
+  getAuthStateObservable(): Observable<AuthStatePacket> {
+    return this.phase$.pipe(
+      map(({ state }) => ({
+        from: this.relay.url,
+        state,
+      }))
+    );
   }
 
-  private createAuthEvent(
-    challengeMessage: string
-  ): Nostr.Event<Nostr.Kind.ClientAuthentication> {}
-
-  private async updateChallenge(challengeMessage: string): Promise<void> {
-    if (this.auth?.challenge === challengeMessage) {
+  private async challenge(): Promise<void> {
+    if (!("challenge" in this.phase)) {
       return;
     }
 
-    this.auth = {
-      challenge: challengeMessage,
-      result: undefined,
-    };
-    this.challenge$.next(challengeMessage);
+    const challenge = this.phase.challenge;
+    const event = await this.createAuthEvent(challenge);
+    const eventId = event.id;
 
+    this.setPhase({ state: "challenging", challenge, eventId });
+
+    this.relay.send(["AUTH", event]);
+  }
+
+  private async createAuthEvent(
+    challenge: string
+  ): Promise<Nostr.Event<Nostr.Kind.ClientAuthentication>> {
+    return this.signer.signEvent({
+      kind: 22242,
+      content: "",
+      tags: [
+        ["relay", this.relay.url],
+        ["challenge", challenge],
+      ],
+    });
+  }
+
+  private updateChallenge(challenge: string): void {
+    if ("challenge" in this.phase && this.phase.challenge === challenge) {
+      return;
+    }
+
+    this.setPhase({
+      state: "ready-for-challenge",
+      challenge,
+    });
+  }
+
+  private async storeChallenge(challenge: string): Promise<void> {
     this.authenticator.store?.save?.(
-      await this.pubkey,
+      await this.signer.getPublicKey(),
       this.relay.url,
-      challengeMessage
+      challenge
     );
   }
 
-  private get pubkey() {
-    return (this.authenticator.signer ?? this.config.signer).getPublicKey();
+  private get signer() {
+    return this.authenticator.signer ?? this.config.signer;
   }
 
   dispose(): void {
@@ -109,7 +204,7 @@ export class AuthProxy {
 
     this.disposed = true;
 
-    const subjects = [this.challenge$];
+    const subjects = [this.phase$];
     for (const sub of subjects) {
       sub.complete();
     }

@@ -3,6 +3,8 @@ import type { Observable } from "rxjs";
 
 import type { EventSigner } from "../config/signer.js";
 import type {
+  AuthState,
+  AuthStatePacket,
   ConnectionState,
   ConnectionStatePacket,
   ErrorPacket,
@@ -65,6 +67,7 @@ export interface RxNostr {
   removeDefaultRelays(urls: string | string[]): void;
 
   /**
+   * @deprecated Use `getAllRelayStatus()` instead.
    * Return connection status of all default relays and all relays that RxNostr has used temporary.
    *
    * **NOTE**:
@@ -73,9 +76,23 @@ export interface RxNostr {
    */
   getAllRelayState(): Record<string, ConnectionState>;
   /**
+   * @deprecated Use `getRealyStatus` instead.
    * Return connection state of the given relay if it exists.
    */
   getRelayState(url: string): ConnectionState | undefined;
+  /**
+   * Return relay status of all default relays and all relays that RxNostr has used temporary.
+   *
+   * **NOTE**:
+   * Keys are **normalized** URL, so may be different from ones you set.
+   * Use `getRelayState(url)` instead to ensure that you get the value associated with a given URL.
+   */
+  getAllRelayStatus(): Record<string, RelayStatus>;
+  /**
+   * Return relay status of the given relay if it exists.
+   */
+  getRelayStatus(url: string): RelayStatus | undefined;
+
   /**
    * Attempt to reconnect manually if its connection state is `error` or `rejected`.
    *
@@ -122,6 +139,12 @@ export interface RxNostr {
    * Nothing happens when this Observable is unsubscribed.
    */
   createConnectionStateObservable(): Observable<ConnectionStatePacket>;
+  /**
+   * Create an Observable that receives changing of auth phase.
+   *
+   * Nothing happens when this Observable is unsubscribed.
+   */
+  createAuthStateObservable(): Observable<AuthStatePacket>;
   /**
    * Create an Observable that receives all message sent to websocket connections.
    *
@@ -194,3 +217,8 @@ export type AcceptableDefaultRelaysConfig =
   | Nostr.Nip07.GetRelayResult;
 /** @deprecated Use `AcceptableDefaultRelaysConfig` instead. */
 export type AcceptableRelaysConfig = AcceptableDefaultRelaysConfig;
+
+export interface RelayStatus {
+  auth: AuthState | undefined;
+  connection: ConnectionState;
+}
