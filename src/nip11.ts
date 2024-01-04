@@ -23,15 +23,15 @@ export class Nip11Registry {
     }
   ): Promise<T> {
     if (!options?.skipCahce) {
-      const v = getter(this.get(url) ?? {});
-      if (v) {
-        return v;
+      const data = this.get(url);
+      if (data) {
+        return getter(data);
       }
     }
     if (!options?.skipFetch) {
-      const v = getter((await this.fetch(url)) ?? {});
-      if (v) {
-        return v;
+      const data = await this.fetch(url);
+      if (data) {
+        return getter(data);
       }
     }
 
