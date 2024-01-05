@@ -172,7 +172,8 @@ export function spyMessage(): {
   return {
     tap: () =>
       tap((packet) => {
-        tapNext(packet.message);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tapNext(packet.message as any);
       }),
     ...spy,
   };
