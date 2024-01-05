@@ -239,8 +239,7 @@ export function filterByType<T extends Nostr.ToClientMessage.Type>(
   type: T
 ): OperatorFunction<MessagePacket, MessagePacket & { type: T }> {
   return filter(
-    (packet): packet is MessagePacket & { type: T } =>
-      packet.message[0] === type
+    (packet): packet is MessagePacket & { type: T } => packet.type === type
   );
 }
 /** @deprecated Renamed. Use `filterByType` instead. */

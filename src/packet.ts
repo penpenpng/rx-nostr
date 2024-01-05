@@ -36,7 +36,8 @@ export type MessagePacket =
   | ClosedPacket
   | NoticePacket
   | AuthPacket
-  | CountPacket;
+  | CountPacket
+  | UnknownMessagePacket;
 
 export interface MessagePacketBase<
   T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type
@@ -76,6 +77,12 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
 
 export interface OkPacketAgainstEvent extends OkPacket {
   done: boolean;
+}
+
+export interface UnknownMessagePacket {
+  from: string;
+  type: "unknown";
+  message: unknown;
 }
 
 export type AuthProgressOnSending =
