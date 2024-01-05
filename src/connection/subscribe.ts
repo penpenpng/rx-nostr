@@ -6,7 +6,7 @@ import { evalFilters } from "../lazy-filter.js";
 import { Nip11Registry } from "../nip11.js";
 import { isFiltered } from "../nostr/filter.js";
 import { isExpired } from "../nostr/nip40.js";
-import { EventPacket, LazyREQ, OkPacket } from "../packet.js";
+import { EventPacket, LazyREQ } from "../packet.js";
 import { AuthProxy } from "./auth.js";
 import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
@@ -24,6 +24,7 @@ export class SubscribeProxy {
   private authProxy: AuthProxy | null;
   private config: RxNostrConfig;
   private subs = new Map<string, SubRecord>();
+  private authRequiredSubs = new Set<string>();
   private fin$ = new Subject<FinPacket>();
   private disposed = false;
   private queue: SubQueue;
@@ -67,25 +68,28 @@ export class SubscribeProxy {
         return;
       }
 
-      if (!this.authProxy || !notice?.startsWith("auth-required:")) {
-        this.fin(subId);
-        return;
-      }
-
-      let authResult: OkPacket;
-      try {
-        authResult = await this.authProxy.nextAuth();
-      } catch {
-        this.fin(subId);
-        return;
-      }
-
-      const req = this.subs.get(subId)?.req;
-      if (authResult.ok && req) {
-        this.sendREQ(req);
+      if (this.authProxy && notice?.startsWith("auth-required:")) {
+        this.authRequiredSubs.add(subId);
       } else {
         this.fin(subId);
       }
+    });
+
+    this.authProxy?.getAuthResultObservable().subscribe((ok) => {
+      if (ok) {
+        for (const subId of this.authRequiredSubs) {
+          const req = this.subs.get(subId)?.req;
+          if (req) {
+            this.sendREQ(req);
+          }
+        }
+      } else {
+        for (const subId of this.authRequiredSubs) {
+          this.fin(subId);
+        }
+      }
+
+      this.authRequiredSubs.clear();
     });
   }
 

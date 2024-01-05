@@ -76,7 +76,6 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
 
 export interface OkPacketAgainstEvent extends OkPacket {
   done: boolean;
-  authProgress: AuthProgressOnSending;
 }
 
 export type AuthProgressOnSending =
@@ -143,18 +142,3 @@ export type ConnectionState =
   | "error"
   | "rejected"
   | "terminated";
-
-/**
- * Packets emitted when auth phase is changed.
- */
-export interface AuthStatePacket {
-  from: string;
-  state: AuthState;
-}
-
-export type AuthState =
-  | "no-challenge"
-  | "ready-for-challenge"
-  | "challenging"
-  | "succeeded"
-  | "failed";

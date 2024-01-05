@@ -10,7 +10,7 @@ import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { createClientSpy, faker as _faker, type MockRelay } from "vitest-nostr";
 
-import { ChallengeStore, EventSigner, EventVerifier } from "../config/index.js";
+import { EventSigner, EventVerifier } from "../config/index.js";
 import { WebSocketCloseCode } from "../connection/relay.js";
 import { ConnectionState, EventPacket, MessagePacket } from "../packet.js";
 import { RxNostr } from "../rx-nostr/index.js";
@@ -261,26 +261,6 @@ export function fakeSigner(idPrefix?: string): EventSigner {
 
 export function fakeVerifier(): EventVerifier {
   return (params) => params.sig === fakeSig;
-}
-
-export interface ChallengeStoreMock extends ChallengeStore {
-  getLastChallenge: () => string | undefined;
-}
-
-export function challengeStoreMock(initial?: string): ChallengeStoreMock {
-  let lastChallenge: string | undefined = initial;
-
-  return {
-    async get() {
-      return lastChallenge;
-    },
-    save(_pubkey, _relay, challenge) {
-      lastChallenge = challenge;
-    },
-    getLastChallenge() {
-      return lastChallenge;
-    },
-  };
 }
 
 export function expectedChallengeEvent(

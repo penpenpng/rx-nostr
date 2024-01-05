@@ -24,4 +24,5 @@ jobs:
           key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
       - run: yarn install
       - run: yarn lint
+      - run: yarn build
       - run: yarn test

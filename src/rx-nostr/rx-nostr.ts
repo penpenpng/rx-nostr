@@ -30,7 +30,6 @@ import {
 } from "../error.js";
 import { completeOnTimeout, filterBySubId } from "../operator.js";
 import type {
-  AuthStatePacket,
   ConnectionState,
   ConnectionStatePacket,
   ErrorPacket,
@@ -93,7 +92,6 @@ class RxNostrImpl implements RxNostr {
 
   private error$ = new Subject<ErrorPacket>();
   private connectionState$ = new Subject<ConnectionStatePacket>();
-  private authState$ = new Subject<AuthStatePacket>();
   private outgoing$ = new Subject<OutgoingMessagePacket>();
 
   private dispose$ = new Subject<void>();
@@ -205,7 +203,6 @@ class RxNostrImpl implements RxNostr {
     conn.getOkAgainstEventObservable().subscribe(this.ok$);
     conn.getAllMessageObservable().subscribe(this.all$);
     conn.getConnectionStateObservable().subscribe(this.connectionState$);
-    conn.getAuthStateObservable()?.subscribe(this.authState$);
     conn.getErrorObservable().subscribe(this.error$);
     conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
   }
@@ -255,7 +252,7 @@ class RxNostrImpl implements RxNostr {
     return Object.fromEntries(
       Array.from(this.connections.values()).map((e) => [
         e.url,
-        { connection: e.connectionState, auth: e.authState },
+        { connection: e.connectionState },
       ])
     );
   }
@@ -265,7 +262,7 @@ class RxNostrImpl implements RxNostr {
       return undefined;
     }
 
-    return { connection: conn.connectionState, auth: conn.authState };
+    return { connection: conn.connectionState };
   }
   // #endregion
 
@@ -497,9 +494,6 @@ class RxNostrImpl implements RxNostr {
   createConnectionStateObservable(): Observable<ConnectionStatePacket> {
     return this.connectionState$.asObservable();
   }
-  createAuthStateObservable(): Observable<AuthStatePacket> {
-    return this.authState$.asObservable();
-  }
   createOutgoingMessageObservable(): Observable<OutgoingMessagePacket> {
     return this.outgoing$.asObservable();
   }
@@ -588,7 +582,6 @@ class RxNostrImpl implements RxNostr {
       this.fin$,
       this.all$,
       this.connectionState$,
-      this.authState$,
       this.error$,
       this.outgoing$,
     ];
