@@ -4,8 +4,6 @@ import { combineLatest, map, Observable } from "rxjs";
 import type { Authenticator, RxNostrConfig } from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
-  AuthState,
-  AuthStatePacket,
   ConnectionState,
   ConnectionStatePacket,
   ErrorPacket,
@@ -202,13 +200,6 @@ export class NostrConnection {
     return this.relay.state;
   }
 
-  getAuthStateObservable(): Observable<AuthStatePacket> | undefined {
-    return this.authProxy?.getAuthStateObservable();
-  }
-  get authState(): AuthState | undefined {
-    return this.authProxy?.state;
-  }
-
   getErrorObservable(): Observable<ErrorPacket> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
@@ -247,8 +238,7 @@ function getAuthenticator(
   if (!a) {
     return;
   }
-  if ("strategy" in a) {
-    return a;
-  }
-  return a(url);
+
+  const c = a instanceof Function ? a(url) : a;
+  return c === "auto" ? {} : c;
 }

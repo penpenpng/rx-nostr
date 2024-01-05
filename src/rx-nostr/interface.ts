@@ -3,8 +3,6 @@ import type { Observable } from "rxjs";
 
 import type { EventSigner } from "../config/signer.js";
 import type {
-  AuthState,
-  AuthStatePacket,
   ConnectionState,
   ConnectionStatePacket,
   ErrorPacket,
@@ -140,12 +138,6 @@ export interface RxNostr {
    */
   createConnectionStateObservable(): Observable<ConnectionStatePacket>;
   /**
-   * Create an Observable that receives changing of auth phase.
-   *
-   * Nothing happens when this Observable is unsubscribed.
-   */
-  createAuthStateObservable(): Observable<AuthStatePacket>;
-  /**
    * Create an Observable that receives all message sent to websocket connections.
    *
    * Nothing happens when this Observable is unsubscribed.
@@ -219,6 +211,5 @@ export type AcceptableDefaultRelaysConfig =
 export type AcceptableRelaysConfig = AcceptableDefaultRelaysConfig;
 
 export interface RelayStatus {
-  auth: AuthState | undefined;
   connection: ConnectionState;
 }

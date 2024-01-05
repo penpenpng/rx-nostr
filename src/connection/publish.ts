@@ -1,7 +1,7 @@
 import Nostr from "nostr-typedef";
 import { Observable, Subject } from "rxjs";
 
-import { OkPacket, OkPacketAgainstEvent } from "../packet.js";
+import { OkPacketAgainstEvent } from "../packet.js";
 import { AuthProxy } from "./auth.js";
 import { RelayConnection } from "./relay.js";
 import { CounterSubject } from "./utils.js";
@@ -10,6 +10,7 @@ export class PublishProxy {
   private relay: RelayConnection;
   private authProxy: AuthProxy | null;
   private pubs = new Map<string, Nostr.Event>();
+  private authRequiredPubs = new Set<string>();
   private count$ = new CounterSubject(0);
   private ok$ = new Subject<OkPacketAgainstEvent>();
   private disposed = false;
@@ -41,33 +42,33 @@ export class PublishProxy {
         return;
       }
 
-      if (!this.authProxy || !notice?.startsWith("auth-required:")) {
+      if (this.authProxy && notice?.startsWith("auth-required:")) {
+        this.authRequiredPubs.add(eventId);
+        this.ok$.next({ ...packet, done: false });
+      } else {
         this.ok$.next({
           ...packet,
-          authProgress: !this.authProxy ? "no-authenticator" : "unneeded",
           done: true,
         });
         this.confirmOK(eventId);
-        return;
       }
+    });
 
-      this.ok$.next({ ...packet, authProgress: "requesting", done: false });
-
-      let authResult: OkPacket;
-      try {
-        authResult = await this.authProxy.nextAuth();
-      } catch {
-        this.ok$.next({ ...packet, authProgress: "timeout", done: true });
-        this.confirmOK(eventId);
-        return;
-      }
-
-      if (authResult.ok) {
-        this.sendEVENT(event);
+    this.authProxy?.getAuthResultObservable().subscribe((ok) => {
+      if (ok) {
+        for (const eventId of this.authRequiredPubs) {
+          const event = this.pubs.get(eventId);
+          if (event) {
+            this.sendEVENT(event);
+          }
+        }
       } else {
-        this.ok$.next({ ...packet, authProgress: "failed", done: true });
-        this.confirmOK(eventId);
+        for (const eventId of this.authRequiredPubs) {
+          this.confirmOK(eventId);
+        }
       }
+
+      this.authRequiredPubs.clear();
     });
   }
 

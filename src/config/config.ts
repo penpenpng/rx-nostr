@@ -1,5 +1,5 @@
 import { defineDefault } from "../utils.js";
-import { Authenticator } from "./authenticator.js";
+import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
 import { EventVerifier, verifier } from "./verifier.js";
 
@@ -34,7 +34,10 @@ export interface RxNostrConfig {
    * Default verifier, which is used to verify event's signature.
    */
   verifier: EventVerifier;
-  authenticator: Authenticator | ((relay: string) => Authenticator) | undefined;
+  authenticator:
+    | AuthenticatorConfig
+    | ((relay: string) => AuthenticatorConfig)
+    | undefined;
   /**
    * If true, default relays don't get to `"dormant"` state.
    *

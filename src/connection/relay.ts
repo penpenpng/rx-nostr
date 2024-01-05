@@ -27,8 +27,6 @@ import {
 } from "../packet.js";
 
 export class RelayConnection {
-  public onConnected?: () => void | Promise<void>;
-
   private socket: WebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
@@ -97,7 +95,6 @@ export class RelayConnection {
       }
 
       this.setState("connected");
-      await this.onConnected?.();
 
       if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
