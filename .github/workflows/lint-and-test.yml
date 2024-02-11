@@ -22,7 +22,8 @@ jobs:
           path: |
             node_modules
           key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
+      - uses: crate-ci/typos@master
       - run: npm install install
       - run: npm install lint
-      - run: npm install build
       - run: npm install test
+      - run: npm install build
