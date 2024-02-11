@@ -37,7 +37,7 @@ export class UrlMap<T> extends Map<string, T> {
     }
 
     for (const [url, v] of Object.entries(obj)) {
-      this.set(url, v);
+      this.set(normalizeRelayUrl(url), v);
     }
   }
   get(url: string) {
