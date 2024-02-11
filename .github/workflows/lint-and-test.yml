@@ -21,8 +21,8 @@ jobs:
         with:
           path: |
             node_modules
-          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
-      - run: yarn install
-      - run: yarn lint
-      - run: yarn build
-      - run: yarn test
+          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
+      - run: npm install install
+      - run: npm install lint
+      - run: npm install build
+      - run: npm install test
