@@ -12,7 +12,11 @@ import {
 } from "rxjs";
 
 import type { RetryConfig, RxNostrConfig } from "../config/index.js";
-import { RxNostrLogicError, RxNostrWebSocketError } from "../error.js";
+import {
+  RxNostrInvalidUsageError,
+  RxNostrLogicError,
+  RxNostrWebSocketError,
+} from "../error.js";
 import { Nip11Registry } from "../nip11.js";
 import {
   AuthPacket,
@@ -25,9 +29,16 @@ import {
   OkPacket,
   OutgoingMessagePacket,
 } from "../packet.js";
+import {
+  ICloseEvent,
+  IMessageEvent,
+  IWebSocket,
+  IWebSocketConstructor,
+  ReadyState,
+} from "../websocket.js";
 
 export class RelayConnection {
-  private socket: WebSocket | null = null;
+  private socket: IWebSocket | null = null;
   private buffer: Nostr.ToRelayMessage.Any[] = [];
   private unsent: Nostr.ToRelayMessage.Any[] = [];
   private reconnected$ = new Subject<Nostr.ToRelayMessage.Any[]>();
@@ -111,7 +122,7 @@ export class RelayConnection {
         this.buffer = [];
       }
     };
-    const onmessage = ({ data }: MessageEvent) => {
+    const onmessage = ({ data }: IMessageEvent) => {
       if (this.state === "terminated") {
         return;
       }
@@ -122,7 +133,7 @@ export class RelayConnection {
         this.error$.next(err);
       }
     };
-    const onclose = ({ code }: CloseEvent) => {
+    const onclose = ({ code }: ICloseEvent) => {
       socket.removeEventListener("open", onopen);
       socket.removeEventListener("message", onmessage);
       socket.removeEventListener("close", onclose);
@@ -179,7 +190,14 @@ export class RelayConnection {
       }
     };
 
-    const socket = new WebSocket(this.url);
+    const WebSocket: IWebSocketConstructor =
+      this.config.websocketCtor ?? globalThis.WebSocket;
+
+    if (!WebSocket) {
+      throw new RxNostrInvalidUsageError("WebSocket constructor is missing");
+    }
+
+    const socket: IWebSocket = new WebSocket(this.url);
 
     socket.addEventListener("open", onopen);
     socket.addEventListener("message", onmessage);
@@ -272,7 +290,7 @@ export class RelayConnection {
           throw new RxNostrLogicError();
         }
 
-        if (this.socket.readyState === WebSocket.OPEN) {
+        if (this.socket.readyState === ReadyState.OPEN) {
           this.outgoing$.next({ to: this.url, message });
           this.socket.send(JSON.stringify(message));
         } else {

@@ -1,4 +1,5 @@
 import { defineDefault } from "../utils.js";
+import type { IWebSocketConstructor } from "../websocket.js";
 import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
 import { EventVerifier, verifier } from "./verifier.js";
@@ -20,6 +21,7 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   skipValidateFilterMatching: false,
   skipFetchNip11: false,
   skipExpirationCheck: false,
+  websocketCtor: undefined,
 });
 
 /**
@@ -84,6 +86,10 @@ export interface RxNostrConfig {
    * If true, skip automatic expiration check based on NIP-40.
    */
   skipExpirationCheck: boolean;
+  /**
+   * Optional. For environments where `WebSocket` doesn't exist in `globalThis` such as Node.js.
+   */
+  websocketCtor: IWebSocketConstructor | undefined;
 }
 /** @deprecated Use `RxNostrConfig` instead. */
 export type RxNostrOptions = RxNostrConfig;
