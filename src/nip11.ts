@@ -19,10 +19,10 @@ export class Nip11Registry {
     getter: (data: Nostr.Nip11.RelayInfo) => T,
     options?: {
       skipFetch?: boolean;
-      skipCahce?: boolean;
+      skipCache?: boolean;
     }
   ): Promise<T> {
-    if (!options?.skipCahce) {
+    if (!options?.skipCache) {
       const data = this.get(url);
       if (data) {
         return getter(data);

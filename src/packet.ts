@@ -134,7 +134,7 @@ export interface OutgoingMessagePacket {
  * - `connected`: Connected.
  * - `waiting-for-retrying`: Closed unexpectedly and the next auto-retry is scheduled.
  * - `retrying`: Attempting to connect because of auto-retry.
- * - `dormant`: Closed temporary because there is no acitve messaging.
+ * - `dormant`: Closed temporary because there is no active messaging.
  * - `error`: Closed unexpectedly after the maximum number of retries. You can try to `reconnect()` manually.
  * - `rejected`: Closed by a relay with closing code 4000. You can try to reconnect, but should not do.
  * - `terminated`: Closed because of `dispose()`. Never reconnect.

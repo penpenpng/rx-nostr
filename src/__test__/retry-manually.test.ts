@@ -47,7 +47,7 @@ describe("Under a single relay", () => {
   });
 });
 
-describe("Under a sigle keep-alive relay", async () => {
+describe("Under a single keep-alive relay", async () => {
   test("[forward] Manually reconnection resend EVENTs that attempted while down.", async () => {
     // TODO
   });
