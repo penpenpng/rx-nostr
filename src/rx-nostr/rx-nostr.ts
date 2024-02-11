@@ -82,8 +82,10 @@ class RxNostrImpl implements RxNostr {
     }
     return conns;
   }
-  private weakSubscriptions: Map<string, { req: LazyREQ; autoclose: boolean }> =
-    new Map();
+  private defaultSubscriptions: Map<
+    string,
+    { req: LazyREQ; autoclose: boolean }
+  > = new Map();
 
   private event$ = new Subject<EventPacket>();
   private fin$ = new Subject<FinPacket>();
@@ -172,14 +174,14 @@ class RxNostrImpl implements RxNostr {
 
     for (const { read, url } of nextDefaultRelays.values()) {
       const conn = this.ensureNostrConnection(url);
-      conn.setKeepAlive(this.config.keepAliveDefaultRelayConnections);
+      conn.setConnectionStrategy(this.config.connectionStrategy);
 
       if (read) {
         nextReadableConnections.push(conn);
       }
     }
 
-    this.updateWeakSubscriptions(nextReadableConnections);
+    this.updateDefaultSubscriptions(nextReadableConnections);
 
     this.defaultRelays = nextDefaultRelays;
   }
@@ -206,7 +208,7 @@ class RxNostrImpl implements RxNostr {
     conn.getErrorObservable().subscribe(this.error$);
     conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
   }
-  private updateWeakSubscriptions(
+  private updateDefaultSubscriptions(
     nextReadableConnections: NostrConnection[]
   ): void {
     const noLongerNeededConnections = subtract(
@@ -215,13 +217,13 @@ class RxNostrImpl implements RxNostr {
     );
 
     for (const conn of noLongerNeededConnections) {
-      conn.setKeepWeakSubscriptions(false);
+      conn.markAsDefault(false);
     }
     for (const conn of nextReadableConnections) {
-      conn.setKeepWeakSubscriptions(true);
-      for (const { req, autoclose } of this.weakSubscriptions.values()) {
+      conn.markAsDefault(true);
+      for (const { req, autoclose } of this.defaultSubscriptions.values()) {
         conn?.subscribe(req, {
-          mode: "weak",
+          mode: "default",
           overwrite: false,
           autoclose,
         });
@@ -323,8 +325,8 @@ class RxNostrImpl implements RxNostr {
           ) ?? this.defaultReadables,
         mode:
           emitScopeRelays === undefined && useScopeRelays === undefined
-            ? "weak"
-            : "normal",
+            ? "default"
+            : "temporary",
       };
     };
     const startSubscription = ({
@@ -454,8 +456,8 @@ class RxNostrImpl implements RxNostr {
     const { req, targetConnections, mode, overwrite, autoclose } = params;
     const subId = req[1];
 
-    if (mode === "weak") {
-      this.weakSubscriptions.set(subId, { req, autoclose });
+    if (mode === "default") {
+      this.defaultSubscriptions.set(subId, { req, autoclose });
     }
     for (const conn of targetConnections) {
       conn.subscribe(req, {
@@ -472,8 +474,8 @@ class RxNostrImpl implements RxNostr {
   }): void {
     const { subId, targetConnections, mode } = params;
 
-    if (mode === "weak") {
-      this.weakSubscriptions.delete(subId);
+    if (mode === "default") {
+      this.defaultSubscriptions.delete(subId);
     }
     for (const conn of targetConnections) {
       conn.unsubscribe(subId);

@@ -8,7 +8,7 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   signer: nip07Signer(),
   verifier: verifier,
   authenticator: undefined,
-  keepAliveDefaultRelayConnections: false,
+  connectionStrategy: "lazy",
   retry: {
     strategy: "exponential",
     maxCount: 5,
@@ -40,17 +40,12 @@ export interface RxNostrConfig {
     | AuthenticatorConfig
     | ((relay: string) => AuthenticatorConfig)
     | undefined;
+
   /**
-   * If true, default relays don't get to `"dormant"` state.
-   *
-   * Normally, rx-nostr will temporarily close a WebSocket connection on relays
-   * when there is no more active communication going on over it.
-   * This option disables this behavior **only for default relays**.
-   *
-   * Temporary relays specified within `use()`'s options get `"dormant"`
-   * when they are no longer used.
+   * Connection strategy for default relays.
    */
-  keepAliveDefaultRelayConnections: boolean;
+  connectionStrategy: ConnectionStrategy;
+
   /**
    * Auto reconnection strategy.
    */
@@ -126,3 +121,12 @@ export type RetryConfig =
     };
 /** @deprecated Use `RxNostrConfig` instead. */
 export type BackoffConfig = RetryConfig;
+
+/**
+ * Connection strategy for default relays.
+ *
+ * - `"lazy"`: Connect when needed, and disconnect when unneeded.
+ * - `"lazy-keep"`: Connect when needed, when the relay gets to be non-default and it is unneeded.
+ * - `"aggressive"`: Connect immediately, and disconnect when the relay gets to be non-default and it is unneeded.
+ */
+export type ConnectionStrategy = "lazy" | "lazy-keep" | "aggressive";

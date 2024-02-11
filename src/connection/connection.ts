@@ -1,7 +1,11 @@
 import Nostr from "nostr-typedef";
 import { combineLatest, map, Observable } from "rxjs";
 
-import type { Authenticator, RxNostrConfig } from "../config/index.js";
+import type {
+  Authenticator,
+  ConnectionStrategy,
+  RxNostrConfig,
+} from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
   ConnectionState,
@@ -26,25 +30,25 @@ export interface SubscribeOptions {
 }
 
 /**
- * - `"weak"`: Subscriptions are active only while `keepWeakSubscriptions` is true.
- * - `"normal"`: Subscriptions are always active.
+ * - `"default"`: Subscriptions are active only while the relay is marked as a default relay.
+ * - `"temporary"`: Subscriptions are always active.
  */
-export type REQMode = "weak" | "normal";
+export type REQMode = "default" | "temporary";
 
 const makeSubscribeOptions = defineDefault<SubscribeOptions>({
   overwrite: false,
   autoclose: false,
-  mode: "weak",
+  mode: "default",
 });
 
 export class NostrConnection {
   private relay: RelayConnection;
   private pubProxy: PublishProxy;
   private subProxy: SubscribeProxy;
-  private weakSubscriptionIds: Set<string> = new Set();
-  private logicalConns = 0;
-  private keepAlive = false;
-  private keepWeakSubscriptions = false;
+  private defaultSubscriptionIds: Set<string> = new Set();
+  private communicating = false;
+  private strategy: ConnectionStrategy = "lazy";
+  private isDefaultRelay = false;
   private disposed = false;
   private _url: string;
 
@@ -73,38 +77,63 @@ export class NostrConnection {
     ])
       .pipe(map(([pubConns, subConns]) => pubConns + subConns))
       .subscribe((logicalConns) => {
-        this.logicalConns = logicalConns;
-
-        if (!this.keepAlive && this.logicalConns <= 0) {
-          this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
-        }
+        this.communicating = logicalConns > 0;
+        this.resetConnection();
       });
   }
 
-  setKeepAlive(flag: boolean): void {
+  setConnectionStrategy(strategy: ConnectionStrategy): void {
     if (this.disposed) {
       return;
     }
 
-    this.keepAlive = flag;
+    this.strategy = strategy;
+    this.resetConnection();
+  }
 
-    if (!this.keepAlive && this.logicalConns <= 0) {
-      this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
+  private resetConnection() {
+    let strategy = this.strategy;
+    if (!this.isDefaultRelay) {
+      strategy = "lazy";
+    }
+
+    switch (strategy) {
+      case "lazy": {
+        if (!this.communicating) {
+          this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
+        }
+        break;
+      }
+      case "lazy-keep": {
+        break;
+      }
+      case "aggressive": {
+        if (
+          this.connectionState === "initialized" ||
+          this.connectionState === "dormant"
+        ) {
+          this.relay.connectManually();
+        }
+        break;
+      }
     }
   }
-  setKeepWeakSubscriptions(flag: boolean): void {
+
+  markAsDefault(flag: boolean): void {
     if (this.disposed) {
       return;
     }
 
-    this.keepWeakSubscriptions = flag;
+    this.isDefaultRelay = flag;
 
-    if (!this.keepWeakSubscriptions) {
-      for (const subId of this.weakSubscriptionIds) {
+    if (!this.isDefaultRelay) {
+      for (const subId of this.defaultSubscriptionIds) {
         this.subProxy.unsubscribe(subId);
       }
-      this.weakSubscriptionIds.clear();
+      this.defaultSubscriptionIds.clear();
     }
+
+    this.resetConnection();
   }
 
   publish(event: Nostr.Event<number>): void {
@@ -129,15 +158,15 @@ export class NostrConnection {
     const { mode, overwrite, autoclose } = makeSubscribeOptions(options);
     const [, subId] = req;
 
-    if (mode === "weak" && !this.keepWeakSubscriptions) {
+    if (mode === "default" && !this.isDefaultRelay) {
       return;
     }
     if (!overwrite && this.subProxy.isOngoingOrQueued(subId)) {
       return;
     }
 
-    if (mode === "weak") {
-      this.weakSubscriptionIds.add(subId);
+    if (mode === "default") {
+      this.defaultSubscriptionIds.add(subId);
     }
     this.subProxy.subscribe(req, autoclose);
   }
@@ -146,7 +175,7 @@ export class NostrConnection {
       return;
     }
 
-    this.weakSubscriptionIds.delete(subId);
+    this.defaultSubscriptionIds.delete(subId);
     this.subProxy.unsubscribe(subId);
   }
 
