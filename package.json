@@ -51,6 +51,8 @@
     "@types/node": "^18.15.10",
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
+    "@vuepress/bundler-vite": "^2.0.0-rc.7",
+    "@vuepress/theme-default": "^2.0.0-rc.14",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-import": "^2.27.5",
