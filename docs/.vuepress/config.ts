@@ -1,7 +1,10 @@
-import { defineUserConfig, defaultTheme } from "vuepress";
+import { defineUserConfig } from "vuepress";
+import { viteBundler } from "@vuepress/bundler-vite";
+import { defaultTheme } from "@vuepress/theme-default";
 import attrs from "markdown-it-attrs";
 
 export default defineUserConfig({
+  bundler: viteBundler(),
   // To host on GitHub Pages.
   base: "/rx-nostr/",
   lang: "ja_JP",
