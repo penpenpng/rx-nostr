@@ -1,5 +1,5 @@
 // # Playground
-// Edit here and try `yarn dev`
+// Edit here and try `npm run dev`
 
 import {
   createRxBackwardReq,

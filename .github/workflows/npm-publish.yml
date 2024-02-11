@@ -20,11 +20,11 @@ jobs:
         with:
           path: |
             node_modules
-          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
-      - run: yarn install
-      - run: yarn lint
-      - run: yarn test
-      - run: yarn build
+          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
+      - run: npm install install
+      - run: npm install lint
+      - run: npm install test
+      - run: npm install build
       - run: npx -y can-npm-publish && npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
