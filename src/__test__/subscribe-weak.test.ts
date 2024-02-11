@@ -17,19 +17,19 @@ import {
 } from "./helper.js";
 
 describe("Under a single relay", () => {
-  const DEFUALT_RELAY = "ws://localhost:1234";
+  const DEFAULT_RELAY = "ws://localhost:1234";
   let rxNostr: RxNostr;
   let relay: MockRelay;
 
   beforeEach(async () => {
-    relay = createMockRelay(DEFUALT_RELAY);
+    relay = createMockRelay(DEFAULT_RELAY);
 
     rxNostr = createRxNostr({
       retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
       skipVerify: true,
     });
-    await rxNostr.switchRelays([DEFUALT_RELAY]);
+    await rxNostr.switchRelays([DEFAULT_RELAY]);
   });
 
   afterEach(() => {

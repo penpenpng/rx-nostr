@@ -74,7 +74,7 @@ export interface RxNostr {
    */
   getAllRelayState(): Record<string, ConnectionState>;
   /**
-   * @deprecated Use `getRealyStatus` instead.
+   * @deprecated Use `getReadyStatus` instead.
    * Return connection state of the given relay if it exists.
    */
   getRelayState(url: string): ConnectionState | undefined;

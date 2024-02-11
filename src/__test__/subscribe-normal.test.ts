@@ -10,21 +10,21 @@ import {
 import { disposeMockRelay, faker, spyEvent } from "./helper.js";
 
 describe("", () => {
-  const DEFUALT_RELAY = "ws://localhost:1234";
+  const DEFAULT_RELAY = "ws://localhost:1234";
   const ANOTHER_RELAY = "ws://localhost:1235";
   let rxNostr: RxNostr;
   let defaultRelay: MockRelay;
   let anotherRelay: MockRelay;
 
   beforeEach(async () => {
-    defaultRelay = createMockRelay(DEFUALT_RELAY);
+    defaultRelay = createMockRelay(DEFAULT_RELAY);
     anotherRelay = createMockRelay(ANOTHER_RELAY);
 
     rxNostr = createRxNostr({
       skipFetchNip11: true,
       skipVerify: true,
     });
-    await rxNostr.switchRelays([DEFUALT_RELAY]);
+    await rxNostr.switchRelays([DEFAULT_RELAY]);
   });
 
   afterEach(() => {
@@ -88,7 +88,7 @@ describe("", () => {
     await anotherRelay.connected;
     await expect(anotherRelay).toReceiveREQ("sub:1");
 
-    req.emit(faker.filter(), { relays: [DEFUALT_RELAY, ANOTHER_RELAY] });
+    req.emit(faker.filter(), { relays: [DEFAULT_RELAY, ANOTHER_RELAY] });
     await expect(defaultRelay).toReceiveREQ("sub:2");
     await expect(anotherRelay).toReceiveREQ("sub:2");
 
