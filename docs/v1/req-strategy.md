@@ -1,5 +1,9 @@
 # REQ Strategy
 
+::: danger Caution
+このドキュメントは rx-nostr 1.x のものです。2.x のドキュメントは[こちら](../v2/)を参照してください。
+:::
+
 **REQ Strategy** は `RxNostr` が `ReqPacket` をどのように取り扱うか、または `EventPacket` をどのように発行するかを定める読み取り専用の値で、`RxReq` オブジェクトごとに割り当てられています。`rxNostr.use(rxReq)` が呼び出された際に `RxNostr` は `rxReq.strategy` を読み取り、その値に応じて REQ の戦略を決定します。
 
 ::: tip Note

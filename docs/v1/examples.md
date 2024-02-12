@@ -1,5 +1,9 @@
 # Examples
 
+::: danger Caution
+このドキュメントは rx-nostr 1.x のものです。2.x のドキュメントは[こちら](../v2/)を参照してください。
+:::
+
 [[TOC]]
 
 ## Subscribe all kind1 and filter them at local
