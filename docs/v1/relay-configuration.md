@@ -1,5 +1,9 @@
 # Relay Configuration
 
+::: danger Caution
+このドキュメントは rx-nostr 1.x のものです。2.x のドキュメントは[こちら](../v2/)を参照してください。
+:::
+
 `RxNostr` が実際に通信するリレーセットは `rxNostr.switchRelays()` を使って構成できます。
 
 ```js

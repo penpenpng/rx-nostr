@@ -1,5 +1,9 @@
 # Getting Started
 
+::: danger Caution
+このドキュメントは rx-nostr 1.x のものです。2.x のドキュメントは[こちら](../v2/)を参照してください。
+:::
+
 ## Installation
 
 npm または yarn から以下の通りインストールできます。

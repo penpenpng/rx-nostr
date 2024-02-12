@@ -1,5 +1,9 @@
 # Monitoring Connections
 
+::: danger Caution
+このドキュメントは rx-nostr 1.x のものです。2.x のドキュメントは[こちら](../v2/)を参照してください。
+:::
+
 `RxNostr` が抱えている WebSocket 接続の状況 (`ConnectionState`) は `createConnectionStateObservable()` を通じて監視することができます。
 このメソッドの戻り値は `ConnectionState` が変化したときに Packet を発行する Observable です。
 
