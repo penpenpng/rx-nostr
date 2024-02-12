@@ -30,7 +30,7 @@ export default defineUserConfig({
     navbar: [
       {
         text: "Docs",
-        link: "/docs/",
+        link: "/v1/",
       },
       {
         text: "GitHub",
@@ -38,30 +38,30 @@ export default defineUserConfig({
       },
     ],
     sidebar: {
-      "/docs/": [
+      "/v1/": [
         {
           text: "Introduction",
           children: [
-            "/docs/index.md",
-            "/docs/getting-started.md",
-            "/docs/first-step.md",
+            "/v1/index.md",
+            "/v1/getting-started.md",
+            "/v1/first-step.md",
           ],
         },
         {
           text: "Guide",
           children: [
-            "/docs/req-strategy.md",
-            "/docs/relay-configuration.md",
-            "/docs/lazy-since-until.md",
-            "/docs/sending-event.md",
-            "/docs/monitoring-connections.md",
-            "/docs/error-handling.md",
-            "/docs/operators.md",
+            "/v1/req-strategy.md",
+            "/v1/relay-configuration.md",
+            "/v1/lazy-since-until.md",
+            "/v1/sending-event.md",
+            "/v1/monitoring-connections.md",
+            "/v1/error-handling.md",
+            "/v1/operators.md",
           ],
         },
         {
           text: "Examples",
-          link: "/docs/examples.md",
+          link: "/v1/examples.md",
         },
       ],
     },

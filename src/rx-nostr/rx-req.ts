@@ -167,7 +167,7 @@ const createRxReq = <S extends RxReqStrategy>(params: {
  * - All REQ-subscriptions keep alive until timeout or getting EOSE.
  * - In most cases, you should specify `until` or `limit` for filters.
  *
- * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#backward-strategy).
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#backward-strategy).
  */
 export function createRxBackwardReq(
   rxReqId?: string
@@ -191,7 +191,7 @@ export function createRxBackwardReq(
  *   The latest REQ keeps alive until it is overwritten or explicitly terminated.
  * - In most cases, you should not specify `limit` for filters.
  *
- * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#forward-strategy).
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#forward-strategy).
  */
 export function createRxForwardReq(
   rxReqId?: string
@@ -207,7 +207,7 @@ export function createRxForwardReq(
  * It is almost the same as backward strategy, however can publish only one REQ
  * and the Observable completes on EOSE.
  *
- * For more information, see [document](https://penpenpng.github.io/rx-nostr/docs/req-strategy.html#oneshot-strategy).
+ * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#oneshot-strategy).
  */
 export function createRxOneshotReq(params: {
   filters: LazyFilter | LazyFilter[];
