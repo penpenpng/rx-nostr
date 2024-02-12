@@ -30,7 +30,10 @@ export default defineUserConfig({
     navbar: [
       {
         text: "Docs",
-        link: "/v1/",
+        children: [
+          { text: "v1.x", link: "/v1/" },
+          { text: "v2.x", link: "/v2/" },
+        ],
       },
       {
         text: "GitHub",
@@ -62,6 +65,32 @@ export default defineUserConfig({
         {
           text: "Examples",
           link: "/v1/examples.md",
+        },
+      ],
+      "/v2/": [
+        {
+          text: "Introduction",
+          children: [
+            "/v2/index.md",
+            "/v2/getting-started.md",
+            "/v2/first-step.md",
+          ],
+        },
+        {
+          text: "Guide",
+          children: [
+            "/v2/req-strategy.md",
+            "/v2/relay-configuration.md",
+            "/v2/lazy-since-until.md",
+            "/v2/sending-event.md",
+            "/v2/monitoring-connections.md",
+            "/v2/error-handling.md",
+            "/v2/operators.md",
+          ],
+        },
+        {
+          text: "Examples",
+          link: "/v2/examples.md",
         },
       ],
     },
