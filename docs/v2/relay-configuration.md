@@ -1,87 +1,69 @@
 # Relay Configuration
 
-`RxNostr` が実際に通信するリレーセットはいくつかの方法で指定できますが、もっとも基本的な方法は **デフォルトリレー** 設定を利用することです。
+`RxNostr` が実際に通信するリレーセットはいくつかの方法で指定できますが、もっとも基本的な方法は **デフォルトリレー** を設定することです。
 
 ## Default Relays
 
-`RxNostr` が実際に通信するリレーセットは `rxNostr.switchRelays()` を使って構成できます。
+デフォルトリレーは `rxNostr.setDefaultRelays()` を使って設定できる、読み書き権限の指定を伴うリレーのセットです。特に権限を指定しなかった場合には両方が許可されたものとして扱われます。
 
-```js
+`rxNostr.send()` および `rxNostr.use()` を後述する一時リレーを指定せずに実行する場合には、ここで登録されたデフォルトリレーが使用されます。
+
+```ts
 import { createRxNostr } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-await rxNostr.switchRelays([
+rxNostr.setDefaultRelays([
   "wss://nostr1.example.com",
   "wss://nostr2.example.com",
   "wss://nostr3.example.com",
 ]);
 ```
 
-上の例のように `rxNostr.switchRelays()` に単に WebSocket エンドポイントの URL を渡した場合、それらのリレーに対して **読み取り** と **書き込み** が両方許可されたものとして扱われます。ここで、読み取りとは `RxReq` オブジェクトを通じた REQ メッセージから始まる一連の双方向通信を、書き込みとは `rxNostr.send()` メソッドを通じた EVENT メッセージの送信から始まる一連の双方向通信を指します。
+権限を指定する場合には以下のようにします:
 
-特定のリレーに対して読み取りまたは書き込みのいずれかのみを許可したい場合、`rxNostr.switchRelays()` の引数にオブジェクトのリストを渡すことができます。
-
-```js
-await rxNostr.switchRelays([
+```ts
+rxNostr.setDefaultRelays([
+  // Readonly
   {
     url: "wss://nostr1.example.com",
     read: true,
-    write: false,
   },
+  // Writeonly
   {
-    url: "wss://nostr2.example.com",
-    read: false,
-    write: true,
-  },
-  {
-    url: "wss://nostr3.example.com",
-    read: true,
+    url: "wss://nostr1.example.com",
     write: true,
   },
 ]);
 ```
 
-NIP-07 インターフェースが存在するブラウザ環境下では `window.nostr.getRelays()` の引数をそのまま使うこともできます。
+NIP-07 インターフェースが利用できる場合にはその返り値を直接渡すこともできます:
 
-```js
+```ts
 await rxNostr.switchRelays(await window.nostr.getRelays());
 ```
 
-## Reactivity
+### Reactivity
 
-リレー構成の変更は、現在確立している REQ サブスクリプションに直ちに反映されます。すなわち、新しい構成のもとでもはや読み取りが許可されなくなったリレーにおける REQ は即座に CLOSE され、逆に新しく読み取りが可能になったリレーに対しては同等の REQ が自動的に送信されます。
+デフォルトリレー上での通信は、読み取りについて反応的かつ適応的です。すなわち、デフォルトリレーの変更は現在確立している REQ サブスクリプションに直ちに反映されます。
 
-## Auto Reconnection
+より詳しく説明すると、今すでにデフォルトリレーの上で REQ サブスクリプションが存在しているとしてデフォルトリレーの構成に変更を加えると、新しいデフォルトリレーのもとではもはや読み取りが許可されなくなったリレーでの REQ は直ちに CLOSE され、逆に新しく読み取りが可能になったリレーに対しては同等の REQ が自動的に送信されます。
 
-WebSocket が予期しない理由で切断されたとき、rx-nostr は [exponential backoff and jitter](https://aws.amazon.com/jp/blogs/architecture/exponential-backoff-and-jitter/) 戦略に従って自動で再接続を試みます。この挙動は `createRxNostr()` のオプションで変更できます。
+デフォルトリレーの変更は、後述する一時リレーの上での通信には影響しません。
 
-## Read on a subset of relays (v1.1.0+)
+## Temporary Relays
 
-構成された読み取り可能リレーのうちの一部だけで REQ サブスクリプションを確立したい場合、`rxNostr.use()` の `scope` オプションにリレーの URL のリストを指定できます。
-`scope` オプションに URL を指定しても、指定された URL が構成されていない場合には読み取りは発生しないことに注意してください。
+`rxNostr.send()` や `rxNostr.use()` などの第二引数に `relays` オプションを渡すことによって、**一時リレー** の上で通信することができます。一時リレーは [Connection Strategy](./connection-strategy.md) の設定に関わらず、必要な間だけ接続され不要になると切断されます。
 
-```js
-await rxNostr.switchRelays([
-  "wss://nostr1.example.com",
-  "wss://nostr2.example.com",
-]);
+一時リレーの指定はデフォルトリレーにおける権限設定を**尊重しません**。つまり、デフォルトリレーに何が指定されていようと、一時リレーに対して書き込みないし読み取りを実行します。
 
-// - `wss://nostr1.example.com` will be used.
-// - `wss://unknown.example.com` and `wss://not-yet.example.com`
-//   will not be used because it is not in the configuration.
-rxNostr.use(rxReq, {
-  scope: [
-    "wss://nostr1.example.com",
-    "wss://unknown.example.com",
-    "wss://not-yet.example.com",
-  ],
-});
+### Publish on Temporary Relays
 
-// `addRelay()` is a wrapper of `switchRelays()`.
-// This is equivalent to:
-//   `rxNostr.switchRelays([...rxNostr.getRelays(), 'wss://not-yet.example.com'])`
-await rxNostr.addRelay("wss://not-yet.example.com");
+`rxNostr.send()` の第二引数に `relays` オプションを渡すと一時リレーに対して EVENT を送信することができます。
 
-// Now `wss://not-yet.example.com` is available.
-rxReq.emit(filters);
-```
+一時リレーは書き込みにかかる通信の間、言い換えると EVENT を発行してから OK を受け取るまでの間だけ接続され、それが終わると (ほかのデフォルトリレーや一時リレーとして使われていない限り) 切断されます。
+
+### Subscribe on Temporary Relays
+
+読み取りにおける一時リレーは `rxNostr.use()` で指定する **use scope** と `rxReq.emit()` で指定する **emit scope** の 2 種類が存在し、より狭いスコープの指定 (つまり emit scope) が優先されます。
+
+一時リレーは読み取りにかかる通信の間、言い換えると REQ を発行してから CLOSE されるまでの間だけ接続され、それが終わると (ほかのデフォルトリレーや一時リレーとして使われていない限り) 切断されます。
