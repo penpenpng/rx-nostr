@@ -3,10 +3,10 @@ home: true
 tagline: Make easier Nostr development, with RxJS
 actions:
   - text: Get Started
-    link: ./v2/
+    link: ./v2/ja/
     type: primary
   - text: Examples
-    link: ./v2/examples
+    link: ./v2/ja/examples
     type: secondary
 features:
   - title: Reactive
