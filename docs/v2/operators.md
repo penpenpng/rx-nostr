@@ -2,7 +2,7 @@
 
 rx-nostr の各所に存在する Observable は純粋な RxJS の Observable インスタンスなので、[operator](https://rxjs.dev/guide/operators) を適用することができます。`RxReq` だけは Observable の他に REQ Strategy 等の情報を保持するためこれそのものは Observable インスタンスではないのですが、RxJS の `observable.pipe()` と完全な互換性を持つ `pipe()` メソッドを備えているので、やはり同様に operator を適用することができます。
 
-rx-nostr が提供する operator はもちろんのこと、RxJS が提供する強力な operator の力を借りることも可能です。以下はその一例です。より多くの例は [Examples](.//examples.md) を参照してください。
+rx-nostr が提供する operator はもちろんのこと、RxJS が提供する強力な operator の力を借りることも可能です。以下はその一例です。より多くの例は [Examples](./examples.md) を参照してください。
 
 ```js:line-numbers{8-11,15-20}
 import { throttleTime } from "rxjs";

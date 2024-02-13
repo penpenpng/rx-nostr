@@ -72,9 +72,13 @@ export default defineUserConfig({
           text: "Introduction",
           children: [
             "/v2/index.md",
+            "/v2/installation.md",
             "/v2/getting-started.md",
-            "/v2/first-step.md",
           ],
+        },
+        {
+          text: "Publish / Subscribe",
+          children: ["/v2/sending-event.md"],
         },
         {
           text: "Guide",
