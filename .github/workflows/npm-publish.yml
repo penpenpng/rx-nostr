@@ -21,10 +21,10 @@ jobs:
           path: |
             node_modules
           key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
-      - run: npm install install
-      - run: npm install lint
-      - run: npm install test
-      - run: npm install build
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
       - run: npx -y can-npm-publish && npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}

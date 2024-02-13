@@ -40,7 +40,7 @@ jobs:
           path: |
             node_modules
           key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
-      - run: npm install
+      - run: npm ci
       - run: npm run docs:build
 
       # Deploy
