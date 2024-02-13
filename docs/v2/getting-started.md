@@ -1,41 +1,112 @@
 # Getting Started
 
-## Installation
+rx-nostr の構造を理解するためには中心となる 3 種類の登場人物について知る必要があります。 それは [`RxReq`](/api/rx-req.md), [`RxNostr`](/api/rx-nostr.md)とあなたのアプリケーションです。rx-nostr の世界ではこれら 3 種類の登場人物の間を `RxReq -> RxNostr -> Your Application` の単方向に **Packet** と呼ばれるデータが流れます。実際のコードを見る前に、まずは `RxReq` と `RxNostr` が一体何者であるのかを確認しましょう。
 
-npm または yarn から以下の通りインストールできます。
+`RxReq` は [REQ message](https://github.com/nostr-protocol/nips/blob/master/01.md#from-client-to-relay-sending-events-and-creating-subscriptions) を組み立てるために必要な情報 (**`ReqPacket`**) を `RxNostr` に送出するオブジェクトです。あなたは `RxReq` が提供するインターフェースを通じて、間接的に REQ を発行することができます。ここで、`RxReq` はあくまで REQ message に必要な情報を提供するだけで、リレーとの交信を行うのは次に説明する `RxNostr` の役目であることに注意してください。
 
-:::: code-group
-::: code-group-item npm
+`RxNostr` は受け取った `ReqPacket` をもとにリレーとの間に REQ サブスクリプションを確立し、これを管理するオブジェクトです。あなたは `RxNostr` が提供するインターフェースを通じて、EVENT message をはじめとしたリレーからもたらされる各種の情報を Packet として受け取ることができます。
 
-```sh
-npm install rx-nostr
+なお、`RxNostr` はひとつのリレープールと関連づいています。言い換えると、同じ `RxNostr` インスタンスの上では同一のリレーとの通信はすべてひとつの WebSocket 接続にまとめあげられ、逆に、異なるインスタンスの間では同一リレーに対しても異なる WebSocket 接続が確立されるということです。
+
+全体の流れを眺めたところで、早速最小の Nostr アプリケーションを構築してみましょう！まずは `RxNostr` オブジェクトを生成して、リレープールと関連付けます。
+
+```ts:line-numbers
+import { createRxNostr } from "rx-nostr";
+
+const rxNostr = createRxNostr();
+rxNostr.setDefaultRelays([
+  "wss://relay1.example.com",
+  "wss://relay2.example.com",
+]);
 ```
 
-:::
-::: code-group-item yarn
+次に `RxReq` オブジェクトを生成して、`RxNostr` と関連付けます。これで `RxReq` から `RxNostr` に `ReqPacket` を送出する準備が整いました。
 
-```sh
-yarn add rx-nostr
+```ts:line-numbers{9-11}
+import { createRxNostr, createRxForwardReq } from "rx-nostr";
+
+const rxNostr = createRxNostr();
+rxNostr.setDefaultRelays([
+  "wss://relay1.example.com",
+  "wss://relay2.example.com",
+]);
+
+const rxReq = createRxForwardReq();
+
+rxNostr.use(rxReq);
 ```
 
-:::
-::::
+`rxNostr.use()` の返り値は `subscribe()` 可能なオブジェクト (正確には RxJS の [`Observable`](https://rxjs.dev/guide/observable) ですが、それについて知っておく必要はありません) です。REQ の結果として得られる **`EventPacket`** をここで受け取ることができます。つまり、以下のハイライト部分が `RxReq -> RxNostr -> Your Application` フローにおける `Your Application` 相当の部分です。
 
-::: tip Node
-rx-nostr を Node.js ランタイムの上で使用する場合は [websocket-polyfill](https://www.npmjs.com/package/websocket-polyfill) も同時にインストールする必要があります。
-:::
+```ts:line-numbers{12-13}
+import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
-## Playground
+const rxNostr = createRxNostr();
+rxNostr.setDefaultRelays([
+  "wss://relay1.example.com",
+  "wss://relay2.example.com",
+]);
 
-rx-nostr をすぐに試したい場合は以下の通りリポジトリをクローンして、`app/main.ts` を編集して動作を確認することができます。
+const rxReq = createRxForwardReq();
 
-```sh
-git clone https://github.com/penpenpng/rx-nostr
-cd rx-nostr
-npm install
-npm run dev
-
-# then, open http://localhost:5173/ and edit ./app/main.ts
+rxNostr.use(rxReq).subscribe((packet) => {
+  // This is your minimal application!
+  console.log(packet);
+});
 ```
 
-vite の HMR により、`app/main.ts` の変更が保存されるとページが即座にリロードされスクリプトは再実行されます。
+しかしこのアプリケーションはまだ何も仕事をしないでしょう。なぜなら Packet が流れてこないからです。そう、`ReqPacket` を送出しなければなりませんね。
+
+```ts:line-numbers{16-17}
+import { createRxNostr, createRxForwardReq } from "rx-nostr";
+
+const rxNostr = createRxNostr();
+rxNostr.setDefaultRelays([
+  "wss://relay1.example.com",
+  "wss://relay2.example.com",
+]);
+
+const rxReq = createRxForwardReq();
+
+rxNostr.use(rxReq).subscribe((packet) => {
+  // This is your minimal application!
+  console.log(packet);
+});
+
+// Send REQ message to listen kind1 events
+rxReq.emit({ kinds: [1] });
+```
+
+16, 17 行目を追加しました。さほど不思議なコードではないはずです。
+これによって、`RxReq` は `RxNostr` に向かって `ReqPacket` をひとつ送出します。`RxNostr` は受け取った Packet をもとに REQ サブスクリプションを確立・購読し、購読されたイベントが 13 行目で消費されることになるでしょう。おめでとうございます！タイムラインを表示するアプリケーションの完成です！
+
+ただ少し待ってください、最後にひと仕事だけ残っています。このままでは購読は永遠に続きます。CLOSE message を送出しなければなりません。
+
+rx-nostr では `subscribe()` の結果を `unsubscribe()` することによって、`use()` で関連づいている REQ をすべて CLOSE することができます。少し不格好ですがここでは 10 秒後に CLOSE する、ということにしましょう。次のようにコードを追加します。
+
+```js:line-numbers{11,19-22}
+import { createRxNostr, createRxForwardReq } from "rx-nostr";
+
+const rxNostr = createRxNostr();
+rxNostr.setDefaultRelays([
+  "wss://relay1.example.com",
+  "wss://relay2.example.com",
+]);
+
+const rxReq = createRxForwardReq();
+
+const subscription = rxNostr.use(rxReq).subscribe((packet) => {
+  // This is your minimal application!
+  console.log(packet);
+});
+
+// Send REQ message to listen kind1 events
+rxReq.emit({ kinds: [1] });
+
+// Send CLOSE message in 10 seconds
+setTimeout(() => {
+  subscription.unsubscribe();
+}, 10 * 1000);
+```
+
+完璧です！

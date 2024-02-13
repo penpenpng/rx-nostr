@@ -1,18 +1,33 @@
 # Overview
 
-rx-nostr は [Nostr](https://nostr.com/) アプリケーションがリレーとより簡単に通信するための [RxJS](https://rxjs.dev/) に基づくライブラリです。Nostr アプリケーションの開発者が考慮を迫られる以下のような煩わしい課題を肩代わりし、開発者がアプリケーションロジックに集中する手助けをします。
+rx-nostr は [Nostr](https://nostr.com/) アプリケーションがひとつまたは複数のリレーとの堅牢な通信を簡便かつ直感的に実現するためのライブラリです。rx-nostr は [RxJS](https://rxjs.dev/) で実装されており、RxJS の諸機能とのシームレスな連携が可能となるよう設計されていますが、RxJS との併用は必須ではありません。
 
-- **REQ サブスクリプションの管理**: REQ の確立および更新、あるいは自動的な CLOSE を初めとした REQ サブスクリプションの管理を簡潔なインターフェースで実現します。
-- **リレープールの管理**: リレーの集合をリアクティブに扱います。リレーの増減や Read/Write 設定の変更といったリレー構成の変化に反応して、新しいリレー構成のもとで現在アクティブな REQ を適切に再構成します。
-- **WebSocket 接続の管理**: WebSocket の自動再接続と、それに伴う必要に応じた REQ の再発行を行います。接続状態の変化を購読することも可能で、アプリケーションが接続しているリレー集合のヘルスステータスを簡単に確認できるようにします。
+Nostr アプリケーションの開発者は rx-nostr を利用することで、リレー通信に伴う以下のような煩わしい問題の存在を意識せず、[NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md) に基づく publish/subscribe を透過的に扱えるようになります。
 
-rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、これと同等のコードの説明は [First Step](.//first-step.md) で詳述します。より複雑な例は [Examples](.//examples.md) で見ることができます。
+- **REQ サブスクリプションの管理**:
+  - REQ の確立、CLOSE の送出、CLOSED メッセージのハンドリングといった REQ サブスクリプションの管理に必須の低レベルな操作を、より高レベルに抽象化されたインターフェースで取り扱えるようになります。
+- **WebSocket の再接続**:
+  - バックオフ戦略に基づいて WebSocket 伝送路の自動再接続を行います。切断時に伝送路から失われた REQ サブスクリプションも自動的に再構成します。
+- **WebSocket 接続の遅延およびアイドリング**:
+  - リレーとの WebSocket 接続を本当に必要になるまで遅延させたり、使われなくなった接続を自動で切断することができます。この挙動は設定で無効にもできます。
+- **WebSocket 接続状態のモニタリング**:
+  - WebSocket 接続のヘルスステータスを監視できます。アプリケーションはこれをリレーとの接続状況をユーザに通知するインターフェースの構築などに応用できます。
+- **リレープールの管理**:
+  - リレーの集合をリアクティブに扱います。デフォルトリレーの増減や Read/Write 設定の変更といったリレー構成の変化に反応して、新しいリレー構成のもとで現在アクティブな REQ を適切に再構成します。
+- **リレーサーバ固有の制約へのフレキシブルな対応**
+  - [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) に基づいて公開されるリレーの同時 REQ サブスクリプション上限に抵触しないよう、リレーへの REQ 要求を適切にキューイングします。
+- **AUTH メッセージの自動ハンドリング**
+  - [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングします。rx-nostr を利用する場合、NIP-42 に対応するための追加の開発は必要ありません。
+- **署名およびその検証**
+  - 署名およびその検証を自動で行います。イベントを発行する際に開発者が用意する必要がある情報は、イベントの本質的なコンテンツだけです。
+
+rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、このコードの説明は [Hello, rx-nostr](./first-step.md) で詳述します。より複雑な例は [Examples](./examples.md) で見ることができます。
 
 ```js
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
 
 const rxNostr = createRxNostr();
-await rxNostr.switchRelays(["wss://nostr.example.com"]);
+rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
 
 const rxReq = createRxForwardReq();
 
@@ -23,12 +38,10 @@ rxNostr.use(rxReq).subscribe((packet) => {
 rxReq.emit({ kinds: [1] });
 ```
 
-また、rx-nostr は RxJS 以外のフレームワークに依存しません。これは rx-nostr を任意のフロンエンドフレームと組み合わせて Web フロントエンドアプリケーションに利用することも、あるいは任意の Node.js ライブラリと組み合わせて bot や CLI アプリケーションを構築することも可能であることを意味します。
-
 ::: tip Note
-本ドキュメントは Nostr と RxJS に関する基本的な知識を前提として記述されます。これらについて馴染みのない方は先に次に挙げる資料に目を通すことをおすすめします。
+本ドキュメントは NIP の、特に NIP-01 に関する基本的な理解を前提に記述されます。これに馴染みのない方は以下に挙げる資料に先に目を通すことをおすすめします。
 
-- [NIPs](https://github.com/nostr-protocol/nips) の特に [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)
-- [RxJS Introduction](https://rxjs.dev/guide/overview)
+- [NIP-01 (EN)](https://github.com/nostr-protocol/nips/blob/master/01.md)
+- [NIP-01 (JA)](https://github.com/nostr-jp/nips-ja/blob/main/01.md)
 
 :::

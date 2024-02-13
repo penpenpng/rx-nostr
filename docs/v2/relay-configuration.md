@@ -1,5 +1,9 @@
 # Relay Configuration
 
+`RxNostr` が実際に通信するリレーセットはいくつかの方法で指定できますが、もっとも基本的な方法は **デフォルトリレー** 設定を利用することです。
+
+## Default Relays
+
 `RxNostr` が実際に通信するリレーセットは `rxNostr.switchRelays()` を使って構成できます。
 
 ```js
