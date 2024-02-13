@@ -15,11 +15,11 @@ WebSocket 接続がステータスコード 4000 によって切断された場�
 
 WebSocket の再接続に伴って REQ が再発行されるとき、過去に発行した REQ とまったく同一の REQ を再度発行するのは望ましくない場合があります。
 
-例えば、現在よりも「未来」の投稿を購読するために `{ since: datetime }` フィルターを送信したとします。この購読が有効なうちに WebSocket の再接続が発生するとリレーには再度まったく同じ REQ が送信されますが、これはつまり再接続時点から見て「過去」のイベントをリレーに要求することを意味しており、期待に反します。
+例えば、現在よりも「未来」の投稿を購読するために `{ since: Math.floor(Date.now() / 1000) }` フィルターを送信したとします。この購読が有効なうちに WebSocket の再接続が発生するとリレーには再度まったく同じ REQ が送信されますが、これはつまり再接続時点から見て「過去」のイベントをリレーに要求することを意味しており、期待に反します。
 
 この問題に対応するため、`rxReq.emit()` は Nostr 標準の Filter オブジェクトの代わりに独自の `LazyFilter` 型を許容しています。`LazyFilter` は `since` または `until` に数値の代わりに `() => number` 型の関数も受け入れる Filter です。`since`/`until` に関数を渡した場合、リレーに実際に送信される `since`/`until` の値は送信の直前に評価されます。
 
-例えば `{ since: CURRENT_DATETIME }` の代わりに `{ since: () => CURRENT_DATETIME }` を指定すると、再接続時点であらためて `since` が評価され、常に「未来」のイベントを購読できます。rx-nostr はこのユースケースのために便利な `now` ユーティリティを公開しています。
+先の例では、`{ since: Math.floor(Date.now() / 1000) }` の代わりに `{ since: () => Math.floor(Date.now() / 1000) }` を指定すると、再接続時点であらためて `since` が評価され、常に「未来」のイベントを購読できます。rx-nostr はこのユースケースのために便利な `now` ユーティリティを公開しています。
 
 ```ts
 import { createRxNostr, createRxForwardReq, now } from "rx-nostr";

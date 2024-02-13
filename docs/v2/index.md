@@ -17,7 +17,7 @@ Nostr アプリケーションの開発者は rx-nostr を利用することで�
 - **リレーサーバ固有の制約へのフレキシブルな対応**
   - [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) に基づいて公開されるリレーの同時 REQ サブスクリプション上限に抵触しないよう、リレーへの REQ 要求を適切にキューイングします。
 - **AUTH メッセージの自動ハンドリング**
-  - [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングします。rx-nostr を利用する場合、NIP-42 に対応するための追加の開発は必要ありません。
+  - [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングします。rx-nostr を利用する場合、NIP-42 に対応するためにはオプションを設定するだけで済みます。
 - **署名およびその検証**
   - 署名およびその検証を自動で行います。イベントを発行する際に開発者が用意する必要がある情報は、イベントの本質的なコンテンツだけです。
 
