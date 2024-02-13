@@ -1,19 +1,22 @@
 ---
 home: true
-tagline: Make easier Nostr development, with RxJS
+tagline: Easier and more carefully communications
 actions:
   - text: Get Started
     link: ./v2/
     type: primary
-  - text: Examples
-    link: ./v2/examples
-    type: secondary
 features:
-  - title: Reactive
-    details: Manage all communication reactively to changes in relays or subscriptions.
-  - title: Highly Expressive
-    details: Take full advantage of RxJS's highly expressive declarative notation.
-  - title: Framework Free
-    details: Independent on any front-end or back-end framework.
-footer: 2023 penpenpng
+  - title: REQ Queuing
+    details: Properly queue REQ requests so that concurrent REQ subscriptions do not exceed the limit.
+  - title: WebSocket Reconnection
+    details: Reconnect WebSocket under an appropriate back-off strategy, and properly restore REQ subscriptions.
+  - title: Adaptive Relay Pool
+    details: Reconfigure ongoing communications in response to changes in the relay pool.
+  - title: Respect NIP-11 limitations
+    details: Optimize behavior with respecting to NIP-11 limitation.
+  - title: AUTH Support
+    details: With only a few settings, gets fully compatible with AUTH based on NIP-42.
+  - title: Integration with RxJS
+    details: Seamless integration with RxJS. Take full advantage of RxJS's highly expressive declarative notation.
+footer: 2024 penpenpng
 ---

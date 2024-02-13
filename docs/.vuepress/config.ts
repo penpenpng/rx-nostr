@@ -94,7 +94,14 @@ export default defineUserConfig({
         },
         {
           text: "Operators",
-          children: ["/v2/operators.md", "/v2/examples.md"],
+          children: [
+            "/v2/operators.md",
+            "/v2/event-packet-operators.md",
+            "/v2/req-packet-operators.md",
+            "/v2/ok-packet-operators.md",
+            "/v2/message-packet-operators.md",
+            "/v2/general-operators.md",
+          ],
         },
         {
           text: "Addendum",
