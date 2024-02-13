@@ -1,13 +1,13 @@
 # Subscribe EVENT
 
-`RxNostr` の `use()` メソッドを通じて EVENT message を購読することができます。
+`RxNostr` の `use()` メソッドを通じて EVENT メッセージを購読することができます。
 
-EVENT message 購読までの大まかな流れは次の通りです:
+EVENT メッセージ購読までの大まかな流れは次の通りです:
 
 1. `createRxNostr()` で `RxNostr` オブジェクトを得る
 2. `createRxForwardReq()` または `createRxBackwardReq()` で `RxReq` オブジェクトを得る
-3. `rxNostr.use(rxReq).subscribe(callback)` で EVENT message 受信時の処理を登録しつつ、`Subscription` オブジェクトを得る
-4. `rxReq.emit(filter)` で REQ message を発行する
+3. `rxNostr.use(rxReq).subscribe(callback)` で EVENT メッセージ受信時の処理を登録しつつ、`Subscription` オブジェクトを得る
+4. `rxReq.emit(filter)` で REQ メッセージを発行する
 5. 購読が不要になったら `subscription.unsubscribe()` して購読を終了する
 
 [Getting Started](./getting-started.md) ではこの流れを具体的なコードとともに説明しているので参考にしてください。
@@ -29,7 +29,7 @@ Forward Strategy はこれから発行されるであろう未来のイベント
 - 各 `ReqPacket` はすべて同じ subId を持つ REQ サブスクリプションを確立します。つまり、古い REQ サブスクリプションは上書きされ、**常にひとつ以下の REQ サブスクリプションを保持します。**
 - REQ サブスクリプションは次のいずれかの場合に CLOSE されます。
   - Rx サブスクリプションが明示的に `unsubscribe()` される。
-  - AUTH 要求以外の理由で CLOSED message を受け取る。
+  - AUTH 要求以外の理由で CLOSED メッセージを受け取る。
   - `RxNostr` が明示的に `dispose()` される。
 
 ::: tip Note
@@ -42,10 +42,10 @@ Backward Strategy は既に発行された過去のイベントを取得する�
 
 - 各 `ReqPacket` は互いに異なる subId を持つ REQ サブスクリプションを確立します。つまり、**複数の REQ サブスクリプションが同時に並行する可能性があります。**
 - REQ サブスクリプションは次のいずれかの場合に CLOSE されます。
-  - **EOSE message を受け取る。**
-  - **EVENT message を受け取れない状態が一定時間継続する。**
+  - **EOSE メッセージを受け取る。**
+  - **EVENT メッセージを受け取れない状態が一定時間継続する。**
   - Rx サブスクリプションが明示的に `unsubscribe()` される。
-  - AUTH 要求以外の理由で CLOSED message を受け取る。
+  - AUTH 要求以外の理由で CLOSED メッセージを受け取る。
   - `RxNostr` が明示的に `dispose()` される。
 
 ::: warning
@@ -55,7 +55,7 @@ Backward Strategy はすべての REQ が EOSE を返すことを期待して動
 :::
 
 ::: tip Note
-デフォルトでは EVENT message が受け取れない状態が 30 秒継続したときに CLOSE されます。この時間は `createRxNostr()` の `eoseTimeout` オプションで変更できます。
+デフォルトでは EVENT メッセージ が受け取れない状態が 30 秒継続したときに CLOSE されます。この時間は `createRxNostr()` の `eoseTimeout` オプションで変更できます。
 :::
 
 #### over()

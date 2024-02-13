@@ -54,7 +54,7 @@ console.log(`${pubkey} は ${id} を送信しました。`);
 
 ## Handling OK Messages
 
-`send()` の返り値は `subscribe()` 可能なオブジェクトです。これを `subscribe()` することで、OK message を待ち受けることができます。
+`send()` の返り値は `subscribe()` 可能なオブジェクトです。これを `subscribe()` することで、OK メッセージを待ち受けることができます。
 
 ```ts
 rxNostr.send(event).subscribe((packet) => {
@@ -65,9 +65,9 @@ rxNostr.send(event).subscribe((packet) => {
 ```
 
 ::: warning
-EVENT 送信の過程で [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH を求められた場合、rx-nostr は AUTH の後に EVENT を自動で再送します。このシナリオでは同一のリレーから 2 つの OK message を受け取りうることに注意してください。あるリレーから OK message を受け取ったとき、2 回目の OK message が届きうるかを確かめるには `packet.done` が `false` であることを確認します。
+EVENT 送信の過程で [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH を求められた場合、rx-nostr は AUTH の後に EVENT メッセージを自動で再送します。このシナリオでは同一のリレーから 2 つの OK メッセージを受け取りうることに注意してください。あるリレーから OK メッセージを受け取ったとき、2 回目の OK メッセージが届きうるかを確かめるには `packet.done` が `false` であることを確認します。
 :::
 
 ::: tip RxJS Tips
-`send()` の返り値は厳密には Observable です。この Observable は OK message がこれ以上届き得ないと判断された時点で complete します。また、まだ OK message が届き得るにも関わらず何も届かないまま 30 秒が経過したときには error で終了します。この待ち時間は `createRxNostr()` の `okTimeout` オプションで変更できます。
+`send()` の返り値は厳密には Observable です。この Observable は OK メッセージがこれ以上届き得ないと判断された時点で complete します。また、まだ OK メッセージが届き得るにも関わらず何も届かないまま 30 秒が経過したときには error で終了します。この待ち時間は `createRxNostr()` の `okTimeout` オプションで変更できます。
 :::

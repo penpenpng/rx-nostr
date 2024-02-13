@@ -58,7 +58,7 @@ await rxNostr.switchRelays(await window.nostr.getRelays());
 
 ### Publish on Temporary Relays
 
-`rxNostr.send()` の第二引数に `relays` オプションを渡すと一時リレーに対して EVENT を送信することができます。
+`rxNostr.send()` の第二引数に `relays` オプションを渡すと一時リレーに対してイベントを送信することができます。
 
 一時リレーは書き込みにかかる通信の間、言い換えると EVENT を発行してから OK を受け取るまでの間だけ接続され、それが終わると (ほかのデフォルトリレーや一時リレーとして使われていない限り) 切断されます。
 

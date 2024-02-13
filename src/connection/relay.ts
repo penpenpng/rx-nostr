@@ -265,6 +265,12 @@ export class RelayConnection {
           subId: message[1],
           count: message[2],
         };
+      default:
+        return {
+          from,
+          type: "unknown",
+          message,
+        };
     }
   }
 

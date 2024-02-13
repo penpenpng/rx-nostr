@@ -245,12 +245,6 @@ export function filterByType<T extends Nostr.ToClientMessage.Type>(
 /** @deprecated Renamed. Use `filterByType` instead. */
 export const filterType = filterByType;
 
-export function filterBySubId<P extends { subId: string }>(
-  subId: string
-): OperatorFunction<P, P> {
-  return filter((packet) => packet.subId === subId);
-}
-
 // ----------------------- //
 // OkPacket operators //
 // ----------------------- //
@@ -316,11 +310,13 @@ function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
  */
 export function chunk(
   predicate: (f: LazyFilter[]) => boolean,
-  toChunk: (f: LazyFilter[]) => LazyFilter[][]
+  toChunks: (f: LazyFilter[]) => LazyFilter[][]
 ): MonoTypeOperatorFunction<ReqPacket> {
   return mergeMap((packet) =>
     predicate(packet.filters)
-      ? from(toChunk(packet.filters).map((filters) => ({ ...packet, filters })))
+      ? from(
+          toChunks(packet.filters).map((filters) => ({ ...packet, filters }))
+        )
       : of(packet)
   );
 }
@@ -372,6 +368,12 @@ export function sort<T>(
       return buffer.shift()!;
     })
   );
+}
+
+export function filterBySubId<P extends { subId: string }>(
+  subId: string
+): OperatorFunction<P, P> {
+  return filter((packet) => packet.subId === subId);
 }
 
 // ----------- //
