@@ -85,7 +85,7 @@ describe("aggressive strategy", () => {
     disposeMockRelay(anotherRelay);
   });
 
-  test.only("[forward] Connection establishes immediately", async () => {
+  test("[forward] Connection establishes immediately", async () => {
     await defaultRelay.connected;
     expect(rxNostr.getRelayStatus(DEFAULT_RELAY)?.connection).toBe("connected");
   });
