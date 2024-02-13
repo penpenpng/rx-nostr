@@ -1,6 +1,6 @@
 {
   "name": "rx-nostr",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
   "author": "penpenpng",
   "keywords": [
