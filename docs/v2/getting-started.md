@@ -36,7 +36,7 @@ const rxReq = createRxForwardReq();
 rxNostr.use(rxReq);
 ```
 
-`rxNostr.use()` の返り値は `subscribe()` 可能なオブジェクト (正確には RxJS の [`Observable`](https://rxjs.dev/guide/observable) ですが、それについて知っておく必要はありません) です。REQ の結果として得られる **`EventPacket`** をここで受け取ることができます。つまり、以下のハイライト部分が `RxReq -> RxNostr -> Your Application` フローにおける `Your Application` 相当の部分です。
+`rxNostr.use()` の返り値は `subscribe()` 可能なオブジェクトです。REQ の結果として得られる **`EventPacket`** をここで受け取ることができます。つまり、以下のハイライト部分が `RxReq -> RxNostr -> Your Application` フローにおける `Your Application` 相当の部分です。
 
 ```ts:line-numbers{12-13}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
@@ -50,10 +50,14 @@ rxNostr.setDefaultRelays([
 const rxReq = createRxForwardReq();
 
 rxNostr.use(rxReq).subscribe((packet) => {
-  // This is your minimal application!
+  // これがあなたのアプリケーションです！
   console.log(packet);
 });
 ```
+
+::: tip RxJS Tips
+`use()` の返り値は厳密には RxJS の [`Observable`](https://rxjs.dev/guide/observable) ですが、それについて知っておくことは必須ではありません。しかし、RxJS に親しんでいる開発者であれば RxJS の資産との連携が可能です。
+:::
 
 しかしこのアプリケーションはまだ何も仕事をしないでしょう。なぜなら Packet が流れてこないからです。そう、`ReqPacket` を送出しなければなりませんね。
 
@@ -69,11 +73,11 @@ rxNostr.setDefaultRelays([
 const rxReq = createRxForwardReq();
 
 rxNostr.use(rxReq).subscribe((packet) => {
-  // This is your minimal application!
+  // これがあなたのアプリケーションです！
   console.log(packet);
 });
 
-// Send REQ message to listen kind1 events
+// kind1 event を待ち受けるために REQ message を発行します。
 rxReq.emit({ kinds: [1] });
 ```
 
@@ -96,14 +100,14 @@ rxNostr.setDefaultRelays([
 const rxReq = createRxForwardReq();
 
 const subscription = rxNostr.use(rxReq).subscribe((packet) => {
-  // This is your minimal application!
+  // これがあなたのアプリケーションです！
   console.log(packet);
 });
 
-// Send REQ message to listen kind1 events
+// kind1 event を待ち受けるために REQ message を発行します。
 rxReq.emit({ kinds: [1] });
 
-// Send CLOSE message in 10 seconds
+// 10 秒後に CLOSE message を送信します。
 setTimeout(() => {
   subscription.unsubscribe();
 }, 10 * 1000);

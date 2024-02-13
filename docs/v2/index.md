@@ -21,7 +21,7 @@ Nostr アプリケーションの開発者は rx-nostr を利用することで�
 - **署名およびその検証**
   - 署名およびその検証を自動で行います。イベントを発行する際に開発者が用意する必要がある情報は、イベントの本質的なコンテンツだけです。
 
-rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、このコードの説明は [Hello, rx-nostr](./first-step.md) で詳述します。より複雑な例は [Examples](./examples.md) で見ることができます。
+rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、このコードの説明は [Getting Started](./getting-started.md) で詳述します。より複雑な例は [Examples](./examples.md) で見ることができます。
 
 ```js
 import { createRxNostr, createRxForwardReq } from "rx-nostr";

@@ -78,23 +78,33 @@ export default defineUserConfig({
         },
         {
           text: "Publish / Subscribe",
-          children: ["/v2/sending-event.md"],
-        },
-        {
-          text: "Guide",
           children: [
-            "/v2/req-strategy.md",
+            "/v2/publish-event.md",
+            "/v2/subscribe-event.md",
             "/v2/relay-configuration.md",
-            "/v2/lazy-since-until.md",
-            "/v2/sending-event.md",
-            "/v2/monitoring-connections.md",
-            "/v2/error-handling.md",
-            "/v2/operators.md",
           ],
         },
         {
-          text: "Examples",
-          link: "/v2/examples.md",
+          text: "Connection Management",
+          children: [
+            "/v2/connection-strategy.md",
+            "/v2/reconnection.md",
+            "/v2/monitoring-connections.md",
+          ],
+        },
+        {
+          text: "Operators",
+          children: ["/v2/operators.md", "/v2/examples.md"],
+        },
+        {
+          text: "Addendum",
+          children: [
+            "/v2/auto-filtering.md",
+            "/v2/auth.md",
+            "/v2/nip11-registry.md",
+            "/v2/error-handling.md",
+            "/v2/debugging.md",
+          ],
         },
       ],
     },

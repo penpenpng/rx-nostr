@@ -19,7 +19,8 @@ yarn add rx-nostr
 :::
 ::::
 
-Node.js など、トップレベルスコープに `WebSocket` コンストラクタが存在しないランタイムで rx-nostr を使用する場合、`RxNostr` に `WebSocket` コンストラクタを渡す必要があります。以下は Node.js で [ws](https://github.com/websockets/ws) による WebSocket 実装を利用する例です:
+::: tip Note
+Node.js など、トップレベルスコープに `WebSocket` コンストラクタが存在しないランタイムで rx-nostr を使用する場合、`createRxNostr()` に `WebSocket` コンストラクタを渡す必要があります。以下は Node.js で [ws](https://github.com/websockets/ws) による WebSocket 実装を利用する例です:
 
 ```sh
 npm install rx-nostr ws
@@ -33,3 +34,5 @@ const rxNostr = createRxNostr({
   websocketCtor: WebSocket,
 });
 ```
+
+:::
