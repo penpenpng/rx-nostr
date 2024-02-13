@@ -118,9 +118,10 @@ describe("aggressive strategy", () => {
     const req = createRxForwardReq("sub");
     const sub = rxNostr.use(req, { relays: [ANOTHER_RELAY] }).subscribe();
 
-    await anotherRelay.connected;
+    await defaultRelay.connected;
 
     req.emit(faker.filter());
+    await anotherRelay.connected;
     await expect(anotherRelay).toReceiveREQ("sub:0");
 
     sub.unsubscribe();
