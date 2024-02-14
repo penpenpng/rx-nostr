@@ -53,6 +53,7 @@ export interface MessagePacketBase<
 export interface EventPacket extends MessagePacketBase<"EVENT"> {
   subId: string;
   event: Nostr.Event;
+  rootPubkey: string;
 }
 
 export interface EosePacket extends MessagePacketBase<"EOSE"> {

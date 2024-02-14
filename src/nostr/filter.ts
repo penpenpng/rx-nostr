@@ -1,15 +1,18 @@
 import * as Nostr from "nostr-typedef";
 
 import { defineDefault } from "../utils.js";
+import { isDelegatedBy } from "./nip26.js";
 
 export interface MatchFilterOptions {
   sinceInclusive: boolean;
   untilInclusive: boolean;
+  acceptDelegatedEvent: boolean;
 }
 
 const makeMatchFilterOptions = defineDefault<MatchFilterOptions>({
   sinceInclusive: true,
   untilInclusive: true,
+  acceptDelegatedEvent: false,
 });
 
 /**
@@ -32,7 +35,8 @@ function _isFiltered(
   filter: Nostr.Filter,
   options?: Partial<MatchFilterOptions>
 ): boolean {
-  const { sinceInclusive, untilInclusive } = makeMatchFilterOptions(options);
+  const { sinceInclusive, untilInclusive, acceptDelegatedEvent } =
+    makeMatchFilterOptions(options);
 
   if (
     filter.ids &&
@@ -45,7 +49,13 @@ function _isFiltered(
   }
   if (
     filter.authors &&
-    filter.authors.every((prefix) => !event.pubkey.startsWith(prefix))
+    filter.authors.every(
+      (pubkey) =>
+        !(
+          event.pubkey.startsWith(pubkey) ||
+          (acceptDelegatedEvent && isDelegatedBy(event, pubkey))
+        )
+    )
   ) {
     return false;
   }

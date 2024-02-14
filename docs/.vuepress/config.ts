@@ -110,6 +110,7 @@ export default defineUserConfig({
             "/v2/auth.md",
             "/v2/nip11-registry.md",
             "/v2/other-observables.md",
+            "/v2/delegation.md",
           ],
         },
       ],

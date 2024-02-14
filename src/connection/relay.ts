@@ -18,6 +18,7 @@ import {
   RxNostrWebSocketError,
 } from "../error.js";
 import { Nip11Registry } from "../nip11.js";
+import { getRootPubkey } from "../nostr/nip26.js";
 import {
   AuthPacket,
   ClosedPacket,
@@ -217,6 +218,7 @@ export class RelayConnection {
           message,
           subId: message[1],
           event: message[2],
+          rootPubkey: getRootPubkey(message[2]),
         };
       case "EOSE":
         return {
