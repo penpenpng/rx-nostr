@@ -44,17 +44,17 @@ flushes$.next();
 ```ts
 import { createUniq, type EventPacket } from "rx-nostr";
 
-//イベントID に基づいて重複を排除する
+// イベントID に基づいて重複を排除する
 const keyFn = (packet: EventPacket): string => packet.event.id;
 
-const onHit = (packet: EventPacket): void => {
-  console.log(`${packet.id} はすでに観測されています`);
-};
 const onCache = (packet: EventPacket): void => {
   console.log(`${packet.id} を初めて観測しました`);
 };
+const onHit = (packet: EventPacket): void => {
+  console.log(`${packet.id} はすでに観測されています`);
+};
 
-const [uniq, eventIds] = createUniq(keyFn, { onHit, onCache });
+const [uniq, eventIds] = createUniq(keyFn, { onCache, onHit });
 
 // ...
 
@@ -129,16 +129,19 @@ rxNostr
 リレーに対してはすべての kind1 を要求しつつ、クライアントサイドでそれらを細かく振り分けたい場合などに便利です。
 
 ```ts
+import { share } from "rxjs";
 import { filterBy } from "rx-nostr";
 
 // ...
 
-rxNostr
-  .use(rxReq)
-  .pipe(filterBy({ authors: MY_FOLLOWEES }))
-  .subscribe((packet) => {
-    // ...
-  });
+const kind1$ = rxNostr.use(rxReq).pipe(share());
+
+kind1$.pipe(filterBy({ authors: USER_LIST_1 })).subscribe(() => {
+  // ...
+});
+kind1$.pipe(filterBy({ authors: USER_LIST_2 })).subscribe(() => {
+  // ...
+});
 
 rxReq.emit({ kinds: [1] });
 ```
