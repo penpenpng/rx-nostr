@@ -1,11 +1,7 @@
-import { schnorr } from "@noble/curves/secp256k1";
-import { sha256 } from "@noble/hashes/sha256";
-import { bytesToHex } from "@noble/hashes/utils";
 import Nostr from "nostr-typedef";
 
 import { toHex } from "./bech32.js";
-
-const utf8Encoder = new TextEncoder();
+import { schnorr, sha256 } from "./hash.js";
 
 /**
  * Return a signed event that is ready for sending.
@@ -77,7 +73,7 @@ export async function getSignedEvent(
 
 /** Calculate and return public key in HEX format. */
 export function getPublicKey(seckey: string): string {
-  return bytesToHex(schnorr.getPublicKey(seckey));
+  return schnorr.getPublicKey(seckey);
 }
 
 /** Calculate and return event's hash (ID). */
@@ -90,12 +86,12 @@ export function getEventHash(event: Nostr.UnsignedEvent): string {
     event.tags,
     event.content,
   ]);
-  return bytesToHex(sha256(utf8Encoder.encode(serialized)));
+  return sha256(serialized);
 }
 
 /** Calculate and return schnorr signature. */
 export function getSignature(eventHash: string, seckey: string): string {
-  return bytesToHex(schnorr.sign(eventHash, seckey));
+  return schnorr.sign(eventHash, seckey);
 }
 
 /** Verify the given event and return true if it is valid. */

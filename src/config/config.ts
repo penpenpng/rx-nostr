@@ -19,8 +19,9 @@ export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   authTimeout: 30 * 1000,
   skipVerify: false,
   skipValidateFilterMatching: false,
-  skipFetchNip11: false,
   skipExpirationCheck: false,
+  acceptDelegatedEvent: false,
+  skipFetchNip11: false,
   websocketCtor: undefined,
 });
 
@@ -74,13 +75,17 @@ export interface RxNostrConfig {
    */
   skipValidateFilterMatching: boolean;
   /**
+   * If true, skip automatic expiration check based on NIP-40.
+   */
+  skipExpirationCheck: boolean;
+  /**
    * If true, skip automatic fetching NIP-11 relay information.
    */
   skipFetchNip11: boolean;
   /**
-   * If true, skip automatic expiration check based on NIP-40.
+   * If true, delegated events are treated as events issued by the delegator.
    */
-  skipExpirationCheck: boolean;
+  acceptDelegatedEvent: boolean;
   /**
    * Optional. For environments where `WebSocket` doesn't exist in `globalThis` such as Node.js.
    */

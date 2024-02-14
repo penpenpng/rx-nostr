@@ -8,6 +8,7 @@ import {
   getPublicKey,
   getSignature,
 } from "../nostr/event.js";
+import { schnorr, sha256 } from "../nostr/hash.js";
 import { inlineThrow } from "../utils.js";
 
 export interface EventSigner {
@@ -89,5 +90,52 @@ export function seckeySigner(seckey: string): EventSigner {
     async getPublicKey() {
       return pubhex;
     },
+  };
+}
+
+interface WithDelegationParams {
+  delegateeSigner: EventSigner;
+  delegatorSeckey: string;
+  allowedKinds?: number[];
+  allowedSince?: number;
+  allowedUntil?: number;
+}
+
+export function delegateSigner({
+  delegateeSigner,
+  delegatorSeckey,
+  allowedKinds,
+  allowedSince,
+  allowedUntil,
+}: WithDelegationParams): EventSigner {
+  const delegatorPubkey = schnorr.getPublicKey(delegatorSeckey);
+  const conditions = allowedKinds?.map((k) => `kind=${k}`) ?? [];
+  if (allowedSince !== undefined) {
+    conditions.push(`created_at>${allowedSince}`);
+  }
+  if (allowedUntil !== undefined) {
+    conditions.push(`created_at<${allowedUntil}`);
+  }
+  const query = conditions.join("&");
+
+  const getDelegationTag = async () => {
+    const delegateePubkey = await delegateeSigner.getPublicKey();
+
+    const token = schnorr.sign(
+      sha256(`nostr:${delegateePubkey}:${query}`),
+      delegatorSeckey
+    );
+
+    return ["delegation", delegatorPubkey, query, token];
+  };
+
+  return {
+    async signEvent(params) {
+      return delegateeSigner.signEvent({
+        ...params,
+        tags: [...(params.tags ?? []), await getDelegationTag()],
+      });
+    },
+    getPublicKey: delegateeSigner.getPublicKey,
   };
 }
