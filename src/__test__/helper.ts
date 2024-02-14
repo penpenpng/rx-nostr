@@ -29,17 +29,20 @@ export const faker = {
         }
     >
   ): EventPacket {
+    const event = faker.event(packetOrEvent?.event ?? packetOrEvent);
+
     const message: Nostr.ToClientMessage.EVENT = [
       "EVENT",
       packetOrEvent?.subId ?? "*",
-      faker.event(packetOrEvent?.event ?? packetOrEvent),
+      event,
     ];
 
     return {
       from: packetOrEvent?.from ?? "*",
       subId: packetOrEvent?.subId ?? "*",
-      event: faker.event(packetOrEvent?.event ?? packetOrEvent),
+      event,
       message,
+      rootPubkey: event.pubkey,
       type: "EVENT",
     };
   },
@@ -55,6 +58,7 @@ export const faker = {
           message,
           subId: message[1],
           event: message[2],
+          rootPubkey: message[2].pubkey,
         };
       case "EOSE":
         return {
