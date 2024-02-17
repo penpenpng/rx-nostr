@@ -1,6 +1,6 @@
 # AUTH
 
-`createRxNostr()` の `authenticator` オプションを設定すると、rx-nostr は[NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングするようになります。
+`createRxNostr()` の `authenticator` オプションを設定すると、rx-nostr は[NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングするようになります。この機能が有効化されている場合、`auth-required` のステータスで拒否された REQ または EVENT は AUTH の成功後に自動で再送されます。
 
 もっともシンプルな設定は `authenticator: "auto"` です。これは `RxNostr` に与えられた `signer` を使用して AUTH メッセージに応答します。ほとんどのユースケースではこの設定で十分のはずです。
 
