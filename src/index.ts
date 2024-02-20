@@ -1,3 +1,4 @@
+export type * from "./config/index.js";
 export * from "./error.js";
 export * from "./lazy-filter.js";
 export { toHex } from "./nostr/bech32.js";
