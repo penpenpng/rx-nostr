@@ -39,7 +39,7 @@ rxNostr.setDefaultRelays([
 NIP-07 インターフェースが利用できる場合にはその返り値を直接渡すこともできます:
 
 ```ts
-await rxNostr.switchRelays(await window.nostr.getRelays());
+rxNostr.setDefaultRelays(await window.nostr.getRelays());
 ```
 
 ### Reactivity
