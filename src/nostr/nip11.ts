@@ -13,7 +13,7 @@ export async function fetchRelayInfo(
     const res = await fetch(u.toString(), {
       headers: { Accept: "application/nostr+json" },
     });
-    return res.json();
+    return await res.json();
   } catch {
     return {};
   }
