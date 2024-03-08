@@ -167,13 +167,26 @@ export function verify<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
 /**
  * Only events with given kind are allowed to pass.
  */
-export function filterByKind<P extends EventPacket, K extends number>(
-  kind: K
+export function filterByKind<P extends EventPacket>(
+  kind: number,
+  options?: NotOption
 ): MonoTypeOperatorFunction<P> {
-  return filter(({ event }) => event.kind === kind);
+  const { not } = makeNotOption(options);
+  return filter(({ event }) => xor(event.kind === kind, not));
 }
 /** @deprecated Renamed. Use `filterByKind` instead. */
 export const filterKind = filterByKind;
+
+/**
+ * Only events with given kinds are allowed to pass.
+ */
+export function filterByKinds<P extends EventPacket>(
+  kinds: number[],
+  options?: NotOption
+): MonoTypeOperatorFunction<P> {
+  const { not } = makeNotOption(options);
+  return filter(({ event }) => xor(kinds.includes(event.kind), not));
+}
 
 /**
  * Filter events based on a REQ filter object.
@@ -182,11 +195,10 @@ export function filterBy<P extends EventPacket>(
   filters: LazyFilter | LazyFilter[],
   options?: MatchFilterOptions & FilterByOptions
 ): MonoTypeOperatorFunction<P> {
-  const { not } = makeFilterByOptions(options);
+  const { not } = makeNotOption(options);
   const evaledFilter = evalFilters(filters);
   return filter(({ event }) => {
-    const match = isFiltered(event, evaledFilter, options);
-    return not ? !match : match;
+    return xor(isFiltered(event, evaledFilter, options), not);
   });
 }
 
@@ -253,9 +265,11 @@ export const filterType = filterByType;
  * Only events with given kind are allowed to pass.
  */
 export function filterByEventId<P extends OkPacket>(
-  eventId: string
+  eventId: string,
+  options?: NotOption
 ): MonoTypeOperatorFunction<P> {
-  return filter((p) => p.eventId === eventId);
+  const { not } = makeNotOption(options);
+  return filter((p) => xor(p.eventId === eventId, not));
 }
 
 // ------------------- //
@@ -371,9 +385,11 @@ export function sort<T>(
 }
 
 export function filterBySubId<P extends { subId: string }>(
-  subId: string
+  subId: string,
+  options?: NotOption
 ): OperatorFunction<P, P> {
-  return filter((packet) => packet.subId === subId);
+  const { not } = makeNotOption(options);
+  return filter((packet) => xor(packet.subId === subId, not));
 }
 
 // ----------- //
@@ -391,9 +407,17 @@ export interface CreateUniqOptions<T> {
   onHit?: (packet: EventPacket, cache: Set<T>) => void;
 }
 
-export interface FilterByOptions {
+export interface NotOption {
   not: boolean;
 }
-const makeFilterByOptions = defineDefault<FilterByOptions>({
+
+/** @deprecated */
+export type FilterByOptions = NotOption;
+
+const makeNotOption = defineDefault<NotOption>({
   not: false,
 });
+
+function xor(x: boolean, y: boolean) {
+  return (!x && y) || (x && !y);
+}
