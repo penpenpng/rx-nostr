@@ -2,6 +2,7 @@ export type * from "./config/index.js";
 export { nip07Signer, seckeySigner, verifier } from "./config/index.js";
 export * from "./error.js";
 export * from "./lazy-filter.js";
+export { Nip11Registry } from "./nip11.js";
 export { toHex } from "./nostr/bech32.js";
 export {
   compareEvents,
