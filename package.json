@@ -2,13 +2,17 @@
   "description": "rx-nostr's workspace root. This is private.",
   "private": true,
   "scripts": {
-    "dev": "npm run dev -w packages/core"
+    "dev": "npm run dev -w packages/core",
+    "docs:dev": "npm run dev -w packages/docs",
+    "docs:build": "npm run build -w packages/docs"
   },
   "author": "penpenpng",
   "workspaces": [
     "packages/*"
   ],
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.56.0",
+    "@typescript-eslint/parser": "^5.56.0",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-import": "^2.27.5",
