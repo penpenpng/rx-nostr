@@ -4,7 +4,7 @@ import * as Nostr from "nostr-typedef";
  * Fetch relay's information based on [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md).
  */
 export async function fetchRelayInfo(
-  url: string
+  url: string,
 ): Promise<Nostr.Nip11.RelayInfo> {
   const u = new URL(url);
   u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");

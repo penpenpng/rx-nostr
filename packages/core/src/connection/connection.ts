@@ -236,7 +236,7 @@ export class NostrConnection {
       map((reason) => ({
         from: this.url,
         reason,
-      }))
+      })),
     );
   }
 
@@ -259,7 +259,7 @@ export class NostrConnection {
 
 function getAuthenticator(
   url: string,
-  config: RxNostrConfig
+  config: RxNostrConfig,
 ): Authenticator | undefined {
   const a = config.authenticator;
   if (!a) {

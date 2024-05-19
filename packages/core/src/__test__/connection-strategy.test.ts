@@ -55,7 +55,7 @@ describe("keep-lazy strategy", () => {
     await expect(anotherRelay).toReceiveCLOSE("sub:0");
 
     await expect(stateWillBe(rxNostr, ANOTHER_RELAY, "dormant")).resolves.toBe(
-      true
+      true,
     );
   });
 });
@@ -128,7 +128,7 @@ describe("aggressive strategy", () => {
     await expect(anotherRelay).toReceiveCLOSE("sub:0");
 
     await expect(stateWillBe(rxNostr, ANOTHER_RELAY, "dormant")).resolves.toBe(
-      true
+      true,
     );
   });
 });

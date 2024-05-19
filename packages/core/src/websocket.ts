@@ -9,20 +9,20 @@ export interface IWebSocket {
 
   addEventListener(
     method: "message",
-    callback: (event: IMessageEvent) => void
+    callback: (event: IMessageEvent) => void,
   ): void;
   addEventListener(
     method: "close",
-    callback: (event: ICloseEvent) => void
+    callback: (event: ICloseEvent) => void,
   ): void;
   addEventListener(method: "open", callback: () => void): void;
   removeEventListener(
     method: "message",
-    callback: (event: IMessageEvent) => void
+    callback: (event: IMessageEvent) => void,
   ): void;
   removeEventListener(
     method: "close",
-    callback: (event: ICloseEvent) => void
+    callback: (event: ICloseEvent) => void,
   ): void;
   removeEventListener(method: "open", callback: () => void): void;
 

@@ -21,7 +21,7 @@ test("Override req.", async () => {
       foo() {
         return "foo";
       },
-    }))
+    })),
   );
   const override = mixin<{ foo: () => string }, { foo: () => number }>(() => ({
     foo() {
