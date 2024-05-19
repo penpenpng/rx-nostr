@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 import { Observable, Subject } from "rxjs";
 
 import { OkPacketAgainstEvent } from "../packet.js";

@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 import { fetchRelayInfo } from "./nostr/nip11.js";
 import { UrlMap } from "./utils.js";

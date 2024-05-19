@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 import { RxNostrEnvironmentError } from "../error.js";
 import { toHex } from "../nostr/bech32.js";

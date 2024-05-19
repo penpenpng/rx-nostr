@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 import {
   catchError,
   delay,
@@ -108,7 +108,7 @@ export function tie<P extends EventPacket>(
  */
 export function createTie<P extends EventPacket>(): [
   OperatorFunction<P, P & { seenOn: Set<string>; isNew: boolean }>,
-  Map<string, Set<string>>
+  Map<string, Set<string>>,
 ] {
   const memo = new Map<string, Set<string>>();
 
