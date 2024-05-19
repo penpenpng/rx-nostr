@@ -18,7 +18,7 @@ beforeEach(async () => {
   relay3 = createMockRelay(RELAY_URL3);
 
   rxNostr = createRxNostr();
-  await rxNostr.switchRelays([
+  await rxNostr.setDefaultRelays([
     { url: RELAY_URL1, write: true, read: false },
     { url: RELAY_URL2, write: false, read: true },
   ]);
@@ -44,7 +44,7 @@ test("send() doesn't wait for OK from default relays added later.", async () => 
   const spy = spySubscription();
 
   rxNostr.send(faker.event()).pipe(spy.tap()).subscribe();
-  rxNostr.addRelay(RELAY_URL3);
+  rxNostr.addDefaultRelays([RELAY_URL3]);
 
   await relay1.connected;
   await expect(relay1).toReceiveEVENT();

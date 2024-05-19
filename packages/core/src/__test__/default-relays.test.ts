@@ -21,7 +21,7 @@ beforeEach(async () => {
     skipFetchNip11: true,
     skipVerify: true,
   });
-  await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
+  await rxNostr.setDefaultRelays([RELAY_URL1, RELAY_URL2]);
 });
 
 afterEach(() => {
@@ -42,7 +42,7 @@ test("[forward] Adding a new default relay affects existing REQ.", async () => {
   await expect(relay1).toReceiveREQ("sub:0");
   await expect(relay2).toReceiveREQ("sub:0");
 
-  await rxNostr.addRelay(RELAY_URL3);
+  await rxNostr.addDefaultRelays([RELAY_URL3]);
   await expect(relay3).toReceiveREQ("sub:0");
 });
 
@@ -57,6 +57,6 @@ test("[forward] Removing a new default relay affects existing REQ.", async () =>
   await expect(relay1).toReceiveREQ("sub:0");
   await expect(relay2).toReceiveREQ("sub:0");
 
-  await rxNostr.removeRelay(RELAY_URL2);
+  await rxNostr.removeDefaultRelays([RELAY_URL2]);
   await expect(relay2).toReceiveCLOSE("sub:0");
 });
