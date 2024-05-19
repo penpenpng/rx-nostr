@@ -29,7 +29,7 @@ describe("Under a single relay", () => {
       skipFetchNip11: true,
       skipVerify: true,
     });
-    await rxNostr.switchRelays([DEFAULT_RELAY]);
+    await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
   });
 
   afterEach(() => {
@@ -189,7 +189,7 @@ describe("Under a single relay", () => {
 
   test("[oneshot] Receipt of EOSE terminates the Observable.", async () => {
     const req = createRxOneshotReq({
-      subId: "sub",
+      rxReqId: "sub",
       filters: faker.filter(),
     });
     const spy = spySubscription();
@@ -220,7 +220,7 @@ describe("Under multiple relays", () => {
       skipFetchNip11: true,
       skipVerify: true,
     });
-    await rxNostr.switchRelays([RELAY_URL1, RELAY_URL2]);
+    await rxNostr.setDefaultRelays([RELAY_URL1, RELAY_URL2]);
   });
 
   afterEach(() => {
@@ -232,7 +232,7 @@ describe("Under multiple relays", () => {
 
   test("[oneshot] Collect all events under different timing EOSE.", async () => {
     const req = createRxOneshotReq({
-      subId: "sub",
+      rxReqId: "sub",
       filters: faker.filters(),
     });
     const spy = spyEvent();
@@ -298,7 +298,7 @@ describe("Under a relay which is limited REQ concurrency", () => {
       retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
     });
-    await rxNostr.switchRelays([DEFAULT_RELAY]);
+    await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
   });
 
   afterEach(() => {

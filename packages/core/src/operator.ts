@@ -194,7 +194,7 @@ export function filterByKinds<P extends EventPacket>(
  */
 export function filterBy<P extends EventPacket>(
   filters: LazyFilter | LazyFilter[],
-  options?: MatchFilterOptions & FilterByOptions
+  options?: MatchFilterOptions & NotOption
 ): MonoTypeOperatorFunction<P> {
   const { not } = makeNotOption(options);
   const evaledFilter = evalFilters(filters);

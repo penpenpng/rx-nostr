@@ -24,7 +24,7 @@ describe("", () => {
       skipFetchNip11: true,
       skipVerify: true,
     });
-    await rxNostr.switchRelays([DEFAULT_RELAY]);
+    await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
   });
 
   afterEach(() => {
