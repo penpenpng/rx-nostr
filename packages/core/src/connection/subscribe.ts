@@ -133,9 +133,7 @@ export class SubscribeProxy {
 
         return (
           (this.config.skipValidateFilterMatching ||
-            isFiltered(event, filters, {
-              acceptDelegatedEvent: this.config.acceptDelegatedEvent,
-            })) &&
+            isFiltered(event, filters)) &&
           (this.config.skipVerify || this.config.verifier(event)) &&
           (this.config.skipExpirationCheck || !isExpired(event))
         );
