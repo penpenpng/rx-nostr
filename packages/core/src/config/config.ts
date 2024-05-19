@@ -2,11 +2,11 @@ import { defineDefault } from "../utils.js";
 import type { IWebSocketConstructor } from "../websocket.js";
 import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
-import { EventVerifier, verifier } from "./verifier.js";
+import { EventVerifier, noopVerifier } from "./verifier.js";
 
 export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
   signer: nip07Signer(),
-  verifier: verifier,
+  verifier: noopVerifier,
   authenticator: undefined,
   connectionStrategy: "lazy",
   retry: {

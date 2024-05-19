@@ -22,9 +22,10 @@ import {
   TimeoutError,
 } from "rxjs";
 
+import { EventVerifier } from "./config/verifier.js";
 import { RxNostrLogicError } from "./error.js";
 import { evalFilters } from "./lazy-filter.js";
-import { compareEvents, verify as _verify } from "./nostr/event.js";
+import { compareEvents } from "./nostr/event.js";
 import { isFiltered, MatchFilterOptions } from "./nostr/filter.js";
 import { isExpired } from "./nostr/nip40.js";
 import {
@@ -160,8 +161,10 @@ export function latestEach<P extends EventPacket, K>(
 /**
  * Only events with a valid signature are allowed to pass.
  */
-export function verify<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
-  return filter(({ event }) => _verify(event));
+export function verify<P extends EventPacket>(
+  verifier: EventVerifier
+): MonoTypeOperatorFunction<P> {
+  return filter(({ event }) => verifier(event));
 }
 
 /**

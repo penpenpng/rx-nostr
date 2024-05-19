@@ -1,18 +1,10 @@
 export type * from "./config/index.js";
-export { nip07Signer, seckeySigner, verifier } from "./config/index.js";
+export { nip07Signer } from "./config/index.js";
 export * from "./error.js";
 export * from "./lazy-filter.js";
 export { Nip11Registry } from "./nip11.js";
 export { toHex } from "./nostr/bech32.js";
-export {
-  compareEvents,
-  earlierEvent,
-  getEventHash,
-  getPublicKey,
-  getSignature,
-  getSignedEvent,
-  laterEvent,
-} from "./nostr/event.js";
+export { compareEvents, earlierEvent, laterEvent } from "./nostr/event.js";
 export { isFiltered } from "./nostr/filter.js";
 export { fetchRelayInfo } from "./nostr/nip11.js";
 export { isExpired } from "./nostr/nip40.js";
