@@ -5,13 +5,11 @@ import { defineDefault } from "../utils.js";
 export interface MatchFilterOptions {
   sinceInclusive: boolean;
   untilInclusive: boolean;
-  acceptDelegatedEvent: boolean;
 }
 
 const makeMatchFilterOptions = defineDefault<MatchFilterOptions>({
   sinceInclusive: true,
   untilInclusive: true,
-  acceptDelegatedEvent: false,
 });
 
 /**
@@ -34,8 +32,7 @@ function _isFiltered(
   filter: Nostr.Filter,
   options?: Partial<MatchFilterOptions>,
 ): boolean {
-  const { sinceInclusive, untilInclusive, acceptDelegatedEvent } =
-    makeMatchFilterOptions(options);
+  const { sinceInclusive, untilInclusive } = makeMatchFilterOptions(options);
 
   if (
     filter.ids &&
@@ -48,9 +45,7 @@ function _isFiltered(
   }
   if (
     filter.authors &&
-    filter.authors.every(
-      (pubkey) => !(event.pubkey.startsWith(pubkey) || acceptDelegatedEvent),
-    )
+    filter.authors.every((pubkey) => !event.pubkey.startsWith(pubkey))
   ) {
     return false;
   }
