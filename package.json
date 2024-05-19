@@ -3,6 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "npm run dev -w packages/core",
+    "lint": "npm run lint -w packages/core",
+    "test": "npm run test -w packages/core",
+    "build": "npm run build -w packages/core",
     "docs:dev": "npm run dev -w packages/docs",
     "docs:build": "npm run build -w packages/docs"
   },
