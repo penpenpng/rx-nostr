@@ -61,7 +61,7 @@ export class RelayConnection {
 
   constructor(
     public url: string,
-    private config: RxNostrConfig
+    private config: RxNostrConfig,
   ) {
     // Caching
     if (!config.skipFetchNip11) {
@@ -185,7 +185,7 @@ export class RelayConnection {
               if (!this.disposed) {
                 this.connect(nextRetry);
               }
-            }
+            },
           );
         } else {
           this.setState("error");
@@ -318,17 +318,17 @@ export class RelayConnection {
 
   getEVENTObservable(): Observable<EventPacket> {
     return this.message$.pipe(
-      filter((p): p is EventPacket => p.type === "EVENT")
+      filter((p): p is EventPacket => p.type === "EVENT"),
     );
   }
   getEOSEObservable(): Observable<EosePacket> {
     return this.message$.pipe(
-      filter((p): p is EosePacket => p.type === "EOSE")
+      filter((p): p is EosePacket => p.type === "EOSE"),
     );
   }
   getCLOSEDObservable(): Observable<ClosedPacket> {
     return this.message$.pipe(
-      filter((p): p is ClosedPacket => p.type === "CLOSED")
+      filter((p): p is ClosedPacket => p.type === "CLOSED"),
     );
   }
   getOKObservable(): Observable<OkPacket> {
@@ -336,7 +336,7 @@ export class RelayConnection {
   }
   getAUTHObservable(): Observable<AuthPacket> {
     return this.message$.pipe(
-      filter((p): p is AuthPacket => p.type === "AUTH")
+      filter((p): p is AuthPacket => p.type === "AUTH"),
     );
   }
   getAllMessageObservable(): Observable<MessagePacket> {
@@ -355,7 +355,7 @@ export class RelayConnection {
       map((state) => ({
         from: this.url,
         state,
-      }))
+      })),
     );
   }
   getErrorObservable(): Observable<unknown> {
@@ -392,7 +392,7 @@ function retryTimer(config: RetryConfig, count: number) {
     case "exponential": {
       const time = Math.max(
         config.initialDelay * 2 ** (count - 1) + (Math.random() - 0.5) * 1000,
-        1000
+        1000,
       );
       return timer(time);
     }

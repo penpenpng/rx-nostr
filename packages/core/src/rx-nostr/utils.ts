@@ -25,7 +25,7 @@ export function makeLazyREQ(params: {
 }
 
 export function normalizeRelaysConfig(
-  config: AcceptableDefaultRelaysConfig
+  config: AcceptableDefaultRelaysConfig,
 ): Record<string, DefaultRelayConfig> {
   if (Array.isArray(config)) {
     const arr = config.map((urlOrConfig) => {

@@ -137,7 +137,7 @@ class RxNostrImpl implements RxNostr {
       Array.from(this.connections.values()).map((e) => [
         e.url,
         e.connectionState,
-      ])
+      ]),
     );
   }
   /** @deprecated */
@@ -208,11 +208,11 @@ class RxNostrImpl implements RxNostr {
     conn.getOutgoingMessageObservable().subscribe(this.outgoing$);
   }
   private updateDefaultSubscriptions(
-    nextReadableConnections: NostrConnection[]
+    nextReadableConnections: NostrConnection[],
   ): void {
     const noLongerNeededConnections = subtract(
       this.defaultReadables,
-      nextReadableConnections
+      nextReadableConnections,
     );
 
     for (const conn of noLongerNeededConnections) {
@@ -254,7 +254,7 @@ class RxNostrImpl implements RxNostr {
       Array.from(this.connections.values()).map((e) => [
         e.url,
         { connection: e.connectionState },
-      ])
+      ]),
     );
   }
   getRelayStatus(url: string): RelayStatus | undefined {
@@ -271,12 +271,12 @@ class RxNostrImpl implements RxNostr {
     const relay = this.getDefaultRelay(url);
     if (!relay) {
       throw new RxNostrInvalidUsageError(
-        `The relay (${url}) is not a default relay. \`reconnect()\` can be used only for a readable default relay.`
+        `The relay (${url}) is not a default relay. \`reconnect()\` can be used only for a readable default relay.`,
       );
     }
     if (!relay.read) {
       throw new RxNostrInvalidUsageError(
-        `The relay (${url}) is not readable. \`reconnect()\` can be used only for a readable default relay.`
+        `The relay (${url}) is not readable. \`reconnect()\` can be used only for a readable default relay.`,
       );
     }
 
@@ -295,7 +295,7 @@ class RxNostrImpl implements RxNostr {
   // #region use
   use(
     rxReq: RxReq,
-    options?: Partial<RxNostrUseOptions>
+    options?: Partial<RxNostrUseOptions>,
   ): Observable<EventPacket> {
     const { relays: useScopeRelays } = makeRxNostrUseOptions(options);
 
@@ -308,7 +308,7 @@ class RxNostrImpl implements RxNostr {
 
     const makeOrderPacket = (
       { filters, relays }: ReqPacket,
-      index: number
+      index: number,
     ): OrderPacket => {
       const emitScopeRelays =
         rxReq.strategy === "backward" ? relays : undefined;
@@ -320,7 +320,7 @@ class RxNostrImpl implements RxNostr {
         req,
         targetConnections:
           (emitScopeRelays ?? useScopeRelays)?.map((url) =>
-            this.ensureNostrConnection(url)
+            this.ensureNostrConnection(url),
           ) ?? this.defaultReadables,
         mode:
           emitScopeRelays === undefined && useScopeRelays === undefined
@@ -368,7 +368,7 @@ class RxNostrImpl implements RxNostr {
     const order$ = rxReq.getReqPacketObservable().pipe(
       filter(({ filters }) => filters.length > 0),
       map(makeOrderPacket),
-      takeUntil(this.dispose$)
+      takeUntil(this.dispose$),
     );
 
     if (rxReq.strategy === "forward") {
@@ -387,7 +387,7 @@ class RxNostrImpl implements RxNostr {
           // Because subId, targetConnections and mode keeps their value under forward strategy
           teardownSubscription(firstOrder);
         }),
-        switchAll()
+        switchAll(),
       );
     } else {
       return order$.pipe(
@@ -396,10 +396,10 @@ class RxNostrImpl implements RxNostr {
           createEventObservable(order).pipe(
             finalize(() => {
               teardownSubscription(order);
-            })
-          )
+            }),
+          ),
         ),
-        mergeAll()
+        mergeAll(),
       );
     }
   }
@@ -424,25 +424,25 @@ class RxNostrImpl implements RxNostr {
     const shouldComplete = () =>
       targetConnections.every(
         ({ connectionState, url }) =>
-          isDown(connectionState) || finishedRelays.has(url)
+          isDown(connectionState) || finishedRelays.has(url),
       );
 
     const fin$ = this.fin$.pipe(
       filterBySubId(subId),
       tap(({ from }) => {
         finishedRelays.add(from);
-      })
+      }),
     );
     const complete$ = merge(fin$, this.connectionState$.asObservable()).pipe(
       filter(() => shouldComplete()),
-      first()
+      first(),
     );
 
     return this.event$.pipe(
       takeUntil(complete$),
       completeOnTimeout(this.config.eoseTimeout),
       filterBySubId(subId),
-      filter((e) => !finishedRelays.has(e.from))
+      filter((e) => !finishedRelays.has(e.from)),
     );
   }
   private startSubscription(params: {
@@ -502,7 +502,7 @@ class RxNostrImpl implements RxNostr {
 
   send(
     params: Nostr.EventParameters,
-    options?: RxNostrSendOptions
+    options?: RxNostrSendOptions,
   ): Observable<OkPacketAgainstEvent> {
     const { relays } = makeRxNostrSendOptions(options);
     const signer: EventSigner = options?.signer ?? this.config.signer;
@@ -546,7 +546,7 @@ class RxNostrImpl implements RxNostr {
         teardown();
 
         throw new RxNostrInvalidUsageError(
-          err instanceof Error ? err.message : "Failed to sign the given event"
+          err instanceof Error ? err.message : "Failed to sign the given event",
         );
       });
 
@@ -559,7 +559,7 @@ class RxNostrImpl implements RxNostr {
       }, true),
       takeUntil(this.dispose$),
       timeout(this.config.okTimeout),
-      finalize(teardown)
+      finalize(teardown),
     );
   }
 

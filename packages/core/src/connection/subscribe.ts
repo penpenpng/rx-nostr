@@ -139,7 +139,7 @@ export class SubscribeProxy {
           (this.config.skipVerify || this.config.verifier(event)) &&
           (this.config.skipExpirationCheck || !isExpired(event))
         );
-      })
+      }),
     );
   }
   getFinObservable(): Observable<FinPacket> {
@@ -215,7 +215,7 @@ class SubQueue {
 
   constructor(
     private url: string,
-    private config: RxNostrConfig
+    private config: RxNostrConfig,
   ) {}
 
   enqueue(v: SubRecord): void {
@@ -279,7 +279,7 @@ class SubQueue {
       (data) => data.limitation?.max_subscriptions,
       {
         skipFetch: this.config.skipFetchNip11,
-      }
+      },
     );
     return capacity ?? Infinity;
   }

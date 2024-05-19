@@ -6,7 +6,7 @@ import { inlineThrow } from "../utils.js";
 
 export interface EventSigner {
   signEvent<K extends number>(
-    params: Nostr.EventParameters<K>
+    params: Nostr.EventParameters<K>,
   ): Promise<Nostr.Event<K>>;
   getPublicKey(): Promise<string>;
 }
@@ -14,7 +14,7 @@ export interface EventSigner {
 export function nip07Signer(): EventSigner {
   return {
     async signEvent<K extends number>(
-      params: Nostr.EventParameters<K>
+      params: Nostr.EventParameters<K>,
     ): Promise<Nostr.Event<K>> {
       const event = {
         ...params,
@@ -23,8 +23,8 @@ export function nip07Signer(): EventSigner {
           (await window?.nostr?.getPublicKey()) ??
           inlineThrow(
             new RxNostrEnvironmentError(
-              "window.nostr.getPublicKey() is not found"
-            )
+              "window.nostr.getPublicKey() is not found",
+            ),
           ),
         tags: params.tags ?? [],
         created_at: params.created_at ?? Math.floor(Date.now() / 1000),
@@ -37,7 +37,7 @@ export function nip07Signer(): EventSigner {
       return (
         (await window?.nostr?.signEvent(event)) ??
         inlineThrow(
-          new RxNostrEnvironmentError("window.nostr.signEvent() is not found")
+          new RxNostrEnvironmentError("window.nostr.signEvent() is not found"),
         )
       );
     },
@@ -46,8 +46,8 @@ export function nip07Signer(): EventSigner {
         window?.nostr?.getPublicKey() ??
         inlineThrow(
           new RxNostrEnvironmentError(
-            "window.nostr.getPublicKey() is not found"
-          )
+            "window.nostr.getPublicKey() is not found",
+          ),
         )
       );
     },

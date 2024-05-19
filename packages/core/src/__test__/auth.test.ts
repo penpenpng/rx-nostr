@@ -52,7 +52,7 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
 
     relay.emit(["AUTH", CHALLENGE1]);
     await expect(relay).toReceiveAUTH(
-      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1)
+      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1),
     );
   });
 
@@ -66,12 +66,12 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
 
     relay.emit(["AUTH", CHALLENGE1]);
     await expect(relay).toReceiveAUTH(
-      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1)
+      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1),
     );
 
     relay.emit(["AUTH", CHALLENGE2]);
     await expect(relay).toReceiveAUTH(
-      expectedChallengeEvent("auth:1", DEFAULT_RELAY, CHALLENGE2)
+      expectedChallengeEvent("auth:1", DEFAULT_RELAY, CHALLENGE2),
     );
   });
 
@@ -92,7 +92,7 @@ describe("Under aggressive strategy with a persisted initial challenge.", () => 
     relay.emit(["CLOSED", "sub2:0", "auth-required: test"]);
     relay.emit(["AUTH", CHALLENGE1]);
     await expect(relay).toReceiveAUTH(
-      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1)
+      expectedChallengeEvent("auth:0", DEFAULT_RELAY, CHALLENGE1),
     );
 
     relay.emit(["OK", "auth:0", true]);

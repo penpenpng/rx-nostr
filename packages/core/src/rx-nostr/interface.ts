@@ -108,7 +108,7 @@ export interface RxNostr {
    */
   use(
     rxReq: RxReq,
-    options?: Partial<RxNostrUseOptions>
+    options?: Partial<RxNostrUseOptions>,
   ): Observable<EventPacket>;
   /**
    * Create an Observable that receives all events (EVENT) from all websocket connections.
@@ -152,7 +152,7 @@ export interface RxNostr {
    */
   send(
     params: Nostr.EventParameters,
-    options?: RxNostrSendOptions
+    options?: RxNostrSendOptions,
   ): Observable<OkPacketAgainstEvent>;
 
   /**

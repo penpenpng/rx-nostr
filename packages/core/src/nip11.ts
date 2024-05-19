@@ -20,7 +20,7 @@ export class Nip11Registry {
     options?: {
       skipFetch?: boolean;
       skipCache?: boolean;
-    }
+    },
   ): Promise<T> {
     if (!options?.skipCache) {
       const data = this.get(url);

@@ -27,7 +27,7 @@ export const faker = {
         Omit<EventPacket, "event"> & {
           event?: Partial<EventPacket["event"]>;
         }
-    >
+    >,
   ): EventPacket {
     const event = faker.event(packetOrEvent?.event ?? packetOrEvent);
 
@@ -218,7 +218,7 @@ export function disposeMockRelay(relay: MockRelay) {
 export async function stateWillBe(
   rxNostr: RxNostr,
   url: string,
-  state: ConnectionState
+  state: ConnectionState,
 ): Promise<boolean> {
   if (rxNostr.getRelayState(url) === state) {
     return true;
@@ -226,7 +226,7 @@ export async function stateWillBe(
 
   const state$ = rxNostr.createConnectionStateObservable().pipe(
     first((packet) => packet.from === url && packet.state === state),
-    timeout(100)
+    timeout(100),
   );
 
   try {
@@ -269,7 +269,7 @@ export function fakeVerifier(): EventVerifier {
 export function expectedChallengeEvent(
   id: string,
   relay: string,
-  challenge: string
+  challenge: string,
 ): Partial<Nostr.Event<Nostr.Kind.ClientAuthentication>> {
   return {
     id,
