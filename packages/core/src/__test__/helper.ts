@@ -10,7 +10,7 @@ import { TestScheduler } from "rxjs/testing";
 import { expect } from "vitest";
 import { createClientSpy, faker as _faker, type MockRelay } from "vitest-nostr";
 
-import { EventSigner, EventVerifier } from "../config/index.js";
+import { EventSigner, type EventVerifier } from "../config/index.js";
 import { WebSocketCloseCode } from "../connection/relay.js";
 import { ConnectionState, EventPacket, MessagePacket } from "../packet.js";
 import { RxNostr } from "../rx-nostr/index.js";
@@ -27,7 +27,7 @@ export const faker = {
         Omit<EventPacket, "event"> & {
           event?: Partial<EventPacket["event"]>;
         }
-    >
+    >,
   ): EventPacket {
     const event = faker.event(packetOrEvent?.event ?? packetOrEvent);
 
@@ -71,7 +71,6 @@ export const faker = {
           type,
           message,
           eventId: message[1],
-          id: message[1],
           ok: message[2],
           notice: message[3],
         };
@@ -218,7 +217,7 @@ export function disposeMockRelay(relay: MockRelay) {
 export async function stateWillBe(
   rxNostr: RxNostr,
   url: string,
-  state: ConnectionState
+  state: ConnectionState,
 ): Promise<boolean> {
   if (rxNostr.getRelayStatus(url)?.connection === state) {
     return true;
@@ -226,7 +225,7 @@ export async function stateWillBe(
 
   const state$ = rxNostr.createConnectionStateObservable().pipe(
     first((packet) => packet.from === url && packet.state === state),
-    timeout(100)
+    timeout(100),
   );
 
   try {
@@ -269,7 +268,7 @@ export function fakeVerifier(): EventVerifier {
 export function expectedChallengeEvent(
   id: string,
   relay: string,
-  challenge: string
+  challenge: string,
 ): Partial<Nostr.Event<Nostr.Kind.ClientAuthentication>> {
   return {
     id,

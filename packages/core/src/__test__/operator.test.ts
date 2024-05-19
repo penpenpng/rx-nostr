@@ -20,11 +20,11 @@ test("latestEach()", async () => {
       faker.eventPacket({ id: "3", pubkey: "a", created_at: 2 }),
       faker.eventPacket({ id: "4", pubkey: "a", created_at: 1 }),
       faker.eventPacket({ id: "5", pubkey: "b", created_at: 3 }),
-      faker.eventPacket({ id: "6", pubkey: "b", created_at: 2 })
+      faker.eventPacket({ id: "6", pubkey: "b", created_at: 2 }),
     ).pipe(latestEach((packet) => packet.event.pubkey));
 
     expectObservable(packet$.pipe(map((e) => e.event.id))).toEqual(
-      of("1", "2", "5")
+      of("1", "2", "5"),
     );
   });
 });
@@ -62,7 +62,7 @@ test("dropExpiredEvents()", async () => {
     ];
 
     const packet$ = of(...packets).pipe(
-      dropExpiredEvents(new Date(3000 * 1000))
+      dropExpiredEvents(new Date(3000 * 1000)),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,7 +89,7 @@ test("tie()", async () => {
       map((e) => ({
         ...e,
         seenOn: [...e.seenOn].sort(),
-      }))
+      })),
     );
 
     expectObservable(packet$).toEqual(
@@ -128,8 +128,8 @@ test("tie()", async () => {
             "wss://ccc.example.com",
           ],
           isNew: false,
-        }
-      )
+        },
+      ),
     );
   });
 });
