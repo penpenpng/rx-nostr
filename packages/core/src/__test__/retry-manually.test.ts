@@ -36,12 +36,12 @@ describe("Under a single relay", () => {
 
     await closeSocket(relay, WebSocketCloseCode.ABNORMAL_CLOSURE);
     await expect(stateWillBe(rxNostr, DEFAULT_RELAY, "error")).resolves.toBe(
-      true
+      true,
     );
 
     rxNostr.reconnect(DEFAULT_RELAY);
     await expect(
-      stateWillBe(rxNostr, DEFAULT_RELAY, "connected")
+      stateWillBe(rxNostr, DEFAULT_RELAY, "connected"),
     ).resolves.toBe(true);
     await expect(relay).toReceiveREQ("sub:0");
   });

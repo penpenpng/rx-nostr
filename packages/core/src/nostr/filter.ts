@@ -20,7 +20,7 @@ const makeMatchFilterOptions = defineDefault<MatchFilterOptions>({
 export function isFiltered(
   event: Nostr.Event,
   filters: Nostr.Filter | Nostr.Filter[],
-  options?: Partial<MatchFilterOptions>
+  options?: Partial<MatchFilterOptions>,
 ): boolean {
   if (Array.isArray(filters)) {
     return filters.some((filter) => _isFiltered(event, filter, options));
@@ -32,7 +32,7 @@ export function isFiltered(
 function _isFiltered(
   event: Nostr.Event,
   filter: Nostr.Filter,
-  options?: Partial<MatchFilterOptions>
+  options?: Partial<MatchFilterOptions>,
 ): boolean {
   const { sinceInclusive, untilInclusive, acceptDelegatedEvent } =
     makeMatchFilterOptions(options);
@@ -49,7 +49,7 @@ function _isFiltered(
   if (
     filter.authors &&
     filter.authors.every(
-      (pubkey) => !(event.pubkey.startsWith(pubkey) || acceptDelegatedEvent)
+      (pubkey) => !(event.pubkey.startsWith(pubkey) || acceptDelegatedEvent),
     )
   ) {
     return false;
@@ -79,7 +79,7 @@ function _isFiltered(
       !event.tags.find(
         ([tagName, tagValue]) =>
           needleTagName === tagName &&
-          (needleValues as string[]).includes(tagValue)
+          (needleValues as string[]).includes(tagValue),
       )
     ) {
       return false;

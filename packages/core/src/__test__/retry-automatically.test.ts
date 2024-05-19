@@ -63,7 +63,7 @@ describe("Under a single relay", () => {
 
     await closeSocket(relay, WebSocketCloseCode.DONT_RETRY);
     await expect(stateWillBe(rxNostr, DEFAULT_RELAY, "rejected")).resolves.toBe(
-      true
+      true,
     );
   });
 
@@ -116,7 +116,7 @@ describe("Under a single relay", () => {
 
     await closeSocket(relay, WebSocketCloseCode.ABNORMAL_CLOSURE, 1);
     await expect(stateWillBe(rxNostr, DEFAULT_RELAY, "error")).resolves.toBe(
-      true
+      true,
     );
   });
 
