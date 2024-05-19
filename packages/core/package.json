@@ -1,6 +1,6 @@
 {
   "name": "rx-nostr",
-  "version": "2.7.2",
+  "version": "2.7.3",
   "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
   "author": "penpenpng",
   "keywords": [
@@ -53,12 +53,7 @@
     "@typescript-eslint/parser": "^5.56.0",
     "@vuepress/bundler-vite": "^2.0.0-rc.7",
     "@vuepress/theme-default": "^2.0.0-rc.14",
-    "eslint": "^8.45.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-simple-import-sort": "^10.0.0",
     "markdown-it-attrs": "^4.1.6",
-    "prettier": "^2.8.7",
     "typescript": "^5.0.0",
     "vite": "^4.2.0",
     "vitest": "^0.32.0",
