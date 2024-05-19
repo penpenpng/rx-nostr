@@ -17,13 +17,6 @@ export interface RxReq<S extends RxReqStrategy = RxReqStrategy> {
 }
 
 /**
- * @deprecated
- *
- * The RxReq interface that is provided for users (not for RxNostr).
- */
-export type RxReqController = RxReqPipeable & RxReqEmittable<RxReqStrategy>;
-
-/**
  * REQ strategy.
  *
  * See comments on `createRxForwardReq()`, `createRxBackwardReq()` and `createRxOneshotReq()
@@ -39,25 +32,25 @@ export interface RxReqPipeable {
   pipe(op1: OperatorFunction<ReqPacket, ReqPacket>): RxReq;
   pipe<A>(
     op1: OperatorFunction<ReqPacket, A>,
-    op2: OperatorFunction<A, ReqPacket>,
+    op2: OperatorFunction<A, ReqPacket>
   ): RxReq;
   pipe<A, B>(
     op1: OperatorFunction<ReqPacket, A>,
     op2: OperatorFunction<A, B>,
-    op3: OperatorFunction<B, ReqPacket>,
+    op3: OperatorFunction<B, ReqPacket>
   ): RxReq;
   pipe<A, B, C>(
     op1: OperatorFunction<ReqPacket, A>,
     op2: OperatorFunction<A, B>,
     op3: OperatorFunction<B, C>,
-    op4: OperatorFunction<C, ReqPacket>,
+    op4: OperatorFunction<C, ReqPacket>
   ): RxReq;
   pipe<A, B, C, D>(
     op1: OperatorFunction<ReqPacket, A>,
     op2: OperatorFunction<A, B>,
     op3: OperatorFunction<B, C>,
     op4: OperatorFunction<C, D>,
-    op5: OperatorFunction<D, ReqPacket>,
+    op5: OperatorFunction<D, ReqPacket>
   ): RxReq;
   pipe<A, B, C, D, E>(
     op1: OperatorFunction<ReqPacket, A>,
@@ -65,7 +58,7 @@ export interface RxReqPipeable {
     op3: OperatorFunction<B, C>,
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, E>,
-    op6: OperatorFunction<E, ReqPacket>,
+    op6: OperatorFunction<E, ReqPacket>
   ): RxReq;
   pipe<A, B, C, D, E, F>(
     op1: OperatorFunction<ReqPacket, A>,
@@ -74,7 +67,7 @@ export interface RxReqPipeable {
     op4: OperatorFunction<C, D>,
     op5: OperatorFunction<D, E>,
     op6: OperatorFunction<E, F>,
-    op7: OperatorFunction<F, ReqPacket>,
+    op7: OperatorFunction<F, ReqPacket>
   ): RxReq;
   pipe<A, B, C, D, E, F, G>(
     op1: OperatorFunction<ReqPacket, A>,
@@ -84,7 +77,7 @@ export interface RxReqPipeable {
     op5: OperatorFunction<D, E>,
     op6: OperatorFunction<E, F>,
     op7: OperatorFunction<F, G>,
-    op8: OperatorFunction<G, ReqPacket>,
+    op8: OperatorFunction<G, ReqPacket>
   ): RxReq;
   pipe<A, B, C, D, E, F, G, H>(
     op1: OperatorFunction<ReqPacket, A>,
@@ -95,7 +88,7 @@ export interface RxReqPipeable {
     op6: OperatorFunction<E, F>,
     op7: OperatorFunction<F, G>,
     op8: OperatorFunction<G, H>,
-    op9: OperatorFunction<H, ReqPacket>,
+    op9: OperatorFunction<H, ReqPacket>
   ): RxReq;
 }
 
@@ -170,7 +163,7 @@ const createRxReq = <S extends RxReqStrategy>(params: {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#backward-strategy).
  */
 export function createRxBackwardReq(
-  rxReqId?: string,
+  rxReqId?: string
 ): RxReq<"backward"> &
   RxReqEmittable<{ relays: string[] }> &
   RxReqOverable &
@@ -194,7 +187,7 @@ export function createRxBackwardReq(
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#forward-strategy).
  */
 export function createRxForwardReq(
-  rxReqId?: string,
+  rxReqId?: string
 ): RxReq<"forward"> & RxReqEmittable & RxReqPipeable {
   return createRxReq({
     strategy: "forward",
@@ -211,13 +204,11 @@ export function createRxForwardReq(
  */
 export function createRxOneshotReq(params: {
   filters: LazyFilter | LazyFilter[];
-  /** @deprecated Use `rxReqId` instead */
-  subId?: string;
   rxReqId?: string;
 }): RxReq<"backward"> {
   return {
     strategy: "backward",
-    rxReqId: params.rxReqId ?? params.subId ?? getRandomDigitsString(),
+    rxReqId: params.rxReqId ?? getRandomDigitsString(),
     getReqPacketObservable: () =>
       of({ filters: normalizeFilters(params.filters) }),
   };
@@ -229,7 +220,7 @@ export interface Mixin<R, T> {
 
 /** NOTE: unstable feature */
 export function mixin<R extends object, T extends object>(
-  def: () => ThisType<R> & T,
+  def: () => ThisType<R> & T
 ): Mixin<R, T> {
   return def;
 }
@@ -237,7 +228,7 @@ export function mixin<R extends object, T extends object>(
 /** NOTE: unstable feature */
 export function extend<B extends R, R extends object, T extends object>(
   base: B,
-  mixin: Mixin<R, T>,
+  mixin: Mixin<R, T>
 ): Override<B, T> {
   return Object.assign(base, mixin()) as Override<B, T>;
 }

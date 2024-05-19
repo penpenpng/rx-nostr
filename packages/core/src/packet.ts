@@ -68,8 +68,6 @@ export interface ClosedPacket extends MessagePacketBase<"CLOSED"> {
  * Packets represents OK messages associated with an EVENT submission.
  */
 export interface OkPacket extends MessagePacketBase<"OK"> {
-  /** @deprecated Use `eventId` instead. */
-  id: string;
   eventId: string;
   ok: boolean;
   notice?: string;

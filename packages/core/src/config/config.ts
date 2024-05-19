@@ -91,8 +91,6 @@ export interface RxNostrConfig {
    */
   websocketCtor: IWebSocketConstructor | undefined;
 }
-/** @deprecated Use `RxNostrConfig` instead. */
-export type RxNostrOptions = RxNostrConfig;
 
 /**
  * Auto reconnection strategy.
@@ -124,8 +122,6 @@ export type RetryConfig =
   | {
       strategy: "off";
     };
-/** @deprecated Use `RxNostrConfig` instead. */
-export type BackoffConfig = RetryConfig;
 
 /**
  * Connection strategy for default relays.
