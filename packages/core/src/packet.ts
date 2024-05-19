@@ -40,7 +40,7 @@ export type MessagePacket =
   | UnknownMessagePacket;
 
 export interface MessagePacketBase<
-  T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type
+  T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type,
 > {
   from: string;
   type: T;
@@ -53,7 +53,6 @@ export interface MessagePacketBase<
 export interface EventPacket extends MessagePacketBase<"EVENT"> {
   subId: string;
   event: Nostr.Event;
-  rootPubkey: string;
 }
 
 export interface EosePacket extends MessagePacketBase<"EOSE"> {

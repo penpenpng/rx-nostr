@@ -42,7 +42,6 @@ export const faker = {
       subId: packetOrEvent?.subId ?? "*",
       event,
       message,
-      rootPubkey: event.pubkey,
       type: "EVENT",
     };
   },
@@ -58,7 +57,6 @@ export const faker = {
           message,
           subId: message[1],
           event: message[2],
-          rootPubkey: message[2].pubkey,
         };
       case "EOSE":
         return {
