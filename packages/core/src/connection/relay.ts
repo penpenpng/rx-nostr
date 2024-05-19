@@ -234,7 +234,6 @@ export class RelayConnection {
           type,
           message,
           eventId: message[1],
-          id: message[1],
           ok: message[2],
           notice: message[3],
         };
