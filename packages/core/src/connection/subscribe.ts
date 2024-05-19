@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 import { filter, Observable, Subject } from "rxjs";
 
 import type { RxNostrConfig } from "../config/index.js";
@@ -213,7 +213,10 @@ class SubQueue {
     this._ongoings = v;
   }
 
-  constructor(private url: string, private config: RxNostrConfig) {}
+  constructor(
+    private url: string,
+    private config: RxNostrConfig
+  ) {}
 
   enqueue(v: SubRecord): void {
     this.queuings = [...this.queuings, v];

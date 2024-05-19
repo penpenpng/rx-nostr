@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 import { Observable, of, type OperatorFunction, Subject } from "rxjs";
 
 import { LazyFilter, ReqPacket } from "../packet.js";

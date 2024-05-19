@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 
 import type { EventSigner } from "../config/signer.js";

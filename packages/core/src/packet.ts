@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 // Packet is data treated by rx-nostr Observables.
 
