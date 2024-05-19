@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 export function isExpired(event: Nostr.Event, now?: number): boolean {
   const tag = event.tags.find((tag) => tag[0] === "expiration");

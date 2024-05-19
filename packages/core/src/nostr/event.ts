@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 import { toHex } from "./bech32.js";
 import { schnorr, sha256 } from "./hash.js";
