@@ -45,7 +45,7 @@ import { defineDefault } from "./utils.js";
  * Remove the events once seen.
  */
 export function uniq<P extends EventPacket>(
-  flushes?: ObservableInput<unknown>,
+  flushes?: ObservableInput<unknown>
 ): MonoTypeOperatorFunction<P> {
   return distinct<P, string>(({ event }) => event.id, flushes);
 }
@@ -62,7 +62,7 @@ export function uniq<P extends EventPacket>(
  */
 export function createUniq<P extends EventPacket, T>(
   keyFn: (packet: P) => T | null,
-  options?: CreateUniqOptions<T>,
+  options?: CreateUniqOptions<T>
 ): [MonoTypeOperatorFunction<P>, Set<T>] {
   const cache = new Set<T>();
 
@@ -91,7 +91,7 @@ export function createUniq<P extends EventPacket, T>(
  * then record on which relay the event was seen.
  */
 export function tie<P extends EventPacket>(
-  flushes?: ObservableInput<unknown>,
+  flushes?: ObservableInput<unknown>
 ): OperatorFunction<P, P & { seenOn: Set<string> }> {
   const [fn, memo] = createTie<P>();
 
@@ -128,7 +128,7 @@ export function createTie<P extends EventPacket>(): [
           seenOn,
           isNew,
         };
-      }),
+      })
     ),
     memo,
   ];
@@ -140,12 +140,12 @@ export function createTie<P extends EventPacket>(): [
 export function latest<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
   return pipe(
     scan((acc, packet) =>
-      compareEvents(acc.event, packet.event) < 0 ? packet : acc,
+      compareEvents(acc.event, packet.event) < 0 ? packet : acc
     ),
     distinctUntilChanged(
       (a, b) => a === b,
-      ({ event }) => event.id,
-    ),
+      ({ event }) => event.id
+    )
   );
 }
 
@@ -153,7 +153,7 @@ export function latest<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
  * For each key, only the latest events are allowed to pass.
  */
 export function latestEach<P extends EventPacket, K>(
-  key: (packet: P) => K,
+  key: (packet: P) => K
 ): MonoTypeOperatorFunction<P> {
   return pipe(groupBy(key), map(pipe(latest())), mergeAll());
 }
@@ -162,7 +162,7 @@ export function latestEach<P extends EventPacket, K>(
  * Only events with a valid signature are allowed to pass.
  */
 export function verify<P extends EventPacket>(
-  verifier: EventVerifier,
+  verifier: EventVerifier
 ): MonoTypeOperatorFunction<P> {
   return filter(({ event }) => verifier(event));
 }
@@ -172,20 +172,18 @@ export function verify<P extends EventPacket>(
  */
 export function filterByKind<P extends EventPacket>(
   kind: number,
-  options?: NotOption,
+  options?: NotOption
 ): MonoTypeOperatorFunction<P> {
   const { not } = makeNotOption(options);
   return filter(({ event }) => xor(event.kind === kind, not));
 }
-/** @deprecated Renamed. Use `filterByKind` instead. */
-export const filterKind = filterByKind;
 
 /**
  * Only events with given kinds are allowed to pass.
  */
 export function filterByKinds<P extends EventPacket>(
   kinds: number[],
-  options?: NotOption,
+  options?: NotOption
 ): MonoTypeOperatorFunction<P> {
   const { not } = makeNotOption(options);
   return filter(({ event }) => xor(kinds.includes(event.kind), not));
@@ -196,7 +194,7 @@ export function filterByKinds<P extends EventPacket>(
  */
 export function filterBy<P extends EventPacket>(
   filters: LazyFilter | LazyFilter[],
-  options?: MatchFilterOptions & FilterByOptions,
+  options?: MatchFilterOptions & FilterByOptions
 ): MonoTypeOperatorFunction<P> {
   const { not } = makeNotOption(options);
   const evaledFilter = evalFilters(filters);
@@ -209,11 +207,11 @@ export function filterBy<P extends EventPacket>(
  * Accumulate latest events in order of new arrival (based on `created_at`).
  */
 export function timeline<P extends EventPacket>(
-  limit?: number,
+  limit?: number
 ): OperatorFunction<P, P[]> {
   return scan<P, P[]>((acc, packet) => {
     const next = [...acc, packet].sort(
-      (a, b) => -1 * compareEvents(a.event, b.event),
+      (a, b) => -1 * compareEvents(a.event, b.event)
     );
     if (limit !== undefined) {
       next.splice(limit);
@@ -224,11 +222,11 @@ export function timeline<P extends EventPacket>(
 
 export function sortEvents<P extends EventPacket>(
   bufferTime: number,
-  compareFn?: (a: P, b: P) => number,
+  compareFn?: (a: P, b: P) => number
 ): MonoTypeOperatorFunction<P> {
   return sort(
     bufferTime,
-    compareFn ?? ((a, b) => compareEvents(a.event, b.event)),
+    compareFn ?? ((a, b) => compareEvents(a.event, b.event))
   );
 }
 
@@ -236,7 +234,7 @@ export function sortEvents<P extends EventPacket>(
  * Remove expired events. See also [NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md).
  */
 export function dropExpiredEvents<P extends EventPacket>(
-  now?: Date,
+  now?: Date
 ): MonoTypeOperatorFunction<P> {
   let refTime: number | undefined = undefined;
   if (now) {
@@ -251,14 +249,12 @@ export function dropExpiredEvents<P extends EventPacket>(
 // ----------------------- //
 
 export function filterByType<T extends Nostr.ToClientMessage.Type>(
-  type: T,
+  type: T
 ): OperatorFunction<MessagePacket, MessagePacket & { type: T }> {
   return filter(
-    (packet): packet is MessagePacket & { type: T } => packet.type === type,
+    (packet): packet is MessagePacket & { type: T } => packet.type === type
   );
 }
-/** @deprecated Renamed. Use `filterByType` instead. */
-export const filterType = filterByType;
 
 // ----------------------- //
 // OkPacket operators //
@@ -269,7 +265,7 @@ export const filterType = filterByType;
  */
 export function filterByEventId<P extends OkPacket>(
   eventId: string,
-  options?: NotOption,
+  options?: NotOption
 ): MonoTypeOperatorFunction<P> {
   const { not } = makeNotOption(options);
   return filter((p) => xor(p.eventId === eventId, not));
@@ -286,7 +282,7 @@ export function filterByEventId<P extends OkPacket>(
  */
 export function batch(
   /** Function used for merge REQ filters. Default behavior is simple concatenation. */
-  mergeFilter?: MergeFilter,
+  mergeFilter?: MergeFilter
 ): OperatorFunction<ReqPacket[], ReqPacket> {
   return mergeMap((packets) => {
     const batched: ReqPacket[] = [];
@@ -327,14 +323,14 @@ function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
  */
 export function chunk(
   predicate: (f: LazyFilter[]) => boolean,
-  toChunks: (f: LazyFilter[]) => LazyFilter[][],
+  toChunks: (f: LazyFilter[]) => LazyFilter[][]
 ): MonoTypeOperatorFunction<ReqPacket> {
   return mergeMap((packet) =>
     predicate(packet.filters)
       ? from(
-          toChunks(packet.filters).map((filters) => ({ ...packet, filters })),
+          toChunks(packet.filters).map((filters) => ({ ...packet, filters }))
         )
-      : of(packet),
+      : of(packet)
   );
 }
 
@@ -346,7 +342,7 @@ export function chunk(
  * Almost RxJS's `timeout`, but won't throw.
  */
 export function completeOnTimeout<T>(
-  time: number,
+  time: number
 ): MonoTypeOperatorFunction<T> {
   return pipe(
     timeout(time),
@@ -356,7 +352,7 @@ export function completeOnTimeout<T>(
       } else {
         throw error;
       }
-    }),
+    })
   );
 }
 
@@ -366,7 +362,7 @@ export function completeOnTimeout<T>(
  */
 export function sort<T>(
   bufferTime: number,
-  compareFn: (a: T, b: T) => number,
+  compareFn: (a: T, b: T) => number
 ): MonoTypeOperatorFunction<T> {
   const buffer: T[] = [];
 
@@ -383,13 +379,13 @@ export function sort<T>(
       // Non-null is valid because the length has been checked.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return buffer.shift()!;
-    }),
+    })
   );
 }
 
 export function filterBySubId<P extends { subId: string }>(
   subId: string,
-  options?: NotOption,
+  options?: NotOption
 ): OperatorFunction<P, P> {
   const { not } = makeNotOption(options);
   return filter((packet) => xor(packet.subId === subId, not));
@@ -413,9 +409,6 @@ export interface CreateUniqOptions<T> {
 export interface NotOption {
   not: boolean;
 }
-
-/** @deprecated */
-export type FilterByOptions = NotOption;
 
 const makeNotOption = defineDefault<NotOption>({
   not: false,

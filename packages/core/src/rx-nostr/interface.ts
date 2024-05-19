@@ -20,23 +20,6 @@ import type { RxReq } from "./rx-req.js";
  * Use `createRxNostr()` to get the object.
  */
 export interface RxNostr {
-  /** @deprecated Use getDefaultRelays() */
-  getRelays(): DefaultRelayConfig[];
-
-  /** @deprecated Use `setDefaultRelays()` instead. */
-  switchRelays(config: AcceptableDefaultRelaysConfig): Promise<void>;
-  /** @deprecated Use `addDefaultRelays()` instead. */
-  addRelay(relay: string | DefaultRelayConfig): Promise<void>;
-  /** @deprecated Use `removeDefaultRelays()` instead. */
-  removeRelay(url: string): Promise<void>;
-
-  /** @deprecated Use `getDefaultRelay(url) !== undefined` instead. */
-  hasRelay(url: string): boolean;
-  /** @deprecated Use `getDefaultRelay(url)?.write` instead. */
-  canWriteRelay(url: string): boolean;
-  /** @deprecated Use `getDefaultRelay(url)?.read` instead. */
-  canReadRelay(url: string): boolean;
-
   /**
    * Return config objects of the default relays used by this object.
    * The relay URLs are normalised so may not match the URLs set.
@@ -64,20 +47,6 @@ export interface RxNostr {
   /** Utility wrapper for `setDefaultRelays()`. */
   removeDefaultRelays(urls: string | string[]): void;
 
-  /**
-   * @deprecated Use `getAllRelayStatus()` instead.
-   * Return connection status of all default relays and all relays that RxNostr has used temporary.
-   *
-   * **NOTE**:
-   * Keys are **normalized** URL, so may be different from ones you set.
-   * Use `getRelayState(url)` instead to ensure that you get the value associated with a given URL.
-   */
-  getAllRelayState(): Record<string, ConnectionState>;
-  /**
-   * @deprecated Use `getRelayStatus` instead.
-   * Return connection state of the given relay if it exists.
-   */
-  getRelayState(url: string): ConnectionState | undefined;
   /**
    * Return relay status of all default relays and all relays that RxNostr has used temporary.
    *
@@ -108,7 +77,7 @@ export interface RxNostr {
    */
   use(
     rxReq: RxReq,
-    options?: Partial<RxNostrUseOptions>,
+    options?: Partial<RxNostrUseOptions>
   ): Observable<EventPacket>;
   /**
    * Create an Observable that receives all events (EVENT) from all websocket connections.
@@ -152,7 +121,7 @@ export interface RxNostr {
    */
   send(
     params: Nostr.EventParameters,
-    options?: RxNostrSendOptions,
+    options?: RxNostrSendOptions
   ): Observable<OkPacketAgainstEvent>;
 
   /**
@@ -178,12 +147,9 @@ export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
 
 export interface RxNostrSendOptions {
   signer?: EventSigner;
-  /** @deprecated Use `signer` instead */
-  seckey?: string;
   relays?: string[];
 }
 export const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
-  seckey: undefined,
   relays: undefined,
 });
 
@@ -196,8 +162,6 @@ export interface DefaultRelayConfig {
   /** If true, rxNostr can send EVENTs. */
   write: boolean;
 }
-/** @deprecated Use `DefaultRelayConfig` instead.  */
-export type RelayConfig = DefaultRelayConfig;
 
 /** Parameter of `rxNostr.setDefaultRelays()` */
 export type AcceptableDefaultRelaysConfig =
@@ -207,8 +171,6 @@ export type AcceptableDefaultRelaysConfig =
       | DefaultRelayConfig
     )[]
   | Nostr.Nip07.GetRelayResult;
-/** @deprecated Use `AcceptableDefaultRelaysConfig` instead. */
-export type AcceptableRelaysConfig = AcceptableDefaultRelaysConfig;
 
 export interface RelayStatus {
   connection: ConnectionState;
