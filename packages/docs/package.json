@@ -1,0 +1,15 @@
+{
+  "name": "@rx-nostr/docs",
+  "private": true,
+  "scripts": {
+    "dev": "vuepress dev .",
+    "build": "vuepress build ."
+  },
+  "author": "penpenpng",
+  "devDependencies": {
+    "@vuepress/bundler-vite": "^2.0.0-rc.7",
+    "@vuepress/theme-default": "^2.0.0-rc.14",
+    "markdown-it-attrs": "^4.1.6",
+    "vuepress": "^2.0.0-rc.7"
+  }
+}
