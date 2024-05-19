@@ -19,7 +19,6 @@ import {
   type EventSigner,
   makeRxNostrConfig,
   type RxNostrConfig,
-  seckeySigner,
 } from "../config/index.js";
 import { NostrConnection, type REQMode } from "../connection/index.js";
 import { FinPacket } from "../connection/index.js";
@@ -505,11 +504,8 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions
   ): Observable<OkPacketAgainstEvent> {
-    const { seckey, relays } = makeRxNostrSendOptions(options);
-    const signer: EventSigner =
-      options?.signer ??
-      (seckey ? seckeySigner(seckey) : undefined) ??
-      this.config.signer;
+    const { relays } = makeRxNostrSendOptions(options);
+    const signer: EventSigner = options?.signer ?? this.config.signer;
 
     const targetRelays =
       relays === undefined
