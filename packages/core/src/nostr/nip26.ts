@@ -1,4 +1,4 @@
-import Nostr from "nostr-typedef";
+import * as Nostr from "nostr-typedef";
 
 import { schnorr, sha256 } from "./hash.js";
 
@@ -6,7 +6,7 @@ type DelegationTag = [
   tagName: "delegation",
   delegator: string,
   query: string,
-  token: string
+  token: string,
 ];
 
 interface Delegation {
