@@ -1,0 +1,15 @@
+export const pagesRoutes = [
+  ["v-8daa1a0e","/",{"title":""},["/index.html","/index.md"]],
+  ["v-53196634","/docs/error-handling.html",{"title":"Error Handling"},["/docs/error-handling","/docs/error-handling.md"]],
+  ["v-2a7fd7d6","/docs/examples.html",{"title":"Examples"},["/docs/examples","/docs/examples.md"]],
+  ["v-7e257755","/docs/first-step.html",{"title":"First Step"},["/docs/first-step","/docs/first-step.md"]],
+  ["v-baa76148","/docs/getting-started.html",{"title":"Getting Started"},["/docs/getting-started","/docs/getting-started.md"]],
+  ["v-147825fb","/docs/",{"title":"Overview"},["/docs/index.html","/docs/index.md"]],
+  ["v-50940a68","/docs/lazy-since-until.html",{"title":"Lazy since/until (v1.2.0+)"},["/docs/lazy-since-until","/docs/lazy-since-until.md"]],
+  ["v-2bf260ae","/docs/monitoring-connections.html",{"title":"Monitoring Connections"},["/docs/monitoring-connections","/docs/monitoring-connections.md"]],
+  ["v-715540a5","/docs/operators.html",{"title":"Operators"},["/docs/operators","/docs/operators.md"]],
+  ["v-d141194c","/docs/relay-configuration.html",{"title":"Relay Configuration"},["/docs/relay-configuration","/docs/relay-configuration.md"]],
+  ["v-46fbb9bc","/docs/req-strategy.html",{"title":"REQ Strategy"},["/docs/req-strategy","/docs/req-strategy.md"]],
+  ["v-1f06dfe6","/docs/sending-event.html",{"title":"Sending EVENT"},["/docs/sending-event","/docs/sending-event.md"]],
+  ["v-3706649a","/404.html",{"title":""},["/404"]],
+]
