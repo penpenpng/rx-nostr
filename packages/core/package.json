@@ -54,7 +54,6 @@
     "vitest-websocket-mock": "^0.2.1"
   },
   "dependencies": {
-    "normalize-url": "^8.0.0",
     "nostr-typedef": "^0.8.0",
     "rxjs": "^7.8.0"
   }
