@@ -35,7 +35,7 @@ import {
   OkPacket,
   ReqPacket,
 } from "./packet.js";
-import { defineDefault } from "./utils.js";
+import { defineDefault } from "./utils/define-default.js";
 
 // --------------------- //
 // EventPacket operators //

@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
 
 import { fetchRelayInfo } from "./nostr/nip11.js";
-import { UrlMap } from "./utils.js";
+import { UrlMap } from "./utils/url-map.js";
 
 /**
  * This is used by rx-nostr to access NIP-11 relay information.

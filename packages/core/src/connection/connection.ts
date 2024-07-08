@@ -17,7 +17,8 @@ import {
   OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
-import { defineDefault, normalizeRelayUrl } from "../utils.js";
+import { defineDefault } from "../utils/define-default.js";
+import { normalizeRelayUrl } from "../utils/normalize-url.js";
 import { AuthProxy } from "./auth.js";
 import { PublishProxy } from "./publish.js";
 import { RelayConnection, WebSocketCloseCode } from "./relay.js";
