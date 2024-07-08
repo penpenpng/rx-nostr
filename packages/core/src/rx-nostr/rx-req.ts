@@ -2,7 +2,6 @@ import * as Nostr from "nostr-typedef";
 import { Observable, of, type OperatorFunction, Subject } from "rxjs";
 
 import { LazyFilter, ReqPacket } from "../packet.js";
-import type { Override } from "../utils.js";
 
 /**
  * The RxReq interface that is provided for RxNostr (**not for users**).
@@ -216,21 +215,6 @@ export function createRxOneshotReq(params: {
 
 export interface Mixin<R, T> {
   (): ThisType<R> & T;
-}
-
-/** NOTE: unstable feature */
-export function mixin<R extends object, T extends object>(
-  def: () => ThisType<R> & T,
-): Mixin<R, T> {
-  return def;
-}
-
-/** NOTE: unstable feature */
-export function extend<B extends R, R extends object, T extends object>(
-  base: B,
-  mixin: Mixin<R, T>,
-): Override<B, T> {
-  return Object.assign(base, mixin()) as Override<B, T>;
 }
 
 function getRandomDigitsString() {

@@ -39,7 +39,8 @@ import type {
   OutgoingMessagePacket,
   ReqPacket,
 } from "../packet.js";
-import { subtract, UrlMap } from "../utils.js";
+import { subtract } from "../utils/array-operation.js";
+import { UrlMap } from "../utils/url-map.js";
 import {
   type AcceptableDefaultRelaysConfig,
   type DefaultRelayConfig,

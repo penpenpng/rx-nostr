@@ -2,7 +2,7 @@ import * as Nostr from "nostr-typedef";
 
 import { RxNostrEnvironmentError, RxNostrInvalidUsageError } from "../error.js";
 import { ensureEventFields } from "../nostr/event.js";
-import { inlineThrow } from "../utils.js";
+import { inlineThrow } from "../utils/inline-throw.js";
 
 export interface EventSigner {
   signEvent<K extends number>(

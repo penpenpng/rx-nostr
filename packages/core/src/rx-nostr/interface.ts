@@ -11,7 +11,7 @@ import type {
   OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
-import { defineDefault } from "../utils.js";
+import { defineDefault } from "../utils/define-default.js";
 import type { RxReq } from "./rx-req.js";
 
 /**

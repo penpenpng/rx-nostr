@@ -1,4 +1,4 @@
-import { defineDefault } from "../utils.js";
+import { defineDefault } from "../utils/define-default.js";
 import type { IWebSocketConstructor } from "../websocket.js";
 import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
