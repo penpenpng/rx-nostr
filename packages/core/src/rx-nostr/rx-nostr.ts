@@ -512,7 +512,11 @@ class RxNostrImpl implements RxNostr {
     );
   }
 
-  dispose(): void {
+  dispose() {
+    this[Symbol.dispose]();
+  }
+
+  [Symbol.dispose](): void {
     if (this.disposed) {
       return;
     }

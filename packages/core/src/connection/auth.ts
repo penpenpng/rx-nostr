@@ -69,7 +69,11 @@ export class AuthProxy {
     return this.authenticator.signer ?? this.config.signer;
   }
 
-  dispose(): void {
+  dispose() {
+    this[Symbol.dispose]();
+  }
+
+  [Symbol.dispose](): void {
     if (this.disposed) {
       return;
     }

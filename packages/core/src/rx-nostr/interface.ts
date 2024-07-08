@@ -132,6 +132,11 @@ export interface RxNostr {
    * RxReq used by this object is not affected; in other words, if the RxReq is used
    * by another RxNostr, its use is not prevented.
    */
+  [Symbol.dispose](): void;
+
+  /**
+   * Shorthand for `[Symbol.dispose]()`
+   */
   dispose(): void;
 }
 

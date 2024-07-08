@@ -148,6 +148,10 @@ export class SubscribeProxy {
   }
 
   dispose() {
+    this[Symbol.dispose]();
+  }
+
+  [Symbol.dispose](): void {
     if (this.disposed) {
       return;
     }
