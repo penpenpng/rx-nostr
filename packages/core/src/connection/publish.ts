@@ -104,7 +104,11 @@ export class PublishProxy {
     return this.count$.asObservable();
   }
 
-  dispose(): void {
+  dispose() {
+    this[Symbol.dispose]();
+  }
+
+  [Symbol.dispose](): void {
     if (this.disposed) {
       return;
     }

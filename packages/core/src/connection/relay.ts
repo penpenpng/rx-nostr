@@ -361,7 +361,11 @@ export class RelayConnection {
     return this.error$.asObservable();
   }
 
-  dispose(): void {
+  dispose() {
+    this[Symbol.dispose]();
+  }
+
+  [Symbol.dispose](): void {
     if (this.disposed) {
       return;
     }
