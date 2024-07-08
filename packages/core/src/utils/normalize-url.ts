@@ -1,8 +1,25 @@
-import normalizeUrl from "normalize-url";
+import { inlineTry } from "./inline-try.js";
 
 export function normalizeRelayUrl(url: string) {
-  return normalizeUrl(url, {
-    normalizeProtocol: false,
-    removeTrailingSlash: true,
-  });
+  const o = url.trim();
+
+  try {
+    const u = new URL(o);
+
+    u.hash = "";
+    u.pathname = inlineTry(() => decodeURI(u.pathname), u.pathname);
+    u.pathname = u.pathname.replace(/\/$/, "");
+    u.hostname = u.hostname.replace(/\.$/, "");
+    u.searchParams.sort();
+    u.search = inlineTry(() => decodeURIComponent(u.search), u.search);
+
+    let s = u.toString();
+    if (!u.search) {
+      s = s.replace(/\/$/, "");
+    }
+
+    return s;
+  } catch {
+    return o;
+  }
 }
