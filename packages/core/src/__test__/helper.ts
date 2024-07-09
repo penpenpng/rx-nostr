@@ -262,7 +262,7 @@ export function fakeSigner(idPrefix?: string): EventSigner {
 }
 
 export function fakeVerifier(): EventVerifier {
-  return (params) => params.sig === fakeSig;
+  return async (params) => params.sig === fakeSig;
 }
 
 export function expectedChallengeEvent(

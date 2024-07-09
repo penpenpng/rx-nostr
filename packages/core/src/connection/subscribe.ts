@@ -1,11 +1,12 @@
 import * as Nostr from "nostr-typedef";
-import { filter, Observable, Subject } from "rxjs";
+import { Observable, Subject } from "rxjs";
 
 import type { RxNostrConfig } from "../config/index.js";
 import { evalFilters } from "../lazy-filter.js";
 import { Nip11Registry } from "../nip11.js";
 import { isFiltered } from "../nostr/filter.js";
 import { isExpired } from "../nostr/nip40.js";
+import { filterAsync } from "../operator.js";
 import { EventPacket, LazyREQ } from "../packet.js";
 import { AuthProxy } from "./auth.js";
 import { RelayConnection } from "./relay.js";
@@ -125,7 +126,7 @@ export class SubscribeProxy {
 
   getEventObservable(): Observable<EventPacket> {
     return this.relay.getEVENTObservable().pipe(
-      filter(({ subId, event }) => {
+      filterAsync(async ({ subId, event }) => {
         const filters = this.subs.get(subId)?.filters;
         if (!filters) {
           return false;
@@ -134,7 +135,7 @@ export class SubscribeProxy {
         return (
           (this.config.skipValidateFilterMatching ||
             isFiltered(event, filters)) &&
-          (this.config.skipVerify || this.config.verifier(event)) &&
+          (this.config.skipVerify || (await this.config.verifier(event))) &&
           (this.config.skipExpirationCheck || !isExpired(event))
         );
       }),
