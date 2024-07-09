@@ -164,7 +164,7 @@ export function latestEach<P extends EventPacket, K>(
 export function verify<P extends EventPacket>(
   verifier: EventVerifier,
 ): MonoTypeOperatorFunction<P> {
-  return filter(({ event }) => verifier(event));
+  return filterAsync(({ event }) => verifier(event));
 }
 
 /**
@@ -337,6 +337,16 @@ export function chunk(
 // ----------------- //
 // General operators //
 // ----------------- //
+
+export function filterAsync<T>(
+  predicate: (x: T, index: number) => Promise<boolean>,
+): MonoTypeOperatorFunction<T> {
+  return mergeMap((packet, index) =>
+    from(predicate(packet, index)).pipe(
+      mergeMap((result) => (result ? of(packet) : EMPTY)),
+    ),
+  );
+}
 
 /**
  * Almost RxJS's `timeout`, but won't throw.
