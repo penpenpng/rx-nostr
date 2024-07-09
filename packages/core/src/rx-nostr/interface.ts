@@ -121,7 +121,7 @@ export interface RxNostr {
    */
   send(
     params: Nostr.EventParameters,
-    options?: RxNostrSendOptions,
+    options?: Partial<RxNostrSendOptions>,
   ): Observable<OkPacketAgainstEvent>;
 
   /**
@@ -153,7 +153,7 @@ export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
 export interface RxNostrSendOptions {
   signer?: EventSigner;
   relays?: string[];
-  errorOnTimeout: boolean;
+  errorOnTimeout?: boolean;
   completeOn: "all-ok" | "any-ok" | "sent";
 }
 export const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
