@@ -454,7 +454,7 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     options?: RxNostrSendOptions,
   ): Observable<OkPacketAgainstEvent> {
-    const { relays } = makeRxNostrSendOptions(options);
+    const { relays, errorOnTimeout } = makeRxNostrSendOptions(options);
     const signer: EventSigner = options?.signer ?? this.config.signer;
 
     const targetRelays =
@@ -508,7 +508,9 @@ class RxNostrImpl implements RxNostr {
         return finishedRelays.size < targetRelays.length;
       }, true),
       takeUntil(this.dispose$),
-      timeout(this.config.okTimeout),
+      errorOnTimeout
+        ? timeout(this.config.okTimeout)
+        : completeOnTimeout(this.config.okTimeout),
       finalize(teardown),
     );
   }
