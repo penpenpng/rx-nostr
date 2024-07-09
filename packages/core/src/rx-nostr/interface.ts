@@ -153,11 +153,13 @@ export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
 export interface RxNostrSendOptions {
   signer?: EventSigner;
   relays?: string[];
-  errorOnTimeout?: boolean;
+  errorOnTimeout: boolean;
+  completeOn: "all-ok" | "any-ok" | "sent";
 }
 export const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
   relays: undefined,
   errorOnTimeout: false,
+  completeOn: "all-ok",
 });
 
 /** Config object specifying default relays' behaviors. */
