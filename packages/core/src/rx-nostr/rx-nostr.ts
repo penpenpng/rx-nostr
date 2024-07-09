@@ -3,9 +3,11 @@ import {
   filter,
   finalize,
   first,
+  identity,
   map,
   merge,
   mergeAll,
+  type MonoTypeOperatorFunction,
   Observable,
   Subject,
   switchAll,
@@ -452,9 +454,10 @@ class RxNostrImpl implements RxNostr {
 
   send(
     params: Nostr.EventParameters,
-    options?: RxNostrSendOptions,
+    options?: Partial<RxNostrSendOptions>,
   ): Observable<OkPacketAgainstEvent> {
-    const { relays, errorOnTimeout } = makeRxNostrSendOptions(options);
+    const { relays, errorOnTimeout, completeOn } =
+      makeRxNostrSendOptions(options);
     const signer: EventSigner = options?.signer ?? this.config.signer;
 
     const targetRelays =
@@ -491,6 +494,10 @@ class RxNostrImpl implements RxNostr {
         for (const conn of targetRelays) {
           conn.publish(event);
         }
+
+        if (completeOn === "sent") {
+          subject.complete();
+        }
       })
       .catch((err) => {
         teardown();
@@ -500,13 +507,25 @@ class RxNostrImpl implements RxNostr {
         );
       });
 
-    return subject.pipe(
-      takeWhile(({ from, done }) => {
-        if (done) {
-          finishedRelays.add(from);
+    const completeManager =
+      ((): MonoTypeOperatorFunction<OkPacketAgainstEvent> => {
+        switch (completeOn) {
+          case "sent":
+            return identity;
+          case "all-ok":
+            return takeWhile(({ from, done }) => {
+              if (done) {
+                finishedRelays.add(from);
+              }
+              return finishedRelays.size < targetRelays.length;
+            }, true);
+          case "any-ok":
+            return first((p) => p.ok);
         }
-        return finishedRelays.size < targetRelays.length;
-      }, true),
+      })();
+
+    return subject.pipe(
+      completeManager,
       takeUntil(this.dispose$),
       errorOnTimeout
         ? timeout(this.config.okTimeout)
