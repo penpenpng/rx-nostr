@@ -64,3 +64,17 @@ test("temporary relay option works in send().", async () => {
 
   expect(relay1.messagesToConsume.pendingItems.length).toBe(0);
 });
+
+test("completeOn: 'sent' works.", async () => {
+  const spy = spySubscription();
+
+  rxNostr
+    .send(faker.event(), { relays: [RELAY_URL3], completeOn: "sent" })
+    .pipe(spy.tap())
+    .subscribe();
+
+  await relay3.connected;
+  await expect(relay3).toReceiveEVENT();
+
+  await expect(spy.willComplete()).resolves.toBe(true);
+});
