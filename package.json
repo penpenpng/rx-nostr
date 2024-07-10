@@ -2,7 +2,6 @@
   "description": "rx-nostr's workspace root. This is private.",
   "private": true,
   "scripts": {
-    "dev": "npm run dev -w packages/core",
     "lint": "npm run lint -w packages/core",
     "test": "npm run test -w packages/core",
     "build": "npm run build -w packages/core",

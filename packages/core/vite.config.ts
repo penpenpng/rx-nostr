@@ -1,4 +1,6 @@
 import path from "path";
+import { type PluginOption } from "vite";
+import dts from "vite-plugin-dts";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -14,6 +16,7 @@ export default defineConfig({
     },
     sourcemap: true,
   },
+  plugins: [dts({ rollupTypes: true }) as PluginOption],
   test: {
     hookTimeout: 1000,
   },
