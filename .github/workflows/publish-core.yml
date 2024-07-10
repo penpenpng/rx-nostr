@@ -1,8 +1,6 @@
-name: npm publish
+name: publish core
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -20,9 +18,5 @@ jobs:
       - run: npm run build
       - name: publish rx-nostr
         run: npx -y can-npm-publish packages/core && npm publish -w packages/core
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
-      - name: publish rx-nostr-crypto
-        run: npx -y can-npm-publish packages/crypto && npm publish -w packages/crypto
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
