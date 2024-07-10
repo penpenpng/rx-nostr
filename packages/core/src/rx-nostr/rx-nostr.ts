@@ -480,7 +480,7 @@ class RxNostrImpl implements RxNostr {
 
     signer
       .signEvent(params)
-      .then((event) => {
+      .then(async (event) => {
         if (subject.closed) {
           return;
         }
@@ -491,9 +491,7 @@ class RxNostrImpl implements RxNostr {
           .pipe(filter(({ eventId }) => eventId === event.id))
           .subscribe(subject);
 
-        for (const conn of targetRelays) {
-          conn.publish(event);
-        }
+        await Promise.all(targetRelays.map((conn) => conn.publish(event)));
 
         if (completeOn === "sent") {
           subject.complete();

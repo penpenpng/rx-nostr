@@ -1,4 +1,4 @@
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, first, firstValueFrom, Subject } from "rxjs";
 
 export class CounterSubject extends BehaviorSubject<number> {
   constructor(count?: number) {
@@ -17,5 +17,11 @@ export class CounterSubject extends BehaviorSubject<number> {
     } else {
       super.next(x(this.getValue()));
     }
+  }
+}
+
+export class NotifySubject<T = void> extends Subject<T> {
+  waitNext() {
+    return firstValueFrom(this.pipe(first()));
   }
 }

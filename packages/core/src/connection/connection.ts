@@ -137,12 +137,12 @@ export class NostrConnection {
     this.resetConnection();
   }
 
-  publish(event: Nostr.Event<number>): void {
+  async publish(event: Nostr.Event<number>): Promise<void> {
     if (this.disposed) {
       return;
     }
 
-    this.pubProxy.publish(event);
+    return this.pubProxy.publish(event);
   }
   confirmOK(eventId: string): void {
     if (this.disposed) {

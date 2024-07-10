@@ -36,6 +36,7 @@ import {
   IWebSocketConstructor,
   ReadyState,
 } from "../websocket.js";
+import { NotifySubject } from "./utils.js";
 
 export class RelayConnection {
   private socket: IWebSocket | null = null;
@@ -46,6 +47,7 @@ export class RelayConnection {
   private message$ = new Subject<MessagePacket>();
   private error$ = new Subject<unknown>();
   private retryTimer: Subscription | null = null;
+  private sendAttempted$ = new NotifySubject();
 
   private disposed = false;
 
@@ -280,18 +282,21 @@ export class RelayConnection {
     this.socket?.close(code);
   }
 
-  send(message: Nostr.ToRelayMessage.Any): void {
+  send(message: Nostr.ToRelayMessage.Any): Promise<void> {
+    const done = this.sendAttempted$.waitNext();
+
     switch (this.state) {
       case "terminated":
       case "rejected": {
-        return;
+        this.sendAttempted$.next();
+        return done;
       }
       case "initialized":
       case "connecting":
       case "dormant": {
         this.buffer.push(message);
         this.connect();
-        return;
+        return done;
       }
       case "connected": {
         if (!this.socket) {
@@ -301,16 +306,19 @@ export class RelayConnection {
         if (this.socket.readyState === ReadyState.OPEN) {
           this.outgoing$.next({ to: this.url, message });
           this.socket.send(JSON.stringify(message));
+          this.sendAttempted$.next();
+          return done;
         } else {
           this.buffer.push(message);
         }
-        return;
+        return done;
       }
       case "waiting-for-retrying":
       case "retrying":
       case "error": {
+        this.sendAttempted$.next();
         this.unsent.push(message);
-        return;
+        return done;
       }
     }
   }
@@ -383,6 +391,7 @@ export class RelayConnection {
       this.message$,
       this.error$,
       this.reconnected$,
+      this.sendAttempted$,
     ];
     for (const sub of subjects) {
       sub.complete();

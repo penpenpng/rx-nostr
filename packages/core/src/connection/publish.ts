@@ -72,7 +72,7 @@ export class PublishProxy {
     });
   }
 
-  publish(event: Nostr.Event): void {
+  async publish(event: Nostr.Event): Promise<void> {
     if (this.disposed) {
       return;
     }
@@ -82,7 +82,7 @@ export class PublishProxy {
       this.count$.increment();
     }
 
-    this.sendEVENT(event);
+    return this.sendEVENT(event);
   }
 
   confirmOK(eventId: string): void {
@@ -122,6 +122,6 @@ export class PublishProxy {
   }
 
   private sendEVENT(event: Nostr.Event) {
-    this.relay.send(["EVENT", event]);
+    return this.relay.send(["EVENT", event]);
   }
 }
