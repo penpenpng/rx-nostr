@@ -17,8 +17,7 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "declarationDir": "./types",
     "sourceMap": true
   },
-  "include": ["app/**/*.ts", "src/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
