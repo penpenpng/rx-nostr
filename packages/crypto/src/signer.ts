@@ -4,7 +4,7 @@ import { getEventHash, getPublicKey, getSignature, toHex } from "./crypto.js";
 
 export interface EventSigner {
   signEvent<K extends number>(
-    params: Nostr.EventParameters<K>
+    params: Nostr.EventParameters<K>,
   ): Promise<Nostr.Event<K>>;
   getPublicKey(): Promise<string>;
 }
