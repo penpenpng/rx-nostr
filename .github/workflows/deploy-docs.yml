@@ -30,7 +30,7 @@ jobs:
       # Vuepress's deps is broken. Planning to move to vitepress.
 
       # # Build
-      # - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
       # - uses: actions/setup-node@v3
       #   with:
       #     node-version: ${{ vars.NODE_VERSION }}

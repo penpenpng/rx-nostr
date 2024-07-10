@@ -18,6 +18,11 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
-      - run: npx -y can-npm-publish && npm publish
+      - name: publish rx-nostr
+        run: npx -y can-npm-publish packages/core && npm publish -w packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
+      - name: publish rx-nostr-crypto
+        run: npx -y can-npm-publish packages/crypto && npm publish -w packages/crypto
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}

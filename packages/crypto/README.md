@@ -1,1 +1,1 @@
-# @rx-nostr/crypto
+# rx-nostr-crypto
