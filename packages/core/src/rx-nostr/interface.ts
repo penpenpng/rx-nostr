@@ -125,6 +125,14 @@ export interface RxNostr {
   ): Observable<OkPacketAgainstEvent>;
 
   /**
+   * It is almostly the same as `send()` with `completeOn: 'sent'`, but it returns promise.
+   */
+  cast(
+    params: Nostr.EventParameters,
+    options?: Partial<Omit<RxNostrSendOptions, "completeOn">>,
+  ): Promise<void>;
+
+  /**
    * Release all resources held by the RxNostr object.
    *
    * Any Observable resulting from this RxNostr will be in the completed state
