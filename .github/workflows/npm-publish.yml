@@ -8,5 +8,32 @@ on:
 jobs:
   npm-publish:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
+    permissions:
+      actions: write
+      checks: write
+      contents: write
     steps:
-      - run: echo ${{ github.ref_name }}
+      - id: parse
+        uses: ./.github/actions/parse-git-tag
+      - if: ${{ steps.parse.outputs.package == "" }}
+        name: exit job because no target package
+        run: exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+      - name: publish package
+        uses: ./.github/actions/publish-package
+        with:
+          version: ${{ steps.parse.outputs.version }}
+          package: ${{ steps.parse.outputs.package }}
