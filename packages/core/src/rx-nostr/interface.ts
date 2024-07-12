@@ -125,7 +125,7 @@ export interface RxNostr {
   ): Observable<OkPacketAgainstEvent>;
 
   /**
-   * It is almostly the same as `send()` with `completeOn: 'sent'`, but it returns promise.
+   * It is almost the same as `send()` with `completeOn: 'sent'`, but it returns promise.
    */
   cast(
     params: Nostr.EventParameters,
