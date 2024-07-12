@@ -49,7 +49,7 @@ autolabeler:
       - /^fix.*:/
   - label: documentation
     files:
-      - *.md
+      - "*.md"
     branch:
       - /^docs{0,1}\//
     title:
