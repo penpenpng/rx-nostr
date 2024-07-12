@@ -3,59 +3,59 @@ template: |
 
   $CHANGES
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
-change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+change-title-escapes: \<*_& # You can add # and @ to disable mentions, and add ` to disable code blocks.
 
 categories:
-  - title: "🚨 BREAKING CHANGES"
+  - title: 🚨 BREAKING CHANGES
     labels:
-      - "breaking change"
-  - title: "🚀 New Features"
+      - breaking change
+  - title: 🚀 New Features
     labels:
-      - "feature"
-  - title: "🐛 Bug Fixes"
+      - feature
+  - title: 🐛 Bug Fixes
     labels:
-      - "bugfix"
-  - title: "📖 Docs"
+      - bugfix
+  - title: 📖 Docs
     labels:
       - documentation
-  - title: "🧰 Maintenance"
+  - title: 🧰 Maintenance
     labels:
-      - "chore"
+      - chore
 
 version-resolver:
   major:
     labels:
-      - "breaking change"
+      - breaking change
   minor:
     labels:
-      - "feature"
+      - feature
   patch:
     labels:
-      - "bugfix"
-      - "chore"
+      - bugfix
+      - chore
   default: patch
 
 autolabeler:
-  - label: "feature"
+  - label: feature
     branch:
-      - '/^feat\//'
-      - '/^feature\//'
+      - /^feat\//
+      - /^feature\//
     title:
-      - "/^feat.*:/"
-  - label: "bugfix"
+      - /^feat.*:/
+  - label: bugfix
     branch:
-      - '/^fix\//'
+      - /^fix\//
     title:
-      - "/^fix.*:/"
-  - label: "documentation"
+      - /^fix.*:/
+  - label: documentation
     files:
-      - "*.md"
+      - *.md
     branch:
-      - '/^docs{0,1}\//'
+      - /^docs{0,1}\//
     title:
-      - "/^docs.*:/"
-  - label: "chore"
+      - /^docs.*:/
+  - label: chore
     branch:
-      - '/chore\//'
+      - /chore\//
     title:
-      - "/^chore.*:/"
+      - /^chore.*:/
