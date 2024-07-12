@@ -15,9 +15,6 @@ jobs:
       checks: write
       contents: write
     steps:
-      - id: parse
-        uses: ./.github/actions/parse-git-tag
-
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
@@ -28,6 +25,8 @@ jobs:
       - run: npm run test
       - run: npm run build
 
+      - id: parse
+        uses: ./.github/actions/parse-git-tag
       - name: publish package
         uses: ./.github/actions/publish-package
         with:
