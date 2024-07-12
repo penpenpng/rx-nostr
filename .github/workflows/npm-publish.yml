@@ -16,6 +16,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          branch: main
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ vars.NODE_VERSION }}
