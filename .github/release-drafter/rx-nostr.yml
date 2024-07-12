@@ -1,6 +1,6 @@
 _extends: rx-nostr:.github/release-drafter/base.yml
 
-name-template: rx-nostr@v$RESOLVED_VERSION
+name-template: core@$RESOLVED_VERSION
 tag-template: core@$RESOLVED_VERSION
 tag-prefix: core@
 include-paths:
