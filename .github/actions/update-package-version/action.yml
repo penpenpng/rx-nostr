@@ -1,0 +1,65 @@
+name: update package version
+
+description: |
+  On the default branch, create a commit that updates package.json's version,
+  then tag it, and push the commit and tag.
+
+# Requirement:
+#   - permissions:
+#       actions: write
+#       checks: write
+#       contents: write
+#   - env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+inputs:
+  version:
+    description: Version string.
+    required: true
+  package:
+    description: Path to the directory which has package.json.
+    default: "."
+  commit_message_template:
+    description: Template of commit message. You can use $VERSION as a given version string.
+    default: v$VERSION
+  tag_template:
+    description: Template of tag name. You can use $VERSION as a given version string.
+    default: v$VERSION
+  tag_force:
+    description: If true, the existing tag with the same name will be moved and pushed with force option.
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - name: update package version
+      shell: bash
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        cd ${{ inputs.package }}
+
+        for file in "package.json" "package-lock.json"; do
+          if [ -e $file ] && [ $(jq -r '.version' $file) != "${{ inputs.version }}" ]; then
+            cat <<< $(jq '.version = "${{ inputs.version }}"' $file) > $file
+            git add $file
+            UPDATED=1
+          fi
+        done
+
+        VERSION="${{ inputs.version }}"
+        MESSAGE="${{ inputs.commit_message_template }}"
+        TAG_NAME="${{ inputs.tag_template }}"
+
+        if [ $UPDATED = 1 ]; then
+          git commit -m "$MESSAGE"
+          git push origin HEAD
+        fi
+
+        if [ "${{ inputs.tag_force }}" = "true" ]; then
+          git tag  -f "$TAG_NAME"
+          git push -f origin "$TAG_NAME"
+        else
+          git tag  "$TAG_NAME"
+          git push origin "$TAG_NAME"
+        fi
