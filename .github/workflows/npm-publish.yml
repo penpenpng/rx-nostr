@@ -18,6 +18,7 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+      - run: echo ${{ github.ref_name }}
       - name: publish rx-nostr
         if: ${{ startsWith(github.ref_name, 'refs/tags/core@') }}
         run: npx -y can-npm-publish packages/core && npm publish -w packages/core
