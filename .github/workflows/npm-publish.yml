@@ -1,6 +1,8 @@
-name: publish crypto
+name: publish core
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -17,6 +19,12 @@ jobs:
       - run: npm run test
       - run: npm run build
       - name: publish rx-nostr
+        if: ${{ startsWith(github.ref_name, 'refs/tags/core@') }}
+        run: npx -y can-npm-publish packages/core && npm publish -w packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
+      - name: publish rx-nostr-crypto
+        if: ${{ startsWith(github.ref_name, 'refs/tags/crypto@') }}
         run: npx -y can-npm-publish packages/crypto && npm publish -w packages/crypto
         env:
           NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
