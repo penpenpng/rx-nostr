@@ -17,9 +17,6 @@ jobs:
     steps:
       - id: parse
         uses: ./.github/actions/parse-git-tag
-      - if: ${{ steps.parse.outputs.package == "" }}
-        name: exit job because no target package
-        run: exit 1
 
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
