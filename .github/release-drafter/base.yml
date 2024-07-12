@@ -1,0 +1,61 @@
+template: |
+  ## Changes
+
+  $CHANGES
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+
+categories:
+  - title: "🚨 BREAKING CHANGES"
+    labels:
+      - "breaking change"
+  - title: "🚀 New Features"
+    labels:
+      - "feature"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - "bugfix"
+  - title: "📖 Docs"
+    labels:
+      - documentation
+  - title: "🧰 Maintenance"
+    labels:
+      - "chore"
+
+version-resolver:
+  major:
+    labels:
+      - "breaking change"
+  minor:
+    labels:
+      - "feature"
+  patch:
+    labels:
+      - "bugfix"
+      - "chore"
+  default: patch
+
+autolabeler:
+  - label: "feature"
+    branch:
+      - '/^feat\//'
+      - '/^feature\//'
+    title:
+      - "/^feat.*:/"
+  - label: "bugfix"
+    branch:
+      - '/^fix\//'
+    title:
+      - "/^fix.*:/"
+  - label: "documentation"
+    files:
+      - "*.md"
+    branch:
+      - '/^docs{0,1}\//'
+    title:
+      - "/^docs.*:/"
+  - label: "chore"
+    branch:
+      - '/chore\//'
+    title:
+      - "/^chore.*:/"
