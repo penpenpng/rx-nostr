@@ -1,4 +1,4 @@
-name: publish core
+name: npm publish
 
 on:
   release:
@@ -9,23 +9,4 @@ jobs:
   npm-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-          registry-url: https://registry.npmjs.org
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
       - run: echo ${{ github.ref_name }}
-      - name: publish rx-nostr
-        if: ${{ startsWith(github.ref_name, 'refs/tags/core@') }}
-        run: npx -y can-npm-publish packages/core && npm publish -w packages/core
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
-      - name: publish rx-nostr-crypto
-        if: ${{ startsWith(github.ref_name, 'refs/tags/crypto@') }}
-        run: npx -y can-npm-publish packages/crypto && npm publish -w packages/crypto
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
