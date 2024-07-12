@@ -1,4 +1,4 @@
-# rx-nostr [![GitHub Release](https://img.shields.io/github/release/penpenpng/rx-nostr?style=flat)](https://github.com/penpenpng/rx-nostr/releases)
+# rx-nostr
 
 rx-nostr is a library based on [RxJS](https://rxjs.dev/), which allows [Nostr](https://nostr.com/) applications to easily communicate with relays.
 It wraps REQ subscriptions and other primitive operations of Nostr application in the RxJS subscription model, and provides high-level interfaces.
