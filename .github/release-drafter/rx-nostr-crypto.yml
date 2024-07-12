@@ -1,7 +1,7 @@
 _extends: rx-nostr:.github/release-drafter/base.yml
 
 name-template: rx-nostr-crypto@v$RESOLVED_VERSION
-tag-template: rx-nostr-crypto@v$RESOLVED_VERSION
+tag-template: crypto@$RESOLVED_VERSION
 tag-prefix: crypto@
 include-paths:
   - packages/crypto
