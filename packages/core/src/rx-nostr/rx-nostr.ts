@@ -3,6 +3,7 @@ import {
   filter,
   finalize,
   first,
+  firstValueFrom,
   identity,
   map,
   merge,
@@ -530,6 +531,13 @@ class RxNostrImpl implements RxNostr {
         : completeOnTimeout(this.config.okTimeout),
       finalize(teardown),
     );
+  }
+
+  async cast(
+    params: Nostr.EventParameters<number>,
+    options?: Partial<Omit<RxNostrSendOptions, "completeOn">> | undefined,
+  ): Promise<void> {
+    await firstValueFrom(this.send(params, { ...options, completeOn: "sent" }));
   }
 
   dispose() {
