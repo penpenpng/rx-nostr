@@ -3,9 +3,6 @@ import * as Nostr from "nostr-typedef";
 import { Batch } from "./uitls/batch.js";
 import { type EventVerifier, verifier as defaultVerifier } from "./verifier.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const WorkerGlobalScope: any;
-
 interface VerificationRequest {
   reqId: number;
   event: Nostr.Event;
@@ -20,8 +17,8 @@ export const startVerificationServiceHost = (
   verifier: EventVerifier = defaultVerifier,
 ) => {
   if (
-    typeof WorkerGlobalScope === "undefined" ||
-    !(self instanceof WorkerGlobalScope)
+    typeof ServiceWorkerGlobalScope === "undefined" ||
+    !(self instanceof ServiceWorkerGlobalScope)
   ) {
     throw new Error(
       "startVerificationServiceHost() must be called in a Service Worker context.",
@@ -39,10 +36,15 @@ export const startVerificationServiceHost = (
       } satisfies VerificationResponse);
     },
   );
+
+  self.addEventListener("activate", (ev) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ev as any).waitUntil((self as any).clients.claim());
+  });
 };
 
 export const createVerificationServiceClient = () => {
-  if (!navigator?.serviceWorker?.controller) {
+  if (!navigator?.serviceWorker) {
     throw new Error("This runtime doesn't support Service Worker.");
   }
 
@@ -62,27 +64,34 @@ export const createVerificationServiceClient = () => {
 
   const verify: EventVerifier = (event) => {
     if (disposed) {
-      throw new Error("");
+      throw new Error("VerificationServiceClient is already disposed.");
     }
 
-    const reqId = nextReqId++;
+    const controller = navigator.serviceWorker.controller;
 
-    const r = new Promise<boolean>((resolve, reject) => {
-      resolvers.set(reqId, resolve);
-      batch.set(() => {
-        if (resolvers.get(reqId)) {
-          reject(new Error("Verification request was timed out."));
-          resolvers.delete(reqId);
-        }
+    if (controller) {
+      const reqId = nextReqId++;
+
+      const r = new Promise<boolean>((resolve, reject) => {
+        resolvers.set(reqId, resolve);
+        batch.set(() => {
+          if (resolvers.get(reqId)) {
+            reject(new Error("Verification request was timed out."));
+            resolvers.delete(reqId);
+          }
+        });
       });
-    });
 
-    navigator.serviceWorker.controller?.postMessage({
-      reqId,
-      event,
-    } satisfies VerificationRequest);
+      controller.postMessage({
+        reqId,
+        event,
+      } satisfies VerificationRequest);
 
-    return r;
+      return r;
+    } else {
+      // fallback
+      return defaultVerifier(event);
+    }
   };
 
   const dispose = () => {
