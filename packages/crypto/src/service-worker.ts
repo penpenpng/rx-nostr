@@ -42,7 +42,7 @@ export const startVerificationServiceHost = (
 };
 
 export const createVerificationServiceClient = () => {
-  if (!window.navigator?.serviceWorker?.controller) {
+  if (!navigator?.serviceWorker?.controller) {
     throw new Error("This runtime doesn't support Service Worker.");
   }
 
