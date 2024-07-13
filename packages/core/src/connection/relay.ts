@@ -67,7 +67,7 @@ export class RelayConnection {
   ) {
     // Caching
     if (!config.skipFetchNip11) {
-      Nip11Registry.fetch(url);
+      Nip11Registry.getOrFetch(url);
     }
 
     this.setState("initialized");
