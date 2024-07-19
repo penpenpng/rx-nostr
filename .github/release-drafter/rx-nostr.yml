@@ -1,6 +1,6 @@
 _extends: rx-nostr:.github/release-drafter/base.yml
 
-footer: https://www.npmjs.com/package/rx-nostr/v/$RESOLVED_VERSION
+header: https://www.npmjs.com/package/rx-nostr/v/$RESOLVED_VERSION
 
 name-template: core@$RESOLVED_VERSION
 tag-template: core@$RESOLVED_VERSION
