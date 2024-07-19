@@ -11,7 +11,6 @@ import type {
   OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
-import { defineDefault } from "../utils/define-default.js";
 import type { RxReq } from "./rx-req.js";
 
 /**
@@ -153,22 +152,12 @@ export interface RxNostrUseOptions {
   relays?: string[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const makeRxNostrUseOptions = defineDefault<RxNostrUseOptions>({
-  relays: undefined,
-});
-
 export interface RxNostrSendOptions {
   signer?: EventSigner;
   relays?: string[];
   errorOnTimeout?: boolean;
-  completeOn: "all-ok" | "any-ok" | "sent";
+  completeOn?: "all-ok" | "any-ok" | "sent";
 }
-export const makeRxNostrSendOptions = defineDefault<RxNostrSendOptions>({
-  relays: undefined,
-  errorOnTimeout: false,
-  completeOn: "all-ok",
-});
 
 /** Config object specifying default relays' behaviors. */
 export interface DefaultRelayConfig {

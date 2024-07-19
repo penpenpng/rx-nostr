@@ -4,7 +4,7 @@ import { combineLatest, map, Observable } from "rxjs";
 import type {
   Authenticator,
   ConnectionStrategy,
-  RxNostrConfig,
+  FilledRxNostrConfig,
 } from "../config/index.js";
 import { RxNostrAlreadyDisposedError } from "../error.js";
 import {
@@ -17,7 +17,7 @@ import {
   OkPacketAgainstEvent,
   OutgoingMessagePacket,
 } from "../packet.js";
-import { defineDefault } from "../utils/define-default.js";
+import { fill } from "../utils/config.js";
 import { normalizeRelayUrl } from "../utils/normalize-url.js";
 import { AuthProxy } from "./auth.js";
 import { PublishProxy } from "./publish.js";
@@ -36,12 +36,6 @@ export interface SubscribeOptions {
  */
 export type REQMode = "default" | "temporary";
 
-const makeSubscribeOptions = defineDefault<SubscribeOptions>({
-  overwrite: false,
-  autoclose: false,
-  mode: "default",
-});
-
 export class NostrConnection {
   private relay: RelayConnection;
   private pubProxy: PublishProxy;
@@ -57,7 +51,7 @@ export class NostrConnection {
     return this._url;
   }
 
-  constructor(url: string, config: RxNostrConfig) {
+  constructor(url: string, config: FilledRxNostrConfig) {
     this._url = normalizeRelayUrl(url);
     const authenticator = getAuthenticator(url, config);
 
@@ -156,7 +150,11 @@ export class NostrConnection {
       return;
     }
 
-    const { mode, overwrite, autoclose } = makeSubscribeOptions(options);
+    const { mode, overwrite, autoclose } = fill(options ?? {}, {
+      overwrite: false,
+      autoclose: false,
+      mode: "default",
+    });
     const [, subId] = req;
 
     if (mode === "default" && !this.isDefaultRelay) {
@@ -264,7 +262,7 @@ export class NostrConnection {
 
 function getAuthenticator(
   url: string,
-  config: RxNostrConfig,
+  config: FilledRxNostrConfig,
 ): Authenticator | undefined {
   const a = config.authenticator;
   if (!a) {

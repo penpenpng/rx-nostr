@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
 import { Observable, Subject } from "rxjs";
 
-import type { RxNostrConfig } from "../config/index.js";
+import type { FilledRxNostrConfig } from "../config/index.js";
 import { evalFilters } from "../lazy-filter.js";
 import { Nip11Registry } from "../nip11.js";
 import { isFiltered } from "../nostr/filter.js";
@@ -23,7 +23,7 @@ export class SubscribeProxy {
   // maxLimit: number | null;
   private relay: RelayConnection;
   private authProxy: AuthProxy | null;
-  private config: RxNostrConfig;
+  private config: FilledRxNostrConfig;
   private subs = new Map<string, SubRecord>();
   private authRequiredSubs = new Set<string>();
   private fin$ = new Subject<FinPacket>();
@@ -33,7 +33,7 @@ export class SubscribeProxy {
   constructor(params: {
     relay: RelayConnection;
     authProxy: AuthProxy | null;
-    config: RxNostrConfig;
+    config: FilledRxNostrConfig;
   }) {
     this.relay = params.relay;
     this.authProxy = params.authProxy;
@@ -218,7 +218,7 @@ class SubQueue {
 
   constructor(
     private url: string,
-    private config: RxNostrConfig,
+    private config: FilledRxNostrConfig,
   ) {}
 
   enqueue(v: SubRecord): void {
