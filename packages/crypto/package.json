@@ -5,7 +5,7 @@
   "keywords": [
     "rx-nostr"
   ],
-  "homepage": "https://penpenpng.github.io/rx-nostr/",
+  "homepage": "https://github.com/penpenpng/rx-nostr/tree/main/packages/crypto",
   "bugs": {
     "url": "https://github.com/penpenpng/rx-nostr/issues"
   },
