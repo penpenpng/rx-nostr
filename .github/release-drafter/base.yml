@@ -58,3 +58,6 @@ autolabeler:
       - /chore\//
     title:
       - /^chore.*:/
+
+exclude-labels:
+  - "skip-changelog"
