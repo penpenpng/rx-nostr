@@ -1,11 +1,11 @@
 import { Subject } from "rxjs";
 
-import type { Authenticator, RxNostrConfig } from "../config/index.js";
+import type { Authenticator, FilledRxNostrConfig } from "../config/index.js";
 import type { RelayConnection } from "./relay.js";
 
 export class AuthProxy {
   private relay: RelayConnection;
-  private config: RxNostrConfig;
+  private config: FilledRxNostrConfig;
   private authenticator: Authenticator;
   private ongoings = new Set<string>();
   private authResult$ = new Subject<boolean>();
@@ -13,7 +13,7 @@ export class AuthProxy {
 
   constructor(params: {
     relay: RelayConnection;
-    config: RxNostrConfig;
+    config: FilledRxNostrConfig;
     authenticator: Authenticator;
   }) {
     this.relay = params.relay;

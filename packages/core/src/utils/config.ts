@@ -2,7 +2,7 @@ import { RxNostrLogicError } from "../error.js";
 import { EMPTY, Empty } from "./empty.js";
 import type { OptionalPart, RequiredPart } from "./types.js";
 
-export type FilledConfig<C, D> = RequiredPart<C> & {
+type FilledConfig<C, D> = RequiredPart<C> & {
   [K in keyof OptionalPart<C>]: K extends keyof D ? NonNullable<C[K]> : C[K];
 };
 

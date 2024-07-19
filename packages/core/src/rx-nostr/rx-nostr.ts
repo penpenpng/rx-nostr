@@ -19,7 +19,7 @@ import {
 } from "rxjs";
 
 import {
-  type EventSigner,
+  type FilledRxNostrConfig,
   makeRxNostrConfig,
   type RxNostrConfig,
 } from "../config/index.js";
@@ -43,12 +43,11 @@ import type {
   ReqPacket,
 } from "../packet.js";
 import { subtract } from "../utils/array-operation.js";
+import { fill } from "../utils/config.js";
 import { UrlMap } from "../utils/url-map.js";
 import {
   type AcceptableDefaultRelaysConfig,
   type DefaultRelayConfig,
-  makeRxNostrSendOptions,
-  makeRxNostrUseOptions,
   RelayStatus,
   type RxNostr,
   type RxNostrSendOptions,
@@ -58,8 +57,8 @@ import type { RxReq } from "./rx-req.js";
 import { makeLazyREQ, normalizeRelaysConfig } from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
-export function createRxNostr(config?: Partial<RxNostrConfig>): RxNostr {
-  return new RxNostrImpl(makeRxNostrConfig(config));
+export function createRxNostr(config: RxNostrConfig): RxNostr {
+  return new RxNostrImpl(makeRxNostrConfig(config ?? {}));
 }
 
 class RxNostrImpl implements RxNostr {
@@ -102,7 +101,7 @@ class RxNostrImpl implements RxNostr {
   private dispose$ = new Subject<void>();
   private disposed = false;
 
-  constructor(private config: RxNostrConfig) {}
+  constructor(private config: FilledRxNostrConfig) {}
 
   // #region defaultRelays getter/setter
   getDefaultRelays(): Record<string, DefaultRelayConfig> {
@@ -250,7 +249,7 @@ class RxNostrImpl implements RxNostr {
     rxReq: RxReq,
     options?: Partial<RxNostrUseOptions>,
   ): Observable<EventPacket> {
-    const { relays: useScopeRelays } = makeRxNostrUseOptions(options);
+    const { relays: useScopeRelays } = options ?? {};
 
     interface OrderPacket {
       subId: string;
@@ -457,9 +456,11 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     options?: Partial<RxNostrSendOptions>,
   ): Observable<OkPacketAgainstEvent> {
-    const { relays, errorOnTimeout, completeOn } =
-      makeRxNostrSendOptions(options);
-    const signer: EventSigner = options?.signer ?? this.config.signer;
+    const { signer, relays, errorOnTimeout, completeOn } = fill(options ?? {}, {
+      signer: this.config.signer,
+      errorOnTimeout: false,
+      completeOn: "all-ok",
+    });
 
     const targetRelays =
       relays === undefined

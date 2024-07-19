@@ -1,16 +1,11 @@
 import * as Nostr from "nostr-typedef";
 
-import { defineDefault } from "../utils/define-default.js";
+import { fill } from "../utils/config.js";
 
 export interface MatchFilterOptions {
   sinceInclusive: boolean;
   untilInclusive: boolean;
 }
-
-const makeMatchFilterOptions = defineDefault<MatchFilterOptions>({
-  sinceInclusive: true,
-  untilInclusive: true,
-});
 
 /**
  * Return true if the given filter matches the given filters.
@@ -32,7 +27,10 @@ function _isFiltered(
   filter: Nostr.Filter,
   options?: Partial<MatchFilterOptions>,
 ): boolean {
-  const { sinceInclusive, untilInclusive } = makeMatchFilterOptions(options);
+  const { sinceInclusive, untilInclusive } = fill(options ?? {}, {
+    sinceInclusive: true,
+    untilInclusive: true,
+  });
 
   if (
     filter.ids &&

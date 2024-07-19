@@ -11,7 +11,7 @@ import {
   timer,
 } from "rxjs";
 
-import type { RetryConfig, RxNostrConfig } from "../config/index.js";
+import type { FilledRxNostrConfig, RetryConfig } from "../config/index.js";
 import {
   RxNostrInvalidUsageError,
   RxNostrLogicError,
@@ -63,7 +63,7 @@ export class RelayConnection {
 
   constructor(
     public url: string,
-    private config: RxNostrConfig,
+    private config: FilledRxNostrConfig,
   ) {
     // Caching
     if (!config.skipFetchNip11) {

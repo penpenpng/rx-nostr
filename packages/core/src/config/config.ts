@@ -1,28 +1,27 @@
-import { defineDefault } from "../utils/define-default.js";
+import { fill } from "../utils/config.js";
 import type { IWebSocketConstructor } from "../websocket.js";
 import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
-import { emptyVerifier, EventVerifier } from "./verifier.js";
+import { EventVerifier } from "./verifier.js";
 
-export const makeRxNostrConfig = defineDefault<RxNostrConfig>({
-  signer: nip07Signer(),
-  verifier: emptyVerifier,
-  authenticator: undefined,
-  connectionStrategy: "lazy",
-  retry: {
-    strategy: "exponential",
-    maxCount: 5,
-    initialDelay: 1000,
-  },
-  eoseTimeout: 30 * 1000,
-  okTimeout: 30 * 1000,
-  authTimeout: 30 * 1000,
-  skipVerify: false,
-  skipValidateFilterMatching: false,
-  skipExpirationCheck: false,
-  skipFetchNip11: false,
-  websocketCtor: undefined,
-});
+export const makeRxNostrConfig = (config: RxNostrConfig) =>
+  fill(config, {
+    signer: nip07Signer(),
+    connectionStrategy: "lazy",
+    retry: {
+      strategy: "exponential",
+      maxCount: 5,
+      initialDelay: 1000,
+    },
+    eoseTimeout: 30 * 1000,
+    okTimeout: 30 * 1000,
+    authTimeout: 30 * 1000,
+    skipVerify: false,
+    skipValidateFilterMatching: false,
+    skipExpirationCheck: false,
+    skipFetchNip11: false,
+  });
+export type FilledRxNostrConfig = ReturnType<typeof makeRxNostrConfig>;
 
 /**
  * Configuration object for a RxNostr instance.
@@ -31,60 +30,59 @@ export interface RxNostrConfig {
   /**
    * Default signer, which is used to convert event parameters into signed event.
    */
-  signer: EventSigner;
+  signer?: EventSigner;
   /**
    * Default verifier, which is used to verify event's signature.
    */
   verifier: EventVerifier;
-  authenticator:
+  authenticator?:
     | AuthenticatorConfig
-    | ((relay: string) => AuthenticatorConfig)
-    | undefined;
+    | ((relay: string) => AuthenticatorConfig);
 
   /**
    * Connection strategy for default relays.
    */
-  connectionStrategy: ConnectionStrategy;
+  connectionStrategy?: ConnectionStrategy;
 
   /**
    * Auto reconnection strategy.
    */
-  retry: RetryConfig;
+  retry?: RetryConfig;
   /**
    * Specify how long rx-nostr waits for EOSE messages in `use()` following backward strategy (milliseconds).
    *
    * If EOSE doesn't come after waiting for this amount of time,
    * rx-nostr is considered to get EOSE.
    */
-  eoseTimeout: number;
+  eoseTimeout?: number;
   /**
    * Specify how long rx-nostr waits for OK messages in `send()` (milliseconds).
    *
    * If OK doesn't come after waiting for this amount of time,
    * rx-nostr stops listening OK and the Observable come from `send()` finishes with TimeoutError.
    */
-  okTimeout: number;
-  authTimeout: number;
+  okTimeout?: number;
+  authTimeout?: number;
   /**
    * If true, skip filtering EVENTs based on signature verification.
    */
-  skipVerify: boolean;
+  skipVerify?: boolean;
   /**
    * If true, skip filtering EVENTs based on matching with REQ filter.
    */
-  skipValidateFilterMatching: boolean;
+  skipValidateFilterMatching?: boolean;
   /**
    * If true, skip automatic expiration check based on NIP-40.
    */
-  skipExpirationCheck: boolean;
+  skipExpirationCheck?: boolean;
   /**
    * If true, skip automatic fetching NIP-11 relay information.
    */
-  skipFetchNip11: boolean;
+  skipFetchNip11?: boolean;
   /**
    * Optional. For environments where `WebSocket` doesn't exist in `globalThis` such as Node.js.
    */
-  websocketCtor: IWebSocketConstructor | undefined;
+  websocketCtor?: IWebSocketConstructor;
 }
 
 /**

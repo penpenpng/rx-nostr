@@ -35,7 +35,7 @@ import {
   OkPacket,
   ReqPacket,
 } from "./packet.js";
-import { defineDefault } from "./utils/define-default.js";
+import { fill } from "./utils/config.js";
 
 // --------------------- //
 // EventPacket operators //
@@ -174,7 +174,7 @@ export function filterByKind<P extends EventPacket>(
   kind: number,
   options?: NotOption,
 ): MonoTypeOperatorFunction<P> {
-  const { not } = makeNotOption(options);
+  const { not } = fill(options, { not: false });
   return filter(({ event }) => xor(event.kind === kind, not));
 }
 
@@ -185,7 +185,7 @@ export function filterByKinds<P extends EventPacket>(
   kinds: number[],
   options?: NotOption,
 ): MonoTypeOperatorFunction<P> {
-  const { not } = makeNotOption(options);
+  const { not } = fill(options, { not: false });
   return filter(({ event }) => xor(kinds.includes(event.kind), not));
 }
 
@@ -196,7 +196,7 @@ export function filterBy<P extends EventPacket>(
   filters: LazyFilter | LazyFilter[],
   options?: MatchFilterOptions & NotOption,
 ): MonoTypeOperatorFunction<P> {
-  const { not } = makeNotOption(options);
+  const { not } = fill(options, { not: false });
   const evaledFilter = evalFilters(filters);
   return filter(({ event }) => {
     return xor(isFiltered(event, evaledFilter, options), not);
@@ -267,7 +267,7 @@ export function filterByEventId<P extends OkPacket>(
   eventId: string,
   options?: NotOption,
 ): MonoTypeOperatorFunction<P> {
-  const { not } = makeNotOption(options);
+  const { not } = fill(options, { not: false });
   return filter((p) => xor(p.eventId === eventId, not));
 }
 
@@ -397,7 +397,7 @@ export function filterBySubId<P extends { subId: string }>(
   subId: string,
   options?: NotOption,
 ): OperatorFunction<P, P> {
-  const { not } = makeNotOption(options);
+  const { not } = fill(options, { not: false });
   return filter((packet) => xor(packet.subId === subId, not));
 }
 
@@ -419,10 +419,6 @@ export interface CreateUniqOptions<T> {
 export interface NotOption {
   not: boolean;
 }
-
-const makeNotOption = defineDefault<NotOption>({
-  not: false,
-});
 
 function xor(x: boolean, y: boolean) {
   return (!x && y) || (x && !y);
