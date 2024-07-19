@@ -1,5 +1,7 @@
 _extends: rx-nostr:.github/release-drafter/base.yml
 
+footer: https://www.npmjs.com/package/rx-nostr-crypto/v/$RESOLVED_VERSION
+
 name-template: crypto@$RESOLVED_VERSION
 tag-template: crypto@$RESOLVED_VERSION
 tag-prefix: crypto@
