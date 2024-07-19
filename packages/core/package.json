@@ -8,7 +8,7 @@
     "rxjs7",
     "nostr"
   ],
-  "homepage": "https://penpenpng.github.io/rx-nostr/",
+  "homepage": "https://github.com/penpenpng/rx-nostr",
   "bugs": {
     "url": "https://github.com/penpenpng/rx-nostr/issues"
   },
