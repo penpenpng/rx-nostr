@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://penpenpng.github.io/rx-nostr/">documentation</a>
+  <a href="https://penpenpng.github.io/rx-nostr/">documentation</a> /  <a href="https://github.com/penpenpng/rx-nostr/releases">release notes</a>
 </p>
 
 ## Description
@@ -65,7 +65,8 @@ rxReq.emit({ kinds: [1] });
 
 ## For more information
 
-https://penpenpng.github.io/rx-nostr/
+- Documentation: https://penpenpng.github.io/rx-nostr/
+- Release notes: https://github.com/penpenpng/rx-nostr/releases
 
 ## License
 
