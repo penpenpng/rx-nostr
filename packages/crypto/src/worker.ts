@@ -1,17 +1,15 @@
 import * as Nostr from "nostr-typedef";
 
-import { VerificationRequest, VerificationResponse } from "./types.js";
+import type {
+  VerificationRequest,
+  VerificationResponse,
+  VerificationServiceStatus,
+} from "./types.js";
 import { Batch } from "./uitls/batch.js";
 import { type EventVerifier, verifier as defaultVerifier } from "./verifier.js";
 
 type PingMessage = "ping";
 type PongMessage = "pong";
-type VerificationServiceState =
-  | "prepared"
-  | "booting"
-  | "active"
-  | "error"
-  | "terminated";
 
 export interface SignerOptions {
   tags?: Nostr.Tag.Any[];
@@ -22,6 +20,18 @@ export interface VerificationServiceClientConfig extends SignerOptions {
   fallback?: EventVerifier;
 }
 
+export interface VerificationServiceClient {
+  start(): void;
+  verifier: EventVerifier;
+  get status(): VerificationServiceStatus;
+  dispose(): void;
+  [Symbol.dispose](): void;
+}
+
+/**
+ * On the Worker context, it performs the verification process
+ * in response to a request from VerificationServiceClient and returns the results to the client.
+ */
 export const startVerificationServiceHost = (
   verifier: EventVerifier = defaultVerifier,
 ) => {
@@ -62,12 +72,34 @@ export const startVerificationServiceHost = (
   );
 };
 
+/**
+ * This client does nothing, but can be used when you have to create a fake client
+ * in a context where Worker does not exist, e.g. SSR
+ */
+export const createNoopClient = (): VerificationServiceClient => {
+  const noop = () => {};
+  return {
+    start: noop,
+    verifier: async () => false,
+    get status() {
+      return "prepared" as const;
+    },
+    dispose: noop,
+    [Symbol.dispose]: noop,
+  };
+};
+
+/**
+ * Create a client that sends a verification request to the Worker and receive the result.
+ * Since this does the verification process outside of the UI thread, it prevents the UI thread from hanging.
+ * However, for example, if the Worker is not ready, the verification process is done by `fallback`, which runs on the UI thread.
+ */
 export const createVerificationServiceClient = ({
   worker,
   fallback,
   tags,
-}: VerificationServiceClientConfig) => {
-  let status: VerificationServiceState = "prepared";
+}: VerificationServiceClientConfig): VerificationServiceClient => {
+  let status: VerificationServiceStatus = "prepared";
   let nextReqId = 1;
 
   const resolvers = new Map<number, (ok: boolean) => void>();
@@ -162,12 +194,12 @@ export const createVerificationServiceClient = ({
   };
 
   return {
-    [Symbol.dispose]: dispose,
     start,
-    dispose,
     verifier,
     get status() {
       return status;
     },
+    dispose,
+    [Symbol.dispose]: dispose,
   };
 };
