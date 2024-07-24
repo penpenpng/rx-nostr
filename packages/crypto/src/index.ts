@@ -12,9 +12,13 @@ export {
   type EventSignerOptions,
   seckeySigner,
 } from "./signer.js";
+export type * from "./types.js";
 export { type EventVerifier, verifier } from "./verifier.js";
 export {
+  createNoopClient,
   createVerificationServiceClient,
+  type SignerOptions,
   startVerificationServiceHost,
+  type VerificationServiceClient,
   type VerificationServiceClientConfig,
 } from "./worker.js";

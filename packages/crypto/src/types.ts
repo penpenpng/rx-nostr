@@ -10,3 +10,10 @@ export interface VerificationResponse {
   ok: boolean;
   error?: string;
 }
+
+export type VerificationServiceStatus =
+  | "prepared"
+  | "booting"
+  | "active"
+  | "error"
+  | "terminated";
