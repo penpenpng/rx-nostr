@@ -11,7 +11,12 @@ export interface EventSigner {
   getPublicKey(): Promise<string>;
 }
 
-export function nip07Signer(): EventSigner {
+export interface EventSignerOptions {
+  /** If set, the set tags is appended to the end of the given event's tags on signing. */
+  tags?: Nostr.Tag.Any[];
+}
+
+export function nip07Signer(options?: EventSignerOptions): EventSigner {
   return {
     async signEvent<K extends number>(
       params: Nostr.EventParameters<K>,
@@ -26,7 +31,7 @@ export function nip07Signer(): EventSigner {
               "window.nostr.getPublicKey() is not found",
             ),
           ),
-        tags: params.tags ?? [],
+        tags: [...(params.tags ?? []), ...(options?.tags ?? [])],
         created_at: params.created_at ?? Math.floor(Date.now() / 1000),
       };
 

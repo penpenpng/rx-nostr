@@ -9,7 +9,15 @@ export interface EventSigner {
   getPublicKey(): Promise<string>;
 }
 
-export function seckeySigner(seckey: string): EventSigner {
+export interface EventSignerOptions {
+  /** If set, the set tags is appended to the end of the given event's tags on signing. */
+  tags?: Nostr.Tag.Any[];
+}
+
+export function seckeySigner(
+  seckey: string,
+  options?: EventSignerOptions,
+): EventSigner {
   const sechex = seckey.startsWith("nsec1") ? toHex(seckey) : seckey;
   const pubhex = getPublicKey(sechex);
 
@@ -18,7 +26,7 @@ export function seckeySigner(seckey: string): EventSigner {
       const event = {
         ...params,
         pubkey: params.pubkey ?? pubhex,
-        tags: params.tags ?? [],
+        tags: [...(params.tags ?? []), ...(options?.tags ?? [])],
         created_at: params.created_at ?? Math.floor(Date.now() / 1000),
       };
 
