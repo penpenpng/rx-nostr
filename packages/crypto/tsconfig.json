@@ -4,6 +4,7 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ESNext", "DOM", "WebWorker"],
+    "types": ["vite/client"],
     "moduleResolution": "bundler",
     "strict": true,
     "resolveJsonModule": true,
@@ -16,7 +17,6 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "declarationDir": "./types",
     "sourceMap": true
   },
   "include": ["src/**/*.ts"]
