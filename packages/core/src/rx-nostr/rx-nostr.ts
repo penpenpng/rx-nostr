@@ -30,7 +30,8 @@ import {
   RxNostrInvalidUsageError,
   RxNostrLogicError,
 } from "../error.js";
-import { completeOnTimeout, filterBySubId } from "../operator.js";
+import { isExpired } from "../nostr/nip40.js";
+import { completeOnTimeout, filterAsync, filterBySubId } from "../operator.js";
 import type {
   ConnectionState,
   ConnectionStatePacket,
@@ -323,6 +324,14 @@ class RxNostrImpl implements RxNostr {
       takeUntil(this.dispose$),
     );
 
+    const validate = () =>
+      filterAsync<EventPacket>(async ({ event }) => {
+        return (
+          (this.config.skipVerify || (await this.config.verifier(event))) &&
+          (this.config.skipExpirationCheck || !isExpired(event))
+        );
+      });
+
     if (rxReq.strategy === "forward") {
       let firstOrder: OrderPacket | undefined;
 
@@ -340,6 +349,7 @@ class RxNostrImpl implements RxNostr {
           teardownSubscription(firstOrder);
         }),
         switchAll(),
+        validate(),
       );
     } else {
       return order$.pipe(
@@ -352,6 +362,7 @@ class RxNostrImpl implements RxNostr {
           ),
         ),
         mergeAll(),
+        validate(),
       );
     }
   }
