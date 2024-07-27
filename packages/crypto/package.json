@@ -25,7 +25,9 @@
         "node": "./dist/index.cjs.js",
         "default": "./dist/index.umd.js"
       }
-    }
+    },
+    "./src": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "src",
