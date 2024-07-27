@@ -5,6 +5,7 @@ import {
   createRxBackwardReq,
   createRxForwardReq,
   createRxNostr,
+  noopVerifier,
   RxNostr,
 } from "../index.js";
 import { disposeMockRelay, faker, spyEvent } from "./helper.js";
@@ -21,6 +22,7 @@ describe("", () => {
     anotherRelay = createMockRelay(ANOTHER_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       skipFetchNip11: true,
       skipVerify: true,
     });

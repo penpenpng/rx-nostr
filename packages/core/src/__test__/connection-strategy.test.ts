@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
-import { createRxForwardReq, createRxNostr, RxNostr } from "../index.js";
+import {
+  createRxForwardReq,
+  createRxNostr,
+  noopVerifier,
+  RxNostr,
+} from "../index.js";
 import { disposeMockRelay, faker, stateWillBe } from "./helper.js";
 
 describe("keep-lazy strategy", () => {
@@ -16,6 +21,7 @@ describe("keep-lazy strategy", () => {
     anotherRelay = createMockRelay(ANOTHER_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       connectionStrategy: "lazy-keep",
       skipFetchNip11: true,
       skipVerify: true,
@@ -72,6 +78,7 @@ describe("aggressive strategy", () => {
     anotherRelay = createMockRelay(ANOTHER_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       connectionStrategy: "aggressive",
       skipFetchNip11: true,
       skipVerify: true,
