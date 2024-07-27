@@ -18,6 +18,7 @@ export interface SignerOptions {
 export interface VerificationServiceClientConfig extends SignerOptions {
   worker: Worker;
   fallback?: EventVerifier;
+  timeout?: number;
 }
 
 export interface VerificationServiceClient {
@@ -98,12 +99,13 @@ export const createVerificationServiceClient = ({
   worker,
   fallback,
   tags,
+  timeout,
 }: VerificationServiceClientConfig): VerificationServiceClient => {
   let status: VerificationServiceStatus = "prepared";
   let nextReqId = 1;
 
   const resolvers = new Map<number, (ok: boolean) => void>();
-  const batch = new Batch(5000);
+  const batch = new Batch(timeout ?? 10000);
 
   const fallbackVerifier: EventVerifier = fallback ?? defaultVerifier;
   const workerVerifier: EventVerifier = (event) => {
