@@ -16,7 +16,7 @@ export default defineConfig({
     },
     sourcemap: true,
   },
-  plugins: [dts({ rollupTypes: true }) as PluginOption],
+  plugins: [dts() as PluginOption],
   test: {
     hookTimeout: 1000,
   },
