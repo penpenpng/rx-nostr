@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
 import { WebSocketCloseCode } from "../connection/index.js";
-import { createRxForwardReq, createRxNostr, RxNostr } from "../index.js";
+import {
+  createRxForwardReq,
+  createRxNostr,
+  noopVerifier,
+  RxNostr,
+} from "../index.js";
 import { closeSocket, disposeMockRelay, faker, stateWillBe } from "./helper.js";
 
 describe("Under a single relay", () => {
@@ -14,6 +19,7 @@ describe("Under a single relay", () => {
     relay = createMockRelay(DEFAULT_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       retry: { strategy: "off" },
       skipFetchNip11: true,
       skipVerify: true,

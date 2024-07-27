@@ -6,6 +6,7 @@ import {
   createRxForwardReq,
   createRxNostr,
   createRxOneshotReq,
+  noopVerifier,
   RxNostr,
 } from "../index.js";
 import { Nip11Registry } from "../nip11.js";
@@ -25,6 +26,7 @@ describe("Under a single relay", () => {
     relay = createMockRelay(DEFAULT_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
       skipVerify: true,
@@ -217,6 +219,7 @@ describe("Under multiple relays", () => {
     relay3 = createMockRelay(RELAY_URL3);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       skipFetchNip11: true,
       skipVerify: true,
     });
@@ -295,6 +298,7 @@ describe("Under a relay which is limited REQ concurrency", () => {
     });
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
     });

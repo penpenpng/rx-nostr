@@ -6,6 +6,7 @@ import {
   createRxBackwardReq,
   createRxForwardReq,
   createRxNostr,
+  noopVerifier,
   RxNostr,
 } from "../index.js";
 import {
@@ -25,6 +26,7 @@ describe("Under a single relay", () => {
     relay = createMockRelay(DEFAULT_RELAY);
 
     rxNostr = createRxNostr({
+      verifier: noopVerifier,
       retry: { strategy: "immediately", maxCount: 1 },
       skipFetchNip11: true,
       skipVerify: true,

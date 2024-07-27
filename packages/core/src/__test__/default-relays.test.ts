@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { createMockRelay, type MockRelay } from "vitest-nostr";
 
-import { createRxForwardReq, createRxNostr, RxNostr } from "../index.js";
+import {
+  createRxForwardReq,
+  createRxNostr,
+  noopVerifier,
+  RxNostr,
+} from "../index.js";
 import { disposeMockRelay, faker } from "./helper.js";
 
 const RELAY_URL1 = "ws://localhost:1234";
@@ -18,6 +23,7 @@ beforeEach(async () => {
   relay3 = createMockRelay(RELAY_URL3);
 
   rxNostr = createRxNostr({
+    verifier: noopVerifier,
     skipFetchNip11: true,
     skipVerify: true,
   });
