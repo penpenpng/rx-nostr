@@ -279,7 +279,9 @@ export class RelayConnection {
   }
 
   disconnect(code: WebSocketCloseCode): void {
-    this.socket?.close(code);
+    if (this.socket?.readyState === ReadyState.OPEN) {
+      this.socket.close(code);
+    }
   }
 
   send(message: Nostr.ToRelayMessage.Any): Promise<void> {
