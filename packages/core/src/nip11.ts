@@ -11,7 +11,9 @@ import { UrlMap } from "./utils/url-map.js";
  * rx-nostr will use them instead of fetching even if `skipFetchNip11` is enabled.
  */
 export class Nip11Registry {
-  private static cache = new UrlMap<Nostr.Nip11.RelayInfo>();
+  private static cache = new UrlMap<
+    Promise<Nostr.Nip11.RelayInfo> | Nostr.Nip11.RelayInfo
+  >();
   private static default: Nostr.Nip11.RelayInfo = {};
 
   static async getValue<T>(
@@ -23,7 +25,7 @@ export class Nip11Registry {
     },
   ): Promise<T> {
     if (!options?.skipCache) {
-      const data = this.get(url);
+      const data = await this.cache.get(url);
       if (data) {
         return getter(data);
       }
@@ -42,7 +44,12 @@ export class Nip11Registry {
    * Return cached or `set()`'ed NIP-11 information.
    */
   static get(url: string): Nostr.Nip11.RelayInfo | undefined {
-    return this.cache.get(url);
+    const v = this.cache.get(url);
+    if (v && !(v instanceof Promise)) {
+      return v;
+    } else {
+      return undefined;
+    }
   }
 
   /**
@@ -50,6 +57,8 @@ export class Nip11Registry {
    */
   static async fetch(url: string) {
     const promise = fetchRelayInfo(url);
+
+    this.cache.set(url, promise);
     promise.then((v) => {
       this.cache.set(url, v);
     });
