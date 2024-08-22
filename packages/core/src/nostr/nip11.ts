@@ -6,10 +6,10 @@ import * as Nostr from "nostr-typedef";
 export async function fetchRelayInfo(
   url: string,
 ): Promise<Nostr.Nip11.RelayInfo> {
-  const u = new URL(url);
-  u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");
-
   try {
+    const u = new URL(url);
+    u.protocol = u.protocol.replace(/^ws(s?):/, "http$1:");
+
     const res = await fetch(u.toString(), {
       headers: { Accept: "application/nostr+json" },
     });
