@@ -1,9 +1,11 @@
 export {
+  generateKeyPair,
   getEventHash,
   getPublicKey,
   getSignature,
   type Schnorr,
   schnorr,
+  signEventBySeckey,
   toHex,
   verify,
 } from "./crypto.js";
