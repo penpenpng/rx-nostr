@@ -1,9 +1,11 @@
 import { inlineTry } from "./inline-try.js";
 
 export function normalizeRelayUrl(url: string) {
-  const o = url.trim();
+  let o = "";
 
   try {
+    o = url.trim();
+
     const u = new URL(o);
 
     u.hash = "";
