@@ -2,6 +2,7 @@ export type {
   AcceptableDefaultRelaysConfig,
   DefaultRelayConfig,
   RxNostr,
+  RxNostrOnParams,
   RxNostrSendOptions,
   RxNostrUseOptions,
 } from "./interface.js";
