@@ -147,16 +147,25 @@ export interface RxNostr {
   dispose(): void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface RxNostrUseOptions {
+  /** @deprecated Use `on` option instead. */
   relays?: string[];
+  on?: RxNostrOnParams;
 }
 
 export interface RxNostrSendOptions {
   signer?: EventSigner;
+  /** @deprecated Use `on` option instead. */
   relays?: string[];
+  on?: RxNostrOnParams;
   errorOnTimeout?: boolean;
   completeOn?: "all-ok" | "any-ok" | "sent";
+}
+
+export interface RxNostrOnParams {
+  relays?: string[];
+  defaultReadRelays?: boolean;
+  defaultWriteRelays?: boolean;
 }
 
 /** Config object specifying default relays' behaviors. */

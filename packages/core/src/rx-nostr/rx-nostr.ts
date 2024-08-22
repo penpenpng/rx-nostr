@@ -55,7 +55,11 @@ import {
   type RxNostrUseOptions,
 } from "./interface.js";
 import type { RxReq } from "./rx-req.js";
-import { makeLazyREQ, normalizeRelaysConfig } from "./utils.js";
+import {
+  getMethodScopeRelays,
+  makeLazyREQ,
+  normalizeRelaysConfig,
+} from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
 export function createRxNostr(config: RxNostrConfig): RxNostr {
@@ -250,7 +254,7 @@ class RxNostrImpl implements RxNostr {
     rxReq: RxReq,
     options?: Partial<RxNostrUseOptions>,
   ): Observable<EventPacket> {
-    const { relays: useScopeRelays } = options ?? {};
+    const useScopeRelays = getMethodScopeRelays(this, options);
 
     interface OrderPacket {
       subId: string;
@@ -467,11 +471,12 @@ class RxNostrImpl implements RxNostr {
     params: Nostr.EventParameters,
     options?: Partial<RxNostrSendOptions>,
   ): Observable<OkPacketAgainstEvent> {
-    const { signer, relays, errorOnTimeout, completeOn } = fill(options ?? {}, {
+    const { signer, errorOnTimeout, completeOn } = fill(options ?? {}, {
       signer: this.config.signer,
       errorOnTimeout: false,
       completeOn: "all-ok",
     });
+    const relays = getMethodScopeRelays(this, options);
 
     const targetRelays =
       relays === undefined
