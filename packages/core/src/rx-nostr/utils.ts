@@ -1,7 +1,10 @@
 import type { LazyFilter, LazyREQ } from "../packet.js";
+import { normalizeRelayUrl } from "../utils/normalize-url.js";
 import type {
   AcceptableDefaultRelaysConfig,
   DefaultRelayConfig,
+  RxNostr,
+  RxNostrOnParams,
 } from "./interface.js";
 import type { RxReq } from "./rx-req.js";
 
@@ -62,5 +65,55 @@ export function normalizeRelaysConfig(
     }));
 
     return Object.fromEntries(arr.map((e) => [e.url, e]));
+  }
+}
+
+export function getMethodScopeRelays(
+  rxNostr: RxNostr,
+  options?: {
+    relays?: string[];
+    on?: RxNostrOnParams;
+  },
+): string[] | undefined {
+  const targets = new Set<string>();
+
+  if (options?.on) {
+    const on = options.on;
+
+    if (!on.defaultReadRelays && !on.defaultWriteRelays && !on.relays) {
+      return undefined;
+    }
+
+    const defaultRelays = rxNostr.getDefaultRelays();
+
+    if (on.defaultReadRelays) {
+      for (const { url } of Object.values(defaultRelays).filter(
+        (e) => e.read,
+      )) {
+        targets.add(url);
+      }
+    }
+    if (on.defaultWriteRelays) {
+      for (const { url } of Object.values(defaultRelays).filter(
+        (e) => e.write,
+      )) {
+        targets.add(url);
+      }
+    }
+    if (on.relays) {
+      for (const url of on.relays) {
+        targets.add(normalizeRelayUrl(url));
+      }
+    }
+
+    return [...targets];
+  } else if (options?.relays) {
+    for (const url of options.relays) {
+      targets.add(normalizeRelayUrl(url));
+    }
+
+    return [...targets];
+  } else {
+    return undefined;
   }
 }
