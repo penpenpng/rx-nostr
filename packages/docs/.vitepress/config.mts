@@ -1,6 +1,5 @@
 import { defineConfig } from "vitepress";
-import * as v2 from "./v2";
-import * as v3 from "./v3";
+import { content } from "./content";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -9,19 +8,18 @@ export default defineConfig({
 
   base: "/rx-nostr/",
   locales: {
-    root: {
+    ja: {
       label: "Japanese",
       lang: "ja",
+      themeConfig: content("ja"),
     },
     en: {
       label: "English",
       lang: "en",
+      themeConfig: content("en"),
     },
   },
-
   themeConfig: {
-    nav: [{ text: "version", items: [v2.nav, v3.nav] }],
-    sidebar: { ...v2.sidebar, ...v3.sidebar },
     socialLinks: [
       { icon: "github", link: "https://github.com/penpenpng/rx-nostr" },
     ],
