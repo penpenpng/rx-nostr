@@ -9,6 +9,7 @@ export const sidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Overview", link: "/v3/index" },
         { text: "Installation", link: "/v3/installation" },
+        { text: "Getting Started", link: "/v3/getting-started" },
       ],
     },
     {
