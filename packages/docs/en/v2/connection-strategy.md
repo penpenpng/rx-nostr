@@ -1,17 +1,17 @@
 # Connection Strategy
 
-**Connection Strategy** は rx-nostr が WebSocket 通信をどのタイミングで確立し、いつ切断するのかを決定づける戦略です。Connection Strategy はデフォルトリレーの上でのみ有効で、Connection Strategy の設定に関わらず、一時リレーへの接続はそれが不要になった時点で直ちに切断されます。
+**Connection Strategy** determines when rx-nostr establishes and breaks WebSocket communication. Connection Strategy is only valid on the default relays, and connections to the temporary relay are dropped as soon as they are no longer needed, regardless of the Connection Strategy setting.
 
-Connection Strategy は `createRxNostr()` の `connectionStrategy` オプションで指定でき、デフォルトは **Lazy Strategy** です。
+The default Connection Strategy is **Lazy Strategy**. You can change this by `connectionStrategy` option of `createRxNostr()`.
 
 ## Lazy Strategy
 
-**Lazy Strategy** はすべてのデフォルトリレーを一時リレーのように扱います。つまり、そのリレーへの通信が必要になったタイミングで初めて接続し、不要になったタイミングで直ちに切断します。
+**Lazy Strategy** treats all default relays as if they were temporary relays. That is, it connects to a relay only when it needs to communicate with that relay, and disconnects immediately when it no longer needs to.
 
 ## Lazy-Keep Strategy
 
-**Lazy-Keep Strategy** は Lazy Strategy と同様に必要になったタイミングで接続しますが、それがデフォルトリレーとして指定されている限りは切断しません。そのリレーがデフォルトリレーから外されたのち、不要になったタイミングで初めて切断します。
+**Lazy-Keep Strategy** is almost like the Lazy Strategy, but does not disconnect as long as it is designated as the default relay. It will only disconnect when it is no longer needed after the relay is removed from the default relays.
 
 ## Aggressive Strategy
 
-**Aggressive Strategy** はそれがデフォルトリレーとして指定されたときに直ちに接続し、デフォルトリレーである限りは切断しません。Lazy-Keep Strategy と同様に、そのリレーがデフォルトリレーから外されたのち、不要になったタイミングで初めて切断します。
+Under **Aggressive Strategy**, rx-nostr connects immediately when a relay gets a default relay and does not disconnect as long as it is a default relay. Like the Lazy-Keep Strategy, it disconnects only when it is no longer needed after the relay is removed from the default relays.

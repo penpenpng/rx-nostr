@@ -1,14 +1,14 @@
 # EventPacket Operators
 
-`rxNostr.use()` が返す `Observable<EventPacket>` に対して適用可能な Operator のリファレンスです。
+References of operators that can be applied to `Observable<EventPacket>`, which is returned by `rxNostr.use()`.
 
 [[TOC]]
 
 ## uniq()
 
-`event.id` に基づいてイベントの重複を排除します。異なるリレーからもたらされた `EventPacket` であっても `event.id` が等しければ同一のイベントとみなします。
+`uniq()` eliminates duplicate events based on `event.id`. Even if `EventPackets` come from different relays, they will be considered the same event if the `event.id` is equal.
 
-省略可能な `ObservableInput<unknown>` によって、内部のイベント ID の Set をフラッシュすることができます。
+The optional `ObservableInput<unknown>` allows you to flush the internal event ID Set.
 
 ```ts
 import { Subject } from "rxjs";
@@ -25,22 +25,22 @@ rxNostr
     // ...
   });
 
-// イベントID の Set をフラッシュする
+// Flush the event ID set.
 flushes$.next();
 ```
 
 ## createUniq()
 
-与えられた `keyFn` に基づいてイベントの重複を排除する Operator と、それに紐づくイベント ID の Set を返します。
+`createUniq()` returns an operator that eliminates duplicate events based on the given `keyFn` and a set of event IDs associated with them.
 
-省略可能な第二引数で、新しい Packet を観測するごとに呼び出されるコールバック関数を登録できます。
+An optional second argument allows you to register a callback function that will be called each time a new Packet is observed.
 
-`uniq()` と異なり、フラッシュするには単に返り値の set を `clear()` します。
+Unlike `uniq()`, simply call `clear()` to flush.
 
 ```ts
 import { createUniq, type EventPacket } from "rx-nostr";
 
-// イベントID に基づいて重複を排除する
+// eliminates duplicate events based on event ID.
 const keyFn = (packet: EventPacket): string => packet.event.id;
 
 const onCache = (packet: EventPacket): void => {
@@ -61,7 +61,7 @@ rxNostr
     // ...
   });
 
-// 観測済みのイベント ID をフラッシュする
+// Flush the event ID set.
 eventIds.clear();
 ```
 

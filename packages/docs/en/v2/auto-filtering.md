@@ -1,18 +1,18 @@
 # Auto Filtering
 
-rx-nostr は REQ の結果として返されるイベントのうち不適格と判断されるものを自動的にフィルターします。この挙動は `createRxNostr()` のオプションから変更できます。
+rx-nostr automatically filters invalid events returned as a result of REQ. You can change these behavior by options of `createRxNostr()`.
 
 ## Auto Verification
 
-自動で署名を検証し、検証に失敗したイベントを結果から除きます。同時に、[NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) に基づいて委任されたイベントが存在する場合は、委任トークンの正当性も検証します。
+rx-nostr automatically verifies signatures and excludes from the results events that fail verification. At the same time, it also verifies the validity of the delegation token if an event delegated under [NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) exists.
 
-この挙動は `skipVerify` オプションで無効にできます。
+You can disable this behavior by `skipVerify` option.
 
 ## Auto Validation
 
-REQ の結果として返されたイベントが本当に REQ のフィルターに合致しているかを自動で検証し、検証に失敗したイベントを結果から除きます。
+rx-nostr automatically verifies that the events returned as a result of REQ really match the REQ filters, and excludes events that fail verification from the results.
 
-この挙動は `skipValidateFilterMatching` オプションで無効にできます。
+You can disable this behavior by `skipValidateFilterMatching` option.
 
 ::: tip Note
 `search` フィールドに対する標準化された解釈は存在しないため、同フィールドの検証は行われません。
