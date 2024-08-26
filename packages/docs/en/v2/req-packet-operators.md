@@ -1,7 +1,3 @@
----
-sidebarDepth: 0
----
-
 # ReqPacket Operators
 
 `rxReq` に対して適用可能な Operator のリファレンスです。
@@ -73,8 +69,8 @@ const chunkedReq = rxReq.pipe(
       }
 
       return chunks;
-    }
-  )
+    },
+  ),
 );
 
 rxNostr.use(chunkedReq).subscribe(() => {

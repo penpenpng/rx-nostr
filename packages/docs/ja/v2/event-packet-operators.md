@@ -1,7 +1,3 @@
----
-sidebarDepth: 0
----
-
 # EventPacket Operators
 
 `rxNostr.use()` が返す `Observable<EventPacket>` に対して適用可能な Operator のリファレンスです。
@@ -89,7 +85,7 @@ rxNostr
     }
 
     console.log(
-      `${packet.event.id} は ${packet.seenOn.length} 個のリレーで観測されました`
+      `${packet.event.id} は ${packet.seenOn.length} 個のリレーで観測されました`,
     );
   });
 ```

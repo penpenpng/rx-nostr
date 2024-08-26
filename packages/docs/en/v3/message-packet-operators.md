@@ -1,7 +1,3 @@
----
-sidebarDepth: 0
----
-
 # MessagePacket Operators
 
 `rxNostr.createAllMessageObservable()` が返す `Observable<MessagePacket>` に対して適用可能な Operator のリファレンスです。
