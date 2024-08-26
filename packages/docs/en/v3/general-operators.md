@@ -1,7 +1,3 @@
----
-sidebarDepth: 0
----
-
 # General Operators
 
 汎用的な Operator のリファレンスです。
