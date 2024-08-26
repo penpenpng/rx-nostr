@@ -1,8 +1,8 @@
 # AUTH
 
-`createRxNostr()` の `authenticator` オプションを設定すると、rx-nostr は[NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングするようになります。この機能が有効化されている場合、`auth-required` のステータスで拒否された REQ または EVENT は AUTH の成功後に自動で再送されます。
+You can set the `authenticator` option of `createRxNostr()` to automatically handle AUTH messages based on [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md). If this feature is enabled, REQs or EVENTs rejected with an `auth-required` status will be automatically retransmitted after a successful AUTH.
 
-もっともシンプルな設定は `authenticator: "auto"` です。これは `RxNostr` に与えられた `signer` を使用して AUTH メッセージに応答します。ほとんどのユースケースではこの設定で十分のはずです。
+The simplest setting is `authenticator: “auto”`. This will respond to AUTH messages using the `signer` given to `RxNostr`. This setting should be sufficient for most use cases.
 
 ```ts:line-numbers
 import { createRxNostr } from "rx-nostr";
@@ -10,7 +10,7 @@ import { createRxNostr } from "rx-nostr";
 const rxNostr = createRxNostr({ authenticator: "auto" });
 ```
 
-より高度なユースケースに対応するため、`authenticator` は `signer` をオプションに取ることができます。これにより、通常のイベント発行時とは異なる署名器を用いて AUTH メッセージを作成できます:
+For more advanced use cases, the `authenticator` can optionally take a `signer`. This allows the AUTH message to be created using a different signer than when issuing normal events:
 
 ```ts:line-numbers
 import { createRxNostr, nsecSigner } from "rx-nostr";
@@ -23,7 +23,7 @@ const rxNostr = createRxNostr({
 });
 ```
 
-また、リレーごとに異なる署名器を使いたい場合のために、関数形式の指定も可能です。例えば以下の例では、`wss://nostr.example.com` でのみ AUTH メッセージに応答し、他のリレーでは AUTH を無視します:
+It is also possible to specify a function format in case you want to use a different signer for each relay. For example, the following example responds to AUTH messages only on `wss://nostr.example.com` and ignores AUTH on other relays:
 
 ```ts:line-numbers
 import { createRxNostr, nsecSigner } from "rx-nostr";
