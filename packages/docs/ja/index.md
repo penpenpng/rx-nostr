@@ -3,14 +3,14 @@ layout: home
 
 hero:
   name: rx-nostr
-  tagline: Supports high quality and flexible communication with multiple Nostr relays.
+  tagline: Nostrリレーとの高品質かつ柔軟な通信のためのライブラリ。
   actions:
     - theme: brand
-      text: Document v3.x
-      link: /en/v3/
+      text: ドキュメント v3.x
+      link: /ja/v3/
     - theme: alt
-      text: Document v2.x
-      link: /en/v2/
+      text: ドキュメント v2.x
+      link: /ja/v2/
 
 features:
   - title: Feature A
