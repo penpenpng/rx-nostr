@@ -16,7 +16,7 @@ export const defineContent =
         ...entry,
         items: entry.items?.map((item) => ({
           ...item,
-          link: `${lang}/v${version}/${item.link}`,
+          link: `/${lang}/v${version}/${item.link}`,
         })),
       }));
 

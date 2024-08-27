@@ -5,7 +5,7 @@ export const content = defineContent({
     {
       text: "Introduction",
       items: [
-        { text: "Overview", link: "index" },
+        { text: "Overview", link: "" },
         { text: "Installation", link: "installation" },
         { text: "Getting Started", link: "getting-started" },
       ],
@@ -55,7 +55,7 @@ export const content = defineContent({
     {
       text: "Introduction",
       items: [
-        { text: "Overview", link: "index" },
+        { text: "Overview", link: "" },
         { text: "Installation", link: "installation" },
         { text: "Getting Started", link: "getting-started" },
       ],
