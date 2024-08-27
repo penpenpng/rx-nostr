@@ -1,12 +1,12 @@
 # Relay Configuration
 
-`RxNostr` が実際に通信するリレーセットはいくつかの方法で指定できますが、もっとも基本的な方法は **デフォルトリレー** を設定することです。
+The set of relays that `RxNostr` actually communicates with can be specified in several ways. The most basic way is to set **default relays**.
 
 ## Default Relays
 
-デフォルトリレーは `rxNostr.setDefaultRelays()` を使って設定できる、読み書き権限の指定を伴うリレーのセットです。特に権限を指定しなかった場合には両方が許可されたものとして扱われます。
+Default relays is a set of relays including settings of permissions of read/write, which can be set using `rxNostr.setDefaultRelays()`. If no permissions are given, both are treated as allowed.
 
-`rxNostr.send()` および `rxNostr.use()` を後述する一時リレーを指定せずに実行する場合には、ここで登録されたデフォルトリレーが使用されます。
+When `rxNostr.send()` and `rxNostr.use()` are executed without specifying a temporary relay as described below, the default relay registered here is used.
 
 ```ts
 import { createRxNostr } from "rx-nostr";
@@ -19,7 +19,7 @@ rxNostr.setDefaultRelays([
 ]);
 ```
 
-権限を指定する場合には以下のようにします:
+If you want to specify permission:
 
 ```ts
 rxNostr.setDefaultRelays([
@@ -36,7 +36,7 @@ rxNostr.setDefaultRelays([
 ]);
 ```
 
-NIP-07 インターフェースが利用できる場合にはその返り値を直接渡すこともできます:
+If the NIP-07 interface is available, its return value can also be passed directly:
 
 ```ts
 rxNostr.setDefaultRelays(await window.nostr.getRelays());
@@ -44,26 +44,26 @@ rxNostr.setDefaultRelays(await window.nostr.getRelays());
 
 ### Reactivity
 
-デフォルトリレー上での通信は、読み取りについて反応的かつ適応的です。すなわち、デフォルトリレーの変更は現在確立している REQ サブスクリプションに直ちに反映されます。
+Communication on the default relay is reactive and adaptive with respect to reading. That is, changes in default relays are immediately reflected in the currently established REQ subscriptions.
 
-より詳しく説明すると、今すでにデフォルトリレーの上で REQ サブスクリプションが存在しているとしてデフォルトリレーの構成に変更を加えると、新しいデフォルトリレーのもとではもはや読み取りが許可されなくなったリレーでの REQ は直ちに CLOSE され、逆に新しく読み取りが可能になったリレーに対しては同等の REQ が自動的に送信されます。
+To elaborate, assuming a REQ subscription on default relays already exists, a changing in default relay configuration immediately CLOSEs REQs on relays no longer allowed to read, and issues new REQs on relays newly allowed to read.
 
-デフォルトリレーの変更は、後述する一時リレーの上での通信には影響しません。
+Changing default relays does not affect communication over the temporary relay, which is discussed below.
 
 ## Temporary Relays
 
-`rxNostr.send()` や `rxNostr.use()` などの第二引数に `relays` オプションを渡すことによって、**一時リレー** の上で通信することができます。一時リレーは [Connection Strategy](./connection-strategy.md) の設定に関わらず、必要な間だけ接続され不要になると切断されます。
+You can communicate over **temporary relays** by passing the `relays` option as the second argument to `rxNostr.send()` or `rxNostr.use()`. Temporary relays are connected only as long as they are needed and disconnected when they are no longer needed, regardless of the current Connection Strategy.
 
-一時リレーの指定はデフォルトリレーにおける権限設定を**尊重しません**。つまり、デフォルトリレーに何が指定されていようと、一時リレーに対して書き込みないし読み取りを実行します。
+Temporary relay does **not** respect the permission settings on default relays. That is, it will write to or read from the temporary relay regardless of default relays configuration.
 
 ### Publish on Temporary Relays
 
-`rxNostr.send()` の第二引数に `relays` オプションを渡すと一時リレーに対してイベントを送信することができます。
+You can send events to temporary relays by passing the `relays` option as the second argument to `rxNostr.send()`.
 
-一時リレーは書き込みにかかる通信の間、言い換えると EVENT を発行してから OK を受け取るまでの間だけ接続され、それが終わると (ほかのデフォルトリレーや一時リレーとして使われていない限り) 切断されます。
+Temporary relays are only connected during the write communication, in other words, from the time an EVENT is issued until the time an OK is received. After that they are disconnected unless they are being used as another default relay or temporary relay.
 
 ### Subscribe on Temporary Relays
 
-読み取りにおける一時リレーは `rxNostr.use()` で指定する **use scope** と `rxReq.emit()` で指定する **emit scope** の 2 種類が存在し、より狭いスコープの指定 (つまり emit scope) が優先されます。
+There are two types of temporary relays for reading: **use scope** specified with `rxNostr.use()` and **emit scope** specified with `rxReq.emit()`. The narrower scope (that is, emit scope) takes precedence.
 
-一時リレーは読み取りにかかる通信の間、言い換えると REQ を発行してから CLOSE されるまでの間だけ接続され、それが終わると (ほかのデフォルトリレーや一時リレーとして使われていない限り) 切断されます。
+Temporary relays are only connected during the read communication, in other words, from the time an REQ is issued until the time it is CLOSE'd. After that they are disconnected unless they are being used as another default relay or temporary relay.

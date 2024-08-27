@@ -1,27 +1,27 @@
 # Overview
 
-rx-nostr は [Nostr](https://nostr.com/) アプリケーションがひとつまたは複数のリレーとの堅牢な通信を簡便かつ直感的に実現するためのライブラリです。rx-nostr は [RxJS](https://rxjs.dev/) で実装されており、RxJS の諸機能とのシームレスな連携が可能となるよう設計されていますが、RxJS との併用は必須ではありません。
+rx-nostr is a library that allows [Nostr](https://nostr.com/) applications to easily and intuitively provide robust communication with one or more relays. As the name shows, rx-nostr is implemented in [RxJS](https://rxjs.dev/) and is designed to work seamlessly with RxJS features, but you don’t need to know much about RxJS.
 
-Nostr アプリケーションの開発者は rx-nostr を利用することで、リレー通信に伴う以下のような煩わしい問題の存在を意識せず、[NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md) に基づく publish/subscribe を透過的に扱えるようになります。
+By using rx-nostr, developers can transparently handle publish/subscribe based on [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md) without being aware of the following troublesome problems associated with relay communication.
 
-- **REQ サブスクリプションの管理**:
-  - REQ の確立、CLOSE の送出、CLOSED メッセージのハンドリングといった REQ サブスクリプションの管理に必須の低レベルな操作を、より高レベルに抽象化されたインターフェースで取り扱えるようになります。
-- **WebSocket の再接続**:
-  - バックオフ戦略に基づいて WebSocket 伝送路の自動再接続を行います。切断時に伝送路から失われた REQ サブスクリプションも自動的に再構成します。
-- **WebSocket 接続の遅延およびアイドリング**:
-  - リレーとの WebSocket 接続を本当に必要になるまで遅延させたり、使われなくなった接続を自動で切断することができます。この挙動は設定で無効にもできます。
-- **WebSocket 接続状態のモニタリング**:
-  - WebSocket 接続のヘルスステータスを監視できます。アプリケーションはこれをリレーとの接続状況をユーザに通知するインターフェースの構築などに応用できます。
-- **リレープールの管理**:
-  - リレーの集合をリアクティブに扱います。デフォルトリレーの増減や Read/Write 設定の変更といったリレー構成の変化に反応して、新しいリレー構成のもとで現在アクティブな REQ を適切に再構成します。
-- **リレーサーバ固有の制約へのフレキシブルな対応**
-  - [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) に基づいて公開されるリレーの同時 REQ サブスクリプション上限に抵触しないよう、リレーへの REQ 要求を適切にキューイングします。
-- **AUTH メッセージの自動ハンドリング**
-  - [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングします。rx-nostr を利用する場合、NIP-42 に対応するためにはオプションを設定するだけで済みます。
-- **署名およびその検証**
-  - 署名およびその検証を自動で行います。イベントを発行する際に開発者が用意する必要がある情報は、イベントの本質的なコンテンツだけです。
+- **REQ Subscription Management**:
+  - Low-level operations essential to REQ subscription management, such as establishing REQs, sending CLOSEs, and handling CLOSED messages, can be handled in a higher-level, abstracted interface.
+- **WebSocket reconnection**:
+  - The WebSocket transmission channel can be automatically reconnected based on a backoff strategy. REQ subscriptions lost from the transmission channel by disconnection are also automatically reconstituted.
+- **Delaying and idling WebSocket Connections**:
+  - You can delay WebSocket connections to relays until they are really needed or automatically disconnect connections that are no longer in use. This behavior can also be disabled in the configuration.
+- **Monitoring WebSocket connection status**:
+  - The health status of WebSocket connections can be monitored. Applications can use this, for example, to build an interface that notifies users of the status of the connection to relays.
+- **Relay Pool Management**:
+  - A set of relays is handled reactively. That is, changing in relay configurations, such as increasing or decreasing the number of default relays or changing read/write settings, properly reconfigures the currently active REQs under the new relay configuration.
+- **Flexible support for relay server-specific constraints**:
+  - REQ requests to relays is queued properly so as not to violate the relay's concurrent REQ subscription limits published under [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md).
+- **Automatic Handling of AUTH Messages**:
+  - AUTH messages can be automatically handled based on [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) if you just set an option.
+- **Sign and verify**:
+  - Signing and verification are automatic. The only information a developer needs to provide when publishing an event is the event's essential content.
 
-rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、このコードの説明は [Getting Started](./getting-started.md) で詳述します。
+Using rx-nostr, the code to subscribe to kind-1 events, for example, can be implemented simply as follows. This code is explained in detail in [Getting Started](./getting-started) .
 
 ```js
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
@@ -39,9 +39,8 @@ rxReq.emit({ kinds: [1] });
 ```
 
 ::: tip Note
-本ドキュメントは NIP の、特に NIP-01 に関する基本的な理解を前提に記述されます。これに馴染みのない方は以下に挙げる資料に先に目を通すことをおすすめします。
+This document assumes a basic understanding of the NIP, and in particular the NIP-01. If you are not familiar with this, we recommend that you read through the following documents first:
 
-- [NIP-01 (EN)](https://github.com/nostr-protocol/nips/blob/master/01.md)
-- [NIP-01 (JA)](https://github.com/nostr-jp/nips-ja/blob/main/01.md)
+- [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)
 
 :::
