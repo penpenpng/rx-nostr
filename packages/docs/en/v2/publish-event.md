@@ -1,16 +1,16 @@
 # Publish EVENT
 
-`RxNostr` の `send()` メソッドを通じて EVENT メッセージを送信することができます。
+You can use `RxNostr`'s `send()` method to send EVENT messages.
 
-`send()` の第一引数は `kind` と `content` のみが必須で残りが省略可能な event オブジェクトです。指定されたパラメータは指定された値が (たとえ不正な値だったとしても) 尊重されます。一方、指定されなかったパラメータは、特に `pubkey`, `id`, `sig` が `signer` によって計算されます。
+The first argument is an event object where only `kind` and `content` is required and rest is optional.Specified parameters are respected even if they are invalid. On the other hand, unspecified parameters, especially `pubkey`, `id`, and `sig`, are computed by the `signer`.
 
-`signer` は `createRxNostr()` のオプションか、`send()` の第二引数で渡すことができる署名器です。`signer` が両方で指定された場合は `send()` の第二引数に渡したものが使われます。通常の利用では `createRxNostr()` のオプションに渡しておくのがいいでしょう。
+`signer` can be passed as an option to `createRxNostr()` or as the second argument to `send()`. If `signer` is specified as both, the one passed as the second argument to `send()` is used. For normal use, it is better to pass it as an option of `createRxNostr()`.
 
 ```ts:line-numbers
 import { createRxNostr, seckeySigner } from "rx-nostr";
 
 const rxNostr = createRxNostr({
-  // nsec1... 形式と HEX 形式のどちらを渡しても動作します。
+  // The both of nsec1... format and HEX format are acceptable.
   signer: seckeySigner("nsec1..."),
 });
 rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
@@ -22,10 +22,10 @@ rxNostr.send({
 ```
 
 ::: tip Note
-デフォルトの `signer` は `nip07Signer()` です。これはランタイムから [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) インターフェースを探し、それを利用して必要な値を計算します。
+The default `signer` is `nip07Signer()`. It looks for the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) interface from the runtime and uses it.
 :::
 
-実際に送信される event オブジェクトの `id` や `pubkey` に興味がある場合もあるかもしれません。そのときは `signer` を使って自分で計算することもできます。
+You may be interested in the `id` or `pubkey` of the event object that is actually sent. You can use `signer` to calculate them yourself.
 
 ```ts:line-numbers
 import { createRxNostr, seckeySigner } from "rx-nostr";
@@ -46,28 +46,28 @@ const event = await signer.signEvent(eventParams);
 rxNostr.send(event);
 
 const id = event.id;
-// event.pubkey と同じ値になります。
+// This will be the same as `event.pubkey`.
 const pubkey = await signer.getPublicKey();
 
-console.log(`${pubkey} は ${id} を送信しました。`);
+console.log(`${pubkey} sent ${id}.`);
 ```
 
 ## Handling OK Messages
 
-`send()` の返り値は `subscribe()` 可能なオブジェクトです。これを `subscribe()` することで、OK メッセージを待ち受けることができます。
+The return value of `send()` is a `subscribe()`-able object, but it is not necessary to `subscribe()` it. If you need to subscribe OK messages, `subscribe()` helps you.
 
 ```ts
 rxNostr.send(event).subscribe((packet) => {
   console.log(
-    `リレー ${packet.from} への送信が ${packet.ok ? "成功" : "失敗"} しました。`
+    `Sending to ${packet.from} ${packet.ok ? "succeeded" : "failed"}.`,
   );
 });
 ```
 
 ::: warning
-EVENT 送信の過程で [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH を求められた場合、rx-nostr は AUTH の後に EVENT メッセージを自動で再送します。このシナリオでは同一のリレーから 2 つの OK メッセージを受け取りうることに注意してください。あるリレーから OK メッセージを受け取ったとき、2 回目の OK メッセージが届きうるかを確かめるには `packet.done` が `false` であることを確認します。
+If an AUTH based on [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) is requested during the EVENT transmission process, rx-nostr will automatically resend the EVENT message after the AUTH. Note that in this scenario you may receive two OK messages from the same relay. When an OK message is received from one relay, check that `packet.done` is `false` to see if a second OK message may be.
 :::
 
 ::: tip RxJS Tips
-`send()` の返り値は厳密には Observable です。この Observable は OK メッセージがこれ以上届き得ないと判断された時点で complete します。また、まだ OK メッセージが届き得るにも関わらず何も届かないまま 30 秒が経過したときには error で終了します。この待ち時間は `createRxNostr()` の `okTimeout` オプションで変更できます。
+The return value of `send()` is strictly an Observable. This Observable completes when it is determined that no more OK messages can be received. It also exits with an error when 30 seconds elapses without any OK message being received, even though one is still possible. This timeout can be changed with the `okTimeout` option of `createRxNostr()`.
 :::

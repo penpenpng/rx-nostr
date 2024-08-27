@@ -44,10 +44,10 @@ import { createUniq, type EventPacket } from "rx-nostr";
 const keyFn = (packet: EventPacket): string => packet.event.id;
 
 const onCache = (packet: EventPacket): void => {
-  console.log(`${packet.id} を初めて観測しました`);
+  console.log(`${packet.id} is observed for the first time.`);
 };
 const onHit = (packet: EventPacket): void => {
-  console.log(`${packet.id} はすでに観測されています`);
+  console.log(`${packet.id} is already observed.`);
 };
 
 const [uniq, eventIds] = createUniq(keyFn, { onCache, onHit });
