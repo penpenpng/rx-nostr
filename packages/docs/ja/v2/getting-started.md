@@ -1,6 +1,6 @@
 # Getting Started
 
-rx-nostr の構造を理解するためには中心となる 3 種類の登場人物について知る必要があります。 それは [`RxReq`](/api/rx-req.md), [`RxNostr`](/api/rx-nostr.md)とあなたのアプリケーションです。rx-nostr の世界ではこれら 3 種類の登場人物の間を `RxReq -> RxNostr -> Your Application` の単方向に **Packet** と呼ばれるデータが流れます。実際のコードを見る前に、まずは `RxReq` と `RxNostr` が一体何者であるのかを確認しましょう。
+rx-nostr の構造を理解するためには中心となる 3 種類の登場人物について知る必要があります。 それは `RxReq`, `RxNostr`とあなたのアプリケーションです。rx-nostr の世界ではこれら 3 種類の登場人物の間を `RxReq -> RxNostr -> Your Application` の単方向に **Packet** と呼ばれるデータが流れます。実際のコードを見る前に、まずは `RxReq` と `RxNostr` が一体何者であるのかを確認しましょう。
 
 `RxReq` は [REQ メッセージ](https://github.com/nostr-protocol/nips/blob/master/01.md#from-client-to-relay-sending-events-and-creating-subscriptions) を組み立てるために必要な情報 (**`ReqPacket`**) を `RxNostr` に送出するオブジェクトです。あなたは `RxReq` が提供するインターフェースを通じて、間接的に REQ を発行することができます。ここで、`RxReq` はあくまで REQ メッセージに必要な情報を提供するだけで、リレーとの交信を行うのは次に説明する `RxNostr` の役目であることに注意してください。
 
