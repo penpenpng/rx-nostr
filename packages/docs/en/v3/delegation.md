@@ -28,4 +28,4 @@ Enabling the `acceptDelegatedEvent` option allows you to subscribe to delegated 
 
 Regardless of the `acceptDelegatedEvent` setting, the `EventPacket` exposes a `rootPubkey` field. This field is equal to the public key of the delegator if the event is delegated, or the public key of the event's author if the event is not delegated.
 
-See also [Auto Validation](./auto-filtering.md#auto-validation).
+See also [Auto Validation](./auto-filtering#auto-validation).
