@@ -1,14 +1,14 @@
 # EventPacket Operators
 
-`rxNostr.use()` が返す `Observable<EventPacket>` に対して適用可能な Operator のリファレンスです。
+References of operators that can be applied to `Observable<EventPacket>`, which is returned by `rxNostr.use()`.
 
 [[TOC]]
 
 ## uniq()
 
-`event.id` に基づいてイベントの重複を排除します。異なるリレーからもたらされた `EventPacket` であっても `event.id` が等しければ同一のイベントとみなします。
+`uniq()` eliminates duplicate events based on `event.id`. Even if `EventPackets` come from different relays, they will be considered the same event if the `event.id` is equal.
 
-省略可能な `ObservableInput<unknown>` によって、内部のイベント ID の Set をフラッシュすることができます。
+The optional `ObservableInput<unknown>` allows you to flush the internal event ID Set.
 
 ```ts
 import { Subject } from "rxjs";
@@ -25,29 +25,29 @@ rxNostr
     // ...
   });
 
-// イベントID の Set をフラッシュする
+// Flush the event ID set.
 flushes$.next();
 ```
 
 ## createUniq()
 
-与えられた `keyFn` に基づいてイベントの重複を排除する Operator と、それに紐づくイベント ID の Set を返します。
+`createUniq()` returns an operator that eliminates duplicate events based on the given `keyFn` and a set of event IDs associated with them.
 
-省略可能な第二引数で、新しい Packet を観測するごとに呼び出されるコールバック関数を登録できます。
+An optional second argument allows you to register a callback function that will be called each time a new Packet is observed.
 
-`uniq()` と異なり、フラッシュするには単に返り値の set を `clear()` します。
+Unlike `uniq()`, simply call `clear()` to flush.
 
 ```ts
 import { createUniq, type EventPacket } from "rx-nostr";
 
-// イベントID に基づいて重複を排除する
+// eliminates duplicate events based on event ID.
 const keyFn = (packet: EventPacket): string => packet.event.id;
 
 const onCache = (packet: EventPacket): void => {
-  console.log(`${packet.id} を初めて観測しました`);
+  console.log(`${packet.id} is observed for the first time.`);
 };
 const onHit = (packet: EventPacket): void => {
-  console.log(`${packet.id} はすでに観測されています`);
+  console.log(`${packet.id} is already observed.`);
 };
 
 const [uniq, eventIds] = createUniq(keyFn, { onCache, onHit });
@@ -61,15 +61,15 @@ rxNostr
     // ...
   });
 
-// 観測済みのイベント ID をフラッシュする
+// Flush the event ID set.
 eventIds.clear();
 ```
 
 ## tie()
 
-異なるリレーからもたらされた同一のイベントをまとめ上げ、イベントごとにそれがどのリレーの上で観測済みかを `seenOn` に記録します。また、そのイベントが初めて観測されたものならば `isNew` フラグをセットします。
+It will group identical events from different relays and record in `seenOn` for each event which relay it has been observed on. It also sets the `isNew` flag if the event is the first time it has been observed.
 
-`uniq()` と同様に、省略可能な `ObservableInput<unknown>` によって、内部の Map をフラッシュすることができます。
+Like `uniq()`, the inner map can be flushed by the optional `ObservableInput<unknown>`.
 
 ```ts
 import { tie } from "rx-nostr";
@@ -81,48 +81,48 @@ rxNostr
   .pipe(tie())
   .subscribe((packet) => {
     if (packet.isNew) {
-      console.log(`${packet.event.id} は新しいイベントです`);
+      console.log(`${packet.event.id} was observed at the first time.`);
     }
 
     console.log(
-      `${packet.event.id} は ${packet.seenOn.length} 個のリレーで観測されました`,
+      `${packet.event.id} was observed on ${packet.seenOn.length} relays.`,
     );
   });
 ```
 
 ## createTie()
 
-`tie()` とほぼ同様の Operator と、それに紐づく Map を返します。Map の型は `Map<string, Set<string>>` で、キーはイベント ID、値はリレーの集合です。
+Returns an Operator similar to `tie()` and a Map associated with it, of type `Map<string, Set<string>>` where the keys are event IDs and the value is a set of relays.
 
-`tie()` と異なり、フラッシュするには単に返り値の map を `clear()` します。
+Unlike `uniq()`, simply call `clear()` to flush.
 
 ## latest()
 
-過去に観測した中で最も新しい `created_at` を持つイベントのみ通し、それ以外を排除します。言い換えると、Observable を流れるイベントの時系列順序を担保できます。
+Only events with the most recent `created_at` date observed in the past are passed through, all others are eliminated. In other words, it ensures the chronological order of events flowing through the Observable.
 
 ## latestEach()
 
-与えられた `keyFn` に基づいて、キーごとにもっとも新しい `created_at` を持つイベントのみ通し、それ以外を排除します。
+Based on the given `keyFn`, only events with the most recent `created_at` per key are passed through, all others are eliminated.
 
-ユーザごとの最新の kind0 を収集したいときなどに役立ちます。
+This is useful, for example, when you want to collect the latest kind0 for each user.
 
 ## verify()
 
-イベントの署名を検証し、検証に失敗したイベントを排除します。
+Verifies event signatures and eliminates events that fail verification.
 
-通常、検証処理は rx-nostr によって自動で行われますが、`skipVerify` が有効になっている場合にはこの Operator が便利です。
+Normally, the verification process is done automatically by rx-nostr, but this Operator is useful when `skipVerify` is enabled.
 
 ## filterByKind()
 
-与えられた kind のイベントのみ通し、それ以外を排除します。
+Only events of a given kind are passed through, all others are eliminated.
 
 ## filterBy()
 
-与えられたフィルターに合致するイベントのみ通し、それ以外を排除します。
+Only events that match the given filter are passed through, all others are eliminated.
 
-省略可能な第二引数に `not` を指定すると、フィルター条件を反転させることができます。
+You can invert the filter condition by specifying `not` as the optional second argument.
 
-リレーに対してはすべての kind1 を要求しつつ、クライアントサイドでそれらを細かく振り分けたい場合などに便利です。
+For example, this is useful when you request all kind1 for a relay, but want to distribute them in detail on the client side.
 
 ```ts
 import { share } from "rxjs";
@@ -143,12 +143,12 @@ rxReq.emit({ kinds: [1] });
 ```
 
 ::: warning
-`search` フィールドと `limit` フィールドは無視されることに注意してください。
+Note that the `search` and `limit` fields are ignored.
 :::
 
 ## timeline()
 
-`EventPacket` の Observable を `EventPacket[]` の Observable に変換します。変換後の各 `EventPacket[]` は、その時点での最新 `limit` 件のイベントです。
+Convert an `EventPacket` Observable to an `EventPacket[]` Observable. Each converted `EventPacket[]` is the latest `limit` events at that time.
 
 ```ts
 import { timeline } from "rx-nostr";
@@ -159,15 +159,15 @@ rxNostr
   .use(rxReq)
   .pipe(timeline(5))
   .subscribe((packets) => {
-    console.log(`最新5件のイベントは`, packets);
+    console.log(`The latest 5 events:`, packets);
   });
 ```
 
 ## sortEvents()
 
-与えられた待機時間とソートキーに基づいて、可能な限り順序を保った Observable に変換します。
+Convert to an Observable that is as ordered as possible based on the given wait time and sort key.
 
-省略可能な第二引数でソートキーを設定できます。省略された場合は `created_at` に基づいて昇順にソートされます。すなわち、できる限り `created_at` の時間が前後しないような Observable が得られます。
+An optional second argument allows you to set the sort key. If it is omitted, then the sorting is done in ascending order based on `created_at`.
 
 ```ts
 import { sortEvents } from "rx-nostr";
@@ -178,12 +178,12 @@ rxNostr
   .use(rxReq)
   .pipe(sortEvents(3 * 1000))
   .subscribe((packet) => {
-    // 3 秒遅延する代わりに、可能な限り順序通りのイベントを得る
+    // Instead of a 3-second delay, get the events in sequence as much as possible
   });
 ```
 
 ## dropExpiredEvents()
 
-[NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md) に基づいてイベントが期限切れになっているかどうかを確認し、期限切れのイベントを排除します。
+Based on [NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md) check events and eliminate expired events.
 
-通常、この処理は rx-nostr によって自動で行われますが、`skipExpirationCheck` が有効になっている場合にはこの Operator が便利です。
+Normally, this is done automatically by rx-nostr, but this Operator is useful if `skipExpirationCheck` is enabled.

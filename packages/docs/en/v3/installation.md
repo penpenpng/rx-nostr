@@ -1,6 +1,6 @@
 # Installation
 
-npm または yarn から以下の通りインストールできます。
+You can install rx-nostr from npm or yarn as follows:
 
 ::: code-group
 
@@ -15,7 +15,7 @@ yarn add rx-nostr
 :::
 
 ::: tip Note
-Node.js など、トップレベルスコープに `WebSocket` コンストラクタが存在しないランタイムで rx-nostr を使用する場合、`createRxNostr()` に `WebSocket` コンストラクタを渡す必要があります。以下は Node.js で [ws](https://github.com/websockets/ws) による WebSocket 実装を利用する例です:
+When using rx-nostr on runtimes such as Node.js where the `WebSocket` constructor does not exist in the top-level scope, the `WebSocket` constructor must be passed to `createRxNostr()`. The following is an example of using the WebSocket implementation with [ws](https://github.com/websockets/ws) in Node.js
 
 ```ts
 import { createRxNostr } from "rx-nostr";

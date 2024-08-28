@@ -1,23 +1,23 @@
 # Other Observables
 
-rx-nostr には他にもいくつか `subscribe()` 可能なオブジェクトがあります。
+rx-nostr has several other `subscribe()`-able objects.
 
 ::: tip RxJS Tips
-これらはすべて RxJS の Observable です。明示的に `rxNostr.dispose()` が呼ばれるまで complete せず、`unsubscribe()` を呼ばれても何も起こりません。
+These are all Observable of RxJS. They are not completed until `rxNostr.dispose()` is explicitly called, and nothing happens when `unsubscribe()` is called.
 :::
 
 ## createAllMessageObservable()
 
-`rxNostr.createAllMessageObservable()` によって、リレーから送られてきた (未知のタイプのメッセージを含む) すべてのメッセージを監視できます。
+`rxNostr.createAllMessageObservable()` allows you to observe all incoming messages (including unknown type messages).
 
 ## createAllMessageObservable()
 
-`rxNostr.createAllMessageObservable()` によって、リレーから送られてきたすべての EVENT メッセージを監視できます。
+`rxNostr.createAllMessageObservable()` allows you to observe all EVENT message.
 
 ## createAllErrorObservable()
 
-`rxNostr.createAllErrorObservable()` によってエラーを監視することができます。典型的には、これらはリレーが不正な JSON を返したときに発生するエラーです。
+`rxNostr.createAllErrorObservable()` allows you to observe errors.Typically, these are errors that occur when a relay returns invalid JSON.
 
 ::: tip RxJS Tips
-`rxNostr.use()` が返す Observable は error で終了しません。これは、どこかひとつのリレーに起因するエラーによって Observable 全体が停止しないようにするためです。
+The Observable returned by `rxNostr.use()` is not terminated with an error. This is to prevent the entire Observable from stopping due to an error caused by any one relay.
 :::
