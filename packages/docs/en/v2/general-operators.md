@@ -1,21 +1,21 @@
 # General Operators
 
-汎用的な Operator のリファレンスです。
+References of operators for general purpose.
 
 [[TOC]]
 
 ## completeOnTimeout()
 
-一定時間何も観測しない時間が続いたときに Observable を complete します。
+Observable is completed when there is no observation for a certain period of time.
 
 ::: tip Note
-[`timeout()`](https://rxjs.dev/api/operators/timeout) は complete ではなく error で終了します。
+[`timeout()`](https://rxjs.dev/api/operators/timeout) finishes the observable as error, not as complete.
 :::
 
 ## sort()
 
-[`sortEvents()`](./event-packet-operators.html#sortevents) の、より汎用的なバリエーションです。
+A more generic variation of [`sortEvents()`](./event-packet-operators.html#sortevents).
 
 ## filterBySubId()
 
-与えられた値と合致する `subId` を持つ Packet のみ抽出し、それ以外を排除します。`EventPacket`, `EosePacket`, `ClosedPacket`, `CountPacket` の Observable で利用可能です。
+Only packets with `subId` matching the given value are passed through, all others will be eliminated. Available for `EventPacket`, `EosePacket`, `ClosedPacket`, and `CountPacket` Observables.

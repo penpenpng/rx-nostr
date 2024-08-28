@@ -1,29 +1,29 @@
 # Auto Filtering
 
-rx-nostr は REQ の結果として返されるイベントのうち不適格と判断されるものを自動的にフィルターします。この挙動は `createRxNostr()` のオプションから変更できます。
+rx-nostr automatically filters invalid events returned as a result of REQ. You can change these behavior by options of `createRxNostr()`.
 
 ## Auto Verification
 
-自動で署名を検証し、検証に失敗したイベントを結果から除きます。同時に、[NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) に基づいて委任されたイベントが存在する場合は、委任トークンの正当性も検証します。
+rx-nostr automatically verifies signatures and excludes from the results events that fail verification. At the same time, it also verifies the validity of the delegation token if an event delegated under [NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) exists.
 
-この挙動は `skipVerify` オプションで無効にできます。
+You can disable this behavior by `skipVerify` option.
 
 ## Auto Validation
 
-REQ の結果として返されたイベントが本当に REQ のフィルターに合致しているかを自動で検証し、検証に失敗したイベントを結果から除きます。
+rx-nostr automatically verifies that the events returned as a result of REQ really match the REQ filters, and excludes events that fail verification from the results.
 
-この挙動は `skipValidateFilterMatching` オプションで無効にできます。
+You can disable this behavior by `skipValidateFilterMatching` option.
 
 ::: tip Note
-`search` フィールドに対する標準化された解釈は存在しないため、同フィールドの検証は行われません。
+There is no standardized interpretation of the `search` field, so no validation of the field is performed.
 :::
 
-もし Auto Validation が有効かつ `acceptDelegatedEvent` オプションも有効ならば、`authors` フィールドによるフィルタリングが委任されたイベントも受け入れるようになります。すなわち、`authors` フィールドに指定された公開鍵が `event.pubkey` と一致しなくても、イベントの委任元が `authors` に含まれているならばそれは正当なイベントとみなされます。
+If Auto Validation is enabled and the `acceptDelegatedEvent` option is also enabled, then filtering by the `authors` field will also accept delegated events. That is, even if the public key specified in the `authors` field does not match `event.pubkey`, it will be considered a legitimate event if the event's delegate source is included in the `authors` field.
 
-`acceptDelegatedEvent` はデフォルトでは無効になっています。
+`acceptDelegatedEvent` is disabled by default.
 
 ## Auto Expiration Check
 
-[NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md) に基づいて、REQ の結果として返されたイベントが期限切れとなっていないかを自動で確認し、期限が切れているイベントを結果から除きます。
+Based on [NIP-40](https://github.com/nostr-protocol/nips/blob/master/40.md), events returned as a result of REQ are automatically checked whether or not they are expired and removes expired events from the result.
 
-この挙動は `skipExpirationCheck` オプションで無効にできます。
+You can disable this behavior by `skipExpirationCheck` option.

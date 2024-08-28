@@ -1,6 +1,6 @@
 # NIP-11 Registry
 
-[REQ Queue](./subscribe-event.html#req-queue) で説明した通り、rx-nostr はリレーの制約を尊重して動作するために NIP-11 に関連する情報を自動で取得します。この動作は `createRxNostr()` の `skipFetchNip11` オプションで無効にできます。
+[REQ Queue](./subscribe-event#req-queue) で説明した通り、rx-nostr はリレーの制約を尊重して動作するために NIP-11 に関連する情報を自動で取得します。この動作は `createRxNostr()` の `skipFetchNip11` オプションで無効にできます。
 
 ::: tip Note
 今のところ、rx-nostr が動作の最適化のために利用する情報は `limitation.max_subscriptions` のみです。

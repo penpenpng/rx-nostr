@@ -1,10 +1,10 @@
 # Delegation
 
-rx-nostr は [NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) に基づくイベントの委任に対応しています。
+rx-nostr supports event delegation based on [NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md).
 
 ## Publish Deleteged Events
 
-`delegateSigner()` を利用すると委任されたイベントを発行できます。
+You can use `delegateSigner()` to issue delegated events.
 
 ```ts
 import { delegateSigner, nsecSigner } from "rx-nostr";
@@ -18,14 +18,14 @@ const signer = delegateSigner({
 });
 ```
 
-`allowed...` フィールドは単に委任文字列を作るためだけに用いられます。すなわち、`delegateSigner()` による署名器は委任条件外のイベントも生成することができます。
+The `allowed... ` field is used only to create a delegation string. That is, the signer with `delegateSigner()` can also generate events outside the delegation condition.
 
-もし委任条件の検証を行いたい場合は `validateDelegation()` が利用できます。
+You can use `validateDelegation()` to validate the delegation condition.
 
 ## Subscribe Delegated Events
 
-`acceptDelegatedEvent` オプションを有効化すると、委任されたイベントを購読できるようになります (リレーが NIP-26 に基づくクエリに対応している必要があります)。
+Enabling the `acceptDelegatedEvent` option allows you to subscribe to delegated events (if the relay supports queries based on NIP-26).
 
-`acceptDelegatedEvent` の設定に関わらず、`EventPacket` はそのイベントの「ルート公開鍵」が何であるかを示す `rootPubkey` フィールドを公開しています。このフィールドは、イベントが委任されていれば委任元の公開鍵と、委任されていなければイベントの発行元の公開鍵と等しいです。
+Regardless of the `acceptDelegatedEvent` setting, the `EventPacket` exposes a `rootPubkey` field. This field is equal to the public key of the delegator if the event is delegated, or the public key of the event's author if the event is not delegated.
 
-[Auto Validation](./auto-filtering.md#auto-validation) も参照してください。
+See also [Auto Validation](./auto-filtering.md#auto-validation).

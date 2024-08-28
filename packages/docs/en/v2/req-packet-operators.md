@@ -1,14 +1,14 @@
 # ReqPacket Operators
 
-`rxReq` に対して適用可能な Operator のリファレンスです。
+References of operators that can be applied to `rxReq`.
 
 [[TOC]]
 
 ## batch()
 
-`ReqPacket[]` の Observable を、`mergeFilter` パラメータに基づいて `ReqPacket` の Observable に変換します。[`bufferTime()`](https://rxjs.dev/api/operators/bufferTime)と併用すると便利です。
+Converts an Observable of `ReqPacket[]` to an Observable of `ReqPacket` based on the `mergeFilter` parameter. This is useful in conjunction with [`bufferTime()`](https://rxjs.dev/api/operators/bufferTime).
 
-`mergeFilter` パラメータが省略された場合、フィルターは単に結合されます。
+If the `mergeFilter` parameter is omitted, the filters are simply combined.
 
 ```ts
 import { bufferTime } from "rxjs";
@@ -16,16 +16,16 @@ import { batch, latestEach, now } from "rx-nostr";
 
 // ...
 
-// kind1 のタイムラインを観測し続ける forward REQ
+// Forward REQ observing kind1 timeline.
 const timelineReq = createRxForwardReq();
 
-// 必要に応じて kind0 を収集する backward REQ
+// Backward REQ fetching kind0 on demand.
 const profileReq = createRxBackwardReq();
 
 rxNostr.use(timelineReq).subscribe((packet) => {
   const event = packet.event;
 
-  // タイムラインに現れたユーザの kind0 を取得
+  // Get kind0 of user appeared in the timeline.
   profileReq.emit({
     kinds: [0],
     authors: [event.pubkey],
@@ -33,7 +33,8 @@ rxNostr.use(timelineReq).subscribe((packet) => {
   });
 });
 
-// 短い間に大量の REQ が発行されないように、1 秒毎に REQ をまとめ上げて発行
+// To prevent a large number of REQs from being issued in a short period of time,
+// REQs are issued in batches every second
 const batchedReq = profileReq.pipe(bufferTime(1000), batch());
 
 rxNostr
@@ -48,11 +49,11 @@ timelineReq.emit({ kinds: [1], since: now });
 
 ## chunk()
 
-`ReqPacket` を必要に応じていくつかの `ReqPacket` に分割します。
+Split `ReqPacket` into several `ReqPackets` as needed.
 
-今のところ rx-nostr は NIP-11 に定められる `max_filters` を自動で尊重することができないので、大量のフィルターを指定した REQ が発行され得る場合には `chunk()` を利用する必要があります。
+Currently rx-nostr cannot automatically respect the `max_filters` defined in NIP-11, so `chunk()` must be used if an REQ with a large number of filters can be issued.
 
-第一引数は分割が必要かどうかを判定する `predicate` で、第二引数は分割の方法を指定する `toChunks` です。
+The first argument is a `predicate` that determines if a split is necessary, and the second argument is `toChunks` that specifies the method of split.
 
 ```ts
 import { chunk } from "rx-nostr";

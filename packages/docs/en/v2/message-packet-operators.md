@@ -1,12 +1,12 @@
 # MessagePacket Operators
 
-`rxNostr.createAllMessageObservable()` が返す `Observable<MessagePacket>` に対して適用可能な Operator のリファレンスです。
+References of operators that can be applied to `Observable<MessagePacket>`, which is returned by `rxNostr.createAllMessageObservable()`.
 
 [[TOC]]
 
 ## filterByType()
 
-与えられたタイプ (すなわち `"EVENT"`, `"EOSE"`, `"OK"` など) に合致するメッセージのみ抽出し、ほかを排除します。TypeScript において、このフィルターは型ガードのように機能します。
+Only messages that match the given type (i.e., `“EVENT”`, `“EOSE”`, `“OK”`, etc.) are passed through, and others are eliminated. In TypeScript, it works as a type guard.
 
 ```ts
 import { filterByType } from "rx-nostr";

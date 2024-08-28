@@ -4,6 +4,6 @@
 
 ## filterByEventId()
 
-与えられたイベント ID に対応する OkPacket のみ抽出し、ほかを排除します。
+Only the OkPacket corresponding to a given event ID is extracted and the others are eliminated.
 
-`rxNostr.send()` には発行された単一のイベントに対する OK メッセージしか流れてこないため、通常利用する必要はありません。
+Since `rxNostr.send()` will only receive OK messages for a single issued event, it is usually not necessary to use it.
