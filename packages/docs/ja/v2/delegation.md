@@ -28,4 +28,4 @@ const signer = delegateSigner({
 
 `acceptDelegatedEvent` の設定に関わらず、`EventPacket` はそのイベントの「ルート公開鍵」が何であるかを示す `rootPubkey` フィールドを公開しています。このフィールドは、イベントが委任されていれば委任元の公開鍵と、委任されていなければイベントの発行元の公開鍵と等しいです。
 
-[Auto Validation](./auto-filtering.md#auto-validation) も参照してください。
+[Auto Validation](./auto-filtering#auto-validation) も参照してください。
