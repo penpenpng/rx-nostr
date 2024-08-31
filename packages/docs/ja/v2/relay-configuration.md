@@ -52,7 +52,7 @@ rxNostr.setDefaultRelays(await window.nostr.getRelays());
 
 ## Temporary Relays
 
-`rxNostr.send()` や `rxNostr.use()` などの第二引数に `relays` オプションを渡すことによって、**一時リレー** の上で通信することができます。一時リレーは [Connection Strategy](./connection-strategy.md) の設定に関わらず、必要な間だけ接続され不要になると切断されます。
+`rxNostr.send()` や `rxNostr.use()` などの第二引数に `relays` オプションを渡すことによって、**一時リレー** の上で通信することができます。一時リレーは [Connection Strategy](./connection-strategy) の設定に関わらず、必要な間だけ接続され不要になると切断されます。
 
 一時リレーの指定はデフォルトリレーにおける権限設定を**尊重しません**。つまり、デフォルトリレーに何が指定されていようと、一時リレーに対して書き込みないし読み取りを実行します。
 

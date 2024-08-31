@@ -1,46 +1,45 @@
-# Overview
+# Why rx-nostr?
 
-rx-nostr is a library that allows [Nostr](https://nostr.com/) applications to easily and intuitively provide robust communication with one or more relays. As the name shows, rx-nostr is implemented in [RxJS](https://rxjs.dev/) and is designed to work seamlessly with RxJS features, but you don’t need to know much about RxJS.
+It is because, in short, **NIP-01 is simple but not easy**.
+rx-nostr is a library to make NIP-01 as easy to handle as possible while keeping all the possibilities of the protocol.
 
-By using rx-nostr, developers can transparently handle publish/subscribe based on [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md) without being aware of the following troublesome problems associated with relay communication.
+More specifically, rx-nostr is a communication client that sends REQ, EVENT, CLOSE, and possibly AUTH to receive EVENT, OK, and CLOSED.
+Thus, for example, it does not directly provide application-level operations such as fetching someone's follow list or updating their status.
+Instead, it provides almost complete control over communication-level operations, such as what payload is sent to which relay and by how procedure.
+The control is useful for the developer to directly optimize the application's performance.
 
-- **REQ Subscription Management**:
-  - Low-level operations essential to REQ subscription management, such as establishing REQs, sending CLOSEs, and handling CLOSED messages, can be handled in a higher-level, abstracted interface.
-- **WebSocket reconnection**:
-  - The WebSocket transmission channel can be automatically reconnected based on a backoff strategy. REQ subscriptions lost from the transmission channel by disconnection are also automatically reconstituted.
-- **Delaying and idling WebSocket Connections**:
-  - You can delay WebSocket connections to relays until they are really needed or automatically disconnect connections that are no longer in use. This behavior can also be disabled in the configuration.
-- **Monitoring WebSocket connection status**:
-  - The health status of WebSocket connections can be monitored. Applications can use this, for example, to build an interface that notifies users of the status of the connection to relays.
-- **Relay Pool Management**:
-  - A set of relays is handled reactively. That is, changing in relay configurations, such as increasing or decreasing the number of default relays or changing read/write settings, properly reconfigures the currently active REQs under the new relay configuration.
-- **Flexible support for relay server-specific constraints**:
-  - REQ requests to relays is queued properly so as not to violate the relay's concurrent REQ subscription limits published under [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md).
-- **Automatic Handling of AUTH Messages**:
-  - AUTH messages can be automatically handled based on [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) if you just set an option.
-- **Sign and verify**:
-  - Signing and verification are automatic. The only information a developer needs to provide when publishing an event is the event's essential content.
+## Why NIP-01 is Not Easy?
 
-Using rx-nostr, the code to subscribe to kind-1 events, for example, can be implemented simply as follows. This code is explained in detail in [Getting Started](./getting-started) .
+But what in the world is not easy about NIP-01?
+Indeed, at first glance, the specification seems to require only an extremely simple implementation, since all the application has to do is "send REQ then receive EVENT, and send EVENT then receive OK".
+The standard WebSocket class seems to be enough to do.
+In reality, however, real-world applications also require the following implementations:
 
-```js
-import { createRxNostr, createRxForwardReq } from "rx-nostr";
+- Communicate with multiple relays.
+- However, [clients SHOULD open a single websocket connection to each relay](https://github.com/nostr-protocol/nips/blob/8184749f5b336117ae4cedc72be28a9875a004d3/01.md#:~:text=Clients%20SHOULD%20open%20a%20single%20websocket%20connection%20to%20each%20relay).
+- Reconstruct ongoing communications if user changes the application's relay setting.
+- Queue REQ requests as needed to ensure that the number of concurrent REQ subscriptions does not exceed [the limit of relays](https://github.com/nostr-protocol/nips/blob/8184749f5b336117ae4cedc72be28a9875a004d3/11.md#server-limitations).
+- Specify the target relay to communicate with, for each message.
+- Send CLOSE after confirming OK, if needed.
+- Authenticate by [AUTH](https://github.com/nostr-protocol/nips/blob/master/42.md)
+- Handle CLOSED messages.
+- When a connection to a relay is unintentionally dropped, reconnect and then reestablish the communication that was in progress immediately before.
+- When reconnecting, reconnect [in the manner recommended by the RFC](https://www.rfc-editor.org/rfc/rfc6455.html#section-7.2.3)
+- Validate that events returned from relays really match the filters conditions
+- Ignore [expired events](https://github.com/nostr-protocol/nips/blob/master/40.md).
+- Verify the signature of events.
 
-const rxNostr = createRxNostr();
-rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
+rx-nostr handles all of this transparently.
+Thus, now all you really have to do is "send REQ then receive EVENT, and send EVENT then receive OK".
 
-const rxReq = createRxForwardReq();
+## Work with RxJS
 
-rxNostr.use(rxReq).subscribe((packet) => {
-  console.log(packet);
-});
+Common Web APIs such as REST provide one asynchronous output for each input.
+This is abstracted as an asynchronous function that returns a Promise in most cases.
+However, in the case of Nostr, for one or more asynchronous inputs, there can be one or more asynchronous outputs.
+This cannot be abstracted as a simple asynchronous function.
+One of the best models for representing such inputs and outputs is [Subject](https://rxjs.dev/guide/subject) provided by [RxJS](https://rxjs.dev/).
+The core API of rx-nostr is implemented as a kind of Subject.
 
-rxReq.emit({ kinds: [1] });
-```
-
-::: tip Note
-This document assumes a basic understanding of the NIP, and in particular the NIP-01. If you are not familiar with this, we recommend that you read through the following documents first:
-
-- [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)
-
-:::
+However, it is not at all necessary to know about RxJS in order to use rx-nostr.
+If you are familiar with RxJS, you can use the power of [Operator](https://rxjs.dev/guide/operators) to express complex requirements declaratively.
