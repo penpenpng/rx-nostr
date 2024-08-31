@@ -2,15 +2,13 @@
 
 You can use `RxNostr`'s `send()` method to send EVENT messages.
 
-The first argument is an event object where only `kind` and `content` is required and rest is optional.Specified parameters are respected even if they are invalid. On the other hand, unspecified parameters, especially `pubkey`, `id`, and `sig`, are computed by the `signer`.
-
-`signer` can be passed as an option to `createRxNostr()` or as the second argument to `send()`. If `signer` is specified as both, the one passed as the second argument to `send()` is used. For normal use, it is better to pass it as an option of `createRxNostr()`.
+The argument of `send()` is an event object of which only `kind` and `content` are required and the rest are optional.
+The object given as the argument is signed by a `signer` specified in the options of `createRxNostr()` and sent to the appropriate relays. For more information on `signer`, see [Signer](./signer).
 
 ```ts:line-numbers
 import { createRxNostr, seckeySigner } from "rx-nostr";
 
 const rxNostr = createRxNostr({
-  // The both of nsec1... format and HEX format are acceptable.
   signer: seckeySigner("nsec1..."),
 });
 rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
@@ -22,35 +20,8 @@ rxNostr.send({
 ```
 
 ::: tip Note
-The default `signer` is `nip07Signer()`. It looks for the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) interface from the runtime and uses it.
+The `signer` can also be passed as the second argument of `send()`. If `signer` is specified in both, the one passed as the argument to `send()` is used.
 :::
-
-You may be interested in the `id` or `pubkey` of the event object that is actually sent. You can use `signer` to calculate them yourself.
-
-```ts:line-numbers
-import { createRxNostr, seckeySigner } from "rx-nostr";
-
-const signer = seckeySigner("nsec1...");
-
-const rxNostr = createRxNostr({
-  signer,
-});
-rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
-
-const eventParams = {
-  kind: 1,
-  content: "Hello, Nostr!",
-};
-const event = await signer.signEvent(eventParams);
-
-rxNostr.send(event);
-
-const id = event.id;
-// This will be the same as `event.pubkey`.
-const pubkey = await signer.getPublicKey();
-
-console.log(`${pubkey} sent ${id}.`);
-```
 
 ## Handling OK Messages
 
@@ -64,10 +35,22 @@ rxNostr.send(event).subscribe((packet) => {
 });
 ```
 
+If you are not interested in the result of the OK message, there is no need to `subscribe()`. If you `unsubscribe()` the result of `subscribe()`, it will stop resending the message to relays that have not yet been successfully sent.
+
 ::: warning
 If an AUTH based on [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) is requested during the EVENT transmission process, rx-nostr will automatically resend the EVENT message after the AUTH. Note that in this scenario you may receive two OK messages from the same relay. When an OK message is received from one relay, check that `packet.done` is `false` to see if a second OK message may be.
 :::
 
 ::: tip RxJS Tips
-The return value of `send()` is strictly an Observable. This Observable completes when it is determined that no more OK messages can be received. It also exits with an error when 30 seconds elapses without any OK message being received, even though one is still possible. This timeout can be changed with the `okTimeout` option of `createRxNostr()`.
+The return value of `send()` is strictly an Observable. This Observable completes when it is determined that no more OK messages can be received. It also completes when 30 seconds elapses without any OK message being received, even though one is still possible. This behavior can be changed with the `okTimeout` option of `createRxNostr()` and `completeOn` option of `send()`.
+:::
+
+## cast()
+
+`cast()` is almost the same as `send()`, but returns a `Promise<void>` that is resolved as soon as the event has been delivered to at least one of the relays.
+
+::: warning
+It is guaranteed at least one submission attempt to all relays that are connected at the time `cast()` is called, but it is not guaranteed submission attempt to other relays after the resolution of the Promise.
+
+Use `cast()` only in specific situations where a successful send to any one relay is sufficient.
 :::

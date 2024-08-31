@@ -10,7 +10,7 @@ EVENT メッセージ購読までの大まかな流れは次の通りです:
 4. `rxReq.emit(filter)` で REQ メッセージを発行する
 5. 購読が不要になったら `subscription.unsubscribe()` して購読を終了する
 
-[Getting Started](./getting-started.md) ではこの流れを具体的なコードとともに説明しているので参考にしてください。
+[Getting Started](./getting-started) ではこの流れを具体的なコードとともに説明しているので参考にしてください。
 
 `createRxForwardReq()` と `createRxBackwardReq()` の動作の違いは REQ Strategy によって決定づけられます。
 
@@ -88,4 +88,4 @@ rxReq.over();
 
 通常、リレーには同時並行できる REQ サブスクリプションの数に上限が設けられており、[NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) に基づきその上限設定が公開されます。rx-nostr はこの情報を自動で読み取って、並行数の制限を逸脱しないように REQ 要求をキューイングします。
 
-詳しくは [NIP-11 Registry](./nip11-registry.md) を参照してください。
+詳しくは [NIP-11 Registry](./nip11-registry) を参照してください。

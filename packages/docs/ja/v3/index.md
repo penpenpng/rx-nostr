@@ -1,47 +1,45 @@
-# Overview
+# Why rx-nostr?
 
-rx-nostr は [Nostr](https://nostr.com/) アプリケーションがひとつまたは複数のリレーとの堅牢な通信を簡便かつ直感的に実現するためのライブラリです。rx-nostr は [RxJS](https://rxjs.dev/) で実装されており、RxJS の諸機能とのシームレスな連携が可能となるよう設計されていますが、RxJS との併用は必須ではありません。
+なぜ rx-nostr が必要なのか？それは短く言えば、**NIP-01はシンプルであってもイージーではない**からです。
+rx-nostr は NIP-01 のプロトコルが持つすべての可能性を維持したまま、これを可能な限りイージーに取り扱うためのライブラリです。
 
-Nostr アプリケーションの開発者は rx-nostr を利用することで、リレー通信に伴う以下のような煩わしい問題の存在を意識せず、[NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md) に基づく publish/subscribe を透過的に扱えるようになります。
+より具体的に言えば、rx-nostr は REQ, EVENT, CLOSE, そして場合によっては AUTH を発行して、EVENT, OK, CLOSED を受け取るための通信クライアントです。
+したがって例えば、誰かのフォローリストを取得したり、ステータスを更新したりといったアプリケーションレベルの操作を直接的に提供するものではありません。
+代わりに、どんなペイロードをどこのリレーにどんな手順で送信するかといった通信レベルの操作をほとんど完全にコントロールすることができます。
+この通信手順のコントロールは、アプリケーションの応答を開発者が直接最適化するために有用です。
 
-- **REQ サブスクリプションの管理**:
-  - REQ の確立、CLOSE の送出、CLOSED メッセージのハンドリングといった REQ サブスクリプションの管理に必須の低レベルな操作を、より高レベルに抽象化されたインターフェースで取り扱えるようになります。
-- **WebSocket の再接続**:
-  - バックオフ戦略に基づいて WebSocket 伝送路の自動再接続を行います。切断時に伝送路から失われた REQ サブスクリプションも自動的に再構成します。
-- **WebSocket 接続の遅延およびアイドリング**:
-  - リレーとの WebSocket 接続を本当に必要になるまで遅延させたり、使われなくなった接続を自動で切断することができます。この挙動は設定で無効にもできます。
-- **WebSocket 接続状態のモニタリング**:
-  - WebSocket 接続のヘルスステータスを監視できます。アプリケーションはこれをリレーとの接続状況をユーザに通知するインターフェースの構築などに応用できます。
-- **リレープールの管理**:
-  - リレーの集合をリアクティブに扱います。デフォルトリレーの増減や Read/Write 設定の変更といったリレー構成の変化に反応して、新しいリレー構成のもとで現在アクティブな REQ を適切に再構成します。
-- **リレーサーバ固有の制約へのフレキシブルな対応**
-  - [NIP-11](https://github.com/nostr-protocol/nips/blob/master/11.md) に基づいて公開されるリレーの同時 REQ サブスクリプション上限に抵触しないよう、リレーへの REQ 要求を適切にキューイングします。
-- **AUTH メッセージの自動ハンドリング**
-  - [NIP-42](https://github.com/nostr-protocol/nips/blob/master/42.md) に基づく AUTH メッセージを自動でハンドリングします。rx-nostr を利用する場合、NIP-42 に対応するためにはオプションを設定するだけで済みます。
-- **署名およびその検証**
-  - 署名およびその検証を自動で行います。イベントを発行する際に開発者が用意する必要がある情報は、イベントの本質的なコンテンツだけです。
+## Why NIP-01 is Not Easy?
 
-rx-nostr を使うと、例えば kind1 のイベントを購読するコードは以下のように簡潔に実現できます。なお、このコードの説明は [Getting Started](./getting-started.md) で詳述します。
+しかし、一体 NIP-01 のどこがイージーではないというのでしょうか？
+確かに仕様を一見すると、アプリケーションがすべきことは「REQ を送って EVENT を受け取り、EVENT を送って OK を受け取る」だけですから極めて単純な実装だけが求められているように思われます。
+それならば標準的な WebSocket のクラスで十分そうです。
+ところが実のところ、現実世界のアプリケーションでは次のような実装も求められます:
 
-```js
-import { createRxNostr, createRxForwardReq } from "rx-nostr";
+- 複数のリレーと通信する
+- ただし、[各リレーとの WebSocket 接続は1本までに抑える](https://github.com/nostr-protocol/nips/blob/8184749f5b336117ae4cedc72be28a9875a004d3/01.md#:~:text=Clients%20SHOULD%20open%20a%20single%20websocket%20connection%20to%20each%20relay)
+- アプリケーションのリレー設定をユーザが変更した場合に、現在進行中の通信を再構成する
+- 同時 REQ 数が[リレーの制限](https://github.com/nostr-protocol/nips/blob/8184749f5b336117ae4cedc72be28a9875a004d3/11.md#server-limitations)を超過しないように必要に応じてキューイングする
+- メッセージごとに通信先のリレーを指定する
+- 必要であれば、OK を受け取ったあとに CLOSE する
+- [AUTH](https://github.com/nostr-protocol/nips/blob/master/42.md) による認証を行う
+- CLOSED をハンドルする
+- リレーとの接続が意図せず切断されたとき、再接続を行った上で直前まで進行中だった通信を再構成する
+- 再接続時には [RFC によって推奨された方法](https://www.rfc-editor.org/rfc/rfc6455.html#section-7.2.3)で再接続する
+- リレーから帰ってきたイベントが本当にフィルター条件に合致していることを検証する
+- [期限切れのイベント](https://github.com/nostr-protocol/nips/blob/master/40.md)を無視する
+- 署名を検証する
 
-const rxNostr = createRxNostr();
-rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
+rx-nostrはこれらすべてを透過的に処理します。
+これによって、あなたがすべきことは本当に「REQ を送って EVENT を受け取り、EVENTを 送って OK を受け取る」だけになるのです。
 
-const rxReq = createRxForwardReq();
+## Work with RxJS
 
-rxNostr.use(rxReq).subscribe((packet) => {
-  console.log(packet);
-});
+REST のような一般的な Web API ではひとつの入力に対し、1つの非同期な出力が得られます。
+これはほとんどの場合 Promise を返す非同期関数として抽象化されます。
+しかし、Nostr の場合は1つ以上の非同期な入力に対して、1つ以上の非同期な出力がありえます。
+これを単純な非同期関数として抽象化することはできません。
+このような入出力を表現するのに最適なモデルのひとつが、[RxJS](https://rxjs.dev/) が提供する [Subject](https://rxjs.dev/guide/subject) です。
+実際、rx-nostr の中心的な API は一種の Subject として実装されています。
 
-rxReq.emit({ kinds: [1] });
-```
-
-::: tip Note
-本ドキュメントは NIP の、特に NIP-01 に関する基本的な理解を前提に記述されます。これに馴染みのない方は以下に挙げる資料に先に目を通すことをおすすめします。
-
-- [NIP-01 (EN)](https://github.com/nostr-protocol/nips/blob/master/01.md)
-- [NIP-01 (JA)](https://github.com/nostr-jp/nips-ja/blob/main/01.md)
-
-:::
+とは言っても、rx-nostr を利用するにあたって RxJS について知っておくことはまったく必須ではありません。
+ただ、仮にあなたが RxJS に明るいならば、[Operator](https://rxjs.dev/guide/operators) の力を使うことによって、複雑な要件を宣言的にコード上で表現できるでしょう。

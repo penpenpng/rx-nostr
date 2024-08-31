@@ -55,7 +55,8 @@ export const content = defineContent({
     {
       text: "Introduction",
       items: [
-        { text: "Overview", link: "" },
+        { text: "Why rx-nostr?", link: "" },
+        { text: "Migration Guide", link: "migration-guide" },
         { text: "Installation", link: "installation" },
         { text: "Getting Started", link: "getting-started" },
       ],
@@ -66,6 +67,13 @@ export const content = defineContent({
         { text: "Publish EVENT", link: "publish-event" },
         { text: "Subscribe EVENT", link: "subscribe-event" },
         { text: "Relay Configuration", link: "relay-configuration" },
+      ],
+    },
+    {
+      text: "Sign / Verify",
+      items: [
+        { text: "Signer", link: "signer" },
+        { text: "Verifier", link: "verifier" },
       ],
     },
     {
@@ -82,7 +90,7 @@ export const content = defineContent({
     {
       text: "Operators",
       items: [
-        { text: "Overview", link: "operators" },
+        { text: "Operators", link: "operators" },
         { text: "EventPacket", link: "event-packet-operators" },
         { text: "ReqPacket", link: "req-packet-operators" },
         { text: "OkPacket", link: "ok-packet-operators" },
@@ -93,11 +101,11 @@ export const content = defineContent({
     {
       text: "Addendum",
       items: [
-        { text: "Auto Filtering", link: "auto-filtering" },
         { text: "AUTH", link: "auth" },
         { text: "NIP-11 Registry", link: "nip11-registry" },
+        { text: "Auto Filtering", link: "auto-filtering" },
         { text: "Other Observables", link: "other-observables" },
-        { text: "Delegation", link: "delegation" },
+        { text: "Dispose", link: "dispose" },
       ],
     },
   ],
