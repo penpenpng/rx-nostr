@@ -10,9 +10,9 @@ rx-nostr には他にもいくつか `subscribe()` 可能なオブジェクト�
 
 `rxNostr.createAllMessageObservable()` によって、リレーから送られてきた (未知のタイプのメッセージを含む) すべてのメッセージを監視できます。
 
-## createAllMessageObservable()
+## createAllEventObservable()
 
-`rxNostr.createAllMessageObservable()` によって、リレーから送られてきたすべての EVENT メッセージを監視できます。
+`rxNostr.createAllEventObservable()` によって、リレーから送られてきたすべての EVENT メッセージを監視できます。
 
 ## createAllErrorObservable()
 

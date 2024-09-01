@@ -7,7 +7,7 @@ rx-nostr は [NIP-26](https://github.com/nostr-protocol/nips/blob/master/26.md) 
 `delegateSigner()` を利用すると委任されたイベントを発行できます。
 
 ```ts
-import { delegateSigner, nsecSigner } from "rx-nostr";
+import { delegateSigner, seckeySigner } from "rx-nostr";
 
 const signer = delegateSigner({
   delegateeSigner: seckeySigner(seckeyChild),

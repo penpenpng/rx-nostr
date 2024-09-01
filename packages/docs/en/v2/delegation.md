@@ -7,7 +7,7 @@ rx-nostr supports event delegation based on [NIP-26](https://github.com/nostr-pr
 You can use `delegateSigner()` to issue delegated events.
 
 ```ts
-import { delegateSigner, nsecSigner } from "rx-nostr";
+import { delegateSigner, seckeySigner } from "rx-nostr";
 
 const signer = delegateSigner({
   delegateeSigner: seckeySigner(seckeyChild),
