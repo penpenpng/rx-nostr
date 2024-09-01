@@ -13,12 +13,13 @@ const rxNostr = createRxNostr({ authenticator: "auto" });
 より高度なユースケースに対応するため、`authenticator` は `signer` をオプションに取ることができます。これにより、通常のイベント発行時とは異なる署名器を用いて AUTH メッセージを作成できます:
 
 ```ts:line-numbers
-import { createRxNostr, nsecSigner } from "rx-nostr";
+import { createRxNostr } from "rx-nostr";
+import { seckeySigner } from "rx-nostr-crypto";
 
 const rxNostr = createRxNostr({
-  signer: nsecSigner("nsec1aaa..."),
+  signer: seckeySigner("nsec1aaa..."),
   authenticator: {
-    signer: nsecSigner("nsec1bbb..."),
+    signer: seckeySigner("nsec1bbb..."),
   },
 });
 ```
@@ -26,7 +27,7 @@ const rxNostr = createRxNostr({
 また、リレーごとに異なる署名器を使いたい場合のために、関数形式の指定も可能です。例えば以下の例では、`wss://nostr.example.com` でのみ AUTH メッセージに応答し、他のリレーでは AUTH を無視します:
 
 ```ts:line-numbers
-import { createRxNostr, nsecSigner } from "rx-nostr";
+import { createRxNostr } from "rx-nostr";
 
 const rxNostr = createRxNostr({
   authenticator: (relayUrl) => {

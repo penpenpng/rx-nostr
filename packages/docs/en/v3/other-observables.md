@@ -10,9 +10,9 @@ These are all Observable of RxJS. They are not completed until `rxNostr.dispose(
 
 `rxNostr.createAllMessageObservable()` allows you to observe all incoming messages (including unknown type messages).
 
-## createAllMessageObservable()
+## createAllEventObservable()
 
-`rxNostr.createAllMessageObservable()` allows you to observe all EVENT message.
+`rxNostr.createAllEventObservable()` allows you to observe all EVENT message.
 
 ## createAllErrorObservable()
 

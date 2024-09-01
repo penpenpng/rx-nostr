@@ -13,12 +13,12 @@ const rxNostr = createRxNostr({ authenticator: "auto" });
 For more advanced use cases, the `authenticator` can optionally take a `signer`. This allows the AUTH message to be created using a different signer than when issuing normal events:
 
 ```ts:line-numbers
-import { createRxNostr, nsecSigner } from "rx-nostr";
+import { createRxNostr, seckeySigner } from "rx-nostr";
 
 const rxNostr = createRxNostr({
-  signer: nsecSigner("nsec1aaa..."),
+  signer: seckeySigner("nsec1aaa..."),
   authenticator: {
-    signer: nsecSigner("nsec1bbb..."),
+    signer: seckeySigner("nsec1bbb..."),
   },
 });
 ```
@@ -26,7 +26,7 @@ const rxNostr = createRxNostr({
 It is also possible to specify a function format in case you want to use a different signer for each relay. For example, the following example responds to AUTH messages only on `wss://nostr.example.com` and ignores AUTH on other relays:
 
 ```ts:line-numbers
-import { createRxNostr, nsecSigner } from "rx-nostr";
+import { createRxNostr } from "rx-nostr";
 
 const rxNostr = createRxNostr({
   authenticator: (relayUrl) => {
