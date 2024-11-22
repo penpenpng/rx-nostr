@@ -402,7 +402,7 @@ class RxNostrImpl implements RxNostr {
     );
     const complete$ = merge(fin$, this.connectionState$.asObservable()).pipe(
       filter(() => shouldComplete()),
-      first(),
+      first(null, undefined),
     );
 
     return this.event$.pipe(

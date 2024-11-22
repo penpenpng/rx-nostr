@@ -22,6 +22,6 @@ export class CounterSubject extends BehaviorSubject<number> {
 
 export class NotifySubject<T = void> extends Subject<T> {
   waitNext() {
-    return firstValueFrom(this.pipe(first()));
+    return firstValueFrom(this.pipe(first(null, void 0)));
   }
 }
