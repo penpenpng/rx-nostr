@@ -106,7 +106,7 @@ export class RelayConnection {
 
     const onopen = async () => {
       if (this.state === "terminated") {
-        socket.close(WebSocketCloseCode.RX_NOSTR_DISPOSED);
+        socket?.close(WebSocketCloseCode.RX_NOSTR_DISPOSED);
         return;
       }
 
@@ -139,9 +139,9 @@ export class RelayConnection {
       }
     };
     const onclose = ({ code }: ICloseEvent) => {
-      socket.removeEventListener("open", onopen);
-      socket.removeEventListener("message", onmessage);
-      socket.removeEventListener("close", onclose);
+      socket?.removeEventListener("open", onopen);
+      socket?.removeEventListener("message", onmessage);
+      socket?.removeEventListener("close", onclose);
       if (this.socket === socket) {
         this.socket = null;
       }
@@ -202,11 +202,24 @@ export class RelayConnection {
       throw new RxNostrInvalidUsageError("WebSocket constructor is missing");
     }
 
-    const socket: IWebSocket = new WebSocket(this.url);
+    const socket = (() => {
+      try {
+        return new WebSocket(this.url);
+      } catch (err: unknown) {
+        // When the given URL is invalid, Deno runtime throws SyntaxError.
+        // Here, we fire the error event in a pseudo manner, just as a normal browser runtime would do.
+        onclose({
+          type: "close",
+          code: 0,
+          reason: `${err}`,
+        });
+        return null;
+      }
+    })();
 
-    socket.addEventListener("open", onopen);
-    socket.addEventListener("message", onmessage);
-    socket.addEventListener("close", onclose);
+    socket?.addEventListener("open", onopen);
+    socket?.addEventListener("message", onmessage);
+    socket?.addEventListener("close", onclose);
 
     return socket;
   }
