@@ -13,15 +13,15 @@
   "type": "module",
   "main": "./index.cjs",
   "module": "./dist/rx-nostr-crypto.js",
-  "types": "./dist/rx-nostr-crypto.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/rx-nostr-crypto.d.ts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/rx-nostr-crypto.js"
       },
       "require": {
-        "types": "./dist/rx-nostr-crypto.d.ts",
+        "types": "./dist/index.d.ts",
         "node": "./dist/rx-nostr-crypto.cjs",
         "default": "./dist/rx-nostr-crypto.umd.cjs"
       }

@@ -16,15 +16,15 @@
   "type": "module",
   "main": "./index.cjs",
   "module": "./dist/rx-nostr.js",
-  "types": "./dist/rx-nostr.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/rx-nostr.d.ts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/rx-nostr.js"
       },
       "require": {
-        "types": "./dist/rx-nostr.d.ts",
+        "types": "./dist/index.d.ts",
         "node": "./dist/rx-nostr.cjs",
         "default": "./dist/rx-nostr.umd.cjs"
       }
