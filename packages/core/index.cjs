@@ -1,3 +1,3 @@
 'use strict'
 
-module.exports = require('./dist/index.cjs')
+module.exports = require('./dist/rx-nostr.cjs')
