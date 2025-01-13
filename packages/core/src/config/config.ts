@@ -54,7 +54,7 @@ export interface RxNostrConfig {
    * How long a relay connection should be held open when no longer used
    * @default 10000
    */
-  disconnectTimeout?: number,
+  disconnectTimeout?: number;
 
   /**
    * Specify how long rx-nostr waits for EOSE messages in `use()` following backward strategy (milliseconds).
