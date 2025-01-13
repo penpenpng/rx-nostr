@@ -89,10 +89,12 @@ describe("keep-lazy strategy", () => {
     await expect(anotherRelay).toReceiveCLOSE("sub:0");
 
     // expect relay to still be connected
-    await expect(stateWillBe(rxNostr, ANOTHER_RELAY, 'connected')).resolves.toBe(true)
+    await expect(
+      stateWillBe(rxNostr, ANOTHER_RELAY, "connected"),
+    ).resolves.toBe(true);
 
     // wait 10 ms
-    await delay(10)
+    await delay(10);
 
     // relay should be closed
     await expect(stateWillBe(rxNostr, ANOTHER_RELAY, "dormant")).resolves.toBe(
