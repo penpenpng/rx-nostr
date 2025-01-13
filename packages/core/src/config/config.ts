@@ -13,7 +13,7 @@ export const makeRxNostrConfig = (config: RxNostrConfig) =>
       maxCount: 5,
       initialDelay: 1000,
     },
-    disconnectTimeout: 10_000,
+    disconnectTimeout: 0,
     eoseTimeout: 30 * 1000,
     okTimeout: 30 * 1000,
     authTimeout: 30 * 1000,
@@ -52,7 +52,7 @@ export interface RxNostrConfig {
 
   /**
    * How long a relay connection should be held open when no longer used
-   * @default 10000
+   * @default 0
    */
   disconnectTimeout?: number;
 

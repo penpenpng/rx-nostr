@@ -279,3 +279,7 @@ export function expectedChallengeEvent(
     ],
   };
 }
+
+export function delay(timeout = 100) {
+  return new Promise<void>((res) => setTimeout(() => res(), timeout));
+}
