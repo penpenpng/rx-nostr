@@ -13,6 +13,7 @@ export const makeRxNostrConfig = (config: RxNostrConfig) =>
       maxCount: 5,
       initialDelay: 1000,
     },
+    disconnectTimeout: 10_000,
     eoseTimeout: 30 * 1000,
     okTimeout: 30 * 1000,
     authTimeout: 30 * 1000,
@@ -48,6 +49,13 @@ export interface RxNostrConfig {
    * Auto reconnection strategy.
    */
   retry?: RetryConfig;
+
+  /**
+   * How long a relay connection should be held open when no longer used
+   * @default 5000
+   */
+  disconnectTimeout?: number,
+
   /**
    * Specify how long rx-nostr waits for EOSE messages in `use()` following backward strategy (milliseconds).
    *
