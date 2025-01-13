@@ -98,18 +98,22 @@ export class NostrConnection {
 
     switch (strategy) {
       case "lazy": {
-        // clear existing timer
-        if (this.disconnectTimeout) {
-          clearTimeout(this.disconnectTimer);
-          this.disconnectTimer = undefined;
-        }
-
-        // create a new timer
-        this.disconnectTimer = setTimeout(() => {
+        const disconnect = () => {
           if (!this.communicating) {
             this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
           }
-        }, this.disconnectTimeout);
+        };
+
+        if (this.disconnectTimeout > 0) {
+          // clear existing timer
+          if (this.disconnectTimeout) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = undefined;
+          }
+
+          // create a new timer
+          this.disconnectTimer = setTimeout(disconnect, this.disconnectTimeout);
+        } else disconnect();
         break;
       }
       case "lazy-keep": {

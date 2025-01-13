@@ -7,7 +7,7 @@ import {
   noopVerifier,
   RxNostr,
 } from "../index.js";
-import { disposeMockRelay, faker, stateWillBe } from "./helper.js";
+import { delay, disposeMockRelay, faker, stateWillBe } from "./helper.js";
 
 describe("keep-lazy strategy", () => {
   const DEFAULT_RELAY = "ws://localhost:1234";
@@ -25,6 +25,7 @@ describe("keep-lazy strategy", () => {
       connectionStrategy: "lazy-keep",
       skipFetchNip11: true,
       skipVerify: true,
+      disconnectTimeout: 0,
     });
     await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
   });
@@ -60,6 +61,40 @@ describe("keep-lazy strategy", () => {
     sub.unsubscribe();
     await expect(anotherRelay).toReceiveCLOSE("sub:0");
 
+    await expect(stateWillBe(rxNostr, ANOTHER_RELAY, "dormant")).resolves.toBe(
+      true,
+    );
+  });
+
+  test("[forward] ConnectionState of temporary relays gets dormant after timeout when all temporary subscriptions end.", async () => {
+    // recreate rxNostr with disconnectTimeout
+    rxNostr.dispose();
+    rxNostr = createRxNostr({
+      verifier: noopVerifier,
+      connectionStrategy: "lazy-keep",
+      skipFetchNip11: true,
+      skipVerify: true,
+      disconnectTimeout: 10,
+    });
+    await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
+
+    const req = createRxForwardReq("sub");
+    const sub = rxNostr.use(req, { relays: [ANOTHER_RELAY] }).subscribe();
+
+    req.emit(faker.filter());
+    await anotherRelay.connected;
+    await expect(anotherRelay).toReceiveREQ("sub:0");
+
+    sub.unsubscribe();
+    await expect(anotherRelay).toReceiveCLOSE("sub:0");
+
+    // expect relay to still be connected
+    await expect(stateWillBe(rxNostr, ANOTHER_RELAY, 'connected')).resolves.toBe(true)
+
+    // wait 10 ms
+    await delay(10)
+
+    // relay should be closed
     await expect(stateWillBe(rxNostr, ANOTHER_RELAY, "dormant")).resolves.toBe(
       true,
     );
