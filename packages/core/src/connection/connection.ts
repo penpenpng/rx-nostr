@@ -43,6 +43,8 @@ export class NostrConnection {
   private defaultSubscriptionIds: Set<string> = new Set();
   private communicating = false;
   private strategy: ConnectionStrategy = "lazy";
+  private disconnectTimeout: number
+  private disconnectTimer?: ReturnType<typeof setTimeout>
   private isDefaultRelay = false;
   private disposed = false;
   private _url: string;
@@ -64,6 +66,8 @@ export class NostrConnection {
     this.relay = relay;
     this.pubProxy = pubProxy;
     this.subProxy = subProxy;
+
+    this.disconnectTimeout = config.disconnectTimeout
 
     // Idling cold sockets
     combineLatest([
@@ -94,9 +98,18 @@ export class NostrConnection {
 
     switch (strategy) {
       case "lazy": {
-        if (!this.communicating) {
-          this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
+        // clear existing timer
+        if(this.disconnectTimeout) {
+          clearTimeout(this.disconnectTimer)
+          this.disconnectTimer=undefined
         }
+
+        // create a new timer
+        this.disconnectTimer = setTimeout(() => {
+          if (!this.communicating) {
+            this.relay.disconnect(WebSocketCloseCode.RX_NOSTR_IDLE);
+          }
+        }, this.disconnectTimeout);
         break;
       }
       case "lazy-keep": {
@@ -253,6 +266,9 @@ export class NostrConnection {
     }
 
     this.disposed = true;
+
+    if(this.disconnectTimer) clearTimeout(this.disconnectTimer)
+    this.disconnectTimer=undefined
 
     this.relay.dispose();
     this.pubProxy.dispose();
