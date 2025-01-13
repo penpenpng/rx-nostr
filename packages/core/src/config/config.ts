@@ -52,7 +52,7 @@ export interface RxNostrConfig {
 
   /**
    * How long a relay connection should be held open when no longer used
-   * @default 5000
+   * @default 10000
    */
   disconnectTimeout?: number,
 
