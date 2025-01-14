@@ -1,5 +1,11 @@
 import * as Nostr from "nostr-typedef";
-import { Observable, of, type OperatorFunction, Subject } from "rxjs";
+import {
+  Observable,
+  of,
+  type OperatorFunction,
+  ReplaySubject,
+  Subject,
+} from "rxjs";
 
 import { LazyFilter, ReqPacket } from "../packet.js";
 
@@ -150,6 +156,12 @@ const createRxReq = <S extends RxReqStrategy>(params: {
   };
 };
 
+export interface RxBackwardReqOptions {
+  /** @deprecated */
+  rxReqId?: string;
+  replay?: boolean;
+}
+
 /**
  * Create a RxReq instance based on the backward strategy.
  * It is useful if you want to retrieve past events that have already been published.
@@ -162,15 +174,32 @@ const createRxReq = <S extends RxReqStrategy>(params: {
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#backward-strategy).
  */
 export function createRxBackwardReq(
-  rxReqId?: string,
+  // TODO (v4): remove string format options
+  options?: string /* for backward compatibility. */ | RxBackwardReqOptions,
 ): RxReq<"backward"> &
   RxReqEmittable<{ relays: string[] }> &
   RxReqOverable &
   RxReqPipeable {
-  return createRxReq({
-    strategy: "backward",
-    rxReqId,
-  });
+  if (typeof options === "string") {
+    const rxReqId = options;
+    return createRxReq({
+      strategy: "backward",
+      rxReqId,
+    });
+  } else {
+    const { rxReqId, replay } = options ?? {};
+    return createRxReq({
+      strategy: "backward",
+      rxReqId,
+      subject: replay ? new ReplaySubject() : undefined,
+    });
+  }
+}
+
+export interface RxForwardReqOptions {
+  /** @deprecated */
+  rxReqId?: string;
+  replay?: boolean;
 }
 
 /**
@@ -186,12 +215,23 @@ export function createRxBackwardReq(
  * For more information, see [document](https://penpenpng.github.io/rx-nostr/v1/req-strategy.html#forward-strategy).
  */
 export function createRxForwardReq(
-  rxReqId?: string,
+  // TODO (v4): remove string format options
+  options?: string /* for backward compatibility. */ | RxForwardReqOptions,
 ): RxReq<"forward"> & RxReqEmittable & RxReqPipeable {
-  return createRxReq({
-    strategy: "forward",
-    rxReqId,
-  });
+  if (typeof options === "string") {
+    const rxReqId = options;
+    return createRxReq({
+      strategy: "forward",
+      rxReqId,
+    });
+  } else {
+    const { rxReqId, replay } = options ?? {};
+    return createRxReq({
+      strategy: "forward",
+      rxReqId,
+      subject: replay ? new ReplaySubject() : undefined,
+    });
+  }
 }
 
 /**
