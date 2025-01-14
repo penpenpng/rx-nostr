@@ -119,6 +119,7 @@ describe("aggressive strategy", () => {
       connectionStrategy: "aggressive",
       skipFetchNip11: true,
       skipVerify: true,
+      disconnectTimeout: 0
     });
     await rxNostr.setDefaultRelays([DEFAULT_RELAY]);
   });
