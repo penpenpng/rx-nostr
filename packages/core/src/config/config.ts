@@ -51,7 +51,8 @@ export interface RxNostrConfig {
   retry?: RetryConfig;
 
   /**
-   * How long a relay connection should be held open when no longer used
+   * How long temporary relay connections should be held open when no longer used.
+   * Applies to default relays when connectionStrategy is set to "lazy"
    * @default 0
    */
   disconnectTimeout?: number;
