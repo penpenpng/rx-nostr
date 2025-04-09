@@ -200,7 +200,7 @@ rxReq.emit({ kinds: [0] });
 
 ```ts
 import { verify } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 // ...
 

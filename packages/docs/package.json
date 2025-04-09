@@ -1,5 +1,5 @@
 {
-  "name": "rx-nostr-docs",
+  "name": "@rx-nostr/docs",
   "private": true,
   "scripts": {
     "dev": "vitepress dev",

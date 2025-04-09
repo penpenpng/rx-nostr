@@ -14,7 +14,7 @@ For more advanced use cases, the `authenticator` can optionally take a `signer`.
 
 ```ts:line-numbers
 import { createRxNostr } from "rx-nostr";
-import { seckeySigner } from "rx-nostr-crypto";
+import { seckeySigner } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr({
   signer: seckeySigner("nsec1aaa..."),

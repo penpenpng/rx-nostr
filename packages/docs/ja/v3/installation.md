@@ -5,16 +5,16 @@ npm または yarn から以下の通りインストールできます。
 ::: code-group
 
 ```sh [npm]
-npm install rx-nostr rx-nostr-crypto
+npm install rx-nostr @rx-nostr/crypto
 ```
 
 ```sh [yarn]
-yarn add rx-nostr rx-nostr-crypto
+yarn add rx-nostr @rx-nostr/crypto
 ```
 
 :::
 
-rx-nostr-crypto は署名やその検証に必要な暗号ライブラリです。実際には暗号ライブラリは好きなものを使用できるのでインストールは完全に任意ですが、ほとんどのユースケースではこちらで十分なはずです。
+@rx-nostr/crypto は署名やその検証に必要な暗号ライブラリです。実際には暗号ライブラリは好きなものを使用できるのでインストールは完全に任意ですが、ほとんどのユースケースではこちらで十分なはずです。
 
 特に速度が求められる場合は wasm 製の暗号ライブラリを使用するなど、目的に合わせてライブラリを選定してください。
 

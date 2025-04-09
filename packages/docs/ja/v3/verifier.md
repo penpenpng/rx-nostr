@@ -11,10 +11,10 @@ Verifier は `createRxNostr()` のオプションか `rxNostr.use()` のオプ�
 ## verifier
 
 `verifier` は @noble パッケージと @scure パッケージが提供する実装を使用して署名を検証します。
-この Verifier は rx-nostr-crypto パッケージで公開されています。
+この Verifier は @rx-nostr/crypto パッケージで公開されています。
 
 ```ts
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 ```
 
 ## noopVerifier
@@ -56,7 +56,7 @@ worker.ts を Worker で動作させるスクリプトであるとします。
 ```ts
 // worker.ts
 
-import { startVerificationServiceHost } from "rx-nostr-crypto";
+import { startVerificationServiceHost } from "@rx-nostr/crypto";
 
 startVerificationServiceHost();
 ```
@@ -71,7 +71,7 @@ startVerificationServiceHost();
 
 ```ts
 import { createRxNostr } from "rx-nostr";
-import { createVerificationServiceClient } from "rx-nostr-crypto";
+import { createVerificationServiceClient } from "@rx-nostr/crypto";
 
 import workerUrl from "./worker-host?worker&url";
 
@@ -99,7 +99,7 @@ SSR では、サーバーコンテキストに `Worker` が存在しないため
 import {
   createVerificationServiceClient,
   createNoopClient,
-} from 'rx-nostr-crypto';
+} from '@rx-nostr/crypto';
 import workerUrl from './worker-host?worker&url';
 
 const isBrowser = /* ... */;

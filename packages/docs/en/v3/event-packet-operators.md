@@ -200,7 +200,7 @@ Normally, the verification process is done automatically by rx-nostr, but this O
 
 ```ts
 import { verify } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 // ...
 

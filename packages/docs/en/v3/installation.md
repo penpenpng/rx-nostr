@@ -5,16 +5,16 @@ You can install rx-nostr from npm or yarn as follows:
 ::: code-group
 
 ```sh [npm]
-npm install rx-nostr rx-nostr-crypto
+npm install rx-nostr @rx-nostr/crypto
 ```
 
 ```sh [yarn]
-yarn add rx-nostr rx-nostr-crypto
+yarn add rx-nostr @rx-nostr/crypto
 ```
 
 :::
 
-rx-nostr-crypto is a crypto library needed to sign and verify. In practice, the installation is completely optional because you can use any crypto library you like, but this should be sufficient for most use cases.
+@rx-nostr/crypto is a crypto library needed to sign and verify. In practice, the installation is completely optional because you can use any crypto library you like, but this should be sufficient for most use cases.
 
 Select a library that best suits your purpose, such as using wasm's cryptographic library if speed is particularly important.
 

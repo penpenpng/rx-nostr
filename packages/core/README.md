@@ -14,7 +14,7 @@ rx-nostr provides transparent interface to read/write events on Nostr relays.
 You can exchange data in a very familiar way (as you see [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)) with that interface, but it allows for far more robust and flexible communication than you can do by touching WebSocket directly. For example:
 
 - Auto sign/verify
-  - Sign/verify events automatically by integrating with rx-nostr-crypto or other arbitrary crypto libraries.
+  - Sign/verify events automatically by integrating with @rx-nostr/crypto or other arbitrary crypto libraries.
 - Auto adaptive reconnection
   - If the subscription is based on a time relative to its start time, consider it when auto reconnecting.
 - Auto expiration check
@@ -35,12 +35,12 @@ Under the hood, rx-nostr makes use of [RxJS](https://rxjs.dev/), but you don't n
 ## Quickstart
 
 ```
-npm install rx-nostr rx-nostr-crypto
+npm install rx-nostr @rx-nostr/crypto
 ```
 
 ```ts
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier, seckeySigner } from "rx-nostr-crypto";
+import { verifier, seckeySigner } from "@rx-nostr/crypto";
 
 import WebSocket from "ws";
 
