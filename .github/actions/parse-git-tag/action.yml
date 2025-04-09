@@ -20,6 +20,6 @@ runs:
       shell: bash
       run: |
         tag=${{ github.ref_name }}
-        arr=(${tag//@/ })
+        arr=(${tag//_/ })
         echo "package=${arr[0]}" >> $GITHUB_OUTPUT
         echo "version=${arr[1]}" >> $GITHUB_OUTPUT
