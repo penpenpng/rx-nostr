@@ -6,5 +6,5 @@ name-template: core@$RESOLVED_VERSION
 tag-template: core@$RESOLVED_VERSION
 tag-prefix: core@
 include-paths:
-  - packages/core
+  - packages/rx-nostr
   - packages/docs
