@@ -25,11 +25,11 @@ Note that `RxNostr` is associated with a relay pool. In other words, under the s
 
 Having viewed the overall flow, let's quickly build a minimal Nostr application! First, we create a `RxNostr` object and associate it with our relay pool.
 Note that `verifier` is required.
-In most cases, `verifier` provided by rx-nostr-crypto is sufficient, but if you need more advanced customization, see [Verifier](./verifier).
+In most cases, `verifier` provided by @rx-nostr/crypto is sufficient, but if you need more advanced customization, see [Verifier](./verifier).
 
 ```ts:line-numbers
 import { createRxNostr } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr({ verifier });
 rxNostr.setDefaultRelays([
@@ -42,7 +42,7 @@ Next, create a `RxReq` object and associate it with `RxNostr`. Now we are ready 
 
 ```ts:line-numbers{10-12}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -59,7 +59,7 @@ The return value of `rxNostr.use()` is a `subscribe()`-able object, where you ca
 
 ```ts:line-numbers{13-14}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -83,7 +83,7 @@ However, this application will still not do any work, because no Packets are flo
 
 ```ts:line-numbers{17-18}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -111,7 +111,7 @@ In rx-nostr, you can CLOSE all REQs associated with `use()` by `unsubscribe()` t
 
 ```js:line-numbers{12,20-23}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([

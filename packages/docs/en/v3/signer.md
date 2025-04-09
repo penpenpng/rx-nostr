@@ -20,12 +20,12 @@ import { nip07Signer } from "rx-nostr";
 
 `seckeySigner()` calcutes with the given secret key.
 The both of nsec format and hex format is acceptable.
-This is provided by rx-nostr-crypto package.
+This is provided by @rx-nostr/crypto package.
 
 You can use `tags` option to append the fixed tags on signing each event.
 
 ```ts
-import { seckeySigner } from "rx-nostr-crypto";
+import { seckeySigner } from "@rx-nostr/crypto";
 
 const signer = seckeySigner("nsec1...");
 ```
@@ -63,7 +63,7 @@ Following them helps that developers precompute an event if they are interested 
 
 ```ts
 import { createRxNostr } from "rx-nostr";
-import { seckeySigner } from "rx-nostr-crypto";
+import { seckeySigner } from "@rx-nostr/crypto";
 
 const signer = seckeySigner("nsec1...");
 

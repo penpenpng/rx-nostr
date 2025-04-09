@@ -25,11 +25,11 @@ rx-nostr の構造を理解するためには中心となる 3 種類の登場�
 
 全体の流れを眺めたところで、早速最小の Nostr アプリケーションを構築してみましょう！まずは `RxNostr` オブジェクトを生成して、リレープールと関連付けます。
 このとき `verifier` が必須のパラメータであることに注意してください。
-ほとんどの場合、rx-nostr-crypto が公開している `verifier` を使えば十分ですが、より高度なカスタマイズが必要な場合は [Verifier](./verifier) を参照してください。
+ほとんどの場合、@rx-nostr/crypto が公開している `verifier` を使えば十分ですが、より高度なカスタマイズが必要な場合は [Verifier](./verifier) を参照してください。
 
 ```ts:line-numbers
 import { createRxNostr } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr({ verifier });
 rxNostr.setDefaultRelays([
@@ -42,7 +42,7 @@ rxNostr.setDefaultRelays([
 
 ```ts:line-numbers{10-12}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -59,7 +59,7 @@ rxNostr.use(rxReq);
 
 ```ts:line-numbers{13-14}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -83,7 +83,7 @@ rxNostr.use(rxReq).subscribe((packet) => {
 
 ```ts:line-numbers{17-18}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([
@@ -111,7 +111,7 @@ rx-nostr では `subscribe()` の結果を `unsubscribe()` することによっ
 
 ```js:line-numbers{12,20-23}
 import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 
 const rxNostr = createRxNostr();
 rxNostr.setDefaultRelays([

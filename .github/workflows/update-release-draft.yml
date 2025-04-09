@@ -27,7 +27,7 @@ jobs:
         uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter/rx-nostr.yml
-      - name: Update release draft for rx-nostr-crypto
+      - name: Update release draft for @rx-nostr/crypto
         uses: release-drafter/release-drafter@v6
         with:
-          config-name: release-drafter/rx-nostr-crypto.yml
+          config-name: release-drafter/@rx-nostr/crypto.yml

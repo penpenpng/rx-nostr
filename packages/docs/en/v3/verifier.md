@@ -11,10 +11,10 @@ If you do not intentionally perform verification, specify `noopVerifier` explici
 ## verifier
 
 `verifier` verifies the signature using the implementation provided by the @noble and @scure packages.
-This is provided by rx-nostr-crypto package.
+This is provided by @rx-nostr/crypto package.
 
 ```ts
-import { verifier } from "rx-nostr-crypto";
+import { verifier } from "@rx-nostr/crypto";
 ```
 
 ## noopVerifier
@@ -56,7 +56,7 @@ First, write worker.ts as follows to create a service that performs the verifica
 ```ts
 // worker.ts
 
-import { startVerificationServiceHost } from "rx-nostr-crypto";
+import { startVerificationServiceHost } from "@rx-nostr/crypto";
 
 startVerificationServiceHost();
 ```
@@ -71,7 +71,7 @@ If you are using [vite](https://vitejs.dev) as a bundler, [import by `?worker&ur
 
 ```ts
 import { createRxNostr } from "rx-nostr";
-import { createVerificationServiceClient } from "rx-nostr-crypto";
+import { createVerificationServiceClient } from "@rx-nostr/crypto";
 
 import workerUrl from "./worker-host?worker&url";
 
@@ -99,7 +99,7 @@ In SSR case, `new Worker()` fails because `Worker` does not exist in the server 
 import {
   createVerificationServiceClient,
   createNoopClient,
-} from 'rx-nostr-crypto';
+} from '@rx-nostr/crypto';
 import workerUrl from './worker-host?worker&url';
 
 const isBrowser = /* ... */;

@@ -20,12 +20,12 @@ import { nip07Signer } from "rx-nostr";
 
 `seckeySigner()` は秘密鍵を用いて必要な値を計算します。
 秘密鍵は nsec 形式と hex 形式のいずれも使用できます。
-この Signer は rx-nostr-crypto パッケージで公開されています。
+この Signer は @rx-nostr/crypto パッケージで公開されています。
 
 `tags` オプションを指定すると、`tags` フィールドの末尾に与えられたタグを常に付加します。
 
 ```ts
-import { seckeySigner } from "rx-nostr-crypto";
+import { seckeySigner } from "@rx-nostr/crypto";
 
 const signer = seckeySigner("nsec1...");
 ```
@@ -61,11 +61,11 @@ Signer を実装する場合は以下の規約を守ることを推奨します:
 
 この規約を遵守することによって、開発者が実際に送信されるイベントオブジェクトの `id` や `pubkey` に興味がある場合に、Signer を使ってイベントオブジェクトを事前計算することができます。
 
-rx-nostr と rx-nostr-crypto が提供する Signer はすべてこの規約を遵守しているため、以下のようにイベントを事前計算することができます:
+rx-nostr と @rx-nostr/crypto が提供する Signer はすべてこの規約を遵守しているため、以下のようにイベントを事前計算することができます:
 
 ```ts
 import { createRxNostr } from "rx-nostr";
-import { seckeySigner } from "rx-nostr-crypto";
+import { seckeySigner } from "@rx-nostr/crypto";
 
 const signer = seckeySigner("nsec1...");
 
