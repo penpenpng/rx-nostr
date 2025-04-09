@@ -29,7 +29,7 @@ runs:
         version: ${{ inputs.version }}
         package: packages/${{ inputs.package }}
         commit_message_template: "version(${{ inputs.package }}): $VERSION"
-        tag_template: ${{ inputs.package }}@$VERSION
+        tag_template: ${{ inputs.package }}_$VERSION
         tag_force: true
     - name: npm publish
       shell: bash
