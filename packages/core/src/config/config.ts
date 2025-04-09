@@ -104,22 +104,29 @@ export interface RxNostrConfig {
  * - `"immediately"`: Retry immediately.
  * - `"off"`: Won't retry.
  *
- * `maxCount` specifies the maximum number of consecutive retry attempts.
+ * Options:
+ *
+ * - `maxCount` specifies the maximum number of consecutive retry attempts.
+ * - `polite` specifies whether to retry only if the relay is alive.
+ *    If true, rx-nostr doesn't try to retry against a relay doesn't respond to the first request.
  */
 export type RetryConfig =
   | {
       strategy: "exponential";
       maxCount: number;
       initialDelay: number;
+      polite?: boolean;
     }
   | {
       strategy: "linear";
       maxCount: number;
       interval: number;
+      polite?: boolean;
     }
   | {
       strategy: "immediately";
       maxCount: number;
+      polite?: boolean;
     }
   | {
       strategy: "off";

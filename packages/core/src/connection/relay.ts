@@ -48,6 +48,8 @@ export class RelayConnection {
   private error$ = new Subject<unknown>();
   private retryTimer: Subscription | null = null;
   private sendAttempted$ = new NotifySubject();
+  private isFirstTry = true;
+  private maybeDown = false;
 
   private disposed = false;
 
@@ -95,6 +97,9 @@ export class RelayConnection {
     this.socket = this.createSocket(retryCount ?? 0);
   }
   private createSocket(retryCount: number) {
+    const isFirstTry = this.isFirstTry;
+    this.isFirstTry = false;
+
     const isAutoRetry = retryCount > 0;
     const isManualRetry = this.state === "error" || this.state === "rejected";
 
@@ -168,6 +173,10 @@ export class RelayConnection {
         this.error$.next(new RxNostrWebSocketError(code));
         this.setState("rejected");
       } else {
+        if (isFirstTry) {
+          this.maybeDown = true;
+        }
+
         this.unsent.push(...this.buffer);
         this.buffer = [];
 
@@ -176,6 +185,7 @@ export class RelayConnection {
         const nextRetry = retryCount + 1;
         const shouldRetry =
           this.config.retry.strategy !== "off" &&
+          !(this.config.retry.polite && this.maybeDown) &&
           nextRetry <= this.config.retry.maxCount;
 
         if (shouldRetry) {
