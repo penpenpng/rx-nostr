@@ -2,9 +2,9 @@ _extends: rx-nostr:.github/release-drafter/base.yml
 
 header: https://www.npmjs.com/package/rx-nostr/v/$RESOLVED_VERSION
 
-name-template: rx-nostr_$RESOLVED_VERSION
-tag-template: rx-nostr_$RESOLVED_VERSION
-tag-prefix: rx-nostr_
+name-template: rx-nostr@$RESOLVED_VERSION
+tag-template: rx-nostr@$RESOLVED_VERSION
+tag-prefix: rx-nostr@
 include-paths:
   - packages/rx-nostr
   - packages/docs

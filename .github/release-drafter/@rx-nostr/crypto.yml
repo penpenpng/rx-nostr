@@ -2,8 +2,8 @@ _extends: rx-nostr:.github/release-drafter/base.yml
 
 header: https://www.npmjs.com/package/@rx-nostr/crypto/v/$RESOLVED_VERSION
 
-name-template: crypto_$RESOLVED_VERSION
-tag-template: crypto_$RESOLVED_VERSION
-tag-prefix: crypto_
+name-template: crypto@$RESOLVED_VERSION
+tag-template: crypto@$RESOLVED_VERSION
+tag-prefix: crypto@
 include-paths:
   - packages/crypto
