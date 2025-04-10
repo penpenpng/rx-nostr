@@ -35,9 +35,7 @@
     "lint:fix": "eslint --fix ./src && prettier --write ./src"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "vite": "^5.3.3",
-    "vite-plugin-dts": "^4.0.0"
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "@noble/curves": "^1.0.0",
