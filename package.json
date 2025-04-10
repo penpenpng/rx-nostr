@@ -14,7 +14,9 @@
   ],
   "devDependencies": {
     "@eslint/js": "^9.24.0",
-    "eslint": "^8.57.1",
+    "eslint": "^9.24.0",
+    "eslint-import-resolver-typescript": "^4.3.2",
+    "eslint-plugin-import-x": "^4.10.2",
     "globals": "^16.0.0",
     "prettier": "3.5.3",
     "typescript-eslint": "^8.29.1"
