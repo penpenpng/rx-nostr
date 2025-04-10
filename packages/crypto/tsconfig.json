@@ -4,7 +4,6 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ESNext", "DOM", "WebWorker"],
-    "types": ["vite/client"],
     "moduleResolution": "bundler",
     "strict": true,
     "resolveJsonModule": true,
@@ -17,7 +16,9 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "next/**/*.ts"],
+  "exclude": ["__test__/**/*.ts", "*.spec.ts", "*.test.ts"]
 }
