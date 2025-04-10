@@ -99,6 +99,7 @@ export class RelayConnection {
   private createSocket(retryCount: number) {
     const isFirstTry = this.isFirstTry;
     this.isFirstTry = false;
+    let hasConnected = false;
 
     const isAutoRetry = retryCount > 0;
     const isManualRetry = this.state === "error" || this.state === "rejected";
@@ -116,6 +117,7 @@ export class RelayConnection {
       }
 
       this.setState("connected");
+      hasConnected = true;
 
       if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
@@ -173,7 +175,7 @@ export class RelayConnection {
         this.error$.next(new RxNostrWebSocketError(code));
         this.setState("rejected");
       } else {
-        if (isFirstTry) {
+        if (isFirstTry && !hasConnected) {
           this.maybeDown = true;
         }
 
