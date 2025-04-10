@@ -11,7 +11,7 @@ export default defineConfig({
     lib: {
       name: "rx-nostr",
       entry: path.resolve(__dirname, "src/index.ts"),
-      formats: ["es", "cjs", "umd"],
+      formats: ["es"],
     },
     sourcemap: true,
   },

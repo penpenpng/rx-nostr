@@ -11,21 +11,10 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./index.cjs",
   "module": "./dist/rx-nostr-crypto.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/rx-nostr-crypto.js"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "node": "./dist/rx-nostr-crypto.cjs",
-        "default": "./dist/rx-nostr-crypto.umd.cjs"
-      }
-    },
+    ".": "./dist/rx-nostr-crypto.js",
     "./src": "./src/index.ts",
     "./package.json": "./package.json"
   },
