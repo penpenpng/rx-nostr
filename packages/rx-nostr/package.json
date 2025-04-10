@@ -14,11 +14,12 @@
   },
   "license": "MIT",
   "type": "module",
-  "module": "./dist/rx-nostr.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/rx-nostr.js",
-    "./src": "./src/index.ts",
+    ".": {
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/rx-nostr.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
