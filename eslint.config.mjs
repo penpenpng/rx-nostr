@@ -14,7 +14,13 @@ export default defineConfig([
     files: ["**/*.{js,mjs,cjs,ts}"],
     languageOptions: { globals: globals.browser },
   },
-  // import path must have `.ts` extension
+  // Project specific rules.
+  {
+    rules: {
+      "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+  // Import path must have `.ts` extension
   // for a case that TypeScript is executed directly by Node.js, deno, etc.
   {
     rules: {
@@ -24,6 +30,7 @@ export default defineConfig([
       "import-x/extensions": [".ts", ".mts"],
     },
   },
+  // import-x needs resolver to track import path.
   {
     settings: {
       "import-x/resolver": {
