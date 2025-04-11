@@ -41,7 +41,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "nostr-typedef": "^0.9.0",
-    "rxjs": "^7.8.0"
+    "nostr-typedef": "^0.13.0",
+    "rxjs": "^7.8.2"
   }
 }
