@@ -13,7 +13,7 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
 
   protected abstract create(): RxReqBase;
 
-  subscribe(): Observable<ReqPacket> {
+  get packets$(): Observable<ReqPacket> {
     return this.inputs$.pipe(...(this.operators as []));
   }
 

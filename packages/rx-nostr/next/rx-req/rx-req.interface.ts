@@ -8,7 +8,7 @@ export interface IRxReq {
   /** @internal User should not use this directly. The RxReq strategy. It is read-only and must not change. */
   strategy: RxReqStrategy;
   /** @internal User should not use this directly. Get an Observable of ReqPacket. */
-  subscribe(): Observable<ReqPacket>;
+  packets$: Observable<ReqPacket>;
 }
 
 export type RxReqStrategy = "forward" | "backward";
