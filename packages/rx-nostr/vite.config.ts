@@ -1,5 +1,4 @@
 import path from "path";
-import { type PluginOption } from "vite";
 import dts from "vite-plugin-dts";
 import { defineConfig } from "vitest/config";
 
@@ -15,8 +14,9 @@ export default defineConfig({
     },
     sourcemap: true,
   },
-  plugins: [dts() as PluginOption],
+  plugins: [dts()],
   test: {
     hookTimeout: 1000,
+    include: ["next/**/*.{test,spec}.{ts,mts}", "next/__test__/*.{ts,mts}"],
   },
 });
