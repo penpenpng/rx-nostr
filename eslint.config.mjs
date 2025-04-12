@@ -20,6 +20,12 @@ export default defineConfig([
       "@typescript-eslint/no-empty-object-type": "off",
     },
   },
+  {
+    files: ["**/*.{test,spec}.{ts,mts}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
   // Import path must have `.ts` extension
   // for a case that TypeScript is executed directly by Node.js, deno, etc.
   {
