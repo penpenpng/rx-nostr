@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { normalizeWebSocketUrl } from "./websocket-url.ts";
+import { normalizeWebSocketUrl, UrlMap } from "./websocket-url.ts";
 
 test("normalizeWebSocketUrl()", () => {
   const f = normalizeWebSocketUrl;
@@ -26,4 +26,49 @@ test("normalizeWebSocketUrl()", () => {
   expect(f("")).toBe(null);
   expect(f(undefined as any)).toBe(null);
   expect(f(0 as any)).toBe(null);
+});
+
+test("UrlMap", () => {
+  const relay = "wss://example.com";
+  const alias = "wss://example.com/";
+  const another = "wss://another.example.com";
+  const invalid = "invalid-url";
+
+  const map = new UrlMap<number>();
+
+  // Add and retrieve values
+  map.set(relay, 1);
+  expect(map.get(relay)).toBe(1);
+  expect(map.get(alias)).toBe(1);
+  expect(map.size).toBe(1);
+
+  // Overwrite value
+  map.set(alias, 2);
+  expect(map.get(relay)).toBe(2);
+  expect(map.get(alias)).toBe(2);
+  expect(map.size).toBe(1);
+
+  // Add another value
+  map.set(another, 3);
+  expect(map.get(another)).toBe(3);
+  expect(map.size).toBe(2);
+
+  // Invalid URL should not be added
+  map.set(invalid, 4);
+  expect(map.size).toBe(2);
+
+  // Existence check
+  expect(map.has(relay)).toBe(true);
+  expect(map.has(alias)).toBe(true);
+  expect(map.has(another)).toBe(true);
+  expect(map.has(invalid)).toBe(false);
+
+  // Delete a value
+  map.delete(relay);
+  expect(map.get(relay)).toBe(undefined);
+  expect(map.get(alias)).toBe(undefined);
+
+  // Clear the map
+  map.clear();
+  expect(map.size).toBe(0);
 });
