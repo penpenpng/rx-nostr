@@ -1,4 +1,4 @@
-export function only(f: () => void) {
+export function once(f: () => void) {
   let done = false;
 
   return () => {

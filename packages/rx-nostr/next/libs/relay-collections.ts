@@ -1,6 +1,6 @@
 import { Subject } from "rxjs";
 import { inlineTry } from "./error.ts";
-import { only } from "./only.ts";
+import { once } from "./once.ts";
 
 export function normalizeRelayUrl(url: string): string | null {
   if (typeof url !== "string") {
@@ -252,7 +252,7 @@ export class RelayGroup {
     return this.#relays.values();
   }
 
-  [Symbol.dispose] = only(() => this.#disposables.dispose());
+  [Symbol.dispose] = once(() => this.#disposables.dispose());
   dispose = this[Symbol.dispose];
 }
 

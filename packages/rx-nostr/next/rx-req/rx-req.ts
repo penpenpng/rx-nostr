@@ -1,5 +1,5 @@
 import { type Observable, type OperatorFunction, Subject } from "rxjs";
-import { only } from "../libs/only.ts";
+import { once } from "../libs/once.ts";
 import type { EmitScopeConnectionPolicy } from "../types/misc.ts";
 import type { ReqPacket } from "../types/packet.ts";
 import type { LazyFilter } from "../types/req.ts";
@@ -32,7 +32,7 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
     return rxreq;
   }
 
-  [Symbol.dispose] = only(() => this.disposables.dispose());
+  [Symbol.dispose] = once(() => this.disposables.dispose());
   dispose = this[Symbol.dispose];
 }
 
