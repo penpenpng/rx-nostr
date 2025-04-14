@@ -1,9 +1,11 @@
+import "disposablestack/auto";
 import { expect, test } from "vitest";
 
-import { normalizeWebSocketUrl, UrlMap, UrlSet } from "./websocket-url.ts";
+import { subscribe } from "../__test__/helper/rxjs.ts";
+import { normalizeRelayUrl, RelayGroup, RelayMap, RelaySet } from "./relay-collections.ts";
 
-test("normalizeWebSocketUrl()", () => {
-  const f = normalizeWebSocketUrl;
+test(normalizeRelayUrl.name, () => {
+  const f = normalizeRelayUrl;
 
   // Trim trailing slash and dot
   expect(f("ws://example.com/")).toBe("ws://example.com");
@@ -28,13 +30,13 @@ test("normalizeWebSocketUrl()", () => {
   expect(f(0 as any)).toBe(null);
 });
 
-test("UrlMap", () => {
+test(RelayMap.name, () => {
   const relay = "wss://example.com";
   const alias = "wss://example.com/";
   const another = "wss://another.example.com";
   const invalid = "invalid-url";
 
-  const map = new UrlMap<number>();
+  const map = new RelayMap<number>();
 
   // Add and retrieve values
   map.set(relay, 1);
@@ -73,13 +75,13 @@ test("UrlMap", () => {
   expect(map.size).toBe(0);
 });
 
-test("UrlSet", () => {
+test(RelaySet.name, () => {
   const relay = "wss://example.com";
   const alias = "wss://example.com/";
   const another = "wss://another.example.com";
   const invalid = "invalid-url";
 
-  const set = new UrlSet();
+  const set = new RelaySet();
 
   // Add values
   set.add(relay);
@@ -110,11 +112,33 @@ test("UrlSet", () => {
   expect(set.has(relay)).toBe(false);
   expect(set.has(alias)).toBe(false);
 
-  const s = (...urls: string[]) => new UrlSet(urls);
+  const s = (...urls: string[]) => new RelaySet(urls);
 
   // Set operation
   expect(s(relay, another).difference(s(alias)).size).toBe(1);
   expect(s(relay).intersection(s(alias)).size).toBe(1);
   expect(s(relay).intersection(s()).size).toBe(0);
   expect(s(relay).union(s(alias)).size).toBe(1);
+});
+
+test(RelayGroup.name, async () => {
+  const group = new RelayGroup(["wss://example.com", "wss://relay1.example.com"]);
+  const obs = subscribe(group);
+
+  group.add("wss://example.com/#alias");
+  await expect(obs.pop()).resolves.toEqual(
+    expect.objectContaining({
+      appended: new RelaySet(),
+    }),
+  );
+
+  group.set("wss://relay1.example.com", "wss://relay2.example.com");
+  await expect(obs.pop()).resolves.toEqual({
+    appended: new RelaySet(["wss://relay2.example.com"]),
+    outdated: new RelaySet(["wss://example.com"]),
+    keep: new RelaySet(["wss://relay1.example.com"]),
+  });
+
+  group.dispose();
+  expect(obs.isComplete()).toBe(true);
 });

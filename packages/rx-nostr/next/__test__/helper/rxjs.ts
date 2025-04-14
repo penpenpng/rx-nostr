@@ -1,4 +1,4 @@
-import type { Observable } from "rxjs";
+import type { Subscribable } from "rxjs";
 
 export interface ObservableTestHelper<T> {
   pop(): Promise<T>;
@@ -8,11 +8,14 @@ export interface ObservableTestHelper<T> {
   getError(): unknown;
 }
 
-export function observe<T>(obs: Observable<T>): ObservableTestHelper<T> {
+export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
   const resolvers: Array<(value: T) => void> = [];
   const unresolve: T[] = [];
   const values: T[] = [];
-  const { reject, promise: finished } = Promise.withResolvers<never>();
+
+  const COMPLETE = Symbol("complete");
+  const ERROR = Symbol("error");
+  const { resolve: finish, promise: finished } = Promise.withResolvers<typeof COMPLETE | typeof ERROR>();
 
   let error: unknown = null;
   let state: "alive" | "error" | "complete" = "alive";
@@ -33,11 +36,11 @@ export function observe<T>(obs: Observable<T>): ObservableTestHelper<T> {
     error(err) {
       error = err;
       state = "error";
-      reject(err);
+      finish(ERROR);
     },
     complete() {
       state = "complete";
-      reject("completed");
+      finish(COMPLETE);
     },
   });
 
@@ -48,7 +51,17 @@ export function observe<T>(obs: Observable<T>): ObservableTestHelper<T> {
       } else {
         const { resolve, promise } = Promise.withResolvers<T>();
         resolvers.push(resolve);
-        return Promise.race([promise, finished]);
+
+        const result = await Promise.race([promise, finished]);
+
+        if (result === COMPLETE) {
+          throw new Error("[TestHelper] Observable was completed");
+        }
+        if (result === ERROR) {
+          throw error;
+        }
+
+        return result;
       }
     },
     getValues() {
