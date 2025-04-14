@@ -1,4 +1,5 @@
 import { type Observable, type OperatorFunction, Subject } from "rxjs";
+import { only } from "../libs/only.ts";
 import type { EmitScopeConnectionPolicy } from "../types/misc.ts";
 import type { ReqPacket } from "../types/packet.ts";
 import type { LazyFilter } from "../types/req.ts";
@@ -7,7 +8,8 @@ import type { IRxReq, IRxReqPipeable, RxReqStrategy } from "./rx-req.interface.t
 
 abstract class RxReqBase implements IRxReq, IRxReqPipeable {
   abstract strategy: RxReqStrategy;
-  protected inputs$ = new Subject<ReqPacket>();
+  protected disposables = new DisposableStack();
+  protected inputs$: Subject<ReqPacket> = this.disposables.adopt(new Subject(), (v) => v.complete());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 
@@ -29,6 +31,9 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
 
     return rxreq;
   }
+
+  [Symbol.dispose] = only(() => this.disposables.dispose());
+  dispose = this[Symbol.dispose];
 }
 
 export class RxForwardReq extends RxReqBase {
