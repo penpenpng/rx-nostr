@@ -115,3 +115,41 @@ export class UrlMap<T> extends Map<string, T> {
     return new UrlMap(this.toObject());
   }
 }
+
+export class UrlSet extends Set<string> {
+  constructor(obj?: string[]) {
+    super();
+
+    if (!obj) {
+      return;
+    }
+
+    for (const url of obj) {
+      this.add(url);
+    }
+  }
+  add(url: string) {
+    const u = normalizeWebSocketUrl(url);
+    if (u === null) {
+      return this;
+    }
+
+    return super.add(u);
+  }
+  has(url: string): boolean {
+    const u = normalizeWebSocketUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return super.has(u);
+  }
+  delete(url: string) {
+    const u = normalizeWebSocketUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return super.delete(u);
+  }
+}

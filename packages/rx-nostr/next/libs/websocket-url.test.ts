@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { normalizeWebSocketUrl, UrlMap } from "./websocket-url.ts";
+import { normalizeWebSocketUrl, UrlMap, UrlSet } from "./websocket-url.ts";
 
 test("normalizeWebSocketUrl()", () => {
   const f = normalizeWebSocketUrl;
@@ -71,4 +71,50 @@ test("UrlMap", () => {
   // Clear the map
   map.clear();
   expect(map.size).toBe(0);
+});
+
+test("UrlSet", () => {
+  const relay = "wss://example.com";
+  const alias = "wss://example.com/";
+  const another = "wss://another.example.com";
+  const invalid = "invalid-url";
+
+  const set = new UrlSet();
+
+  // Add values
+  set.add(relay);
+  expect(set.has(relay)).toBe(true);
+  expect(set.has(alias)).toBe(true);
+  expect(set.size).toBe(1);
+
+  // Add another value
+  set.add(another);
+  expect(set.has(another)).toBe(true);
+  expect(set.size).toBe(2);
+
+  // Invalid URL should not be added
+  set.add(invalid);
+  expect(set.has(invalid)).toBe(false);
+  expect(set.size).toBe(2);
+
+  // Delete a value
+  set.delete(relay);
+  expect(set.has(relay)).toBe(false);
+  expect(set.has(alias)).toBe(false);
+  expect(set.size).toBe(1);
+
+  // Clear the set
+  set.clear();
+  expect(set.size).toBe(0);
+  expect(set.has(another)).toBe(false);
+  expect(set.has(relay)).toBe(false);
+  expect(set.has(alias)).toBe(false);
+
+  const s = (...urls: string[]) => new UrlSet(urls);
+
+  // Set operation
+  expect(s(relay, another).difference(s(alias)).size).toBe(1);
+  expect(s(relay).intersection(s(alias)).size).toBe(1);
+  expect(s(relay).intersection(s()).size).toBe(0);
+  expect(s(relay).union(s(alias)).size).toBe(1);
 });
