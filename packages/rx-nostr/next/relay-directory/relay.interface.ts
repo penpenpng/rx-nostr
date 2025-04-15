@@ -1,6 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import type { BehaviorSubject } from "rxjs";
-import type { ConnectionState } from "../types/index.ts";
+import type { ConnectionState } from "../types.ts";
 
 export interface IRelay {
   retry(): void;

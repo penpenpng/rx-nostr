@@ -1,5 +1,5 @@
 import type { Observable, OperatorFunction } from "rxjs";
-import type { ReqPacket } from "../types/index.ts";
+import type { ReqPacket } from "../packets/index.ts";
 
 /**
  * The RxReq interface that is provided for RxNostr (**not for users**).

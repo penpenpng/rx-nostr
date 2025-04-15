@@ -1,5 +1,3 @@
-import type { Observable } from "rxjs";
-
 /**
  * State of a WebSocket connection established with a relay.
  *
@@ -25,32 +23,3 @@ export type ConnectionState =
   | "terminated";
 
 export type RelayUrl = `ws://${number}` | `wss://${string}`;
-
-export type EmitScopeConnectionPolicy = EmitScopeConnectionPolicyEntry[];
-export type EmitScopeConnectionPolicyEntry =
-  | ConnectionTarget
-  | {
-      relays: ConnectionTarget;
-      trigger: ConnectionTrigger;
-      lifetime: ConnectionLifetime;
-    };
-
-export type ConnectionTarget = string | string[] | Observable<string[]>;
-
-export type ConnectionTrigger = "immediate" | "ondemand";
-
-export type ConnectionLifetime =
-  | {
-      scope: "weak";
-    }
-  | {
-      scope: "emit";
-      stay?: number;
-    }
-  | {
-      scope: "use";
-      stay?: number;
-    }
-  | {
-      scope: "instance";
-    };

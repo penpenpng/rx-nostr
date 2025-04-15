@@ -1,8 +1,7 @@
 import { type Observable, type OperatorFunction, Subject } from "rxjs";
+import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once } from "../libs/once.ts";
-import type { EmitScopeConnectionPolicy } from "../types/misc.ts";
-import type { ReqPacket } from "../types/packet.ts";
-import type { LazyFilter } from "../types/req.ts";
+import type { ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 import type { IRxReq, IRxReqPipeable, RxReqStrategy } from "./rx-req.interface.ts";
 

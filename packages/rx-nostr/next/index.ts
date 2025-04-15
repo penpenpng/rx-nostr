@@ -12,6 +12,32 @@ export {
 export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./libs/nostr/event.ts";
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
 export { normalizeRelayUrl, RelayGroup, RelayMap, RelaySet, type RelayGroupUpdate } from "./libs/relay-collections.ts";
+export {
+  isAuthPacket,
+  isClosedPacket,
+  isCountPacket,
+  isEosePacket,
+  isEventPacket,
+  isNoticePacket,
+  isOkPacket,
+} from "./packets/index.ts";
+export type {
+  AuthPacket,
+  ClosedPacket,
+  ConnectionStatePacket,
+  CountPacket,
+  EosePacket,
+  ErrorPacket,
+  EventPacket,
+  MessagePacket,
+  MessagePacketBase,
+  NoticePacket,
+  OkPacket,
+  OkPacketAgainstEvent,
+  ReqPacket,
+  UnknownMessagePacket,
+} from "./packets/index.ts";
 export { GlobalRelayDirectory, RelayDirectory, type IRelay, type IRelayDirectory } from "./relay-directory/index.ts";
 export { createRxNostr } from "./rx-nostr/index.ts";
 export { RxBackwardReq, RxForwardReq, type IRxReq, type IRxReqPipeable, type RxReqStrategy } from "./rx-req/index.ts";
+export type { ConnectionState, RelayUrl } from "./types.ts";

@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
 
-import type { ConnectionState, EmitScopeConnectionPolicy, RelayUrl } from "./misc";
-import type { LazyFilter } from "./req";
+import type { LazyFilter } from "../lazy-filter/index.ts";
+import type { ConnectionState, RelayUrl } from "../types.ts";
 
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.

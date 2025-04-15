@@ -1,5 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import type { LazyFilter } from "../types/req.ts";
+import type { LazyFilter } from "../lazy-filter/index.ts";
 
 export function normalizeFilters(filters: LazyFilter | LazyFilter[]): LazyFilter[] {
   return (Array.isArray(filters) ? filters : [filters])
