@@ -7,7 +7,7 @@ import { normalizeFilters } from "./normalize-filters.ts";
 import type { IRxReq, IRxReqPipeable, RxReqStrategy } from "./rx-req.interface.ts";
 
 abstract class RxReqBase implements IRxReq, IRxReqPipeable {
-  abstract strategy: RxReqStrategy;
+  abstract _strategy: RxReqStrategy;
   protected disposables = new DisposableStack();
   protected inputs$: Subject<ReqPacket> = this.disposables.adopt(new Subject(), (v) => v.complete());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,7 +15,7 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
 
   protected abstract create(): RxReqBase;
 
-  get packets$(): Observable<ReqPacket> {
+  get _packets$(): Observable<ReqPacket> {
     return this.inputs$.pipe(...(this.operators as []));
   }
 
@@ -37,7 +37,7 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
 }
 
 export class RxForwardReq extends RxReqBase {
-  readonly strategy = "forward";
+  readonly _strategy = "forward";
 
   protected override create() {
     return new RxForwardReq();
@@ -45,7 +45,7 @@ export class RxForwardReq extends RxReqBase {
 }
 
 export class RxBackwardReq extends RxReqBase {
-  readonly strategy = "backward";
+  readonly _strategy = "backward";
 
   protected override create() {
     return new RxBackwardReq();

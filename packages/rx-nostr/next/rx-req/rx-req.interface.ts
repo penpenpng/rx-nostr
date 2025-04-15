@@ -6,9 +6,9 @@ import type { ReqPacket } from "../types/index.ts";
  */
 export interface IRxReq {
   /** @internal User should not use this directly. The RxReq strategy. It is read-only and must not change. */
-  strategy: RxReqStrategy;
+  _strategy: RxReqStrategy;
   /** @internal User should not use this directly. Get an Observable of ReqPacket. */
-  packets$: Observable<ReqPacket>;
+  _packets$: Observable<ReqPacket>;
 }
 
 export type RxReqStrategy = "forward" | "backward";
