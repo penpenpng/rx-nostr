@@ -6,7 +6,7 @@ import { RxBackwardReq } from "./rx-req.ts";
 
 test("RxReq emits a filter", async () => {
   const rxq = new RxBackwardReq();
-  const obs = subscribe(rxq.packets$);
+  const obs = subscribe(rxq._packets$);
 
   rxq.emit({ kinds: [0] });
 
@@ -15,7 +15,7 @@ test("RxReq emits a filter", async () => {
 
 test("Piped RxReq emits a filter", async () => {
   const rxq = new RxBackwardReq();
-  const obs = subscribe(rxq.pipe(filter((_, idx) => idx % 2 === 0)).packets$);
+  const obs = subscribe(rxq.pipe(filter((_, idx) => idx % 2 === 0))._packets$);
 
   rxq.emit({ kinds: [0] });
   rxq.emit({ kinds: [1] });
@@ -33,7 +33,7 @@ test("Extended RxReq emits a filter", async () => {
   }
 
   const rxq = new RxCustomReq();
-  const obs = subscribe(rxq.pipe(filter((_, idx) => idx % 2 === 0)).packets$);
+  const obs = subscribe(rxq.pipe(filter((_, idx) => idx % 2 === 0))._packets$);
 
   rxq.fetchByKind(0);
   rxq.fetchByKind(1);
