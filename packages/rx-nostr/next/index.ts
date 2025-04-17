@@ -13,6 +13,29 @@ export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./li
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
 export { normalizeRelayUrl, RelayGroup, RelayMap, RelaySet, type RelayGroupUpdate } from "./libs/relay-collections.ts";
 export {
+  batch,
+  chunk,
+  completeOnTimeout,
+  createTie,
+  createUniq,
+  dropExpiredEvents,
+  filterAsync,
+  filterBy,
+  filterByEventId,
+  filterByKind,
+  filterByKinds,
+  filterByType,
+  latest,
+  latestEach,
+  sort,
+  sortEvents,
+  tie,
+  timeline,
+  uniq,
+  verify,
+  type MergeFilter,
+} from "./operators/index.ts";
+export {
   isAuthPacket,
   isClosedPacket,
   isCountPacket,
