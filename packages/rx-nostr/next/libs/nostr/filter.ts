@@ -1,10 +1,8 @@
-import * as Nostr from "nostr-typedef";
-
-import { fill } from "../utils/config.js";
+import type * as Nostr from "nostr-typedef";
 
 export interface MatchFilterOptions {
-  sinceInclusive: boolean;
-  untilInclusive: boolean;
+  sinceExclusive?: boolean;
+  untilExclusive?: boolean;
 }
 
 /**
@@ -13,7 +11,10 @@ export interface MatchFilterOptions {
 export function isFiltered(
   event: Nostr.Event,
   filters: Nostr.Filter | Nostr.Filter[],
-  options?: Partial<MatchFilterOptions>,
+  options?: {
+    sinceExclusive?: boolean;
+    untilExclusive?: boolean;
+  },
 ): boolean {
   if (Array.isArray(filters)) {
     return filters.some((filter) => _isFiltered(event, filter, options));
@@ -25,39 +26,32 @@ export function isFiltered(
 function _isFiltered(
   event: Nostr.Event,
   filter: Nostr.Filter,
-  options?: Partial<MatchFilterOptions>,
+  options?: {
+    sinceExclusive?: boolean;
+    untilExclusive?: boolean;
+  },
 ): boolean {
-  const { sinceInclusive, untilInclusive } = fill(options ?? {}, {
-    sinceInclusive: true,
-    untilInclusive: true,
-  });
+  const sinceExclusive = options?.sinceExclusive ?? false;
+  const untilExclusive = options?.untilExclusive ?? false;
 
-  if (
-    filter.ids &&
-    filter.ids.every((prefix) => !event.id.startsWith(prefix))
-  ) {
+  if (filter.ids && filter.ids.every((prefix) => !event.id.startsWith(prefix))) {
     return false;
   }
   if (filter.kinds && !filter.kinds.includes(event.kind)) {
     return false;
   }
-  if (
-    filter.authors &&
-    filter.authors.every((pubkey) => !event.pubkey.startsWith(pubkey))
-  ) {
+  if (filter.authors && filter.authors.every((pubkey) => !event.pubkey.startsWith(pubkey))) {
     return false;
   }
   if (
     filter.since &&
-    ((sinceInclusive && !(filter.since <= event.created_at)) ||
-      (!sinceInclusive && !(filter.since < event.created_at)))
+    ((sinceExclusive && !(filter.since < event.created_at)) || (!sinceExclusive && !(filter.since <= event.created_at)))
   ) {
     return false;
   }
   if (
     filter.until &&
-    ((untilInclusive && !(event.created_at <= filter.until)) ||
-      (!untilInclusive && !(event.created_at < filter.until)))
+    ((untilExclusive && !(event.created_at < filter.until)) || (!untilExclusive && !(event.created_at <= filter.until)))
   ) {
     return false;
   }
@@ -70,9 +64,7 @@ function _isFiltered(
 
     if (
       !event.tags.find(
-        ([tagName, tagValue]) =>
-          needleTagName === tagName &&
-          (needleValues as string[]).includes(tagValue),
+        ([tagName, tagValue]) => needleTagName === tagName && (needleValues as string[]).includes(tagValue),
       )
     ) {
       return false;
