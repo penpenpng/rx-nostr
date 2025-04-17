@@ -33,7 +33,7 @@ export {
   timeline,
   uniq,
   verify,
-  type MergeFilter,
+  type MergeFilterFunction,
 } from "./operators/index.ts";
 export {
   isAuthPacket,

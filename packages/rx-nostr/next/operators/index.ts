@@ -15,6 +15,6 @@ export { verify } from "./event-packet/verify.ts";
 export { filterAsync } from "./filter-async.ts";
 export { filterByType } from "./message-packet/filter-by-type.ts";
 export { filterByEventId } from "./ok-packet/filter-by-event-id.ts";
-export { batch, type MergeFilter } from "./req-packet/batch.ts";
+export { batch, type MergeFilterFunction } from "./req-packet/batch.ts";
 export { chunk } from "./req-packet/chunk.ts";
 export { sort } from "./sort.ts";

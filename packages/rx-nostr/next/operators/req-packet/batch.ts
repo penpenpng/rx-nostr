@@ -9,7 +9,7 @@ import type { ReqPacket } from "../../packets/index.ts";
  */
 export function batch(
   /** Function used for merge REQ filters. Default behavior is simple concatenation. */
-  mergeFilter?: MergeFilter,
+  mergeFilter?: MergeFilterFunction,
 ): OperatorFunction<ReqPacket[], ReqPacket> {
   return mergeMap((packets) => {
     const batched: ReqPacket[] = [];
@@ -29,7 +29,7 @@ export function batch(
   });
 }
 
-export type MergeFilter = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
+export type MergeFilterFunction = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
 
 function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
