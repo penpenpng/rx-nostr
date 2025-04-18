@@ -33,8 +33,8 @@
   },
   "scripts": {
     "build": "vite build",
-    "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src",
+    "lint": "eslint ./next && prettier --check ./next",
+    "lint:fix": "eslint --fix ./next && prettier --write ./next",
     "test": "vitest --run",
     "test:watch": "vitest"
   },

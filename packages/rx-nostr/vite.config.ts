@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     lib: {
       name: "rx-nostr",
-      entry: path.resolve(__dirname, "src/index.ts"),
+      entry: path.resolve(__dirname, "next/index.ts"),
       formats: ["es"],
     },
     sourcemap: true,
