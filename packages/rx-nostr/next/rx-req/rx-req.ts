@@ -1,11 +1,12 @@
 import { type Observable, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once } from "../libs/once.ts";
+import { createPipeMethod, type IPipeable } from "../libs/pipeable.ts";
 import type { ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
-import type { IRxReq, IRxReqPipeable, RxReqStrategy } from "./rx-req.interface.ts";
+import type { IRxReq, RxReqStrategy } from "./rx-req.interface.ts";
 
-abstract class RxReqBase implements IRxReq, IRxReqPipeable {
+abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
   abstract _strategy: RxReqStrategy;
   protected disposables = new DisposableStack();
   protected inputs$: Subject<ReqPacket> = this.disposables.adopt(new Subject(), (v) => v.complete());
@@ -22,14 +23,13 @@ abstract class RxReqBase implements IRxReq, IRxReqPipeable {
     this.inputs$.next({ filters: normalizeFilters(filters), policy });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pipe(...operators: OperatorFunction<any, any>[]): IRxReq {
+  pipe = createPipeMethod<IRxReq, ReqPacket>((...operators) => {
     const rxreq = this.create();
     rxreq.inputs$ = this.inputs$;
     rxreq.operators = [...this.operators, ...operators];
 
     return rxreq;
-  }
+  });
 
   [Symbol.dispose] = once(() => this.disposables.dispose());
   dispose = this[Symbol.dispose];

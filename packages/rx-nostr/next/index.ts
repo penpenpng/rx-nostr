@@ -71,5 +71,5 @@ export type {
 } from "./packets/index.ts";
 export { GlobalRelayDirectory, RelayDirectory, type IRelay, type IRelayDirectory } from "./relay-directory/index.ts";
 export { createRxNostr } from "./rx-nostr/index.ts";
-export { RxBackwardReq, RxForwardReq, type IRxReq, type IRxReqPipeable, type RxReqStrategy } from "./rx-req/index.ts";
+export { RxBackwardReq, RxForwardReq, type IRxReq, type RxReqStrategy } from "./rx-req/index.ts";
 export type { ConnectionState, RelayUrl } from "./types.ts";
