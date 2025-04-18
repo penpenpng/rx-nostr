@@ -1,6 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import { getEventHash, getPublicKey, getSignature, signEvent, toHex } from "../libs/nostr/crypto.ts";
-import { ensureEventFields } from "../libs/nostr/ensure-event-fields.ts";
+import { getPublicKey, signEvent, toHex } from "../libs/nostr/crypto.ts";
 import type { EventSigner } from "./event-signer.interface.ts";
 
 export class SeckeySigner implements EventSigner {
