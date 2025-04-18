@@ -1,5 +1,14 @@
 export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
-export { NoopVerifier, type EventVerifier } from "./event-verifier/index.ts";
+export {
+  NoopVerifier,
+  VerificationClient,
+  VerificationHost,
+  type EventVerifier,
+  type VerificationClientConfig,
+  type VerificationRequest,
+  type VerificationResponse,
+  type VerificationServiceStatus,
+} from "./event-verifier/index.ts";
 export { evalFilters, type LazyFilter } from "./lazy-filter/index.ts";
 export {
   RxNostrAlreadyDisposedError,

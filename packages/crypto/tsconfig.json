@@ -6,7 +6,6 @@
     "lib": [
       "ESNext",
       "DOM",
-      "WebWorker"
     ],
     "types": [
       "vitest/importMeta"
