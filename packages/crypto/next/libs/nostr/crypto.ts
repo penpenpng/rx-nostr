@@ -17,8 +17,7 @@ export interface Schnorr {
 }
 
 export const schnorr: Schnorr = {
-  sign: (m: string, seckey: string): string =>
-    bytesToHex(_schnorr.sign(m, seckey)),
+  sign: (m: string, seckey: string): string => bytesToHex(_schnorr.sign(m, seckey)),
   verify: _schnorr.verify,
   getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(seckey)),
 };
@@ -30,14 +29,7 @@ export function getPublicKey(seckey: string): string {
 
 /** Calculate and return event's hash (ID). */
 export function getEventHash(event: Nostr.UnsignedEvent): string {
-  const serialized = JSON.stringify([
-    0,
-    event.pubkey,
-    event.created_at,
-    event.kind,
-    event.tags,
-    event.content,
-  ]);
+  const serialized = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content]);
   return sha256(serialized);
 }
 
@@ -50,15 +42,14 @@ export function getSignature(eventHash: string, seckey: string): string {
 export function verify(event: Nostr.Event): boolean {
   try {
     return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
-  } catch (err) {
-    console.warn("The following error occurred during verify():", err);
+  } catch {
     return false;
   }
 }
 
 /** Convert bech32 format string to HEX format string. */
 export function toHex(str: string): string {
-  const { words } = bech32.decode(str);
+  const { words } = bech32.decode(str as `${string}1${string}`);
   const data = new Uint8Array(bech32.fromWords(words));
   return bytesToHex(data);
 }
