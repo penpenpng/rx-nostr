@@ -3,6 +3,7 @@ import { sha256 as _sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { bech32 } from "@scure/base";
 import * as Nostr from "nostr-typedef";
+import { ensureEventFields } from "./ensure-event-fields.ts";
 
 const utf8Encoder = new TextEncoder();
 
@@ -10,17 +11,41 @@ export function sha256(m: string): string {
   return bytesToHex(_sha256(utf8Encoder.encode(m)));
 }
 
-export interface Schnorr {
+interface Schnorr {
   sign(m: string, seckey: string): string;
   verify(sig: string, m: string, pubkey: string): boolean;
   getPublicKey(seckey: string): string;
 }
 
-export const schnorr: Schnorr = {
+const schnorr: Schnorr = {
   sign: (m: string, seckey: string): string => bytesToHex(_schnorr.sign(m, seckey)),
   verify: _schnorr.verify,
   getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(seckey)),
 };
+
+export function signEvent<K extends number>(params: Nostr.EventParameters<K>, seckey: string): Nostr.Event<K> {
+  const sechex = seckey.startsWith("nsec1") ? toHex(seckey) : seckey;
+
+  const event = {
+    ...params,
+    pubkey: params.pubkey ?? getPublicKey(sechex),
+    tags: params.tags ?? [],
+    created_at: params.created_at ?? Math.floor(Date.now() / 1000),
+  };
+
+  if (ensureEventFields(event)) {
+    return event;
+  }
+
+  const id = event.id ?? getEventHash(event);
+  const sig = event.sig ?? getSignature(id, sechex);
+
+  return {
+    ...event,
+    id,
+    sig,
+  };
+}
 
 /** Calculate and return public key in HEX format. */
 export function getPublicKey(seckey: string): string {
@@ -39,7 +64,7 @@ export function getSignature(eventHash: string, seckey: string): string {
 }
 
 /** Verify the given event and return true if it is valid. */
-export function verify(event: Nostr.Event): boolean {
+export function verifyEvent(event: Nostr.Event): boolean {
   try {
     return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
   } catch {

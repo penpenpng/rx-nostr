@@ -18,7 +18,9 @@ export class SeckeySigner implements EventSigner {
     return signEvent(
       {
         ...params,
+        pubkey: params.pubkey ?? this.#pubhex,
         tags: [...(params.tags ?? []), ...(this.options?.tags ?? [])],
+        created_at: params.created_at ?? Math.floor(Date.now() / 1000),
       },
       this.#seckey,
     );

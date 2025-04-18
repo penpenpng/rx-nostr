@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { verify } from "../libs/nostr/crypto.ts";
+import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SeckeySigner } from "./seckey-signer.ts";
 
 describe(SeckeySigner.name, () => {
@@ -16,7 +16,7 @@ describe(SeckeySigner.name, () => {
       created_at: 1744991602,
       kind: 1,
     });
-    expect(verify(signedEvent)).toBe(true);
+    expect(verifyEvent(signedEvent)).toBe(true);
   });
 
   test("by hex", async () => {
@@ -32,6 +32,6 @@ describe(SeckeySigner.name, () => {
       created_at: 1744991602,
       kind: 1,
     });
-    expect(verify(signedEvent)).toBe(true);
+    expect(verifyEvent(signedEvent)).toBe(true);
   });
 });
