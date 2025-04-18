@@ -4,9 +4,9 @@
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build -w packages/rx-nostr -w packages/crypto",
-    "docs:dev": "npm run dev -w packages/docs",
-    "docs:build": "npm run build -w packages/docs"
+    "build": "npm run build --workspaces --if-present",
+    "docs:dev": "npm run docs:dev -w packages/docs",
+    "docs:build": "npm run docs:build -w packages/docs"
   },
   "author": "penpenpng",
   "workspaces": [

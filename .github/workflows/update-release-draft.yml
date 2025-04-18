@@ -31,3 +31,7 @@ jobs:
         uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter/@rx-nostr/crypto.yml
+      - name: Update release draft for @rx-nostr/crypto-wasm
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter/@rx-nostr/crypto-wasm.yml
