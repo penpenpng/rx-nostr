@@ -11,11 +11,12 @@
   },
   "license": "MIT",
   "type": "module",
-  "module": "./dist/rx-nostr-crypto.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/rx-nostr-crypto.js",
-    "./src": "./src/index.ts",
+    ".": {
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/rx-nostr-crypto.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -31,11 +32,16 @@
   },
   "scripts": {
     "build": "vite build",
-    "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src"
+    "lint": "eslint ./next && prettier --check ./next",
+    "lint:fix": "eslint --fix ./next && prettier --write ./next",
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^6.2.6",
+    "vite-plugin-dts": "^4.5.3",
+    "vitest": "^3.1.1"
   },
   "dependencies": {
     "@noble/curves": "^1.0.0",

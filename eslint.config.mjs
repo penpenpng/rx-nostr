@@ -14,6 +14,13 @@ export default defineConfig([
     files: ["**/*.{js,mjs,cjs,ts}"],
     languageOptions: { globals: globals.browser },
   },
+  // Only while refactoring.
+  // TODO: Remove this.
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": "warn",
+    },
+  },
   // Project specific rules.
   {
     rules: {

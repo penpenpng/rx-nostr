@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   define: {
+    // https://vitest.dev/guide/in-source.html#production-build
     "import.meta.vitest": "undefined",
   },
   build: {
