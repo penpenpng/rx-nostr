@@ -27,7 +27,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "next/**/*.ts"
   ],
   "exclude": [
     "__test__/**/*.ts",
