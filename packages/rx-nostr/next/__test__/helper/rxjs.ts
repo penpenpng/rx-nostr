@@ -6,6 +6,7 @@ export interface ObservableTestHelper<T> {
   isComplete(): boolean;
   isError(): boolean;
   getError(): unknown;
+  unsubscribe(): void;
 }
 
 export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
@@ -20,7 +21,7 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
   let error: unknown = null;
   let state: "alive" | "error" | "complete" = "alive";
 
-  obs.subscribe({
+  const sub = obs.subscribe({
     next(value) {
       values.push(value);
 
@@ -75,6 +76,9 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
     },
     getError() {
       return error;
+    },
+    unsubscribe() {
+      sub.unsubscribe();
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { Observable, OperatorFunction } from "rxjs";
+import type { Observable } from "rxjs";
 import type { ReqPacket } from "../packets/index.ts";
 
 /**

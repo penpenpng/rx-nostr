@@ -1,6 +1,220 @@
-import { Subject } from "rxjs";
 import { inlineTry } from "./error.ts";
-import { once } from "./once.ts";
+
+export class RelayMap<T> {
+  #map = new Map<string, T>();
+
+  constructor(obj?: Record<string, T>, options?: TrustOption) {
+    if (!obj) {
+      return;
+    }
+
+    for (const [url, v] of Object.entries(obj)) {
+      this.set(url, v, options);
+    }
+  }
+
+  get(url: string, options?: TrustOption): T | undefined {
+    if (options?.trusted) {
+      return this.#map.get(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return undefined;
+    }
+
+    return this.#map.get(u);
+  }
+
+  getMany(urls: Iterable<string>, options?: TrustOption): T[] {
+    const needles = options?.trusted ? new Set(urls) : new RelaySet(urls);
+    const vs: T[] = [];
+
+    for (const url of needles) {
+      if (this.#map.has(url)) {
+        vs.push(this.#map.get(url)!);
+      }
+    }
+
+    return vs;
+  }
+
+  set(url: string, v: T, options?: TrustOption): this {
+    if (options?.trusted) {
+      this.#map.set(url, v);
+      return this;
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return this;
+    }
+
+    this.#map.set(u, v);
+    return this;
+  }
+
+  has(url: string, options?: TrustOption): boolean {
+    if (options?.trusted) {
+      return this.#map.has(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return this.#map.has(u);
+  }
+
+  delete(url: string, options?: TrustOption): boolean {
+    if (options?.trusted) {
+      return this.#map.delete(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return this.#map.delete(u);
+  }
+
+  clear() {
+    this.#map.clear();
+  }
+
+  entries() {
+    return this.#map.entries();
+  }
+
+  toEntries(): Record<string, T> {
+    const obj: Record<string, T> = {};
+
+    for (const [url, v] of this.#map.entries()) {
+      obj[url] = v;
+    }
+
+    return obj;
+  }
+
+  keys() {
+    return this.#map.keys();
+  }
+
+  toKeys(): string[] {
+    return [...this.#map.keys()];
+  }
+
+  values() {
+    return this.#map.values();
+  }
+
+  toValues(): T[] {
+    return [...this.#map.values()];
+  }
+
+  get size() {
+    return this.#map.size;
+  }
+
+  copy() {
+    return new RelayMap(this.toEntries(), { trusted: true });
+  }
+}
+
+export class RelaySet {
+  #set = new Set<string>();
+
+  constructor(urls?: Iterable<string>, options?: TrustOption) {
+    if (!urls) {
+      return;
+    }
+
+    for (const url of urls) {
+      this.add(url, options);
+    }
+  }
+
+  add(url: string, options?: TrustOption) {
+    if (options?.trusted) {
+      return this.#set.add(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return this;
+    }
+
+    return this.#set.add(u);
+  }
+
+  has(url: string, options?: TrustOption): boolean {
+    if (options?.trusted) {
+      return this.#set.has(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return this.#set.has(u);
+  }
+
+  delete(url: string, options?: TrustOption): boolean {
+    if (options?.trusted) {
+      return this.#set.delete(url);
+    }
+
+    const u = normalizeRelayUrl(url);
+    if (u === null) {
+      return false;
+    }
+
+    return this.#set.delete(u);
+  }
+
+  clear() {
+    this.#set.clear();
+  }
+
+  difference(other: RelaySet): RelaySet {
+    return new RelaySet([...this.#set.difference(other.#set)], { trusted: true });
+  }
+
+  intersection(other: RelaySet): RelaySet {
+    return new RelaySet([...this.#set.intersection(other.#set)], { trusted: true });
+  }
+
+  symmetricDifference(other: RelaySet): RelaySet {
+    return new RelaySet([...this.#set.symmetricDifference(other.#set)], { trusted: true });
+  }
+
+  union(other: RelaySet): RelaySet {
+    return new RelaySet([...this.#set.union(other.#set)], { trusted: true });
+  }
+
+  keys() {
+    return this.#set.keys();
+  }
+
+  toSet() {
+    return new Set(this.#set);
+  }
+
+  get size() {
+    return this.#set.size;
+  }
+
+  [Symbol.iterator]() {
+    return this.#set.values();
+  }
+}
+
+interface TrustOption {
+  trusted?: boolean;
+}
 
 export function normalizeRelayUrl(url: string): string | null {
   if (typeof url !== "string") {
@@ -37,227 +251,4 @@ export function normalizeRelayUrl(url: string): string | null {
   }
 
   return s;
-}
-
-export class RelayMap<T> extends Map<string, T> {
-  constructor(obj?: Record<string, T>, options?: { trusted?: boolean }) {
-    super();
-
-    if (!obj) {
-      return;
-    }
-
-    for (const [url, v] of Object.entries(obj)) {
-      if (options?.trusted) {
-        super.set(url, v);
-      } else {
-        this.set(url, v);
-      }
-    }
-  }
-  get(url: string) {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return undefined;
-    }
-
-    return super.get(u);
-  }
-  getMany(urls: string[]) {
-    const vs: T[] = [];
-
-    for (const url of new Set(urls.map(normalizeRelayUrl))) {
-      if (url === null) {
-        continue;
-      }
-
-      if (this.has(url)) {
-        vs.push(this.get(url)!);
-      }
-    }
-
-    return vs;
-  }
-  set(url: string, v: T) {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return this;
-    }
-
-    return super.set(u, v);
-  }
-  has(url: string): boolean {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return false;
-    }
-
-    return super.has(u);
-  }
-  delete(url: string) {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return false;
-    }
-
-    return super.delete(u);
-  }
-  toObject(): Record<string, T> {
-    const obj: Record<string, T> = {};
-
-    for (const [url, v] of this.entries()) {
-      obj[url] = v;
-    }
-
-    return obj;
-  }
-  toKeys(): string[] {
-    return [...super.keys()];
-  }
-  toValues(): T[] {
-    return [...super.values()];
-  }
-  copy() {
-    return new RelayMap(this.toObject());
-  }
-}
-
-export class RelaySet extends Set<string> {
-  constructor(obj?: string[], options?: { trusted?: boolean }) {
-    super();
-
-    if (!obj) {
-      return;
-    }
-
-    for (const url of obj) {
-      if (options?.trusted) {
-        super.add(url);
-      } else {
-        this.add(url);
-      }
-    }
-  }
-  add(url: string) {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return this;
-    }
-
-    return super.add(u);
-  }
-  has(url: string): boolean {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return false;
-    }
-
-    return super.has(u);
-  }
-  delete(url: string) {
-    const u = normalizeRelayUrl(url);
-    if (u === null) {
-      return false;
-    }
-
-    return super.delete(u);
-  }
-}
-
-export class RelayGroup {
-  #relays = new RelaySet();
-  #disposables = new DisposableStack();
-  #stream: Subject<RelayGroupUpdate> = this.#disposables.adopt(new Subject(), (v) => v.complete());
-
-  constructor(relays?: string[]) {
-    for (const url of relays || []) {
-      this.#relays.add(url);
-    }
-  }
-
-  set(...urls: string[]) {
-    const next = new RelaySet(urls);
-    const current = this.#relays;
-
-    const update: RelayGroupUpdate = {
-      appended: new RelaySet([...next.difference(current)], { trusted: true }),
-      outdated: new RelaySet([...current.difference(next)], { trusted: true }),
-      keep: new RelaySet([...current.intersection(next)], { trusted: true }),
-    };
-
-    this.#relays = next;
-
-    this.#stream.next(update);
-
-    return update;
-  }
-
-  add(...urls: string[]) {
-    const added = new RelaySet(urls);
-    const current = this.#relays;
-
-    const update: RelayGroupUpdate = {
-      appended: new RelaySet([...added.difference(current)], { trusted: true }),
-      outdated: new RelaySet(),
-      keep: new RelaySet([...current], { trusted: true }),
-    };
-
-    for (const url of update.appended) {
-      this.#relays.add(url);
-    }
-
-    this.#stream.next(update);
-
-    return update;
-  }
-
-  remove(...urls: string[]) {
-    const removed = new RelaySet(urls);
-    const current = this.#relays;
-
-    const update: RelayGroupUpdate = {
-      appended: new RelaySet(),
-      outdated: new RelaySet([...current.intersection(removed)], { trusted: true }),
-      keep: new RelaySet([...current.difference(removed)], { trusted: true }),
-    };
-
-    for (const url of update.outdated) {
-      this.#relays.delete(url);
-    }
-
-    this.#stream.next(update);
-
-    return update;
-  }
-
-  clear() {
-    const current = this.#relays;
-
-    const update: RelayGroupUpdate = {
-      appended: new RelaySet(),
-      outdated: new RelaySet([...current], { trusted: true }),
-      keep: new RelaySet(),
-    };
-
-    this.#relays.clear();
-
-    this.#stream.next(update);
-
-    return update;
-  }
-
-  subscribe = this.#stream.subscribe.bind(this.#stream);
-
-  values() {
-    return this.#relays.values();
-  }
-
-  [Symbol.dispose] = once(() => this.#disposables.dispose());
-  dispose = this[Symbol.dispose];
-}
-
-export interface RelayGroupUpdate {
-  appended: RelaySet;
-  outdated: RelaySet;
-  keep: RelaySet;
 }

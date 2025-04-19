@@ -1,3 +1,4 @@
+export { changelog, type Changelog } from "./changelog.ts";
 export { completeOnTimeout } from "./complete-on-timeout.ts";
 export { createTie } from "./event-packet/create-tie.ts";
 export { createUniq } from "./event-packet/create-uniq.ts";

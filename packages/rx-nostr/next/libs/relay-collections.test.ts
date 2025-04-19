@@ -1,8 +1,6 @@
-import "disposablestack/auto";
 import { expect, test } from "vitest";
 
-import { subscribe } from "../__test__/helper/rxjs.ts";
-import { normalizeRelayUrl, RelayGroup, RelayMap, RelaySet } from "./relay-collections.ts";
+import { normalizeRelayUrl, RelayMap, RelaySet } from "./relay-collections.ts";
 
 test(normalizeRelayUrl.name, () => {
   const f = normalizeRelayUrl;
@@ -119,26 +117,4 @@ test(RelaySet.name, () => {
   expect(s(relay).intersection(s(alias)).size).toBe(1);
   expect(s(relay).intersection(s()).size).toBe(0);
   expect(s(relay).union(s(alias)).size).toBe(1);
-});
-
-test(RelayGroup.name, async () => {
-  const group = new RelayGroup(["wss://example.com", "wss://relay1.example.com"]);
-  const obs = subscribe(group);
-
-  group.add("wss://example.com/#alias");
-  await expect(obs.pop()).resolves.toEqual(
-    expect.objectContaining({
-      appended: new RelaySet(),
-    }),
-  );
-
-  group.set("wss://relay1.example.com", "wss://relay2.example.com");
-  await expect(obs.pop()).resolves.toEqual({
-    appended: new RelaySet(["wss://relay2.example.com"]),
-    outdated: new RelaySet(["wss://example.com"]),
-    keep: new RelaySet(["wss://relay1.example.com"]),
-  });
-
-  group.dispose();
-  expect(obs.isComplete()).toBe(true);
 });

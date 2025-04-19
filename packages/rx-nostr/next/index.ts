@@ -20,9 +20,10 @@ export {
 } from "./libs/error.ts";
 export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./libs/nostr/event.ts";
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
-export { normalizeRelayUrl, RelayGroup, RelayMap, RelaySet, type RelayGroupUpdate } from "./libs/relay-collections.ts";
+export { normalizeRelayUrl, RelayMap, RelaySet } from "./libs/relay-collections.ts";
 export {
   batch,
+  changelog,
   chunk,
   completeOnTimeout,
   createTie,
@@ -42,6 +43,7 @@ export {
   timeline,
   uniq,
   verify,
+  type Changelog,
   type MergeFilterFunction,
 } from "./operators/index.ts";
 export {
@@ -71,5 +73,6 @@ export type {
 } from "./packets/index.ts";
 export { GlobalRelayDirectory, RelayDirectory, type IRelay, type IRelayDirectory } from "./relay-directory/index.ts";
 export { createRxNostr } from "./rx-nostr/index.ts";
+export { RxRelays } from "./rx-relays/index.ts";
 export { RxBackwardReq, RxForwardReq, type IRxReq, type RxReqStrategy } from "./rx-req/index.ts";
 export type { ConnectionState, RelayUrl } from "./types.ts";
