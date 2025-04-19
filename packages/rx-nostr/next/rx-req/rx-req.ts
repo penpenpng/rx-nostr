@@ -24,11 +24,11 @@ abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
   }
 
   pipe = createPipeMethod<IRxReq, ReqPacket>((...operators) => {
-    const rxreq = this.create();
-    rxreq.inputs$ = this.inputs$;
-    rxreq.operators = [...this.operators, ...operators];
+    const rxq = this.create();
+    rxq.inputs$ = this.inputs$;
+    rxq.operators = [...this.operators, ...operators];
 
-    return rxreq;
+    return rxq;
   });
 
   [Symbol.dispose] = once(() => this.disposables.dispose());
