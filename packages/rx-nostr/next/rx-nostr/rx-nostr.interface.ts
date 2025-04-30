@@ -10,7 +10,7 @@ import type {
   EventPacket,
   ProgressPacket,
 } from "../packets/index.ts";
-import type { IRxRelays } from "../rx-relays/index.ts";
+import type { RxRelays } from "../rx-relays/index.ts";
 import type { IRxReq } from "../rx-req/index.ts";
 import type { IWebSocketConstructor } from "../websocket.ts";
 
@@ -24,7 +24,7 @@ export interface IRxNostr {
     params: Nostr.EventParameters,
     config: RxNostrEventConfig,
   ): Observable<ProgressPacket>;
-  setHotRelays(relays: IRxRelays | Iterable<string>): void;
+  setHotRelays(relays: RxRelays | Iterable<string>): void;
   unsetHotRelays(): void;
   monitorConnectionState(): Observable<ConnectionStatePacket>;
   [Symbol.dispose](): void;
@@ -78,7 +78,7 @@ export interface RxNostrReqOptions {
 }
 
 export interface RxNostrReqConfig extends RxNostrReqOptions {
-  relays: IRxRelays | Iterable<string>;
+  relays: RxRelays | Iterable<string>;
   verifier?: EventVerifier;
 }
 
@@ -94,5 +94,5 @@ export interface RxNostrEventOptions {
 }
 
 export interface RxNostrEventConfig extends RxNostrEventOptions {
-  relays: IRxRelays | Iterable<string>;
+  relays: RxRelays | Iterable<string>;
 }

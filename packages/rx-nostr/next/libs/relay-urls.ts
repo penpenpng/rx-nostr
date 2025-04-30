@@ -55,6 +55,14 @@ export class RelayMap<T> {
     return this;
   }
 
+  setDefault(url: string, v: () => T, options?: TrustOption): this {
+    if (this.has(url, options)) {
+      return this;
+    }
+
+    return this.set(url, v(), options);
+  }
+
   has(url: string, options?: TrustOption): boolean {
     if (options?.trusted) {
       return this.#map.has(url as RelayUrl);

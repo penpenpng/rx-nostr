@@ -1,13 +1,23 @@
-import { BehaviorSubject, combineLatest, concat, of } from "rxjs";
+import {
+  BehaviorSubject,
+  combineLatest,
+  concat,
+  from,
+  of,
+  Subscription,
+  type Observable,
+} from "rxjs";
 import { once } from "../libs/once.ts";
-import { RelaySet } from "../libs/relay-urls.ts";
+import { RelaySet, type RelayUrl } from "../libs/relay-urls.ts";
 import { SetOp } from "../libs/set.ts";
-import type { IRxRelays } from "./rx-relays.interface.ts";
 
-export class RxRelays implements IRxRelays, Iterable<string> {
+export class RxRelays {
   protected disposables = new DisposableStack();
+  protected subscriptions = this.disposables.adopt(new Subscription(), (v) =>
+    v.unsubscribe(),
+  );
   protected relays = new RelaySet();
-  protected stream: BehaviorSubject<Set<string>> = this.disposables.adopt(
+  protected stream: BehaviorSubject<Set<RelayUrl>> = this.disposables.adopt(
     new BehaviorSubject(new Set()),
     (v) => v.complete(),
   );
@@ -62,9 +72,7 @@ export class RxRelays implements IRxRelays, Iterable<string> {
       rxr.set(...x.difference(y));
     });
 
-    rxr.disposables.defer(() => {
-      sub.unsubscribe();
-    });
+    rxr.subscriptions.add(sub);
 
     return rxr;
   }
@@ -75,9 +83,7 @@ export class RxRelays implements IRxRelays, Iterable<string> {
       rxr.set(...SetOp.intersection(...sets));
     });
 
-    rxr.disposables.defer(() => {
-      sub.unsubscribe();
-    });
+    rxr.subscriptions.add(sub);
 
     return rxr;
   }
@@ -88,11 +94,23 @@ export class RxRelays implements IRxRelays, Iterable<string> {
       rxr.set(...SetOp.union(...sets));
     });
 
-    rxr.disposables.defer(() => {
-      sub.unsubscribe();
-    });
+    rxr.subscriptions.add(sub);
 
     return rxr;
+  }
+
+  static observable(
+    relays: RxRelays | Iterable<string>,
+  ): Observable<Set<RelayUrl>> {
+    if (relays instanceof RxRelays) {
+      return relays.asObservable();
+    } else {
+      return of(new RelaySet(relays).toSet());
+    }
+  }
+
+  static array(relays: RxRelays | Iterable<string>): RelayUrl[] {
+    return [...new RelaySet(relays)];
   }
 
   subscribe = this.stream.subscribe.bind(this.stream);

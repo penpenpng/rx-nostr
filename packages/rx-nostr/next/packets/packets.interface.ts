@@ -3,7 +3,7 @@ import * as Nostr from "nostr-typedef";
 import type { ConnectionState } from "../connection-state.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
-import type { IRxRelays } from "../rx-relays/index.ts";
+import type { IRxRelays, RxRelays } from "../rx-relays/index.ts";
 
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
@@ -14,7 +14,7 @@ import type { IRxRelays } from "../rx-relays/index.ts";
  */
 export interface ReqPacket {
   filters: LazyFilter[];
-  relays: IRxRelays | string[];
+  relays?: RxRelays | Iterable<string>;
   linger?: number;
 }
 

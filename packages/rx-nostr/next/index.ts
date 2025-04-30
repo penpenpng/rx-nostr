@@ -52,7 +52,6 @@ export {
   batch,
   changelog,
   chunk,
-  completeOnTimeout,
   createTie,
   createUniq,
   dropExpiredEvents,
@@ -115,7 +114,7 @@ export {
   type RxNostrReqConfig,
   type RxNostrReqOptions,
 } from "./rx-nostr/index.ts";
-export { RxRelays, type IRxRelays } from "./rx-relays/index.ts";
+export { RxRelays } from "./rx-relays/index.ts";
 export {
   RxBackwardReq,
   RxForwardReq,

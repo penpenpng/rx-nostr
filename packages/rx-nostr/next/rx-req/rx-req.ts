@@ -3,6 +3,7 @@ import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once } from "../libs/once.ts";
 import { createPipeMethod, type IPipeable } from "../libs/pipeable.ts";
 import type { ReqPacket } from "../packets/index.ts";
+import { RxRelays } from "../rx-relays/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 import type { IRxReq, RxReqStrategy } from "./rx-req.interface.ts";
 
@@ -22,8 +23,17 @@ abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
     return this.inputs$.pipe(...(this.operators as []));
   }
 
-  emit(filters: LazyFilter | LazyFilter[], policy?: EmitScopeConnectionPolicy) {
-    this.inputs$.next({ filters: normalizeFilters(filters), policy });
+  emit(
+    filters: LazyFilter | LazyFilter[],
+    options?: { relays?: RxRelays | Iterable<string>; linger?: number },
+  ) {
+    const { relays, linger } = options ?? {};
+
+    this.inputs$.next({
+      filters: normalizeFilters(filters),
+      relays,
+      linger,
+    });
   }
 
   pipe = createPipeMethod<IRxReq, ReqPacket>((...operators) => {

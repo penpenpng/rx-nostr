@@ -1,23 +1,21 @@
 import {
   catchError,
-  EMPTY,
   pipe,
   timeout,
   TimeoutError,
-  type MonoTypeOperatorFunction,
+  type ObservableInput,
+  type OperatorFunction,
 } from "rxjs";
 
-/**
- * Almost RxJS's `timeout`, but won't throw.
- */
-export function completeOnTimeout<T>(
+export function timeoutWith<T, R>(
+  input: ObservableInput<R>,
   time: number,
-): MonoTypeOperatorFunction<T> {
+): OperatorFunction<T, T | R> {
   return pipe(
     timeout(time),
     catchError((error: unknown) => {
       if (error instanceof TimeoutError) {
-        return EMPTY;
+        return input;
       } else {
         throw error;
       }

@@ -38,12 +38,16 @@ export class FilledRxNostrConfig {
     const key = "WebSocket";
     return this.config[key] ?? globalThis.WebSocket;
   }
+  get defaultOptions() {
+    const key = "defaultOptions";
+    return this.config[key] ?? {};
+  }
 }
 
 export class FilledRxNostrReqOptions {
   constructor(
     private config: RxNostrReqOptions,
-    private rootConfig: RxNostrConfig,
+    private rootConfig: FilledRxNostrConfig,
   ) {}
 
   private get base() {
@@ -79,7 +83,7 @@ export class FilledRxNostrReqOptions {
 export class FilledRxNostrEventOptions {
   constructor(
     private config: RxNostrEventOptions,
-    private rootConfig: RxNostrConfig,
+    private rootConfig: FilledRxNostrConfig,
   ) {}
 
   private get base() {
@@ -87,7 +91,7 @@ export class FilledRxNostrEventOptions {
   }
 
   private get root() {
-    return new FilledRxNostrConfig(this.rootConfig);
+    return this.rootConfig;
   }
 
   get signer() {
