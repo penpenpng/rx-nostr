@@ -18,12 +18,16 @@ interface Schnorr {
 }
 
 const schnorr: Schnorr = {
-  sign: (m: string, seckey: string): string => bytesToHex(_schnorr.sign(m, seckey)),
+  sign: (m: string, seckey: string): string =>
+    bytesToHex(_schnorr.sign(m, seckey)),
   verify: _schnorr.verify,
   getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(seckey)),
 };
 
-export function signEvent<K extends number>(params: Nostr.EventParameters<K>, seckey: string): Nostr.Event<K> {
+export function signEvent<K extends number>(
+  params: Nostr.EventParameters<K>,
+  seckey: string,
+): Nostr.Event<K> {
   const sechex = seckey.startsWith("nsec1") ? toHex(seckey) : seckey;
 
   const event = {
@@ -54,7 +58,14 @@ export function getPublicKey(seckey: string): string {
 
 /** Calculate and return event's hash (ID). */
 export function getEventHash(event: Nostr.UnsignedEvent): string {
-  const serialized = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content]);
+  const serialized = JSON.stringify([
+    0,
+    event.pubkey,
+    event.created_at,
+    event.kind,
+    event.tags,
+    event.content,
+  ]);
   return sha256(serialized);
 }
 

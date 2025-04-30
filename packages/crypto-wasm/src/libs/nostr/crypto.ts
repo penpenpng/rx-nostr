@@ -1,10 +1,21 @@
-import { Event, EventBuilder, Keys, Kind, loadWasmSync, Tag, Timestamp } from "@rust-nostr/nostr-sdk";
+import {
+  Event,
+  EventBuilder,
+  Keys,
+  Kind,
+  loadWasmSync,
+  Tag,
+  Timestamp,
+} from "@rust-nostr/nostr-sdk";
 import type * as Nostr from "nostr-typedef";
 import { ensureEventFields } from "./ensure-event-fields.ts";
 
 loadWasmSync();
 
-export function signEvent<K extends number>(params: Nostr.EventParameters<K>, seckey: string): Nostr.Event<K> {
+export function signEvent<K extends number>(
+  params: Nostr.EventParameters<K>,
+  seckey: string,
+): Nostr.Event<K> {
   const filledParams = {
     ...params,
     tags: params.tags ?? [],
@@ -20,7 +31,9 @@ export function signEvent<K extends number>(params: Nostr.EventParameters<K>, se
     .tags((tags ?? []).map((tag) => Tag.parse(tag)))
     .customCreatedAt(Timestamp.fromSecs(created_at));
 
-  const signedEvent: Nostr.Event<K> = JSON.parse(event.signWithKeys(Keys.parse(seckey)).asJson());
+  const signedEvent: Nostr.Event<K> = JSON.parse(
+    event.signWithKeys(Keys.parse(seckey)).asJson(),
+  );
 
   if (id) {
     signedEvent.id = id;

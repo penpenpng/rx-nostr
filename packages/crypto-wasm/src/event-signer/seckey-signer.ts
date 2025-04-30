@@ -14,7 +14,9 @@ export class SeckeySigner implements EventSigner {
     this.#pubhex = getPublicKey(seckey);
   }
 
-  async signEvent<K extends number>(params: Nostr.EventParameters<K>): Promise<Nostr.Event<K>> {
+  async signEvent<K extends number>(
+    params: Nostr.EventParameters<K>,
+  ): Promise<Nostr.Event<K>> {
     return signEvent(
       {
         ...params,
