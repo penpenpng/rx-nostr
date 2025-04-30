@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { normalizeRelayUrl, RelayMap, RelaySet } from "./relay-collections.ts";
+import { normalizeRelayUrl, RelayMap, RelaySet } from "./relay-urls.ts";
 
 test(normalizeRelayUrl.name, () => {
   const f = normalizeRelayUrl;

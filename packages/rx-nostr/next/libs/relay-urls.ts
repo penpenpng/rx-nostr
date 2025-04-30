@@ -1,7 +1,9 @@
 import { inlineTry } from "./error.ts";
 
+export type RelayUrl = `ws://${number}` | `wss://${string}`;
+
 export class RelayMap<T> {
-  #map = new Map<string, T>();
+  #map = new Map<RelayUrl, T>();
 
   constructor(obj?: Record<string, T>, options?: TrustOption) {
     if (!obj) {
@@ -15,7 +17,7 @@ export class RelayMap<T> {
 
   get(url: string, options?: TrustOption): T | undefined {
     if (options?.trusted) {
-      return this.#map.get(url);
+      return this.#map.get(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -27,10 +29,9 @@ export class RelayMap<T> {
   }
 
   getMany(urls: Iterable<string>, options?: TrustOption): T[] {
-    const needles = options?.trusted ? new Set(urls) : new RelaySet(urls);
     const vs: T[] = [];
 
-    for (const url of needles) {
+    for (const url of new RelaySet(urls, options)) {
       if (this.#map.has(url)) {
         vs.push(this.#map.get(url)!);
       }
@@ -41,7 +42,7 @@ export class RelayMap<T> {
 
   set(url: string, v: T, options?: TrustOption): this {
     if (options?.trusted) {
-      this.#map.set(url, v);
+      this.#map.set(url as RelayUrl, v);
       return this;
     }
 
@@ -56,7 +57,7 @@ export class RelayMap<T> {
 
   has(url: string, options?: TrustOption): boolean {
     if (options?.trusted) {
-      return this.#map.has(url);
+      return this.#map.has(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -69,7 +70,7 @@ export class RelayMap<T> {
 
   delete(url: string, options?: TrustOption): boolean {
     if (options?.trusted) {
-      return this.#map.delete(url);
+      return this.#map.delete(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -124,7 +125,7 @@ export class RelayMap<T> {
 }
 
 export class RelaySet {
-  #set = new Set<string>();
+  #set = new Set<RelayUrl>();
 
   constructor(urls?: Iterable<string>, options?: TrustOption) {
     if (!urls) {
@@ -138,7 +139,7 @@ export class RelaySet {
 
   add(url: string, options?: TrustOption) {
     if (options?.trusted) {
-      return this.#set.add(url);
+      return this.#set.add(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -151,7 +152,7 @@ export class RelaySet {
 
   has(url: string, options?: TrustOption): boolean {
     if (options?.trusted) {
-      return this.#set.has(url);
+      return this.#set.has(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -164,7 +165,7 @@ export class RelaySet {
 
   delete(url: string, options?: TrustOption): boolean {
     if (options?.trusted) {
-      return this.#set.delete(url);
+      return this.#set.delete(url as RelayUrl);
     }
 
     const u = normalizeRelayUrl(url);
@@ -222,7 +223,7 @@ interface TrustOption {
   trusted?: boolean;
 }
 
-export function normalizeRelayUrl(url: string): string | null {
+export function normalizeRelayUrl(url: string): RelayUrl | null {
   if (typeof url !== "string") {
     return null;
   }
@@ -244,16 +245,17 @@ export function normalizeRelayUrl(url: string): string | null {
   u.searchParams.sort();
   u.search = inlineTry(() => decodeURIComponent(u.search), u.search);
 
-  if (!/^wss?:$/.test(u.protocol)) {
-    return null;
-  }
   if (!u.hostname) {
     return null;
   }
 
-  let s = u.toString();
+  if (!/^wss?:$/.test(u.protocol)) {
+    return null;
+  }
+  let s = u.toString() as RelayUrl;
+
   if (!u.search) {
-    s = s.replace(/\/$/, "");
+    s = s.replace(/\/$/, "") as RelayUrl;
   }
 
   return s;
