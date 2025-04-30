@@ -16,7 +16,7 @@ export default defineConfig([
   },
   // Only while refactoring.
   // TODO: Remove this.
-  { rules: { "@typescript-eslint/no-unused-vars": "warn" } },
+  { rules: { "@typescript-eslint/no-unused-vars": "off" } },
   // Project specific rules.
   { rules: { "@typescript-eslint/no-empty-object-type": "off" } },
   {
