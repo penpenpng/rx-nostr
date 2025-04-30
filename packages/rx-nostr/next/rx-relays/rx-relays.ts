@@ -1,8 +1,10 @@
 import { BehaviorSubject, combineLatest, concat, of } from "rxjs";
 import { once } from "../libs/once.ts";
 import { RelaySet } from "../libs/relay-collections.ts";
+import { SetOp } from "../libs/set.ts";
+import type { IRxRelays } from "./rx-relays.interface.ts";
 
-export class RxRelays {
+export class RxRelays implements IRxRelays, Iterable<string> {
   protected disposables = new DisposableStack();
   protected relays = new RelaySet();
   protected stream: BehaviorSubject<Set<string>> = this.disposables.adopt(
@@ -48,11 +50,10 @@ export class RxRelays {
     this.emit();
   }
 
-  protected static combine(rxRelaysX: RxRelays, rxRelaysY: RxRelays) {
-    return combineLatest([
-      concat(rxRelaysX.asObservable(), of(new Set<string>())),
-      concat(rxRelaysY.asObservable(), of(new Set<string>())),
-    ]);
+  protected static combine(...rxRelays: RxRelays[]) {
+    return combineLatest(
+      rxRelays.map((rxr) => concat(rxr.asObservable(), of(new Set<string>()))),
+    );
   }
 
   static difference(rxRelaysX: RxRelays, rxRelaysY: RxRelays): RxRelays {
@@ -68,10 +69,10 @@ export class RxRelays {
     return rxr;
   }
 
-  static intersection(rxRelaysX: RxRelays, rxRelaysY: RxRelays): RxRelays {
+  static intersection(...rxRelays: RxRelays[]): RxRelays {
     const rxr = new RxRelays();
-    const sub = this.combine(rxRelaysX, rxRelaysY).subscribe(([x, y]) => {
-      rxr.set(...x.intersection(y));
+    const sub = this.combine(...rxRelays).subscribe((sets) => {
+      rxr.set(...SetOp.intersection(...sets));
     });
 
     rxr.disposables.defer(() => {
@@ -81,10 +82,10 @@ export class RxRelays {
     return rxr;
   }
 
-  static union(rxRelaysX: RxRelays, rxRelaysY: RxRelays): RxRelays {
+  static union(...rxRelays: RxRelays[]): RxRelays {
     const rxr = new RxRelays();
-    const sub = this.combine(rxRelaysX, rxRelaysY).subscribe(([x, y]) => {
-      rxr.set(...x.union(y));
+    const sub = this.combine(...rxRelays).subscribe((sets) => {
+      rxr.set(...SetOp.union(...sets));
     });
 
     rxr.disposables.defer(() => {
