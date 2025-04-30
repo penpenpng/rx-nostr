@@ -1,5 +1,5 @@
 import type { Observable } from "rxjs";
 
-export interface RetryController {
+export interface ConnectionRetryer {
   createRetry(): Observable<void>;
 }

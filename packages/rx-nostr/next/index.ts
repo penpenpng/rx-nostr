@@ -3,6 +3,10 @@ export {
   type Authenticator,
 } from "./authenticator/index.ts";
 export {
+  NoopRetryer,
+  type ConnectionRetryer,
+} from "./connection-retryer/index.ts";
+export {
   ConnectionState,
   type ConnectionStateSymbol,
 } from "./connection-state.ts";
@@ -102,7 +106,6 @@ export {
   type IRelay,
   type IRelayDirectory,
 } from "./relay-directory/index.ts";
-export type { RetryController } from "./retry-controller/retry-controller.interface.ts";
 export {
   createRxNostr,
   type IRxNostr,
