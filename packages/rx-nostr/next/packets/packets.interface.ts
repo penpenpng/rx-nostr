@@ -1,8 +1,9 @@
 import * as Nostr from "nostr-typedef";
 
+import type { ConnectionState } from "../connection-state.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
+import type { RelayUrl } from "../libs/relay-urls.ts";
 import type { IRxRelays } from "../rx-relays/index.ts";
-import type { ConnectionState, RelayUrl } from "../types.ts";
 
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.

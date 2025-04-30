@@ -2,7 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 import type { EventSigner } from "../event-signer/event-signer.interface.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import type { EventPacket, ProgressPacket } from "../packets/index.ts";
+import type { ConnectionStatePacket, EventPacket, ProgressPacket } from "../packets/index.ts";
 import type { IRxRelays } from "../rx-relays/index.ts";
 import type { IRxReq } from "../rx-req/index.ts";
 
@@ -16,8 +16,9 @@ export interface IRxNostr {
     params: Nostr.EventParameters,
     config: EventConfig,
   ): Observable<ProgressPacket>;
-  keep(rxRelays: IRxRelays): void;
-  release(rxRelays: IRxRelays): void;
+  keep(rxRelays: IRxRelays): () => void;
+  release(): void;
+  monitorConnectionState(): Observable<ConnectionStatePacket>;
   [Symbol.dispose](): void;
   /**
    * Alias for `[Symbol.dispose]()`
@@ -29,9 +30,11 @@ export interface ReqConfig {
   relays: IRxRelays | Iterable<string>;
   defer?: boolean;
   linger?: number;
+  weak?: boolean;
 }
 
 export interface EventConfig {
   relays: IRxRelays | Iterable<string>;
   signer?: EventSigner;
+  weak?: boolean;
 }

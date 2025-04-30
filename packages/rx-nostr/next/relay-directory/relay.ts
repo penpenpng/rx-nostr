@@ -1,8 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import type { BehaviorSubject } from "rxjs";
+import type { ConnectionState } from "../connection-state.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
-import { normalizeRelayUrl } from "../libs/relay-collections.ts";
-import type { ConnectionState } from "../types.ts";
+import { normalizeRelayUrl } from "../libs/relay-urls.ts";
 import type { IRelay, IRelayInternal } from "./relay.interface.ts";
 
 export class Relay implements IRelay, IRelayInternal {

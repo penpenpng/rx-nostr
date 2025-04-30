@@ -1,4 +1,8 @@
 export {
+  ConnectionState,
+  type ConnectionStateSymbol,
+} from "./connection-state.ts";
+export {
   Nip07Signer,
   NoopSigner,
   type EventSigner,
@@ -33,7 +37,8 @@ export {
   normalizeRelayUrl,
   RelayMap,
   RelaySet,
-} from "./libs/relay-collections.ts";
+  type RelayUrl,
+} from "./libs/relay-urls.ts";
 export {
   batch,
   changelog,
@@ -92,6 +97,7 @@ export {
   type IRelay,
   type IRelayDirectory,
 } from "./relay-directory/index.ts";
+export type { IRetryController } from "./retry-controller/retry-controller.interface.ts";
 export { createRxNostr, type IRxNostr } from "./rx-nostr/index.ts";
 export { RxRelays, type IRxRelays } from "./rx-relays/index.ts";
 export {
@@ -100,4 +106,3 @@ export {
   type IRxReq,
   type RxReqStrategy,
 } from "./rx-req/index.ts";
-export type { ConnectionState, RelayUrl } from "./types.ts";

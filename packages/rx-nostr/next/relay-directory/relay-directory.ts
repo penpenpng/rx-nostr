@@ -1,4 +1,4 @@
-import { RelayMap } from "../libs/relay-collections.ts";
+import { RelayMap } from "../libs/relay-urls.ts";
 import type {
   IRelayDirectory,
   IRelayDirectoryInternal,

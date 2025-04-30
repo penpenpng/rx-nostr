@@ -1,6 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import type { BehaviorSubject } from "rxjs";
-import type { ConnectionState } from "../types.ts";
+import type { ConnectionState } from "../connection-state.ts";
 
 // TODO: internal なやつだけ IRelay として約束すれば良くて、
 // それ以外の public なやつは単に Relay の中に実装を置けばいい

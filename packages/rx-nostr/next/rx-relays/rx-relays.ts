@@ -1,6 +1,6 @@
 import { BehaviorSubject, combineLatest, concat, of } from "rxjs";
 import { once } from "../libs/once.ts";
-import { RelaySet } from "../libs/relay-collections.ts";
+import { RelaySet } from "../libs/relay-urls.ts";
 import { SetOp } from "../libs/set.ts";
 import type { IRxRelays } from "./rx-relays.interface.ts";
 
