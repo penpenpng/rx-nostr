@@ -1,1 +1,1 @@
-export type { IRetryController } from "./retry-controller.interface.ts";
+export type { RetryController } from "./retry-controller.interface.ts";

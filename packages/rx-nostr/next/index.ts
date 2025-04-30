@@ -1,4 +1,8 @@
 export {
+  SimpleAuthenticator,
+  type Authenticator,
+} from "./authenticator/index.ts";
+export {
   ConnectionState,
   type ConnectionStateSymbol,
 } from "./connection-state.ts";
@@ -39,6 +43,7 @@ export {
   RelaySet,
   type RelayUrl,
 } from "./libs/relay-urls.ts";
+export { setLogLevel } from "./logger.ts";
 export {
   batch,
   changelog,
@@ -97,8 +102,16 @@ export {
   type IRelay,
   type IRelayDirectory,
 } from "./relay-directory/index.ts";
-export type { IRetryController } from "./retry-controller/retry-controller.interface.ts";
-export { createRxNostr, type IRxNostr } from "./rx-nostr/index.ts";
+export type { RetryController } from "./retry-controller/retry-controller.interface.ts";
+export {
+  createRxNostr,
+  type IRxNostr,
+  type RxNostrConfig,
+  type RxNostrEventConfig,
+  type RxNostrEventOptions,
+  type RxNostrReqConfig,
+  type RxNostrReqOptions,
+} from "./rx-nostr/index.ts";
 export { RxRelays, type IRxRelays } from "./rx-relays/index.ts";
 export {
   RxBackwardReq,
