@@ -98,6 +98,10 @@ export class FilledRxNostrEventOptions {
     const key = "signer";
     return this.config[key] ?? this.base[key] ?? this.root[key];
   }
+  get linger() {
+    const key = "linger";
+    return this.config[key] ?? this.base[key] ?? Number.POSITIVE_INFINITY;
+  }
   get weak() {
     const key = "weak";
     return this.config[key] ?? this.base[key] ?? false;

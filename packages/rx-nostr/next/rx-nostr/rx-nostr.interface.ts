@@ -84,6 +84,7 @@ export interface RxNostrReqConfig extends RxNostrReqOptions {
 
 export interface RxNostrEventOptions {
   signer?: EventSigner;
+  linger?: number;
   weak?: boolean;
   /**
    * Specify how long rx-nostr waits for OK messages (milliseconds).

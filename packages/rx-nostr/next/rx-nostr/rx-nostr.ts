@@ -10,7 +10,7 @@ import {
 } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once } from "../libs/once.ts";
-import { RelayMap, type RelayUrl } from "../libs/relay-urls.ts";
+import { type RelayUrl } from "../libs/relay-urls.ts";
 import { Logger } from "../logger.ts";
 import { changelog } from "../operators/changelog.ts";
 import { timeoutWith } from "../operators/timeout-with.ts";
@@ -23,6 +23,7 @@ import type {
 import { RxRelays } from "../rx-relays/index.ts";
 import type { IRxReq } from "../rx-req/index.ts";
 import { CommunicationFacade } from "./communication-facade.ts";
+import { RefCountLifeCycle } from "./ref-count-life-cycle.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 import {
   FilledRxNostrConfig,
@@ -61,10 +62,6 @@ export class RxNostr implements IRxNostr {
     params: Nostr.EventParameters,
     { relays, ...options }: RxNostrEventConfig,
   ): Observable<ProgressPacket> {
-    const config = new FilledRxNostrEventOptions(options, this.config);
-    const stream = new Subject<ProgressActivity>();
-    const disposables = new DisposableStack();
-    const subs = disposables.adopt(new Subscription(), (v) => v.unsubscribe());
     const targetRelays = RxRelays.array(relays);
 
     if (targetRelays.length <= 0) {
@@ -72,18 +69,30 @@ export class RxNostr implements IRxNostr {
       return EMPTY;
     }
 
+    const config = new FilledRxNostrEventOptions(options, this.config);
+    const stream = new Subject<ProgressActivity>();
+    const disposables = new DisposableStack();
+    const subs = disposables.adopt(new Subscription(), (v) => v.unsubscribe());
+    const lifecycle = new RefCountLifeCycle({
+      defer: false,
+      weak: config.weak,
+      linger: config.linger,
+    });
+
+    this.facade.forEach(targetRelays, (relay) => {
+      lifecycle.prepare(relay);
+    });
+
     const publish = (relay: RelayCommunication, event: Nostr.Event) => {
       const timeoutActivity: ProgressActivity = {
         state: "timeout",
         relay: relay.url,
       };
 
-      void (config.weak || relay.addRef());
-
       const sub = relay
         .event(event)
         .pipe(
-          finalize(() => void (config.weak || relay.subRef())),
+          finalize(() => void lifecycle.end(relay)),
           timeoutWith(of(timeoutActivity), config.timeout),
         )
         .subscribe(stream);
@@ -106,6 +115,7 @@ export class RxNostr implements IRxNostr {
     return stream.pipe(
       finalize(() => {
         disposables.dispose();
+        lifecycle.cleanup();
       }),
       takeUntil(this.dispose$),
       summarize(),
