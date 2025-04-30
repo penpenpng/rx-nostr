@@ -6,7 +6,10 @@ export class VerificationHost {
   constructor(private verifier: EventVerifier) {}
 
   start() {
-    if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
+    if (
+      typeof WorkerGlobalScope === "undefined" ||
+      !(self instanceof WorkerGlobalScope)
+    ) {
       throw new Error(".start() must be called in a Worker context.");
     }
 
@@ -38,7 +41,10 @@ export class VerificationHost {
   };
 
   [Symbol.dispose] = once(() => {
-    if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
+    if (
+      typeof WorkerGlobalScope === "undefined" ||
+      !(self instanceof WorkerGlobalScope)
+    ) {
       throw new Error(".stop() must be called in a Worker context.");
     }
 
@@ -136,7 +142,9 @@ export class VerificationClient implements EventVerifier {
   #verifyByFallback(event: Nostr.Event): Promise<boolean> {
     const verifier = this.config.fallback;
     if (!verifier) {
-      throw new Error("VerificationHost is not working but no fallback verifier is provided.");
+      throw new Error(
+        "VerificationHost is not working but no fallback verifier is provided.",
+      );
     }
 
     return verifier.verifyEvent(event);
@@ -196,7 +204,12 @@ export interface VerificationResponse {
   error?: string;
 }
 
-export type VerificationServiceStatus = "prepared" | "booting" | "active" | "error" | "terminated";
+export type VerificationServiceStatus =
+  | "prepared"
+  | "booting"
+  | "active"
+  | "error"
+  | "terminated";
 
 export interface VerificationClientConfig {
   worker: Worker;

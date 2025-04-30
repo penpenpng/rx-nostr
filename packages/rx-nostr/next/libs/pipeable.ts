@@ -4,7 +4,11 @@ export interface PipeMethod<T, S, R = S> {
   (): T;
   (op1: OperatorFunction<S, R>): T;
   <A>(op1: OperatorFunction<S, A>, op2: OperatorFunction<A, R>): T;
-  <A, B>(op1: OperatorFunction<S, A>, op2: OperatorFunction<A, B>, op3: OperatorFunction<B, R>): T;
+  <A, B>(
+    op1: OperatorFunction<S, A>,
+    op2: OperatorFunction<A, B>,
+    op3: OperatorFunction<B, R>,
+  ): T;
   <A, B, C>(
     op1: OperatorFunction<S, A>,
     op2: OperatorFunction<A, B>,

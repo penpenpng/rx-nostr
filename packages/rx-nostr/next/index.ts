@@ -1,4 +1,8 @@
-export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
+export {
+  Nip07Signer,
+  NoopSigner,
+  type EventSigner,
+} from "./event-signer/index.ts";
 export {
   NoopVerifier,
   VerificationClient,
@@ -18,9 +22,18 @@ export {
   RxNostrLogicError,
   RxNostrWebSocketError,
 } from "./libs/error.ts";
-export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./libs/nostr/event.ts";
+export {
+  compareEvents,
+  earlierEvent,
+  ensureEventFields,
+  laterEvent,
+} from "./libs/nostr/event.ts";
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
-export { normalizeRelayUrl, RelayMap, RelaySet } from "./libs/relay-collections.ts";
+export {
+  normalizeRelayUrl,
+  RelayMap,
+  RelaySet,
+} from "./libs/relay-collections.ts";
 export {
   batch,
   changelog,
@@ -71,8 +84,18 @@ export type {
   ReqPacket,
   UnknownMessagePacket,
 } from "./packets/index.ts";
-export { GlobalRelayDirectory, RelayDirectory, type IRelay, type IRelayDirectory } from "./relay-directory/index.ts";
+export {
+  GlobalRelayDirectory,
+  RelayDirectory,
+  type IRelay,
+  type IRelayDirectory,
+} from "./relay-directory/index.ts";
 export { createRxNostr } from "./rx-nostr/index.ts";
 export { RxRelays } from "./rx-relays/index.ts";
-export { RxBackwardReq, RxForwardReq, type IRxReq, type RxReqStrategy } from "./rx-req/index.ts";
+export {
+  RxBackwardReq,
+  RxForwardReq,
+  type IRxReq,
+  type RxReqStrategy,
+} from "./rx-req/index.ts";
 export type { ConnectionState, RelayUrl } from "./types.ts";

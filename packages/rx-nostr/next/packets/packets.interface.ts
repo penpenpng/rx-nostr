@@ -28,7 +28,9 @@ export type MessagePacket =
   | CountPacket
   | UnknownMessagePacket;
 
-export interface MessagePacketBase<T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type> {
+export interface MessagePacketBase<
+  T extends Nostr.ToClientMessage.Type = Nostr.ToClientMessage.Type,
+> {
   from: RelayUrl;
   type: T;
   message: Nostr.ToClientMessage.Message<T>;

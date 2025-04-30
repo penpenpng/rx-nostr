@@ -1,7 +1,9 @@
 import type * as Nostr from "nostr-typedef";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 
-export function normalizeFilters(filters: LazyFilter | LazyFilter[]): LazyFilter[] {
+export function normalizeFilters(
+  filters: LazyFilter | LazyFilter[],
+): LazyFilter[] {
   return (Array.isArray(filters) ? filters : [filters])
     .map((filter) => trimInvalidFields(filter))
     .filter((filter): filter is LazyFilter => filter !== null);
@@ -31,7 +33,11 @@ function trimInvalidFields(filter: LazyFilter): LazyFilter | null {
       res[key] = filter[key];
       continue;
     }
-    if (key === "kinds" && filter[key] !== undefined && (filter[key]?.length ?? -1) > 0) {
+    if (
+      key === "kinds" &&
+      filter[key] !== undefined &&
+      (filter[key]?.length ?? -1) > 0
+    ) {
       res[key] = filter[key];
       continue;
     }
@@ -41,7 +47,10 @@ function trimInvalidFields(filter: LazyFilter): LazyFilter | null {
     }
   }
 
-  const timeRangeIsValid = typeof res.since !== "number" || typeof res.until !== "number" || res.since <= res.until;
+  const timeRangeIsValid =
+    typeof res.since !== "number" ||
+    typeof res.until !== "number" ||
+    res.since <= res.until;
   if (!timeRangeIsValid) {
     return null;
   }

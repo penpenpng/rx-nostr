@@ -5,7 +5,9 @@ import type { LazyFilter } from "./lazy-filter.interface.ts";
 /**
  * Evaluate one or more `LazyFilter`s and return `Nostr.Filter[]`.
  */
-export function evalFilters(filters: LazyFilter | LazyFilter[]): Nostr.Filter[] {
+export function evalFilters(
+  filters: LazyFilter | LazyFilter[],
+): Nostr.Filter[] {
   if ("length" in filters) {
     return filters.map(evalFilter);
   } else {

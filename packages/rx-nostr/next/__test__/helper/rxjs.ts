@@ -16,7 +16,9 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
 
   const COMPLETE = Symbol("complete");
   const ERROR = Symbol("error");
-  const { resolve: finish, promise: finished } = Promise.withResolvers<typeof COMPLETE | typeof ERROR>();
+  const { resolve: finish, promise: finished } = Promise.withResolvers<
+    typeof COMPLETE | typeof ERROR
+  >();
 
   let error: unknown = null;
   let state: "alive" | "error" | "complete" = "alive";

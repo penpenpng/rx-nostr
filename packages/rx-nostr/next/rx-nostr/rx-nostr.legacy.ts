@@ -65,7 +65,10 @@ export interface RxNostr {
    *
    * You can unsubscribe the Observable to send CLOSE.
    */
-  use(rxReq: RxReq, options?: Partial<RxNostrUseOptions>): Observable<EventPacket>;
+  use(
+    rxReq: RxReq,
+    options?: Partial<RxNostrUseOptions>,
+  ): Observable<EventPacket>;
   /**
    * Create an Observable that receives all events (EVENT) from all websocket connections.
    *
@@ -106,12 +109,18 @@ export interface RxNostr {
    * The `seckey` option accepts both nsec format and hex format,
    * and if omitted NIP-07 will be automatically used.
    */
-  send(params: Nostr.EventParameters, options?: Partial<RxNostrSendOptions>): Observable<OkPacketAgainstEvent>;
+  send(
+    params: Nostr.EventParameters,
+    options?: Partial<RxNostrSendOptions>,
+  ): Observable<OkPacketAgainstEvent>;
 
   /**
    * It is almost the same as `send()` with `completeOn: 'sent'`, but it returns promise.
    */
-  cast(params: Nostr.EventParameters, options?: Partial<Omit<RxNostrSendOptions, "completeOn">>): Promise<void>;
+  cast(
+    params: Nostr.EventParameters,
+    options?: Partial<Omit<RxNostrSendOptions, "completeOn">>,
+  ): Promise<void>;
 
   /**
    * Release all resources held by the RxNostr object.
@@ -162,7 +171,11 @@ export interface DefaultRelayConfig {
 
 /** Parameter of `rxNostr.setDefaultRelays()` */
 export type AcceptableDefaultRelaysConfig =
-  | (string | string[] /* ["r", url: string, mode?: "read" | "write"] */ | DefaultRelayConfig)[]
+  | (
+      | string
+      | string[] /* ["r", url: string, mode?: "read" | "write"] */
+      | DefaultRelayConfig
+    )[]
   | Nostr.Nip07.GetRelayResult;
 
 export interface RelayStatus {

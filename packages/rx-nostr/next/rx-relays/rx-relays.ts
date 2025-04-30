@@ -5,8 +5,9 @@ import { RelaySet } from "../libs/relay-collections.ts";
 export class RxRelays {
   protected disposables = new DisposableStack();
   protected relays = new RelaySet();
-  protected stream: BehaviorSubject<Set<string>> = this.disposables.adopt(new BehaviorSubject(new Set()), (v) =>
-    v.complete(),
+  protected stream: BehaviorSubject<Set<string>> = this.disposables.adopt(
+    new BehaviorSubject(new Set()),
+    (v) => v.complete(),
   );
 
   constructor(relays?: Iterable<string>) {

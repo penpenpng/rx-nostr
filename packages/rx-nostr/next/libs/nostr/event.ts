@@ -1,6 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 
-export function ensureEventFields(event: Partial<Nostr.Event>): event is Nostr.Event {
+export function ensureEventFields(
+  event: Partial<Nostr.Event>,
+): event is Nostr.Event {
   if (typeof event.id !== "string") return false;
   if (typeof event.sig !== "string") return false;
   if (typeof event.kind !== "number") return false;

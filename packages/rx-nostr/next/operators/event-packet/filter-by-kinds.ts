@@ -9,5 +9,7 @@ export function filterByKinds<P extends EventPacket>(
   kinds: number[],
   options?: { not?: boolean },
 ): MonoTypeOperatorFunction<P> {
-  return filter(({ event }) => xor(kinds.includes(event.kind), options?.not ?? false));
+  return filter(({ event }) =>
+    xor(kinds.includes(event.kind), options?.not ?? false),
+  );
 }

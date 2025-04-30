@@ -1,4 +1,7 @@
-export function inlineTry<T, U>(f: () => T, g: U | ((err: unknown) => U)): T | U {
+export function inlineTry<T, U>(
+  f: () => T,
+  g: U | ((err: unknown) => U),
+): T | U {
   try {
     return f();
   } catch (err) {
@@ -22,7 +25,9 @@ export abstract class RxNostrError extends Error {}
  */
 export class RxNostrWebSocketError extends RxNostrError {
   constructor(public code?: number) {
-    super(`RxNostrWebSocketError: WebSocket was closed with code ${code} by relay.`);
+    super(
+      `RxNostrWebSocketError: WebSocket was closed with code ${code} by relay.`,
+    );
     this.name = "RxNostrWebSocketError";
   }
 }
@@ -58,7 +63,9 @@ export class RxNostrEnvironmentError extends RxNostrError {
  */
 export class RxNostrLogicError extends RxNostrError {
   constructor() {
-    super("RxNostrLogicError: This is rx-nostr's internal bug. Please report to the author of the library.");
+    super(
+      "RxNostrLogicError: This is rx-nostr's internal bug. Please report to the author of the library.",
+    );
     this.name = "RxNostrLogicError";
   }
 }
@@ -70,7 +77,9 @@ export class RxNostrLogicError extends RxNostrError {
  */
 export class RxNostrAlreadyDisposedError extends RxNostrError {
   constructor() {
-    super("RxNostrAlreadyDisposedError: Attempted to access a disposed resource.");
+    super(
+      "RxNostrAlreadyDisposedError: Attempted to access a disposed resource.",
+    );
     this.name = "RxNostrAlreadyDisposedError";
   }
 }

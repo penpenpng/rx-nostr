@@ -1,9 +1,14 @@
 import { RelayMap } from "../libs/relay-collections.ts";
-import type { IRelayDirectory, IRelayDirectoryInternal } from "./relay-directory.interface.ts";
+import type {
+  IRelayDirectory,
+  IRelayDirectoryInternal,
+} from "./relay-directory.interface.ts";
 import type { IRelay, IRelayInternal } from "./relay.interface.ts";
 import { Relay } from "./relay.ts";
 
-export class RelayDirectory implements IRelayDirectory, IRelayDirectoryInternal {
+export class RelayDirectory
+  implements IRelayDirectory, IRelayDirectoryInternal
+{
   #relays = new RelayMap<IRelayInternal>();
 
   get(url: string): IRelay | undefined {

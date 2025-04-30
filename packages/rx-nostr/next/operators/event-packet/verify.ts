@@ -6,6 +6,8 @@ import { filterAsync } from "../filter-async.ts";
 /**
  * Only events with a valid signature are allowed to pass.
  */
-export function verify<P extends EventPacket>(verifier: EventVerifier): MonoTypeOperatorFunction<P> {
+export function verify<P extends EventPacket>(
+  verifier: EventVerifier,
+): MonoTypeOperatorFunction<P> {
   return filterAsync(({ event }) => verifier.verifyEvent(event));
 }

@@ -34,24 +34,32 @@ function _isFiltered(
   const sinceExclusive = options?.sinceExclusive ?? false;
   const untilExclusive = options?.untilExclusive ?? false;
 
-  if (filter.ids && filter.ids.every((prefix) => !event.id.startsWith(prefix))) {
+  if (
+    filter.ids &&
+    filter.ids.every((prefix) => !event.id.startsWith(prefix))
+  ) {
     return false;
   }
   if (filter.kinds && !filter.kinds.includes(event.kind)) {
     return false;
   }
-  if (filter.authors && filter.authors.every((pubkey) => !event.pubkey.startsWith(pubkey))) {
+  if (
+    filter.authors &&
+    filter.authors.every((pubkey) => !event.pubkey.startsWith(pubkey))
+  ) {
     return false;
   }
   if (
     filter.since &&
-    ((sinceExclusive && !(filter.since < event.created_at)) || (!sinceExclusive && !(filter.since <= event.created_at)))
+    ((sinceExclusive && !(filter.since < event.created_at)) ||
+      (!sinceExclusive && !(filter.since <= event.created_at)))
   ) {
     return false;
   }
   if (
     filter.until &&
-    ((untilExclusive && !(event.created_at < filter.until)) || (!untilExclusive && !(event.created_at <= filter.until)))
+    ((untilExclusive && !(event.created_at < filter.until)) ||
+      (!untilExclusive && !(event.created_at <= filter.until)))
   ) {
     return false;
   }
@@ -64,7 +72,9 @@ function _isFiltered(
 
     if (
       !event.tags.find(
-        ([tagName, tagValue]) => needleTagName === tagName && (needleValues as string[]).includes(tagValue),
+        ([tagName, tagValue]) =>
+          needleTagName === tagName &&
+          (needleValues as string[]).includes(tagValue),
       )
     ) {
       return false;

@@ -7,5 +7,8 @@ export function sortEvents<P extends EventPacket>(
   bufferTime: number,
   compareFn?: (a: P, b: P) => number,
 ): MonoTypeOperatorFunction<P> {
-  return sort(bufferTime, compareFn ?? ((a, b) => compareEvents(a.event, b.event)));
+  return sort(
+    bufferTime,
+    compareFn ?? ((a, b) => compareEvents(a.event, b.event)),
+  );
 }

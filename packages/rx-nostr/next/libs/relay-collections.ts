@@ -180,15 +180,21 @@ export class RelaySet {
   }
 
   difference(other: RelaySet): RelaySet {
-    return new RelaySet([...this.#set.difference(other.#set)], { trusted: true });
+    return new RelaySet([...this.#set.difference(other.#set)], {
+      trusted: true,
+    });
   }
 
   intersection(other: RelaySet): RelaySet {
-    return new RelaySet([...this.#set.intersection(other.#set)], { trusted: true });
+    return new RelaySet([...this.#set.intersection(other.#set)], {
+      trusted: true,
+    });
   }
 
   symmetricDifference(other: RelaySet): RelaySet {
-    return new RelaySet([...this.#set.symmetricDifference(other.#set)], { trusted: true });
+    return new RelaySet([...this.#set.symmetricDifference(other.#set)], {
+      trusted: true,
+    });
   }
 
   union(other: RelaySet): RelaySet {

@@ -5,7 +5,10 @@ import { RxNostrLogicError } from "../libs/error.ts";
  * Buffer the received values for a specified time
  * and return the values in sorted order as possible.
  */
-export function sort<T>(bufferTime: number, compareFn: (a: T, b: T) => number): MonoTypeOperatorFunction<T> {
+export function sort<T>(
+  bufferTime: number,
+  compareFn: (a: T, b: T) => number,
+): MonoTypeOperatorFunction<T> {
   const buffer: T[] = [];
 
   return pipe(

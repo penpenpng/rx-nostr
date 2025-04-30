@@ -9,7 +9,10 @@ import type { IRxReq, RxReqStrategy } from "./rx-req.interface.ts";
 abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
   abstract _strategy: RxReqStrategy;
   protected disposables = new DisposableStack();
-  protected inputs$: Subject<ReqPacket> = this.disposables.adopt(new Subject(), (v) => v.complete());
+  protected inputs$: Subject<ReqPacket> = this.disposables.adopt(
+    new Subject(),
+    (v) => v.complete(),
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 
