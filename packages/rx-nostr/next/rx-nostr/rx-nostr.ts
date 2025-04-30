@@ -21,7 +21,7 @@ import type {
   ProgressPacket,
 } from "../packets/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
-import type { IRxReq } from "../rx-req/index.ts";
+import { RxReq } from "../rx-req/index.ts";
 import { CommunicationFacade } from "./communication-facade.ts";
 import { RefCountLifeCycle } from "./ref-count-life-cycle.ts";
 import { RelayCommunication } from "./relay-communication.ts";
@@ -48,13 +48,13 @@ export class RxNostr implements IRxNostr {
     this.config = new FilledRxNostrConfig(config);
   }
 
-  req(rxReq: IRxReq, config: RxNostrReqConfig): Observable<EventPacket>;
+  req(rxReq: RxReq, config: RxNostrReqConfig): Observable<EventPacket>;
   req(
     filters: Iterable<LazyFilter>,
     config: RxNostrReqConfig,
   ): Observable<EventPacket>;
   req(
-    arg: IRxReq | Iterable<LazyFilter>,
+    arg: RxReq | Iterable<LazyFilter>,
     config: RxNostrReqConfig,
   ): Observable<EventPacket> {}
 
@@ -73,11 +73,14 @@ export class RxNostr implements IRxNostr {
     const stream = new Subject<ProgressActivity>();
     const disposables = new DisposableStack();
     const subs = disposables.adopt(new Subscription(), (v) => v.unsubscribe());
-    const lifecycle = new RefCountLifeCycle({
-      defer: false,
-      weak: config.weak,
-      linger: config.linger,
-    });
+    const lifecycle = disposables.adopt(
+      new RefCountLifeCycle({
+        defer: false,
+        weak: config.weak,
+        linger: config.linger,
+      }),
+      (v) => v.cleanup(),
+    );
 
     this.facade.forEach(targetRelays, (relay) => {
       lifecycle.prepare(relay);
@@ -113,10 +116,7 @@ export class RxNostr implements IRxNostr {
       });
 
     return stream.pipe(
-      finalize(() => {
-        disposables.dispose();
-        lifecycle.cleanup();
-      }),
+      finalize(() => void disposables.dispose()),
       takeUntil(this.dispose$),
       summarize(),
     );

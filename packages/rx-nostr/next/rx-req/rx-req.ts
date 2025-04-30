@@ -5,10 +5,11 @@ import { createPipeMethod, type IPipeable } from "../libs/pipeable.ts";
 import type { ReqPacket } from "../packets/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
-import type { IRxReq, RxReqStrategy } from "./rx-req.interface.ts";
 
-abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
-  abstract _strategy: RxReqStrategy;
+export type RxReqStrategy = "forward" | "backward";
+
+export abstract class RxReq implements IPipeable<RxReq, ReqPacket> {
+  abstract strategy: RxReqStrategy;
   protected disposables = new DisposableStack();
   protected inputs$: Subject<ReqPacket> = this.disposables.adopt(
     new Subject(),
@@ -17,9 +18,9 @@ abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 
-  protected abstract create(): RxReqBase;
+  protected abstract create(): RxReq;
 
-  get _packets$(): Observable<ReqPacket> {
+  asObservable(): Observable<ReqPacket> {
     return this.inputs$.pipe(...(this.operators as []));
   }
 
@@ -36,7 +37,7 @@ abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
     });
   }
 
-  pipe = createPipeMethod<IRxReq, ReqPacket>((...operators) => {
+  pipe = createPipeMethod<RxReq, ReqPacket>((...operators) => {
     const rxq = this.create();
     rxq.inputs$ = this.inputs$;
     rxq.operators = [...this.operators, ...operators];
@@ -48,16 +49,16 @@ abstract class RxReqBase implements IRxReq, IPipeable<IRxReq, ReqPacket> {
   dispose = this[Symbol.dispose];
 }
 
-export class RxForwardReq extends RxReqBase {
-  readonly _strategy = "forward";
+export class RxForwardReq extends RxReq {
+  readonly strategy = "forward";
 
   protected override create() {
     return new RxForwardReq();
   }
 }
 
-export class RxBackwardReq extends RxReqBase {
-  readonly _strategy = "backward";
+export class RxBackwardReq extends RxReq {
+  readonly strategy = "backward";
 
   protected override create() {
     return new RxBackwardReq();

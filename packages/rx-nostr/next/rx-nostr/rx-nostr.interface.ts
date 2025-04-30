@@ -11,11 +11,11 @@ import type {
   ProgressPacket,
 } from "../packets/index.ts";
 import type { RxRelays } from "../rx-relays/index.ts";
-import type { IRxReq } from "../rx-req/index.ts";
+import type { RxReq } from "../rx-req/index.ts";
 import type { IWebSocketConstructor } from "../websocket.ts";
 
 export interface IRxNostr {
-  req(rxReq: IRxReq, config: RxNostrReqConfig): Observable<EventPacket>;
+  req(rxReq: RxReq, config: RxNostrReqConfig): Observable<EventPacket>;
   req(
     filters: Iterable<LazyFilter>,
     config: RxNostrReqConfig,

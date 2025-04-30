@@ -1,2 +1,6 @@
-export type { IRxReq, RxReqStrategy } from "./rx-req.interface.ts";
-export { RxBackwardReq, RxForwardReq } from "./rx-req.ts";
+export {
+  RxBackwardReq,
+  RxForwardReq,
+  RxReq,
+  type RxReqStrategy,
+} from "./rx-req.ts";

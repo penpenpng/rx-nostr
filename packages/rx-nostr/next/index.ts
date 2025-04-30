@@ -118,6 +118,6 @@ export { RxRelays } from "./rx-relays/index.ts";
 export {
   RxBackwardReq,
   RxForwardReq,
-  type IRxReq,
+  RxReq,
   type RxReqStrategy,
 } from "./rx-req/index.ts";
