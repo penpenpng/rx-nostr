@@ -19,7 +19,9 @@ export type {
   MessagePacketBase,
   NoticePacket,
   OkPacket,
-  OkPacketAgainstEvent,
+  ProgressActivity,
+  ProgressInitialState,
+  ProgressPacket,
   ReqPacket,
   UnknownMessagePacket,
 } from "./packets.interface.ts";

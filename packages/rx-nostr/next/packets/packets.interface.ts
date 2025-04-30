@@ -1,6 +1,7 @@
 import * as Nostr from "nostr-typedef";
 
 import type { LazyFilter } from "../lazy-filter/index.ts";
+import type { IRxRelays } from "../rx-relays/index.ts";
 import type { ConnectionState, RelayUrl } from "../types.ts";
 
 /**
@@ -12,7 +13,27 @@ import type { ConnectionState, RelayUrl } from "../types.ts";
  */
 export interface ReqPacket {
   filters: LazyFilter[];
-  policy?: EmitScopeConnectionPolicy;
+  relays: IRxRelays | string[];
+  linger?: number;
+}
+
+export interface ProgressPacket {
+  activity: ProgressActivity;
+  progress: Map<RelayUrl, ProgressInitialState | ProgressActivity>;
+  success: number;
+  failure: number;
+}
+
+export interface ProgressInitialState {
+  state: "waiting";
+  relay: RelayUrl;
+}
+
+export interface ProgressActivity {
+  state: "sent" | "ok" | "timeout";
+  relay: RelayUrl;
+  ok?: boolean;
+  reason?: "timeout" | "auth";
 }
 
 /**
@@ -56,10 +77,6 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
   eventId: string;
   ok: boolean;
   notice?: string;
-}
-
-export interface OkPacketAgainstEvent extends OkPacket {
-  done: boolean;
 }
 
 export interface UnknownMessagePacket {

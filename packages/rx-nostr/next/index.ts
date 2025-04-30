@@ -80,7 +80,9 @@ export type {
   MessagePacketBase,
   NoticePacket,
   OkPacket,
-  OkPacketAgainstEvent,
+  ProgressActivity,
+  ProgressInitialState,
+  ProgressPacket,
   ReqPacket,
   UnknownMessagePacket,
 } from "./packets/index.ts";
@@ -90,8 +92,8 @@ export {
   type IRelay,
   type IRelayDirectory,
 } from "./relay-directory/index.ts";
-export { createRxNostr } from "./rx-nostr/index.ts";
-export { RxRelays } from "./rx-relays/index.ts";
+export { createRxNostr, type IRxNostr } from "./rx-nostr/index.ts";
+export { RxRelays, type IRxRelays } from "./rx-relays/index.ts";
 export {
   RxBackwardReq,
   RxForwardReq,
