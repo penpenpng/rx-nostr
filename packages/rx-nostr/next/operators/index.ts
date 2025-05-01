@@ -1,4 +1,4 @@
-export { changelog, type Changelog } from "./changelog.ts";
+export { diff, type SetDiff } from "./diff.ts";
 export { createTie } from "./event-packet/create-tie.ts";
 export { createUniq } from "./event-packet/create-uniq.ts";
 export { dropExpiredEvents } from "./event-packet/drop-expired-events.ts";
@@ -17,5 +17,6 @@ export { filterByType } from "./message-packet/filter-by-type.ts";
 export { filterByEventId } from "./ok-packet/filter-by-event-id.ts";
 export { batch, type MergeFilterFunction } from "./req-packet/batch.ts";
 export { chunk } from "./req-packet/chunk.ts";
+export { sealOnTimeout } from "./seal-on-timeout.ts";
 export { sort } from "./sort.ts";
-export { timeoutWith } from "./timeout-with.ts";
+export { withPrevious } from "./with-previous.ts";

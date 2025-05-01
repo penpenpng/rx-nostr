@@ -12,10 +12,14 @@ import type { RxRelays } from "../rx-relays/index.ts";
  * **NOTE**: The internal structure of ReqPacket is subject to change.
  * Do NOT create RxPackets directly, but issue RxPackets through RxReq instead.
  */
-export interface ReqPacket {
+export interface ReqPacket extends ReqOptions {
   filters: LazyFilter[];
+}
+
+export interface ReqOptions {
   relays?: RxRelays | Iterable<string>;
   linger?: number;
+  traceId?: string;
 }
 
 export interface ProgressPacket {

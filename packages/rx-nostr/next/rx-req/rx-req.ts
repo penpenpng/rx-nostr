@@ -1,45 +1,45 @@
-import { type Observable, type OperatorFunction, Subject } from "rxjs";
+import { type Observable, of, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once } from "../libs/once.ts";
 import { createPipeMethod, type IPipeable } from "../libs/pipeable.ts";
-import type { ReqPacket } from "../packets/index.ts";
-import { RxRelays } from "../rx-relays/index.ts";
+import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 
 export type RxReqStrategy = "forward" | "backward";
 
-export abstract class RxReq implements IPipeable<RxReq, ReqPacket> {
+export abstract class RxReq {
   abstract strategy: RxReqStrategy;
+  abstract asObservable(): Observable<ReqPacket>;
+}
+
+abstract class RxPipeableReq
+  extends RxReq
+  implements IPipeable<RxReq, ReqPacket>
+{
   protected disposables = new DisposableStack();
-  protected inputs$: Subject<ReqPacket> = this.disposables.adopt(
+  protected stream: Subject<ReqPacket> = this.disposables.adopt(
     new Subject(),
     (v) => v.complete(),
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 
-  protected abstract create(): RxReq;
+  protected abstract create(): RxPipeableReq;
 
   asObservable(): Observable<ReqPacket> {
-    return this.inputs$.pipe(...(this.operators as []));
+    return this.stream.pipe(...(this.operators as []));
   }
 
-  emit(
-    filters: LazyFilter | LazyFilter[],
-    options?: { relays?: RxRelays | Iterable<string>; linger?: number },
-  ) {
-    const { relays, linger } = options ?? {};
-
-    this.inputs$.next({
+  emit(filters: LazyFilter | LazyFilter[], options?: ReqOptions) {
+    this.stream.next({
       filters: normalizeFilters(filters),
-      relays,
-      linger,
+      ...(options ?? {}),
     });
   }
 
-  pipe = createPipeMethod<RxReq, ReqPacket>((...operators) => {
+  pipe = createPipeMethod<RxPipeableReq, ReqPacket>((...operators) => {
     const rxq = this.create();
-    rxq.inputs$ = this.inputs$;
+    rxq.stream = this.stream;
     rxq.operators = [...this.operators, ...operators];
 
     return rxq;
@@ -49,7 +49,7 @@ export abstract class RxReq implements IPipeable<RxReq, ReqPacket> {
   dispose = this[Symbol.dispose];
 }
 
-export class RxForwardReq extends RxReq {
+export class RxForwardReq extends RxPipeableReq {
   readonly strategy = "forward";
 
   protected override create() {
@@ -57,7 +57,7 @@ export class RxForwardReq extends RxReq {
   }
 }
 
-export class RxBackwardReq extends RxReq {
+export class RxBackwardReq extends RxPipeableReq {
   readonly strategy = "backward";
 
   protected override create() {
@@ -70,6 +70,27 @@ export class RxBackwardReq extends RxReq {
    * when all REQs that have already been sent have been completed.
    */
   over() {
-    this.inputs$.complete();
+    this.stream.complete();
+  }
+}
+
+export class RxOneshotReq extends RxReq {
+  readonly strategy = "backward";
+  protected stream: Observable<ReqPacket>;
+
+  constructor(
+    filters: LazyFilter | LazyFilter[],
+    options?: Pick<ReqOptions, "traceId">,
+  ) {
+    super();
+
+    this.stream = of({
+      filters: normalizeFilters(filters),
+      ...(options ?? {}),
+    });
+  }
+
+  asObservable(): Observable<ReqPacket> {
+    return this.stream;
   }
 }

@@ -50,10 +50,10 @@ export {
 export { setLogLevel } from "./logger.ts";
 export {
   batch,
-  changelog,
   chunk,
   createTie,
   createUniq,
+  diff,
   dropExpiredEvents,
   filterAsync,
   filterBy,
@@ -69,8 +69,9 @@ export {
   timeline,
   uniq,
   verify,
-  type Changelog,
+  withPrevious,
   type MergeFilterFunction,
+  type SetDiff,
 } from "./operators/index.ts";
 export {
   isAuthPacket,
@@ -96,6 +97,7 @@ export type {
   ProgressActivity,
   ProgressInitialState,
   ProgressPacket,
+  ReqOptions,
   ReqPacket,
   UnknownMessagePacket,
 } from "./packets/index.ts";

@@ -231,6 +231,36 @@ interface TrustOption {
   trusted?: boolean;
 }
 
+export class RelayMapOperator<T> {
+  #map = new RelayMap<T>();
+
+  constructor(private factory: (relay: RelayUrl) => T) {}
+
+  forEach(
+    relays: Iterable<RelayUrl> | null | undefined,
+    callback: (value: T) => void,
+  ) {
+    if (!relays) {
+      return;
+    }
+
+    for (const relay of relays) {
+      let value = this.#map.get(relay);
+
+      if (!value) {
+        value = this.factory(relay);
+        this.#map.set(relay, value);
+      }
+
+      callback(value);
+    }
+  }
+
+  delete(relay: RelayUrl) {
+    this.#map.delete(relay);
+  }
+}
+
 export function normalizeRelayUrl(url: string): RelayUrl | null {
   if (typeof url !== "string") {
     return null;

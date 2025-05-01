@@ -1,7 +1,7 @@
 import { scan, type OperatorFunction } from "rxjs";
 
-export function changelog<T>(): OperatorFunction<Set<T>, Changelog<T>> {
-  return scan<Set<T>, Changelog<T>>(
+export function diff<T>(): OperatorFunction<Set<T>, SetDiff<T>> {
+  return scan<Set<T>, SetDiff<T>>(
     (acc, values) => {
       const next = values;
       const prev = acc.current;
@@ -18,7 +18,7 @@ export function changelog<T>(): OperatorFunction<Set<T>, Changelog<T>> {
   );
 }
 
-export interface Changelog<T> {
+export interface SetDiff<T> {
   appended?: Set<T>;
   outdated?: Set<T>;
   current: Set<T>;

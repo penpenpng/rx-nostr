@@ -17,7 +17,7 @@ import type { IWebSocketConstructor } from "../websocket.ts";
 export interface IRxNostr {
   req(rxReq: RxReq, config: RxNostrReqConfig): Observable<EventPacket>;
   req(
-    filters: Iterable<LazyFilter>,
+    filters: LazyFilter | Iterable<LazyFilter>,
     config: RxNostrReqConfig,
   ): Observable<EventPacket>;
   event(

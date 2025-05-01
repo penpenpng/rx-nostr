@@ -1,6 +1,7 @@
 import { SimpleAuthenticator } from "../authenticator/simple-authenticator.ts";
 import { NoopRetryer } from "../connection-retryer/index.ts";
 import { Nip07Signer } from "../event-signer/index.ts";
+import type { EventVerifier } from "../event-verifier/event-verifier.interface.ts";
 import type {
   RxNostrConfig,
   RxNostrEventOptions,
@@ -46,7 +47,7 @@ export class FilledRxNostrConfig {
 
 export class FilledRxNostrReqOptions {
   constructor(
-    private config: RxNostrReqOptions,
+    private config: RxNostrReqOptions & { verifier?: EventVerifier },
     private rootConfig: FilledRxNostrConfig,
   ) {}
 
@@ -77,6 +78,10 @@ export class FilledRxNostrReqOptions {
   get skipValidateFilterMatching() {
     const key = "skipValidateFilterMatching";
     return this.config[key] ?? this.base[key] ?? false;
+  }
+  get verifier() {
+    const key = "verifier";
+    return this.config[key] ?? this.rootConfig[key];
   }
 }
 

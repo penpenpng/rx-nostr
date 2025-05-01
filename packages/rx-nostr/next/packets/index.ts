@@ -22,6 +22,7 @@ export type {
   ProgressActivity,
   ProgressInitialState,
   ProgressPacket,
+  ReqOptions,
   ReqPacket,
   UnknownMessagePacket,
 } from "./packets.interface.ts";
