@@ -33,19 +33,11 @@ export class RxNostr implements IRxNostr {
   protected dispose$ = new Subject<void>();
   protected relays = new RelayMapOperator((url) => new RelayCommunication(url));
   protected config: FilledRxNostrConfig;
-  protected forwardReqClient: ForwardReqClient;
-  protected backwardReqClient: BackwardReqClient;
   protected publisher: EventPublisher;
   protected warmer: RelayWarmer;
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
-
-    this.forwardReqClient = new ForwardReqClient(this.relays);
-    this.disposables.use(this.forwardReqClient);
-
-    this.backwardReqClient = new BackwardReqClient(this.relays);
-    this.disposables.use(this.backwardReqClient);
 
     this.publisher = new EventPublisher(this.relays);
     this.disposables.use(this.publisher);
@@ -58,6 +50,8 @@ export class RxNostr implements IRxNostr {
     arg: RxReq | LazyFilter | Iterable<LazyFilter>,
     { relays, ...options }: RxNostrReqConfig,
   ): Observable<EventPacket> {
+    const config = new FilledRxNostrReqOptions(options, this.config);
+
     const rxReq: RxReq = (() => {
       if (arg instanceof RxReq) {
         return arg;
@@ -68,15 +62,17 @@ export class RxNostr implements IRxNostr {
       }
     })();
 
-    const config = new FilledRxNostrReqOptions(options, this.config);
-
-    return defer(() => {
+    const client = (() => {
       if (rxReq.strategy === "forward") {
-        return this.forwardReqClient.req({ rxReq, relays, config });
+        return new ForwardReqClient(this.relays);
       } else {
-        return this.backwardReqClient.req({ rxReq, relays, config });
+        return new BackwardReqClient(this.relays);
       }
-    });
+    })();
+
+    this.disposables.use(client);
+
+    return defer(() => client.req({ rxReq, relays, config }));
   }
 
   publish(
@@ -89,11 +85,11 @@ export class RxNostr implements IRxNostr {
   }
 
   setHotRelays(relays: RelayInput): void {
-    return this.warmer.setHotRelays(relays);
+    this.warmer.setHotRelays(relays);
   }
 
   unsetHotRelays(): void {
-    return this.warmer.unsetHotRelays();
+    this.warmer.unsetHotRelays();
   }
 
   monitorConnectionState(): Observable<ConnectionStatePacket> {}

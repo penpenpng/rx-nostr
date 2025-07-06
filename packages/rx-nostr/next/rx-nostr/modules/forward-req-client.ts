@@ -14,7 +14,7 @@ import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
-import type { RelayInput } from "../rx-nostr.interface";
+import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class ForwardReqClient {

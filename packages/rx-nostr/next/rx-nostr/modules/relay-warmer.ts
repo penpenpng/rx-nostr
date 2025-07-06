@@ -7,7 +7,7 @@ import {
 import { setDiff } from "../../operators/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RelayCommunication } from "../relay-communication.ts";
-import type { RelayInput } from "../rx-nostr.interface";
+import type { RelayInput } from "../rx-nostr.interface.ts";
 
 export class RelayWarmer {
   private sub?: Subscription;

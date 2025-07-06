@@ -3,7 +3,7 @@ import { once, type RelayMapOperator } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayCommunication } from "../relay-communication.ts";
-import type { RelayInput } from "../rx-nostr.interface";
+import type { RelayInput } from "../rx-nostr.interface.ts";
 
 export class BackwardReqClient {
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
