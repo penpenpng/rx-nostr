@@ -20,9 +20,9 @@ export interface IRxNostr {
     filters: LazyFilter | Iterable<LazyFilter>,
     config: RxNostrReqConfig,
   ): Observable<EventPacket>;
-  event(
+  publish(
     params: Nostr.EventParameters,
-    config: RxNostrEventConfig,
+    config: RxNostrPublishConfig,
   ): Observable<ProgressPacket>;
   setHotRelays(relays: RxRelays | Iterable<string>): void;
   unsetHotRelays(): void;
@@ -40,7 +40,7 @@ export interface RxNostrConfig {
    */
   signer?: EventSigner;
   authenticator?: Authenticator;
-  defaultOptions?: { req?: RxNostrReqOptions; event?: RxNostrEventOptions };
+  defaultOptions?: { req?: RxNostrReqOptions; publish?: RxNostrPublishOptions };
   /**
    * Auto reconnection controller.
    */
@@ -82,7 +82,7 @@ export interface RxNostrReqConfig extends RxNostrReqOptions {
   verifier?: EventVerifier;
 }
 
-export interface RxNostrEventOptions {
+export interface RxNostrPublishOptions {
   signer?: EventSigner;
   linger?: number;
   weak?: boolean;
@@ -94,6 +94,6 @@ export interface RxNostrEventOptions {
   timeout?: number;
 }
 
-export interface RxNostrEventConfig extends RxNostrEventOptions {
+export interface RxNostrPublishConfig extends RxNostrPublishOptions {
   relays: RxRelays | Iterable<string>;
 }

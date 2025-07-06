@@ -4,7 +4,7 @@ import { Nip07Signer } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/event-verifier.interface.ts";
 import type {
   RxNostrConfig,
-  RxNostrEventOptions,
+  RxNostrPublishOptions,
   RxNostrReqOptions,
 } from "./rx-nostr.interface.ts";
 
@@ -85,14 +85,14 @@ export class FilledRxNostrReqOptions {
   }
 }
 
-export class FilledRxNostrEventOptions {
+export class FilledRxNostrPublishOptions {
   constructor(
-    private config: RxNostrEventOptions,
+    private config: RxNostrPublishOptions,
     private rootConfig: FilledRxNostrConfig,
   ) {}
 
   private get base() {
-    return this.rootConfig.defaultOptions?.event ?? {};
+    return this.rootConfig.defaultOptions?.publish ?? {};
   }
 
   private get root() {
