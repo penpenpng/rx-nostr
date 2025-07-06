@@ -1,5 +1,5 @@
 import { scan, type OperatorFunction } from "rxjs";
-import { compareEvents } from "../../libs/nostr/event.ts";
+import { compareEvents } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

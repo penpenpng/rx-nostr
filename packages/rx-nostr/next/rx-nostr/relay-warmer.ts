@@ -1,7 +1,6 @@
 import { type Subscription } from "rxjs";
-import { once } from "../libs/once.ts";
-import type { RelayMapOperator, RelayUrl } from "../libs/relay-urls.ts";
-import { diff } from "../operators/index.ts";
+import { once, type RelayMapOperator, type RelayUrl } from "../libs/index.ts";
+import { setDiff } from "../operators/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
 import type { RelayCommunication } from "./relay-communication.ts";
 
@@ -14,7 +13,7 @@ export class RelayWarmer {
   setHotRelays = (relays: RxRelays | Iterable<string>): void => {
     this.sub?.unsubscribe();
     this.sub = RxRelays.observable(relays)
-      .pipe(diff({ seed: this.lastValue }))
+      .pipe(setDiff({ seed: this.lastValue }))
       .subscribe(({ current, appended, outdated }) => {
         this.lastValue = current;
 

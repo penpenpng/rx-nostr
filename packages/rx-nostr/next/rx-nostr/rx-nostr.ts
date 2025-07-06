@@ -18,12 +18,11 @@ import {
   timeout,
 } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { once } from "../libs/once.ts";
-import { RelayMapOperator, type RelayUrl } from "../libs/relay-urls.ts";
+import { once, RelayMapOperator, type RelayUrl } from "../libs/index.ts";
 import { Logger } from "../logger.ts";
 import {
-  diff,
-  sealOnTimeout,
+  setDiff,
+  timeoutWith,
   withPrevious,
   type SetDiff,
 } from "../operators/index.ts";
@@ -90,26 +89,26 @@ export class RxNostr implements IRxNostr {
     const subscriptions = disposables.adopt(new Subscription(), (v) =>
       v.unsubscribe(),
     );
-    const lifecycle = disposables.adopt(new SessionLifecycle(config), (v) =>
+    const session = disposables.adopt(new SessionLifecycle(config), (v) =>
       v.cleanup(),
     );
 
     this.relays.forEach(RxRelays.array(relays), (relay) => {
-      lifecycle.preconnect(relay);
+      session.preconnect(relay);
     });
 
     subscriptions.add(
       RxRelays.observable(relays)
-        .pipe(diff())
+        .pipe(setDiff())
         .subscribe(({ appended, outdated }) => {
           if (activeFilters) {
             this.relays.forEach(appended, (relay) => {
-              lifecycle.connect(relay);
-              stream.next(relay.vreq(rxReq.strategy, activeFilters!));
+              session.connect(relay);
+              stream.next(relay.vreq(rxReq.strategy, activeFilters));
             });
             this.relays.forEach(outdated, (relay) => {
               // TODO: unsub here
-              lifecycle.release(relay);
+              session.release(relay);
             });
           }
         }),
@@ -120,14 +119,14 @@ export class RxNostr implements IRxNostr {
     // backward では全ての filter を見ないといけない
     const sub = watchChanges({
       req: rxReq.asObservable().pipe(withPrevious()),
-      relays: RxRelays.observable(relays).pipe(diff()),
+      relays: RxRelays.observable(relays).pipe(setDiff()),
     }).subscribe(([updated, state]) => {
       const [prevReq, nextReq] = state.req;
       const { current, appended, outdated } = state.relays;
 
       if (updated === "req") {
         this.relays.forEach(current, (relay) => {
-          lifecycle.connect(relay);
+          session.connect(relay);
           // TODO: linger, relays, traceId
           stream.next(relay.vreq(rxReq.strategy, nextReq.filters));
         });
@@ -160,7 +159,7 @@ export class RxNostr implements IRxNostr {
     const subscriptions = disposables.adopt(new Subscription(), (v) =>
       v.unsubscribe(),
     );
-    const lifecycle = disposables.adopt(
+    const session = disposables.adopt(
       new SessionLifecycle({
         defer: false,
         weak: config.weak,
@@ -170,19 +169,19 @@ export class RxNostr implements IRxNostr {
     );
 
     this.relays.forEach(targetRelays, (relay) => {
-      lifecycle.preconnect(relay);
+      session.preconnect(relay);
     });
 
     const publish = (relay: RelayCommunication, event: Nostr.Event) => {
-      lifecycle.connect(relay);
+      session.connect(relay);
 
       subscriptions.add(
         relay
           .event(event)
           .pipe(
-            finalize(() => void lifecycle.release(relay)),
+            finalize(() => void session.release(relay)),
             timeout(config.timeout),
-            sealOnTimeout({
+            timeoutWith({
               state: "timeout",
               relay: relay.url,
             } as const),

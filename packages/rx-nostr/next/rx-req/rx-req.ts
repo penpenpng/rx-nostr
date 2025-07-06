@@ -1,7 +1,6 @@
 import { type Observable, of, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { once } from "../libs/once.ts";
-import { createPipeMethod, type IPipeable } from "../libs/pipeable.ts";
+import { createPipeMethod, type IPipeable, once } from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 

@@ -1,5 +1,5 @@
 import { delay, map, pipe, tap, type MonoTypeOperatorFunction } from "rxjs";
-import { RxNostrLogicError } from "../libs/error.ts";
+import { RxNostrLogicError } from "../libs/index.ts";
 
 /**
  * Buffer the received values for a specified time

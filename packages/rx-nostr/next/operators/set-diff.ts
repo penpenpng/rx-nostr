@@ -1,6 +1,6 @@
 import { scan, type OperatorFunction } from "rxjs";
 
-export function diff<T>(options?: {
+export function setDiff<T>(options?: {
   seed?: Set<T>;
 }): OperatorFunction<Set<T>, SetDiff<T>> {
   return scan<Set<T>, SetDiff<T>>(

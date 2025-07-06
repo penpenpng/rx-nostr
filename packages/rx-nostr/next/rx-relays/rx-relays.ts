@@ -7,9 +7,7 @@ import {
   Subscription,
   type Observable,
 } from "rxjs";
-import { once } from "../libs/once.ts";
-import { RelaySet, type RelayUrl } from "../libs/relay-urls.ts";
-import { SetOp } from "../libs/set.ts";
+import { once, RelaySet, SetOp, type RelayUrl } from "../libs/index.ts";
 
 export class RxRelays {
   protected disposables = new DisposableStack();

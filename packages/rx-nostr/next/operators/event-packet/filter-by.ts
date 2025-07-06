@@ -1,10 +1,6 @@
 import { filter, type MonoTypeOperatorFunction } from "rxjs";
 import { evalFilters, type LazyFilter } from "../../lazy-filter/index.ts";
-import {
-  isFiltered,
-  type MatchFilterOptions,
-} from "../../libs/nostr/filter.ts";
-import { xor } from "../../libs/xor.ts";
+import { isFiltered, xor, type MatchFilterOptions } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

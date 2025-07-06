@@ -1,5 +1,5 @@
 import { filter, type MonoTypeOperatorFunction } from "rxjs";
-import { isExpired } from "../../libs/nostr/nip40.ts";
+import { isExpired } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

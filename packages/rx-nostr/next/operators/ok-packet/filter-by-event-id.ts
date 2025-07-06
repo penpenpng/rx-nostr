@@ -1,5 +1,5 @@
 import { filter, type MonoTypeOperatorFunction } from "rxjs";
-import { xor } from "../../libs/xor.ts";
+import { xor } from "../../libs/index.ts";
 import type { OkPacket } from "../../packets/packets.interface.ts";
 
 /**

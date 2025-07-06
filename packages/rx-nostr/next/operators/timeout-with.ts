@@ -6,7 +6,7 @@ import {
   type OperatorFunction,
 } from "rxjs";
 
-export function sealOnTimeout<T, R = void>(
+export function timeoutWith<T, R = void>(
   lastValue?: R,
 ): OperatorFunction<T, T | R> {
   return catchError((error: unknown) => {

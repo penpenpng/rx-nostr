@@ -1,6 +1,9 @@
 import type * as Nostr from "nostr-typedef";
-import { inlineThrow, RxNostrEnvironmentError } from "../libs/error.ts";
-import { ensureEventFields } from "../libs/nostr/event.ts";
+import {
+  ensureEventFields,
+  inlineThrow,
+  RxNostrEnvironmentError,
+} from "../libs/index.ts";
 import type { EventSigner } from "./event-signer.interface.ts";
 
 export class Nip07Signer implements EventSigner {

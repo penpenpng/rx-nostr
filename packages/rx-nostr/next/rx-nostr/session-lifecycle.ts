@@ -1,5 +1,4 @@
-import { Deferrer } from "../libs/deferrer.ts";
-import { RelayMap } from "../libs/relay-urls.ts";
+import { Deferrer, RelayMap } from "../libs/index.ts";
 import type { RelayCommunication } from "./relay-communication.ts";
 
 export type ConnectionResult = "skipped" | "connected";
