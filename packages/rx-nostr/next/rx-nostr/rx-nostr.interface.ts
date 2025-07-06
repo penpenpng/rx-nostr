@@ -24,7 +24,7 @@ export interface IRxNostr {
     params: Nostr.EventParameters,
     config: RxNostrPublishConfig,
   ): Observable<ProgressPacket>;
-  setHotRelays(relays: RxRelays | Iterable<string>): void;
+  setHotRelays(relays: RelayInput): void;
   unsetHotRelays(): void;
   monitorConnectionState(): Observable<ConnectionStatePacket>;
   [Symbol.dispose](): void;
@@ -78,7 +78,7 @@ export interface RxNostrReqOptions {
 }
 
 export interface RxNostrReqConfig extends RxNostrReqOptions {
-  relays: RxRelays | Iterable<string>;
+  relays: RelayInput;
   verifier?: EventVerifier;
 }
 
@@ -95,5 +95,7 @@ export interface RxNostrPublishOptions {
 }
 
 export interface RxNostrPublishConfig extends RxNostrPublishOptions {
-  relays: RxRelays | Iterable<string>;
+  relays: RelayInput;
 }
+
+export type RelayInput = RxRelays | Iterable<string>;

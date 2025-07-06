@@ -7,6 +7,7 @@ import {
 import { setDiff } from "../../operators/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RelayCommunication } from "../relay-communication.ts";
+import type { RelayInput } from "../rx-nostr.interface";
 
 export class RelayWarmer {
   private sub?: Subscription;
@@ -14,7 +15,7 @@ export class RelayWarmer {
 
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
 
-  setHotRelays(relays: RxRelays | Iterable<string>): void {
+  setHotRelays(relays: RelayInput): void {
     this.sub?.unsubscribe();
     this.sub = RxRelays.observable(relays)
       .pipe(setDiff({ seed: this.lastValue }))

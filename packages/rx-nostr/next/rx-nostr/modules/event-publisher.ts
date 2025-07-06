@@ -15,6 +15,7 @@ import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { RelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
+import type { RelayInput } from "../rx-nostr.interface";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class EventPublisher {
@@ -28,7 +29,7 @@ export class EventPublisher {
     config,
   }: {
     params: Nostr.EventParameters;
-    relays: RxRelays | Iterable<string>;
+    relays: RelayInput;
     config: FilledRxNostrPublishOptions;
   }): Observable<ProgressPacket> {
     const targetRelays = RxRelays.array(relays);

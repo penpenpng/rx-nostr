@@ -7,7 +7,6 @@ import type {
   EventPacket,
   ProgressPacket,
 } from "../packets/index.ts";
-import { RxRelays } from "../rx-relays/index.ts";
 import { RxOneshotReq, RxReq } from "../rx-req/index.ts";
 import {
   BackwardReqClient,
@@ -23,6 +22,7 @@ import {
 } from "./rx-nostr.config.ts";
 import type {
   IRxNostr,
+  RelayInput,
   RxNostrConfig,
   RxNostrPublishConfig,
   RxNostrReqConfig,
@@ -88,7 +88,7 @@ export class RxNostr implements IRxNostr {
     return this.publisher.publish({ params, relays, config });
   }
 
-  setHotRelays(relays: RxRelays | Iterable<string>): void {
+  setHotRelays(relays: RelayInput): void {
     return this.warmer.setHotRelays(relays);
   }
 
