@@ -2,22 +2,23 @@ import {
   BehaviorSubject,
   combineLatest,
   concat,
-  from,
   of,
   Subscription,
   type Observable,
 } from "rxjs";
-import { once, RelaySet, SetOp, type RelayUrl } from "../libs/index.ts";
+import {
+  once,
+  RelaySet,
+  RxDisposables,
+  SetOp,
+  type RelayUrl,
+} from "../libs/index.ts";
 
 export class RxRelays {
-  protected disposables = new DisposableStack();
-  protected subscriptions = this.disposables.adopt(new Subscription(), (v) =>
-    v.unsubscribe(),
-  );
+  protected disposables = new RxDisposables();
   protected relays = new RelaySet();
-  protected stream: BehaviorSubject<Set<RelayUrl>> = this.disposables.adopt(
+  protected stream: BehaviorSubject<Set<RelayUrl>> = this.disposables.add(
     new BehaviorSubject(new Set()),
-    (v) => v.complete(),
   );
 
   constructor(relays?: Iterable<string>) {
@@ -70,7 +71,7 @@ export class RxRelays {
       rxr.set(...x.difference(y));
     });
 
-    rxr.subscriptions.add(sub);
+    rxr.disposables.add(sub);
 
     return rxr;
   }
@@ -81,7 +82,7 @@ export class RxRelays {
       rxr.set(...SetOp.intersection(...sets));
     });
 
-    rxr.subscriptions.add(sub);
+    rxr.disposables.add(sub);
 
     return rxr;
   }
@@ -92,7 +93,7 @@ export class RxRelays {
       rxr.set(...SetOp.union(...sets));
     });
 
-    rxr.subscriptions.add(sub);
+    rxr.disposables.add(sub);
 
     return rxr;
   }

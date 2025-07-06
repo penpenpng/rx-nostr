@@ -8,7 +8,7 @@ import {
   takeUntil,
   timeout,
 } from "rxjs";
-import { once, RelayMapOperator } from "../../libs/index.ts";
+import { once, RelayMapOperator, RxDisposables } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
@@ -19,7 +19,7 @@ import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class EventPublisher {
-  protected dispose$ = new Subject<void>();
+  protected disposables = new RxDisposables();
 
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
 
@@ -40,11 +40,7 @@ export class EventPublisher {
     }
 
     const stream = new Subject<ProgressActivity>();
-    const disposables = new DisposableStack();
-    const subscriptions = disposables.adopt(new Subscription(), (v) =>
-      v.unsubscribe(),
-    );
-    const session = disposables.adopt(
+    const session = this.disposables.adopt(
       new SessionLifecycle({
         defer: false,
         weak: config.weak,
@@ -60,7 +56,7 @@ export class EventPublisher {
     const publish = (relay: RelayCommunication, event: Nostr.Event) => {
       session.connect(relay);
 
-      subscriptions.add(
+      this.disposables.add(
         relay
           .event(event)
           .pipe(
@@ -88,16 +84,15 @@ export class EventPublisher {
       });
 
     return stream.pipe(
-      finalize(() => void disposables.dispose()),
-      takeUntil(this.dispose$),
+      finalize(() => void this.dispose()),
+      this.disposables.whileAlive(),
       // TODO: ProgressPacket を作る
       summarize(),
     );
   }
 
   [Symbol.dispose] = once(() => {
-    this.dispose$.next();
-    this.dispose$.complete();
+    this.disposables.dispose();
   });
   dispose = this[Symbol.dispose];
 }

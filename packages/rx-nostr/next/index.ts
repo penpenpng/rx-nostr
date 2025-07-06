@@ -47,6 +47,7 @@ export {
   RelaySet,
   type RelayUrl,
 } from "./libs/relay-urls.ts";
+export { RxDisposables } from "./libs/rxjs/rx-disposable.ts";
 export { setLogLevel } from "./logger.ts";
 export {
   batch,

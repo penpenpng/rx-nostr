@@ -1,6 +1,11 @@
 import { type Observable, of, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { createPipeMethod, type IPipeable, once } from "../libs/index.ts";
+import {
+  createPipeMethod,
+  type IPipeable,
+  once,
+  RxDisposables,
+} from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 
@@ -15,11 +20,8 @@ abstract class RxPipeableReq
   extends RxReq
   implements IPipeable<RxReq, ReqPacket>
 {
-  protected disposables = new DisposableStack();
-  protected stream: Subject<ReqPacket> = this.disposables.adopt(
-    new Subject(),
-    (v) => v.complete(),
-  );
+  protected disposables = new RxDisposables();
+  protected stream: Subject<ReqPacket> = this.disposables.add(new Subject());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 

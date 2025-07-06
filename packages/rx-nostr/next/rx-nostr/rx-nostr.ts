@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
-import { defer, Observable, Subject } from "rxjs";
+import { defer, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { once, RelayMapOperator } from "../libs/index.ts";
+import { once, RelayMapOperator, RxDisposables } from "../libs/index.ts";
 import type {
   ConnectionStatePacket,
   EventPacket,
@@ -29,8 +29,7 @@ import type {
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
-  protected disposables = new DisposableStack();
-  protected dispose$ = new Subject<void>();
+  protected disposables = new RxDisposables();
   protected relays = new RelayMapOperator((url) => new RelayCommunication(url));
   protected config: FilledRxNostrConfig;
   protected publisher: EventPublisher;
@@ -96,8 +95,6 @@ export class RxNostr implements IRxNostr {
 
   [Symbol.dispose] = once(() => {
     this.disposables.dispose();
-    this.dispose$.next();
-    this.dispose$.complete();
   });
   dispose = this[Symbol.dispose];
 }

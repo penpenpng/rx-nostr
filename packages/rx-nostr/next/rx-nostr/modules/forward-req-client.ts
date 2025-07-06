@@ -6,7 +6,11 @@ import {
   takeUntil,
   type Observable,
 } from "rxjs";
-import { once, type RelayMapOperator } from "../../libs/index.ts";
+import {
+  once,
+  RxDisposables,
+  type RelayMapOperator,
+} from "../../libs/index.ts";
 import { watchChanges } from "../../operators/general/watch-changes.ts";
 import { setDiff, withPrevious } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
@@ -18,6 +22,8 @@ import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class ForwardReqClient {
+  private disposables = new RxDisposables();
+
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
 
   req({
@@ -30,11 +36,8 @@ export class ForwardReqClient {
     config: FilledRxNostrReqOptions;
   }): Observable<EventPacket> {
     const stream = new Subject<Observable<EventPacket>>();
-    const disposables = new DisposableStack();
-    const subscriptions = disposables.adopt(new Subscription(), (v) =>
-      v.unsubscribe(),
-    );
-    const session = disposables.adopt(new SessionLifecycle(config), (v) =>
+
+    const session = this.disposables.adopt(new SessionLifecycle(config), (v) =>
       v.cleanup(),
     );
 
@@ -42,7 +45,7 @@ export class ForwardReqClient {
       session.preconnect(relay);
     });
 
-    subscriptions.add(
+    this.disposables.add(
       RxRelays.observable(relays)
         .pipe(setDiff())
         .subscribe(({ appended, outdated }) => {
