@@ -20,13 +20,13 @@ import {
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RelayMapOperator, type RelayUrl } from "../libs/index.ts";
 import { Logger } from "../logger.ts";
+import { watchChanges } from "../operators/general/watch-changes.ts";
 import {
   setDiff,
   timeoutWith,
   withPrevious,
   type SetDiff,
 } from "../operators/index.ts";
-import { watchChanges } from "../operators/watch-changes.ts";
 import type {
   ConnectionStatePacket,
   EventPacket,
