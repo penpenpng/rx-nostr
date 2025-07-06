@@ -37,8 +37,8 @@ import type {
 } from "../packets/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
 import { RxOneshotReq, RxReq } from "../rx-req/index.ts";
-import { ConnectionLifecycle } from "./connection-lifecycle.ts";
 import { RelayCommunication } from "./relay-communication.ts";
+import { RelayWarmer } from "./relay-warmer.ts";
 import {
   FilledRxNostrConfig,
   FilledRxNostrEventOptions,
@@ -50,13 +50,14 @@ import type {
   RxNostrEventConfig,
   RxNostrReqConfig,
 } from "./rx-nostr.interface.ts";
+import { SessionLifecycle } from "./session-lifecycle.ts";
 
 export class RxNostr implements IRxNostr {
   protected disposables = new DisposableStack();
   protected dispose$ = new Subject<void>();
-  protected hotRelaysSubscription?: Subscription;
   protected config: FilledRxNostrConfig;
   protected relays = new RelayMapOperator((url) => new RelayCommunication(url));
+  protected warmer = this.disposables.use(new RelayWarmer(this.relays));
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
@@ -89,7 +90,7 @@ export class RxNostr implements IRxNostr {
     const subscriptions = disposables.adopt(new Subscription(), (v) =>
       v.unsubscribe(),
     );
-    const lifecycle = disposables.adopt(new ConnectionLifecycle(config), (v) =>
+    const lifecycle = disposables.adopt(new SessionLifecycle(config), (v) =>
       v.cleanup(),
     );
 
@@ -102,8 +103,8 @@ export class RxNostr implements IRxNostr {
         .pipe(diff())
         .subscribe(({ appended, outdated }) => {
           if (activeFilters) {
-            this.relays.forEach(appended, async (relay) => {
-              await lifecycle.connect(relay);
+            this.relays.forEach(appended, (relay) => {
+              lifecycle.connect(relay);
               stream.next(relay.vreq(rxReq.strategy, activeFilters!));
             });
             this.relays.forEach(outdated, (relay) => {
@@ -125,8 +126,8 @@ export class RxNostr implements IRxNostr {
       const { current, appended, outdated } = state.relays;
 
       if (updated === "req") {
-        this.relays.forEach(current, async (relay) => {
-          await lifecycle.connect(relay);
+        this.relays.forEach(current, (relay) => {
+          lifecycle.connect(relay);
           // TODO: linger, relays, traceId
           stream.next(relay.vreq(rxReq.strategy, nextReq.filters));
         });
@@ -160,7 +161,7 @@ export class RxNostr implements IRxNostr {
       v.unsubscribe(),
     );
     const lifecycle = disposables.adopt(
-      new ConnectionLifecycle({
+      new SessionLifecycle({
         defer: false,
         weak: config.weak,
         linger: config.linger,
@@ -168,31 +169,32 @@ export class RxNostr implements IRxNostr {
       (v) => v.cleanup(),
     );
 
-    const publish = async (relay: RelayCommunication, event: Nostr.Event) => {
-      await lifecycle.connect(relay);
-
-      const sub = relay
-        .event(event)
-        .pipe(
-          finalize(() => void lifecycle.release(relay)),
-          timeout(config.timeout),
-          sealOnTimeout({
-            state: "timeout",
-            relay: relay.url,
-          } as const),
-        )
-        .subscribe(stream);
-      subscriptions.add(sub);
-    };
-
     this.relays.forEach(targetRelays, (relay) => {
       lifecycle.preconnect(relay);
     });
 
+    const publish = (relay: RelayCommunication, event: Nostr.Event) => {
+      lifecycle.connect(relay);
+
+      subscriptions.add(
+        relay
+          .event(event)
+          .pipe(
+            finalize(() => void lifecycle.release(relay)),
+            timeout(config.timeout),
+            sealOnTimeout({
+              state: "timeout",
+              relay: relay.url,
+            } as const),
+          )
+          .subscribe(stream),
+      );
+    };
+
     config.signer
       .signEvent(params)
       .then((event) => {
-        this.relays.forEach(targetRelays, async (relay) => {
+        this.relays.forEach(targetRelays, (relay) => {
           publish(relay, event);
         });
       })
@@ -208,36 +210,12 @@ export class RxNostr implements IRxNostr {
     );
   }
 
-  setHotRelays(relays: RxRelays | Iterable<string>): void {
-    let lastValue: Set<RelayUrl>;
-    let prevSubscription = this.hotRelaysSubscription;
-
-    this.hotRelaysSubscription = RxRelays.observable(relays)
-      .pipe(
-        diff(),
-        finalize(() => {
-          this.relays.forEach(lastValue, (relay) => relay.release());
-        }),
-      )
-      .subscribe(({ current, appended, outdated }) => {
-        lastValue = current;
-
-        prevSubscription?.unsubscribe();
-        prevSubscription = undefined;
-
-        this.relays.forEach(appended, (relay) => relay.connect());
-        this.relays.forEach(outdated, (relay) => relay.release());
-      });
-  }
-
-  unsetHotRelays(): void {
-    this.setHotRelays([]);
-  }
+  setHotRelays = this.warmer.setHotRelays;
+  unsetHotRelays = this.warmer.unsetHotRelays;
 
   monitorConnectionState(): Observable<ConnectionStatePacket> {}
 
   [Symbol.dispose] = once(() => {
-    this.hotRelaysSubscription?.unsubscribe();
     this.disposables.dispose();
     this.dispose$.next();
     this.dispose$.complete();
