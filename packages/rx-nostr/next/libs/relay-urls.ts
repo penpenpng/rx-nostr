@@ -239,7 +239,7 @@ export class RelayMapOperator<T> {
   forEach(
     relays: Iterable<RelayUrl> | null | undefined,
     callback: (value: T) => void,
-  ) {
+  ): void {
     if (!relays) {
       return;
     }
@@ -254,6 +254,30 @@ export class RelayMapOperator<T> {
 
       callback(value);
     }
+  }
+
+  map<R>(
+    relays: Iterable<RelayUrl> | null | undefined,
+    project: (value: T) => R,
+  ): R[] {
+    if (!relays) {
+      return [];
+    }
+
+    const results: R[] = [];
+
+    for (const relay of relays) {
+      let value = this.#map.get(relay);
+
+      if (!value) {
+        value = this.factory(relay);
+        this.#map.set(relay, value);
+      }
+
+      results.push(project(value));
+    }
+
+    return results;
   }
 
   delete(relay: RelayUrl) {

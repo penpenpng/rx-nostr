@@ -2,8 +2,8 @@ import {
   BehaviorSubject,
   combineLatest,
   concat,
+  EMPTY,
   of,
-  Subscription,
   type Observable,
 } from "rxjs";
 import {
@@ -98,9 +98,27 @@ export class RxRelays {
     return rxr;
   }
 
+  static from(
+    relays: RxRelays | Iterable<string> | null | undefined,
+  ): RxRelays {
+    if (!relays) {
+      return RxRelays.empty();
+    }
+
+    if (relays instanceof RxRelays) {
+      return RxRelays.union(relays);
+    } else {
+      return new RxRelays(...relays);
+    }
+  }
+
   static observable(
-    relays: RxRelays | Iterable<string>,
+    relays: RxRelays | Iterable<string> | null | undefined,
   ): Observable<Set<RelayUrl>> {
+    if (!relays) {
+      return EMPTY;
+    }
+
     if (relays instanceof RxRelays) {
       return relays.asObservable();
     } else {
@@ -108,8 +126,21 @@ export class RxRelays {
     }
   }
 
-  static array(relays: RxRelays | Iterable<string>): RelayUrl[] {
+  static array(
+    relays: RxRelays | Iterable<string> | null | undefined,
+  ): RelayUrl[] {
+    if (!relays) {
+      return [];
+    }
+
     return [...new RelaySet(relays)];
+  }
+
+  static empty(): RxRelays {
+    const rxr = new RxRelays();
+    rxr.dispose();
+
+    return rxr;
   }
 
   subscribe = this.stream.subscribe.bind(this.stream);

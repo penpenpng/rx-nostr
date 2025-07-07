@@ -1,4 +1,12 @@
-import { BehaviorSubject, Subject, Subscription, take, takeUntil } from "rxjs";
+import {
+  BehaviorSubject,
+  finalize,
+  Subject,
+  Subscription,
+  take,
+  takeUntil,
+} from "rxjs";
+import { RxNostrInvalidUsageError } from "../error.ts";
 
 export class RxDisposableStack extends DisposableStack {
   private _disposed = false;
@@ -10,6 +18,12 @@ export class RxDisposableStack extends DisposableStack {
 
   constructor() {
     super();
+  }
+
+  move(): DisposableStack {
+    throw new RxNostrInvalidUsageError(
+      "`move()` is not supported in `RxDisposableStack`.",
+    );
   }
 
   /**
@@ -77,6 +91,12 @@ export class RxDisposableStack extends DisposableStack {
     }
 
     return takeUntil(this.dispose$);
+  }
+
+  finalize() {
+    return finalize(() => {
+      this.dispose();
+    });
   }
 
   [Symbol.dispose]() {

@@ -12,6 +12,7 @@ export { timeline } from "./event-packet/timeline.ts";
 export { uniq } from "./event-packet/uniq.ts";
 export { verify } from "./event-packet/verify.ts";
 export { filterAsync } from "./general/filter-async.ts";
+export { finalizeWithLast } from "./general/finalize-with-last.ts";
 export { setDiff, type SetDiff } from "./general/set-diff.ts";
 export { sort } from "./general/sort.ts";
 export { timeoutWith } from "./general/timeout-with.ts";

@@ -5,12 +5,10 @@ export class SessionLifecycle {
   private deferrer = new Deferrer();
   private segments = new RelayMap<SessionSegment>();
   private defer: boolean;
-  private linger: number;
   private weak: boolean;
 
-  constructor(params: { defer: boolean; linger: number; weak: boolean }) {
+  constructor(params: { defer: boolean; weak: boolean }) {
     this.defer = params.defer;
-    this.linger = params.linger;
     this.weak = params.weak;
   }
 
@@ -57,8 +55,8 @@ export class SessionLifecycle {
    *
    * - For `ligner` connections, the connection is released after a specified delay.
    */
-  end(relay: RelayCommunication): void {
-    if (this.weak || !Number.isFinite(this.linger)) {
+  end(relay: RelayCommunication, linger: number): void {
+    if (this.weak || !Number.isFinite(linger)) {
       return;
     }
 
@@ -75,7 +73,7 @@ export class SessionLifecycle {
           this.segments.delete(relay.url);
         }
       },
-      Math.max(0, this.linger),
+      Math.max(0, linger),
     );
   }
 
