@@ -1,5 +1,6 @@
 import {
   finalize,
+  identity,
   map,
   mergeAll,
   Subject,
@@ -9,7 +10,7 @@ import {
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelayMap, RelaySet, type RelayMapOperator } from "../../libs/index.ts";
-import { setDiff } from "../../operators/index.ts";
+import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -47,6 +48,7 @@ export function reqBackward({
         segmentScopeRelays: RxRelays.from(packet.relays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
+        skipValidateFilterMatching: config.skipValidateFilterMatching,
         eoseTimeout: config.timeout,
       }),
     ),
@@ -67,6 +69,7 @@ function req({
   segmentScopeRelays,
   filters,
   linger,
+  skipValidateFilterMatching,
   eoseTimeout,
 }: {
   session: SessionLifecycle;
@@ -75,6 +78,7 @@ function req({
   segmentScopeRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
+  skipValidateFilterMatching: boolean;
   eoseTimeout: number;
 }): Observable<EventPacket> {
   const destRelays = RxRelays.union(sessionScopeRelays, segmentScopeRelays);
@@ -107,6 +111,7 @@ function req({
         const sub = relay
           .vreq("backward", filters)
           .pipe(
+            skipValidateFilterMatching ? identity : filterBy(filters),
             timeout(eoseTimeout),
             finalize(() => {
               session.endSegment(relay, linger);

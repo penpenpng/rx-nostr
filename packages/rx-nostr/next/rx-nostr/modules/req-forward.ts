@@ -1,5 +1,6 @@
 import {
   finalize,
+  identity,
   map,
   Subject,
   switchAll,
@@ -8,7 +9,7 @@ import {
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelayMap, type RelayMapOperator } from "../../libs/index.ts";
-import { setDiff } from "../../operators/index.ts";
+import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -46,6 +47,7 @@ export function reqForward({
         segmentScopeRelays: RxRelays.from(packet.relays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
+        skipValidateFilterMatching: config.skipValidateFilterMatching,
       }),
     ),
     // Forward: New coming req unsubscribes the previous one.
@@ -65,6 +67,7 @@ function req({
   segmentScopeRelays,
   filters,
   linger,
+  skipValidateFilterMatching,
 }: {
   session: SessionLifecycle;
   relays: RelayMapOperator<RelayCommunication>;
@@ -72,6 +75,7 @@ function req({
   segmentScopeRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
+  skipValidateFilterMatching: boolean;
 }): Observable<EventPacket> {
   const destRelays = RxRelays.union(sessionScopeRelays, segmentScopeRelays);
 
@@ -98,7 +102,10 @@ function req({
 
         ongoings.set(
           relay.url,
-          relay.vreq("forward", filters).subscribe(stream),
+          relay
+            .vreq("forward", filters)
+            .pipe(skipValidateFilterMatching ? identity : filterBy(filters))
+            .subscribe(stream),
         );
       });
 

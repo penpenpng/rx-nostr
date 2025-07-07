@@ -1,7 +1,8 @@
 import * as Nostr from "nostr-typedef";
-import { defer, Observable } from "rxjs";
+import { defer, identity, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RelayMapOperator, RxDisposableStack } from "../libs/index.ts";
+import { dropExpiredEvents, verify } from "../operators";
 import type {
   ConnectionStatePacket,
   EventPacket,
@@ -71,7 +72,10 @@ export class RxNostr implements IRxNostr {
         config,
         relayInput: relays,
         relays: this.relays,
-      }),
+      }).pipe(
+        verify(options.verifier ?? this.config.verifier),
+        options.skipExpirationCheck ? identity : dropExpiredEvents(),
+      ),
     );
   }
 
