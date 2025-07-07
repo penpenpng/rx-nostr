@@ -39,7 +39,7 @@ export class SessionLifecycle {
    * - For `defer` connections, the connection attempt is initiated at this phase.
    * - For `weak` connections, no connection attempt is made.
    */
-  begin(relay: RelayCommunication): void {
+  beginSegment(relay: RelayCommunication): void {
     if (this.weak) {
       return;
     }
@@ -59,7 +59,7 @@ export class SessionLifecycle {
    *
    * - For `ligner` connections, the connection is released after a specified delay.
    */
-  end(relay: RelayCommunication, linger: number): void {
+  endSegment(relay: RelayCommunication, linger: number): void {
     if (this.weak || !Number.isFinite(linger)) {
       return;
     }

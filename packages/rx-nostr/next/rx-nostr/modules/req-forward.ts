@@ -1,8 +1,6 @@
 import {
   finalize,
   map,
-  merge,
-  mergeMap,
   Subject,
   switchAll,
   type Observable,
@@ -10,7 +8,7 @@ import {
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelayMap, type RelayMapOperator } from "../../libs/index.ts";
-import { finalizeWithLast, setDiff } from "../../operators/index.ts";
+import { setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -50,7 +48,8 @@ export function reqForward({
         linger: config.linger ?? packet.linger ?? 0,
       }),
     ),
-    switchAll(), // New coming req unsubscribes the previous one (ForwardReq).
+    // Forward: New coming req unsubscribes the previous one.
+    switchAll(),
     finalize(() => {
       warming.unsubscribe();
       session.dispose();
@@ -82,26 +81,21 @@ function req({
     });
   });
 
-  const stream = new Subject<EventPacket>();
+  // Forward: Only one subscription (segment) at most is held on the same relay.
   const ongoings = new RelayMap<Subscription>();
+
+  const stream = new Subject<EventPacket>();
 
   const sub = destRelays
     .asObservable()
-    .pipe(
-      setDiff(),
-      finalizeWithLast((diff) => {
-        relays.forEach(diff?.current, (relay) => {
-          if (!sessionScopeRelays.has(relay.url)) {
-            session.end(relay, linger);
-          }
-        });
-      }),
-    )
+    .pipe(setDiff())
     .subscribe(({ appended, outdated }) => {
-      // Begin new session before the previous session ends
+      // Forward:
+      // Begin new segment before the previous segment ends
       // to prevent WebSocket blinks when `linger` is 0.
       relays.forEach(appended, (relay) => {
-        session.begin(relay);
+        session.beginSegment(relay);
+
         ongoings.set(
           relay.url,
           relay.vreq("forward", filters).subscribe(stream),
@@ -112,24 +106,31 @@ function req({
         ongoings.get(relay.url)?.unsubscribe();
         ongoings.delete(relay.url);
 
-        // Session scope relays are still needed.
+        // Forward: Session scope relays are still needed.
         if (!sessionScopeRelays.has(relay.url)) {
-          session.end(relay, linger);
+          session.endSegment(relay, linger);
         }
       });
-
-      return merge(
-        ...relays.map(appended, (relay) => relay.vreq("forward", filters)),
-      );
     });
 
   return stream.pipe(
+    // Forward: New coming REQ kicks the finalizer with `switchAll()`.
     finalize(() => {
       warming.unsubscribe();
-      ongoings.values().forEach((ongoing) => {
+
+      // Forward: New coming REQ ends the current REQ, but segments on session scope relays are still needed.
+      for (const ongoing of ongoings.values()) {
         ongoing.unsubscribe();
-      });
+      }
       ongoings.clear();
+
+      relays.forEach(destRelays, (relay) => {
+        if (sessionScopeRelays.has(relay.url)) {
+          return;
+        }
+        session.endSegment(relay, linger);
+      });
+
       sub.unsubscribe();
       segmentScopeRelays.dispose();
       destRelays.dispose();

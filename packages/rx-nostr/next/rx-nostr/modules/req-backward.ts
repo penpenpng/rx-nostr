@@ -1,17 +1,15 @@
 import {
   finalize,
   map,
-  merge,
   mergeAll,
-  mergeMap,
   Subject,
-  switchAll,
+  timeout,
   type Observable,
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
-import { RelayMap, type RelayMapOperator } from "../../libs/index.ts";
-import { finalizeWithLast, setDiff } from "../../operators/index.ts";
+import { RelayMap, RelaySet, type RelayMapOperator } from "../../libs/index.ts";
+import { setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -49,9 +47,11 @@ export function reqBackward({
         segmentScopeRelays: RxRelays.from(packet.relays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
+        eoseTimeout: config.timeout,
       }),
     ),
-    mergeAll(), // New coming req doesn't affect the previous one (BackwardReq).
+    // BackwardReq: New coming req doesn't affect the previous one.
+    mergeAll(),
     finalize(() => {
       warming.unsubscribe();
       session.dispose();
@@ -67,6 +67,7 @@ function req({
   segmentScopeRelays,
   filters,
   linger,
+  eoseTimeout,
 }: {
   session: SessionLifecycle;
   relays: RelayMapOperator<RelayCommunication>;
@@ -74,6 +75,7 @@ function req({
   segmentScopeRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
+  eoseTimeout: number;
 }): Observable<EventPacket> {
   const destRelays = RxRelays.union(sessionScopeRelays, segmentScopeRelays);
 
@@ -83,54 +85,68 @@ function req({
     });
   });
 
-  const stream = new Subject<EventPacket>();
   const ongoings = new RelayMap<Subscription>();
+  const started = new RelaySet();
+  const finished = new RelaySet();
+
+  const stream = new Subject<EventPacket>();
 
   const sub = destRelays
     .asObservable()
-    .pipe(
-      setDiff(),
-      finalizeWithLast((diff) => {
-        relays.forEach(diff?.current, (relay) => {
-          if (!sessionScopeRelays.has(relay.url)) {
-            session.end(relay, linger);
-          }
-        });
-      }),
-    )
+    .pipe(setDiff())
     .subscribe(({ appended, outdated }) => {
-      // Begin new session before the previous session ends
-      // to prevent WebSocket blinks when `linger` is 0.
       relays.forEach(appended, (relay) => {
-        session.begin(relay);
-        ongoings.set(
-          relay.url,
-          relay.vreq("forward", filters).subscribe(stream),
-        );
+        // Backward: Do nothing on re-appended relays.
+        if (started.has(relay.url)) {
+          return;
+        }
+        started.add(relay.url);
+
+        session.beginSegment(relay);
+
+        const sub = relay
+          .vreq("backward", filters)
+          .pipe(
+            timeout(eoseTimeout),
+            finalize(() => {
+              session.endSegment(relay, linger);
+              finished.add(relay.url);
+
+              // Backward:
+              // If this is the last uncompleted subscription, complete the output stream
+              // to ignore relays appended thereafter.
+              if ([...destRelays].every((url) => finished.has(url))) {
+                stream.complete();
+              }
+            }),
+          )
+          .subscribe(stream);
+
+        ongoings.get(relay.url)?.add(sub);
       });
 
       relays.forEach(outdated, (relay) => {
         ongoings.get(relay.url)?.unsubscribe();
         ongoings.delete(relay.url);
 
-        // Session scope relays are still needed.
-        if (!sessionScopeRelays.has(relay.url)) {
-          session.end(relay, linger);
-        }
+        session.endSegment(relay, linger);
       });
-
-      return merge(
-        ...relays.map(appended, (relay) => relay.vreq("forward", filters)),
-      );
     });
 
   return stream.pipe(
+    // Backward: New coming REQ doesn't kicks the finalizer.
     finalize(() => {
       warming.unsubscribe();
-      ongoings.values().forEach((ongoing) => {
+
+      for (const ongoing of ongoings.values()) {
         ongoing.unsubscribe();
-      });
+      }
       ongoings.clear();
+
+      relays.forEach(destRelays, (relay) => {
+        session.endSegment(relay, linger);
+      });
+
       sub.unsubscribe();
       segmentScopeRelays.dispose();
       destRelays.dispose();

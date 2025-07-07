@@ -52,12 +52,12 @@ export function publish({
     .signEvent(params)
     .then((event) => {
       relays.forEach(destRelays, (relay) => {
-        session.begin(relay);
+        session.beginSegment(relay);
       });
 
       const progress = relays.map(destRelays, (relay) =>
         relay.event(event).pipe(
-          finalize(() => void session.end(relay, config.linger)),
+          finalize(() => void session.endSegment(relay, config.linger)),
           timeout(config.timeout),
           timeoutWith({
             state: "timeout",
