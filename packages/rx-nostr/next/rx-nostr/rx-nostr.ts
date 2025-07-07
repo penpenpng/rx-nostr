@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
-import { defer, Observable } from "rxjs";
+import { defer, finalize, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { once, RelayMapOperator, RxDisposables } from "../libs/index.ts";
+import { once, RelayMapOperator, RxDisposableStack } from "../libs/index.ts";
 import type {
   ConnectionStatePacket,
   EventPacket,
@@ -29,20 +29,16 @@ import type {
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
-  protected disposables = new RxDisposables();
+  protected stack = new RxDisposableStack();
   protected relays = new RelayMapOperator((url) => new RelayCommunication(url));
   protected config: FilledRxNostrConfig;
-  protected publisher: EventPublisher;
   protected warmer: RelayWarmer;
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
 
-    this.publisher = new EventPublisher(this.relays);
-    this.disposables.use(this.publisher);
-
     this.warmer = new RelayWarmer(this.relays);
-    this.disposables.use(this.warmer);
+    this.stack.use(this.warmer);
   }
 
   req(
@@ -69,9 +65,11 @@ export class RxNostr implements IRxNostr {
       }
     })();
 
-    this.disposables.use(client);
+    const forget = this.stack.temporary(client);
 
-    return defer(() => client.req({ rxReq, relays, config }));
+    return defer(() =>
+      client.req({ rxReq, relays, config }).pipe(finalize(forget)),
+    );
   }
 
   publish(
@@ -79,8 +77,11 @@ export class RxNostr implements IRxNostr {
     { relays, ...options }: RxNostrPublishConfig,
   ): Observable<ProgressPacket> {
     const config = new FilledRxNostrPublishOptions(options, this.config);
+    const publisher = new EventPublisher(this.relays);
 
-    return this.publisher.publish({ params, relays, config });
+    const forget = this.stack.temporary(publisher);
+
+    return publisher.publish({ params, relays, config }).pipe(finalize(forget));
   }
 
   setHotRelays(relays: RelayInput): void {
@@ -94,7 +95,7 @@ export class RxNostr implements IRxNostr {
   monitorConnectionState(): Observable<ConnectionStatePacket> {}
 
   [Symbol.dispose] = once(() => {
-    this.disposables.dispose();
+    this.stack.dispose();
   });
   dispose = this[Symbol.dispose];
 }

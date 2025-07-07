@@ -19,6 +19,10 @@ export interface ReqPacket extends ReqOptions {
 export interface ReqOptions {
   relays?: RxRelays | Iterable<string>;
   linger?: number;
+  // TODO: reqId が意味を失うので reqId を使って本来やりたかったことをするために用意する？
+  // reqId を使って本来やりたかったこと is 何
+  // -> EOSE の見分け？
+  // -> Logging？
   traceId?: string;
 }
 

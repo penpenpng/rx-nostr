@@ -4,7 +4,7 @@ import {
   createPipeMethod,
   type IPipeable,
   once,
-  RxDisposables,
+  RxDisposableStack,
 } from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
@@ -20,8 +20,8 @@ abstract class RxPipeableReq
   extends RxReq
   implements IPipeable<RxReq, ReqPacket>
 {
-  protected disposables = new RxDisposables();
-  protected stream: Subject<ReqPacket> = this.disposables.add(new Subject());
+  protected stack = new RxDisposableStack();
+  protected stream: Subject<ReqPacket> = this.stack.add(new Subject());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected operators: OperatorFunction<any, any>[] = [];
 
@@ -46,7 +46,7 @@ abstract class RxPipeableReq
     return rxq;
   });
 
-  [Symbol.dispose] = once(() => this.disposables.dispose());
+  [Symbol.dispose] = once(() => this.stack.dispose());
   dispose = this[Symbol.dispose];
 }
 

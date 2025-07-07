@@ -1,14 +1,6 @@
 import type * as Nostr from "nostr-typedef";
-import {
-  EMPTY,
-  finalize,
-  Observable,
-  Subject,
-  Subscription,
-  takeUntil,
-  timeout,
-} from "rxjs";
-import { once, RelayMapOperator, RxDisposables } from "../../libs/index.ts";
+import { EMPTY, finalize, Observable, Subject, timeout } from "rxjs";
+import { once, RelayMapOperator, RxDisposableStack } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
@@ -19,7 +11,7 @@ import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class EventPublisher {
-  protected disposables = new RxDisposables();
+  protected stack = new RxDisposableStack();
 
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
 
@@ -39,28 +31,27 @@ export class EventPublisher {
       return EMPTY;
     }
 
+    const session = new SessionLifecycle({
+      defer: false,
+      weak: config.weak,
+      linger: config.linger,
+    });
+    this.stack.use(session);
+
     const stream = new Subject<ProgressActivity>();
-    const session = this.disposables.adopt(
-      new SessionLifecycle({
-        defer: false,
-        weak: config.weak,
-        linger: config.linger,
-      }),
-      (v) => v.cleanup(),
-    );
 
     this.relays.forEach(targetRelays, (relay) => {
-      session.preconnect(relay);
+      session.prewarm(relay);
     });
 
     const publish = (relay: RelayCommunication, event: Nostr.Event) => {
-      session.connect(relay);
+      session.begin(relay);
 
-      this.disposables.add(
+      this.stack.add(
         relay
           .event(event)
           .pipe(
-            finalize(() => void session.release(relay)),
+            finalize(() => void session.end(relay)),
             timeout(config.timeout),
             timeoutWith({
               state: "timeout",
@@ -85,14 +76,14 @@ export class EventPublisher {
 
     return stream.pipe(
       finalize(() => void this.dispose()),
-      this.disposables.whileAlive(),
+      this.stack.untilDisposed(),
       // TODO: ProgressPacket を作る
       summarize(),
     );
   }
 
   [Symbol.dispose] = once(() => {
-    this.disposables.dispose();
+    this.stack.dispose();
   });
   dispose = this[Symbol.dispose];
 }

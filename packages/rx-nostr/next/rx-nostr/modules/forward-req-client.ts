@@ -2,13 +2,12 @@ import {
   finalize,
   Subject,
   subscribeOn,
-  Subscription,
   takeUntil,
   type Observable,
 } from "rxjs";
 import {
   once,
-  RxDisposables,
+  RxDisposableStack,
   type RelayMapOperator,
 } from "../../libs/index.ts";
 import { watchChanges } from "../../operators/general/watch-changes.ts";
@@ -22,7 +21,7 @@ import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export class ForwardReqClient {
-  private disposables = new RxDisposables();
+  private stack = new RxDisposableStack();
 
   constructor(private relays: RelayMapOperator<RelayCommunication>) {}
 
@@ -35,28 +34,29 @@ export class ForwardReqClient {
     relays: RelayInput;
     config: FilledRxNostrReqOptions;
   }): Observable<EventPacket> {
+    const session = new SessionLifecycle(config);
+    const forget = this.stack.temporary(session);
+
     const stream = new Subject<Observable<EventPacket>>();
 
-    const session = this.disposables.adopt(new SessionLifecycle(config), (v) =>
-      v.cleanup(),
-    );
-
     this.relays.forEach(RxRelays.array(relays), (relay) => {
-      session.preconnect(relay);
+      session.prewarm(relay);
     });
 
-    this.disposables.add(
+    throw new Error();
+
+    this.stack.add(
       RxRelays.observable(relays)
         .pipe(setDiff())
         .subscribe(({ appended, outdated }) => {
           if (activeFilters) {
             this.relays.forEach(appended, (relay) => {
-              session.connect(relay);
+              session.begin(relay);
               stream.next(relay.vreq(rxReq.strategy, activeFilters));
             });
             this.relays.forEach(outdated, (relay) => {
               // TODO: unsub here
-              session.release(relay);
+              session.end(relay);
             });
           }
         }),
@@ -74,7 +74,7 @@ export class ForwardReqClient {
 
       if (updated === "req") {
         this.relays.forEach(current, (relay) => {
-          session.connect(relay);
+          session.begin(relay);
           // TODO: linger, relays, traceId
           stream.next(relay.vreq(rxReq.strategy, nextReq.filters));
         });
@@ -84,12 +84,16 @@ export class ForwardReqClient {
     subscriptions.add(sub);
 
     return stream.pipe(
-      finalize(() => void disposables.dispose()),
+      finalize(() => void stack.dispose()),
       takeUntil(this.dispose$),
       subscribeOn(asapScheduler),
     );
   }
 
-  [Symbol.dispose] = once(() => {});
+  [Symbol.dispose] = once(() => {
+    this.stack.dispose();
+  });
   dispose = this[Symbol.dispose];
 }
+
+class SingleForwardReq {}

@@ -10,7 +10,7 @@ export * from "./nostr/nip40.ts";
 export * from "./once.ts";
 export * from "./relay-urls.ts";
 export * from "./rxjs/pipeable.ts";
-export * from "./rxjs/rx-disposable.ts";
+export * from "./rxjs/rx-disposable-stack.ts";
 export * from "./set.ts";
 export * from "./symbol.ts";
 export * from "./xor.ts";

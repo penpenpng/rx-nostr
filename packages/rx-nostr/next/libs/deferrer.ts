@@ -5,6 +5,11 @@ export class Deferrer {
   #callbacks = new Set<() => void>();
 
   invoke(callback: () => void, delay: number) {
+    if (delay <= 0) {
+      callback();
+      return;
+    }
+
     const f = once(callback);
     this.#callbacks.add(f);
 

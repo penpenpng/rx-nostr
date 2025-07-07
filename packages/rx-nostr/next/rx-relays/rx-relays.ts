@@ -9,15 +9,15 @@ import {
 import {
   once,
   RelaySet,
-  RxDisposables,
+  RxDisposableStack,
   SetOp,
   type RelayUrl,
 } from "../libs/index.ts";
 
 export class RxRelays {
-  protected disposables = new RxDisposables();
+  protected stack = new RxDisposableStack();
   protected relays = new RelaySet();
-  protected stream: BehaviorSubject<Set<RelayUrl>> = this.disposables.add(
+  protected stream: BehaviorSubject<Set<RelayUrl>> = this.stack.add(
     new BehaviorSubject(new Set()),
   );
 
@@ -71,7 +71,7 @@ export class RxRelays {
       rxr.set(...x.difference(y));
     });
 
-    rxr.disposables.add(sub);
+    rxr.stack.add(sub);
 
     return rxr;
   }
@@ -82,7 +82,7 @@ export class RxRelays {
       rxr.set(...SetOp.intersection(...sets));
     });
 
-    rxr.disposables.add(sub);
+    rxr.stack.add(sub);
 
     return rxr;
   }
@@ -93,7 +93,7 @@ export class RxRelays {
       rxr.set(...SetOp.union(...sets));
     });
 
-    rxr.disposables.add(sub);
+    rxr.stack.add(sub);
 
     return rxr;
   }
@@ -120,6 +120,6 @@ export class RxRelays {
   }
 
   [Symbol.iterator] = () => this.relays[Symbol.iterator]();
-  [Symbol.dispose] = once(() => this.disposables.dispose());
+  [Symbol.dispose] = once(() => this.stack.dispose());
   dispose = this[Symbol.dispose];
 }

@@ -1,14 +1,9 @@
-import { Deferrer, RelayMap } from "../libs/index.ts";
+import { Deferrer, once, RelayMap } from "../libs/index.ts";
 import type { RelayCommunication } from "./relay-communication.ts";
-
-export type ConnectionResult = "skipped" | "connected";
 
 export class SessionLifecycle {
   private deferrer = new Deferrer();
-  private map = new RelayMap<{
-    connected: Promise<void>;
-    relay: RelayCommunication;
-  }>();
+  private segments = new RelayMap<SessionSegment>();
   private defer: boolean;
   private linger: number;
   private weak: boolean;
@@ -20,81 +15,85 @@ export class SessionLifecycle {
   }
 
   /**
-   * `preconnect()` is invoked only once when the possibility arises that a WebSocket connection is needed.
+   * Invoked only once when the possibility arises that a WebSocket connection is needed.
    * Specifically, it is called synchronously as a result of calling `req().subscribe()` or `event()`.
    *
    * - For non-`defer` connections, the connection attempt is initiated at this phase.
    * - For `weak` connections, no connection attempt is made.
    */
-  async preconnect(relay: RelayCommunication): Promise<ConnectionResult> {
-    if (this.weak || this.defer) {
-      return "skipped";
+  prewarm(relay: RelayCommunication): void {
+    if (this.weak || this.defer || this.segments.has(relay.url)) {
+      return;
     }
 
-    const connected = relay.connect();
-    this.map.set(relay.url, { connected, relay });
-
-    return connected.then(() => "connected");
+    relay.connect();
+    this.segments.set(relay.url, new SessionSegment(relay));
   }
 
   /**
-   * `connect()` is invoked when the payload to be sent has been fully determined
+   * Invoked when the payload to be sent has been fully determined
    * and immediate communication over the WebSocket is required.
    *
    * - For `defer` connections, the connection attempt is initiated at this phase.
    * - For `weak` connections, no connection attempt is made.
-   * - If the connection is already attempted, it does nothing. // 嘘かも
    */
-  async connect(relay: RelayCommunication): Promise<ConnectionResult> {
+  begin(relay: RelayCommunication): void {
     if (this.weak) {
-      return "skipped";
+      return;
     }
 
-    const attempt = this.map.get(relay.url);
+    const currentSegment = this.segments.get(relay.url);
 
-    if (attempt) {
-      // TODO: この間にリリースされちゃったときの処理 (面倒)
-      // そもそも lifecycle result を使わないなら面倒しなくていいので先に上のレイヤーを書いて検討する
-      return attempt.connected.then(() => "connected");
-    } else {
-      const connected = relay.connect();
-      this.map.set(relay.url, { connected, relay });
-
-      return connected.then(() => "connected");
+    if (!currentSegment) {
+      relay.connect();
     }
+
+    // Set new segment to cancel mortality of the current segment.
+    this.segments.set(relay.url, new SessionSegment(relay));
   }
 
-  release(relay: RelayCommunication): void {
-    if (this.weak) {
+  /**
+   * Invoked when the WebSocket connection is no longer needed.
+   *
+   * - For `ligner` connections, the connection is released after a specified delay.
+   */
+  end(relay: RelayCommunication): void {
+    if (this.weak || !Number.isFinite(this.linger)) {
       return;
     }
 
-    if (!Number.isFinite(this.linger)) {
+    const mortalSegment = this.segments.get(relay.url);
+    if (!mortalSegment) {
       return;
     }
 
-    // TODO: いったん release されたあとにもう一度 connect される可能性がある。
-    // deferrer が走っていると新しい connect が間違って release されてしまう
     this.deferrer.invoke(
       () => {
-        this.map.get(relay.url)?.relay.release();
-        this.map.delete(relay.url);
+        const currentSegment = this.segments.get(relay.url);
+        if (currentSegment === mortalSegment) {
+          currentSegment.relay.release();
+          this.segments.delete(relay.url);
+        }
       },
       Math.max(0, this.linger),
     );
   }
 
-  // dispose されたときだけに呼び出す
-  cleanup(): void {
+  [Symbol.dispose] = once(() => {
     if (this.weak) {
       return;
     }
 
     this.deferrer.cancelAll();
 
-    for (const { relay } of this.map.values()) {
+    for (const { relay } of this.segments.values()) {
       relay.release();
     }
-    this.map.clear();
-  }
+    this.segments.clear();
+  });
+  dispose = this[Symbol.dispose];
+}
+
+class SessionSegment {
+  constructor(public relay: RelayCommunication) {}
 }
