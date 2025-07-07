@@ -4,6 +4,7 @@ import type { RelayCommunication } from "./relay-communication.ts";
 export class SessionLifecycle {
   private deferrer = new Deferrer();
   private segments = new RelayMap<SessionSegment>();
+  private prewarmed = new Set<string>();
   private defer: boolean;
   private weak: boolean;
 
@@ -20,7 +21,10 @@ export class SessionLifecycle {
    * - For `weak` connections, no connection attempt is made.
    */
   prewarm(relay: RelayCommunication): void {
-    if (this.weak || this.defer || this.segments.has(relay.url)) {
+    const prewarmed = this.prewarmed.has(relay.url);
+    this.prewarmed.add(relay.url);
+
+    if (prewarmed || this.weak || this.defer || this.segments.has(relay.url)) {
       return;
     }
 
