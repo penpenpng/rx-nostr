@@ -60,6 +60,7 @@ export {
   filterByEventId,
   filterByKind,
   filterByKinds,
+  filterByPow,
   filterByType,
   latest,
   latestEach,

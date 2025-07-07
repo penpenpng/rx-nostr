@@ -3,6 +3,7 @@ export { createUniq } from "./event-packet/create-uniq.ts";
 export { dropExpiredEvents } from "./event-packet/drop-expired-events.ts";
 export { filterByKind } from "./event-packet/filter-by-kind.ts";
 export { filterByKinds } from "./event-packet/filter-by-kinds.ts";
+export { filterByPow } from "./event-packet/filter-by-pow.ts";
 export { filterBy } from "./event-packet/filter-by.ts";
 export { latestEach } from "./event-packet/latest-each.ts";
 export { latest } from "./event-packet/latest.ts";
