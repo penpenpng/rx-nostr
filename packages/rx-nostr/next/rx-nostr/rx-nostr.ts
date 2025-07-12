@@ -2,7 +2,7 @@ import * as Nostr from "nostr-typedef";
 import { defer, identity, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RelayMapOperator, RxDisposableStack } from "../libs/index.ts";
-import { dropExpiredEvents, verify } from "../operators";
+import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type {
   ConnectionStatePacket,
   EventPacket,

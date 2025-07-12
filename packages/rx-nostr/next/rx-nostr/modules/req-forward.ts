@@ -1,8 +1,10 @@
 import {
+  asapScheduler,
   finalize,
   identity,
   map,
   Subject,
+  subscribeOn,
   switchAll,
   type Observable,
   type Subscription,
@@ -13,7 +15,7 @@ import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
-import type { RelayCommunication } from "../relay-communication.ts";
+import type { IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
@@ -24,7 +26,7 @@ export function reqForward({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<RelayCommunication>;
+  relays: RelayMapOperator<IRelayCommunication>;
   rxReq: RxReq;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
@@ -70,7 +72,7 @@ function req({
   skipValidateFilterMatching,
 }: {
   session: SessionLifecycle;
-  relays: RelayMapOperator<RelayCommunication>;
+  relays: RelayMapOperator<IRelayCommunication>;
   sessionScopeRelays: RxRelays;
   segmentScopeRelays: RxRelays;
   filters: LazyFilter[];
@@ -92,7 +94,11 @@ function req({
 
   const sub = destRelays
     .asObservable()
-    .pipe(setDiff())
+    .pipe(
+      setDiff(),
+      // The subscription must be started after the stream is returned.
+      subscribeOn(asapScheduler),
+    )
     .subscribe(({ appended, outdated }) => {
       // Forward:
       // Begin new segment before the previous segment ends
@@ -141,6 +147,8 @@ function req({
       sub.unsubscribe();
       segmentScopeRelays.dispose();
       destRelays.dispose();
+
+      stream.complete();
     }),
   );
 }

@@ -29,6 +29,11 @@ export class RelayMap<T> {
   }
 
   getMany(urls: Iterable<string>, options?: TrustOption): T[] {
+    if (typeof urls === "string") {
+      const v = this.get(urls, options);
+      return v ? [v] : [];
+    }
+
     const vs: T[] = [];
 
     for (const url of new RelaySet(urls, options)) {
@@ -245,14 +250,7 @@ export class RelayMapOperator<T> {
     }
 
     for (const relay of relays) {
-      let value = this.#map.get(relay);
-
-      if (!value) {
-        value = this.factory(relay);
-        this.#map.set(relay, value);
-      }
-
-      callback(value);
+      callback(this.get(relay));
     }
   }
 
@@ -267,21 +265,33 @@ export class RelayMapOperator<T> {
     const results: R[] = [];
 
     for (const relay of relays) {
-      let value = this.#map.get(relay);
-
-      if (!value) {
-        value = this.factory(relay);
-        this.#map.set(relay, value);
-      }
-
-      results.push(project(value));
+      results.push(project(this.get(relay)));
     }
 
     return results;
   }
 
+  get(relay: RelayUrl): T {
+    let value = this.#map.get(relay);
+
+    if (!value) {
+      value = this.factory(relay);
+      this.#map.set(relay, value);
+    }
+
+    return value;
+  }
+
+  set(relay: RelayUrl, value?: T) {
+    this.#map.set(relay, value ?? this.factory(relay));
+  }
+
   delete(relay: RelayUrl) {
     this.#map.delete(relay);
+  }
+
+  get size(): number {
+    return this.#map.size;
   }
 }
 

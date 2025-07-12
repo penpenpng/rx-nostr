@@ -1,5 +1,5 @@
 import { Deferrer, once, RelayMap } from "../libs/index.ts";
-import type { RelayCommunication } from "./relay-communication.ts";
+import type { IRelayCommunication } from "./relay-communication.ts";
 
 export class SessionLifecycle {
   private deferrer = new Deferrer();
@@ -20,7 +20,7 @@ export class SessionLifecycle {
    * - For non-`defer` connections, the connection attempt is initiated at this phase.
    * - For `weak` connections, no connection attempt is made.
    */
-  prewarm(relay: RelayCommunication): void {
+  prewarm(relay: IRelayCommunication): void {
     const prewarmed = this.prewarmed.has(relay.url);
     this.prewarmed.add(relay.url);
 
@@ -39,7 +39,7 @@ export class SessionLifecycle {
    * - For `defer` connections, the connection attempt is initiated at this phase.
    * - For `weak` connections, no connection attempt is made.
    */
-  beginSegment(relay: RelayCommunication): void {
+  beginSegment(relay: IRelayCommunication): void {
     if (this.weak) {
       return;
     }
@@ -59,7 +59,7 @@ export class SessionLifecycle {
    *
    * - For `ligner` connections, the connection is released after a specified delay.
    */
-  endSegment(relay: RelayCommunication, linger: number): void {
+  endSegment(relay: IRelayCommunication, linger: number): void {
     if (this.weak || !Number.isFinite(linger)) {
       return;
     }
@@ -97,5 +97,5 @@ export class SessionLifecycle {
 }
 
 class SessionSegment {
-  constructor(public relay: RelayCommunication) {}
+  constructor(public relay: IRelayCommunication) {}
 }

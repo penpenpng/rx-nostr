@@ -13,7 +13,7 @@ import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
-import { RelayCommunication } from "../relay-communication.ts";
+import { type IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
 import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
@@ -24,7 +24,7 @@ export function publish({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<RelayCommunication>;
+  relays: RelayMapOperator<IRelayCommunication>;
   params: Nostr.EventParameters;
   relayInput: RelayInput;
   config: FilledRxNostrPublishOptions;

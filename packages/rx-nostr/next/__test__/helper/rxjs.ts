@@ -61,6 +61,7 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
           throw new Error("[TestHelper] Observable was completed");
         }
         if (result === ERROR) {
+          console.error("[TestHelper] Observable was terminated with an error");
           throw error;
         }
 

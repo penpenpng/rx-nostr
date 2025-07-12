@@ -22,7 +22,13 @@ export class RxRelays {
   );
 
   constructor(relays?: Iterable<string>) {
-    if (relays) {
+    if (!relays) {
+      return;
+    }
+
+    if (typeof relays === "string") {
+      this.set(relays);
+    } else {
       this.set(...relays);
     }
   }
@@ -57,6 +63,10 @@ export class RxRelays {
   clear() {
     this.relays.clear();
     this.emit();
+  }
+
+  get size(): number {
+    return this.relays.size;
   }
 
   protected static combine(...rxRelays: RxRelays[]) {
@@ -109,7 +119,7 @@ export class RxRelays {
     if (relays instanceof RxRelays) {
       return RxRelays.union(relays);
     } else {
-      return new RxRelays(...relays);
+      return new RxRelays(relays);
     }
   }
 

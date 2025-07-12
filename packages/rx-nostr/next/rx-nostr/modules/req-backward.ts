@@ -14,7 +14,7 @@ import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
-import type { RelayCommunication } from "../relay-communication.ts";
+import type { IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 import type { RelayInput } from "../rx-nostr.interface.ts";
 import { SessionLifecycle } from "../session-lifecycle.ts";
@@ -25,7 +25,7 @@ export function reqBackward({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<RelayCommunication>;
+  relays: RelayMapOperator<IRelayCommunication>;
   rxReq: RxReq;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
@@ -73,7 +73,7 @@ function req({
   eoseTimeout,
 }: {
   session: SessionLifecycle;
-  relays: RelayMapOperator<RelayCommunication>;
+  relays: RelayMapOperator<IRelayCommunication>;
   sessionScopeRelays: RxRelays;
   segmentScopeRelays: RxRelays;
   filters: LazyFilter[];

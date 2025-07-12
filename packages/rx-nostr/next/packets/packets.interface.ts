@@ -39,8 +39,8 @@ export interface ProgressInitialState {
 }
 
 export interface ProgressActivity {
+  from: RelayUrl;
   state: "sent" | "ok" | "timeout";
-  relay: RelayUrl;
   ok?: boolean;
   reason?: "timeout" | "auth";
 }
