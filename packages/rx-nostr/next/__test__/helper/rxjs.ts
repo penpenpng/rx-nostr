@@ -1,7 +1,8 @@
-import type { Subscribable } from "rxjs";
+import type { Observable, Subscribable } from "rxjs";
 
 export interface ObservableTestHelper<T> {
   pop(): Promise<T>;
+  peep(): T | undefined;
   getValues(): T[];
   isComplete(): boolean;
   isError(): boolean;
@@ -9,13 +10,14 @@ export interface ObservableTestHelper<T> {
   unsubscribe(): void;
 }
 
-export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
+export function subscribe<T>(obs: Observable<T>): ObservableTestHelper<T> {
   const resolvers: Array<(value: T) => void> = [];
   const unresolve: T[] = [];
   const values: T[] = [];
 
   const COMPLETE = Symbol("complete");
   const ERROR = Symbol("error");
+  const TIMEOUT = Symbol("timeout");
   const { resolve: finish, promise: finished } = Promise.withResolvers<
     typeof COMPLETE | typeof ERROR
   >();
@@ -48,15 +50,24 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
   });
 
   return {
-    async pop() {
+    async pop(timeout: number = 100) {
       if (unresolve.length > 0) {
         return unresolve.shift()!;
       } else {
-        const { resolve, promise } = Promise.withResolvers<T>();
-        resolvers.push(resolve);
+        const { resolve, reject, promise } = Promise.withResolvers<T>();
+        const timer = setTimeout(() => {
+          reject(TIMEOUT);
+        }, timeout);
+        resolvers.push((v) => {
+          clearTimeout(timer);
+          resolve(v);
+        });
 
         const result = await Promise.race([promise, finished]);
 
+        if (result === TIMEOUT) {
+          throw new Error("[TestHelper] Observable pop timed out");
+        }
         if (result === COMPLETE) {
           throw new Error("[TestHelper] Observable was completed");
         }
@@ -67,6 +78,13 @@ export function subscribe<T>(obs: Subscribable<T>): ObservableTestHelper<T> {
 
         return result;
       }
+    },
+    peep() {
+      if (values.length <= 0) {
+        return undefined;
+      }
+
+      return values[values.length - 1];
     },
     getValues() {
       return values;

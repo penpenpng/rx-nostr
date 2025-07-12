@@ -1,4 +1,4 @@
-let _logLevel: LogLevel = "error";
+let _logLevel: LogLevel = "warn";
 
 type LogLevel = "debug" | "warn" | "error" | "silent";
 
@@ -20,9 +20,9 @@ function logLevel() {
 }
 
 export class Logger {
-  static log(...args: unknown[]) {
+  static debug(...args: unknown[]) {
     if (logLevel() <= 0) {
-      console.log("[rx-nostr]", ...args);
+      console.debug("[rx-nostr]", ...args);
     }
   }
   static warn(...args: unknown[]) {

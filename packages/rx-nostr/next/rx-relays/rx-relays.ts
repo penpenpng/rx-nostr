@@ -161,6 +161,10 @@ export class RxRelays {
     this.stream.next(this.relays.toSet());
   }
 
+  get disposed() {
+    return this.stack.disposed;
+  }
+
   [Symbol.iterator] = () => this.relays[Symbol.iterator]();
   [Symbol.dispose] = once(() => this.stack.dispose());
   dispose = this[Symbol.dispose];

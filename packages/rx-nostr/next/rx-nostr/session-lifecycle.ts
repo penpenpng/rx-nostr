@@ -1,4 +1,5 @@
 import { Deferrer, once, RelayMap } from "../libs/index.ts";
+import { Logger } from "../logger.ts";
 import type { IRelayCommunication } from "./relay-communication.ts";
 
 export class SessionLifecycle {
@@ -28,6 +29,8 @@ export class SessionLifecycle {
       return;
     }
 
+    Logger.debug(`lifecycle: prewarm (${relay.url})`);
+
     relay.connect();
     this.segments.set(relay.url, new SessionSegment(relay));
   }
@@ -45,6 +48,9 @@ export class SessionLifecycle {
     }
 
     const currentSegment = this.segments.get(relay.url);
+    Logger.debug(
+      `lifecycle: begin-segment, connect=${!currentSegment} (${relay.url})`,
+    );
 
     if (!currentSegment) {
       relay.connect();
@@ -68,6 +74,8 @@ export class SessionLifecycle {
     if (!mortalSegment) {
       return;
     }
+
+    Logger.debug(`lifecycle: end-segment, linger=${linger} (${relay.url})`);
 
     this.deferrer.invoke(
       () => {
