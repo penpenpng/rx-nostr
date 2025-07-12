@@ -37,7 +37,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
     return ch.stream;
   }
 
-  pushNextEventStream(stream: Observable<EventPacket>): Promise<void> {
+  attachNextEventStream(stream: Observable<EventPacket>): Promise<void> {
     const { promise, resolve } = Promise.withResolvers<void>();
 
     this.channels.push({ stream, resolve });
@@ -52,4 +52,22 @@ export class RelayCommunicationMock implements IRelayCommunication {
   }
 
   sendProgress(): void {}
+}
+
+export function attachNextStream(relay: RelayCommunicationMock) {
+  const stream = new Subject<EventPacket>();
+  const popped = relay.attachNextEventStream(stream);
+
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+  const timer = setTimeout(() => {
+    reject(new Error(`Stream was not subscribed (${relay.url})`));
+  }, 100);
+  popped.then(() => {
+    clearTimeout(timer);
+    resolve();
+  });
+
+  // Emit EventPacket to the stream to emulate relay response.
+  return Object.assign(stream, { ready: promise });
 }

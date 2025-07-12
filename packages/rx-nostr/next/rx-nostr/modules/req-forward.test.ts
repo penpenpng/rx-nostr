@@ -1,6 +1,7 @@
 import "disposablestack/auto";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 import {
+  attachNextStream,
   Faker,
   getTestReqOptions,
   RelayCommunicationMock,
@@ -9,9 +10,7 @@ import {
 import { RelayMapOperator } from "../../libs/index.ts";
 import { RxForwardReq } from "../../rx-req/index.ts";
 
-import { Subject } from "rxjs";
 import { Expect } from "../../__test__/helper/expect.ts";
-import { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { reqForward } from "./req-forward.ts";
 
@@ -261,21 +260,3 @@ test("segment scope relays", async () => {
   stream1.next(Faker.eventPacket({ id: "3" }));
   await sub.expectNext(Expect.eventPacket({ id: "3" }));
 });
-
-function attachNextStream(relay: RelayCommunicationMock) {
-  const stream = new Subject<EventPacket>();
-  const popped = relay.pushNextEventStream(stream);
-
-  const { promise, resolve, reject } = Promise.withResolvers<void>();
-
-  const timer = setTimeout(() => {
-    reject(new Error(`Stream was not subscribed (${relay.url})`));
-  }, 100);
-  popped.then(() => {
-    clearTimeout(timer);
-    resolve();
-  });
-
-  // Emit EventPacket to the stream to emulate relay response.
-  return Object.assign(stream, { ready: promise });
-}

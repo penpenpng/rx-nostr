@@ -10,6 +10,7 @@ import {
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelayMap, RelaySet, type RelayMapOperator } from "../../libs/index.ts";
+import { Logger } from "../../logger.ts";
 import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
@@ -45,7 +46,9 @@ export function reqBackward({
         session,
         relays,
         sessionScopeRelays,
-        segmentScopeRelays: RxRelays.from(packet.relays),
+        segmentScopeRelays: packet.relays
+          ? RxRelays.from(packet.relays)
+          : RxRelays.from(sessionScopeRelays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
@@ -81,8 +84,6 @@ function req({
   skipValidateFilterMatching: boolean;
   eoseTimeout: number;
 }): Observable<EventPacket> {
-  const destRelays = RxRelays.union(sessionScopeRelays, segmentScopeRelays);
-
   const warming = segmentScopeRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       session.prewarm(relay);
@@ -95,10 +96,21 @@ function req({
 
   const stream = new Subject<EventPacket>();
 
-  const sub = destRelays
+  const sub = segmentScopeRelays
     .asObservable()
     .pipe(setDiff())
-    .subscribe(({ appended, outdated }) => {
+    .subscribe(({ current, appended, outdated }) => {
+      if (!sessionScopeRelays.disposed) {
+        if (!outdated && current.size <= 0) {
+          Logger.warn("REQ was issued, but no destination relays is set.");
+        }
+        if (outdated && outdated.size > 0 && current.size <= 0) {
+          Logger.warn(
+            "The last relay was removed; no destination relays remain.",
+          );
+        }
+      }
+
       relays.forEach(appended, (relay) => {
         // Backward: Do nothing on re-appended relays.
         if (started.has(relay.url)) {
@@ -120,7 +132,7 @@ function req({
               // Backward:
               // If this is the last uncompleted subscription, complete the output stream
               // to ignore relays appended thereafter.
-              if ([...destRelays].every((url) => finished.has(url))) {
+              if ([...segmentScopeRelays].every((url) => finished.has(url))) {
                 stream.complete();
               }
             }),
@@ -148,13 +160,15 @@ function req({
       }
       ongoings.clear();
 
-      relays.forEach(destRelays, (relay) => {
+      sub.unsubscribe();
+
+      relays.forEach(segmentScopeRelays, (relay) => {
         session.endSegment(relay, linger);
       });
 
-      sub.unsubscribe();
       segmentScopeRelays.dispose();
-      destRelays.dispose();
+
+      stream.complete();
     }),
   );
 }
