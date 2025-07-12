@@ -42,9 +42,9 @@ test("single relay", async () => {
   await stream1.ready;
 
   stream1.next(Faker.eventPacket({ id: "1" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+  await sub.expectNext(Expect.eventPacket({ id: "1" }));
   stream1.next(Faker.eventPacket({ id: "2" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "2" }));
+  await sub.expectNext(Expect.eventPacket({ id: "2" }));
 
   const stream2 = attachNextStream(relay);
   rxReq.emit([{ kinds: [1] }]);
@@ -54,9 +54,9 @@ test("single relay", async () => {
   // so this is expected to be ignored.
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "3" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "3" }));
+  await sub.expectNext(Expect.eventPacket({ id: "3" }));
   stream2.next(Faker.eventPacket({ id: "4" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "4" }));
+  await sub.expectNext(Expect.eventPacket({ id: "4" }));
 
   sub.unsubscribe();
   expect(relay.connectedCount).toBe(1);
@@ -93,7 +93,7 @@ test("single relay, defer=true", async () => {
   expect(relay.refCount).toBe(1);
 
   stream1.next(Faker.eventPacket({ id: "1" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+  await sub.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
   expect(relay.connectedCount).toBe(1);
@@ -130,7 +130,7 @@ test("single relay, weak=true", async () => {
   expect(relay.refCount).toBe(0);
 
   stream1.next(Faker.eventPacket({ id: "1" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+  await sub.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
   expect(relay.connectedCount).toBe(0);
@@ -169,7 +169,7 @@ test("dynamic relays", async () => {
   await stream1.ready;
 
   stream1.next(Faker.eventPacket({ id: "1" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+  await sub.expectNext(Expect.eventPacket({ id: "1" }));
 
   const stream2 = attachNextStream(relay2);
   expect(relay2.refCount).toBe(0);
@@ -179,9 +179,9 @@ test("dynamic relays", async () => {
   await stream2.ready;
 
   stream2.next(Faker.eventPacket({ id: "2" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "2" }));
+  await sub.expectNext(Expect.eventPacket({ id: "2" }));
   stream1.next(Faker.eventPacket({ id: "3" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "3" }));
+  await sub.expectNext(Expect.eventPacket({ id: "3" }));
 
   const stream3 = attachNextStream(relay1);
   const stream4 = attachNextStream(relay2);
@@ -192,19 +192,16 @@ test("dynamic relays", async () => {
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream3.next(Faker.eventPacket({ id: "4" }));
-  await vi.waitFor(() => {
-    expect(sub.peep()).toEqual(Expect.eventPacket({ id: "4" }));
-  });
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "4" }));
+  await sub.expectNext(Expect.eventPacket({ id: "4" }));
   stream4.next(Faker.eventPacket({ id: "5" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "5" }));
+  await sub.expectNext(Expect.eventPacket({ id: "5" }));
 
   sessionRelays.remove(relayUrl1);
   expect(relay1.refCount).toBe(0);
 
   stream3.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream4.next(Faker.eventPacket({ id: "6" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "6" }));
+  await sub.expectNext(Expect.eventPacket({ id: "6" }));
 
   sub.unsubscribe();
   expect(relay1.refCount).toBe(0);
@@ -250,19 +247,19 @@ test("segment scope relays", async () => {
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "1" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+  await sub.expectNext(Expect.eventPacket({ id: "1" }));
 
   segmentRelays.append(relayUrl3);
   await stream3.ready;
 
   stream3.next(Faker.eventPacket({ id: "2" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "2" }));
+  await sub.expectNext(Expect.eventPacket({ id: "2" }));
 
   rxReq.emit({ kinds: [1] });
   await stream1.ready;
 
   stream1.next(Faker.eventPacket({ id: "3" }));
-  await expect(sub.pop()).resolves.toEqual(Expect.eventPacket({ id: "3" }));
+  await sub.expectNext(Expect.eventPacket({ id: "3" }));
 });
 
 function attachNextStream(relay: RelayCommunicationMock) {

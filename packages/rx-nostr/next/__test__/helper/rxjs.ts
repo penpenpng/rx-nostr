@@ -1,7 +1,9 @@
-import type { Observable, Subscribable } from "rxjs";
+import type { Observable } from "rxjs";
+import { assert, expect } from "vitest";
 
 export interface ObservableTestHelper<T> {
   pop(): Promise<T>;
+  expectNext(expected: unknown): Promise<void>;
   peep(): T | undefined;
   getValues(): T[];
   isComplete(): boolean;
@@ -66,10 +68,10 @@ export function subscribe<T>(obs: Observable<T>): ObservableTestHelper<T> {
         const result = await Promise.race([promise, finished]);
 
         if (result === TIMEOUT) {
-          throw new Error("[TestHelper] Observable pop timed out");
+          throw result;
         }
         if (result === COMPLETE) {
-          throw new Error("[TestHelper] Observable was completed");
+          throw result;
         }
         if (result === ERROR) {
           console.error("[TestHelper] Observable was terminated with an error");
@@ -77,6 +79,14 @@ export function subscribe<T>(obs: Observable<T>): ObservableTestHelper<T> {
         }
 
         return result;
+      }
+    },
+    async expectNext(expected: unknown): Promise<void> {
+      try {
+        const value = await this.pop();
+        expect(value).toEqual(expected);
+      } catch (err) {
+        assert.fail(err, expected);
       }
     },
     peep() {
