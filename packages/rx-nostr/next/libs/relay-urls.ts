@@ -1,4 +1,4 @@
-import { inlineTry } from "./error.ts";
+import { tryOrDefault } from "./try.ts";
 
 export type RelayUrl = `ws://${number}` | `wss://${string}`;
 
@@ -145,8 +145,12 @@ export class RelaySet {
       return;
     }
 
-    for (const url of urls) {
-      this.add(url, options);
+    if (typeof urls === "string") {
+      this.add(urls, options);
+    } else {
+      for (const url of urls) {
+        this.add(url, options);
+      }
     }
   }
 
@@ -311,11 +315,11 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
   }
 
   u.hash = "";
-  u.pathname = inlineTry(() => decodeURI(u.pathname), u.pathname);
+  u.pathname = tryOrDefault(() => decodeURI(u.pathname), u.pathname);
   u.pathname = u.pathname.replace(/\/$/, "");
   u.hostname = u.hostname.replace(/\.$/, "");
   u.searchParams.sort();
-  u.search = inlineTry(() => decodeURIComponent(u.search), u.search);
+  u.search = tryOrDefault(() => decodeURIComponent(u.search), u.search);
 
   if (!u.hostname) {
     return null;

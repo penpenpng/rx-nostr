@@ -32,9 +32,9 @@ export function reqBackward({
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
   const session = new SessionLifecycle(config);
-  const sessionScopeRelays = RxRelays.from(relayInput);
+  const sessionRelays = RxRelays.from(relayInput);
 
-  const warming = sessionScopeRelays.subscribe((destRelays) => {
+  const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       session.prewarm(relay);
     });
@@ -45,10 +45,10 @@ export function reqBackward({
       req({
         session,
         relays,
-        sessionScopeRelays,
-        segmentScopeRelays: packet.relays
+        sessionRelays,
+        segmentRelays: packet.relays
           ? RxRelays.from(packet.relays)
-          : RxRelays.from(sessionScopeRelays),
+          : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
@@ -60,7 +60,7 @@ export function reqBackward({
     finalize(() => {
       warming.unsubscribe();
       session.dispose();
-      sessionScopeRelays.dispose();
+      sessionRelays.dispose();
     }),
   );
 }
@@ -68,8 +68,8 @@ export function reqBackward({
 function req({
   session,
   relays,
-  sessionScopeRelays,
-  segmentScopeRelays,
+  sessionRelays,
+  segmentRelays,
   filters,
   linger,
   skipValidateFilterMatching,
@@ -77,14 +77,14 @@ function req({
 }: {
   session: SessionLifecycle;
   relays: RelayMapOperator<IRelayCommunication>;
-  sessionScopeRelays: RxRelays;
-  segmentScopeRelays: RxRelays;
+  sessionRelays: RxRelays;
+  segmentRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
   skipValidateFilterMatching: boolean;
   eoseTimeout: number;
 }): Observable<EventPacket> {
-  const warming = segmentScopeRelays.subscribe((destRelays) => {
+  const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       session.prewarm(relay);
     });
@@ -96,11 +96,11 @@ function req({
 
   const stream = new Subject<EventPacket>();
 
-  const sub = segmentScopeRelays
+  const sub = segmentRelays
     .asObservable()
     .pipe(setDiff())
     .subscribe(({ current, appended, outdated }) => {
-      if (!sessionScopeRelays.disposed) {
+      if (!sessionRelays.disposed) {
         if (!outdated && current.size <= 0) {
           Logger.warn("REQ was issued, but no destination relays is set.");
         }
@@ -132,7 +132,7 @@ function req({
               // Backward:
               // If this is the last uncompleted subscription, complete the output stream
               // to ignore relays appended thereafter.
-              if ([...segmentScopeRelays].every((url) => finished.has(url))) {
+              if ([...segmentRelays].every((url) => finished.has(url))) {
                 stream.complete();
               }
             }),
@@ -162,11 +162,11 @@ function req({
 
       sub.unsubscribe();
 
-      relays.forEach(segmentScopeRelays, (relay) => {
+      relays.forEach(segmentRelays, (relay) => {
         session.endSegment(relay, linger);
       });
 
-      segmentScopeRelays.dispose();
+      segmentRelays.dispose();
 
       stream.complete();
     }),

@@ -98,4 +98,7 @@ export interface RxNostrPublishConfig extends RxNostrPublishOptions {
   relays: RelayInput;
 }
 
-export type RelayInput = RxRelays | Iterable<string>;
+// TODO:
+// * rx-relays でも同じの使いたいので types/* に移す。
+// * ついでに *.interface.ts 系も全部移す。
+export type RelayInput = RxRelays | Iterable<string> | string;

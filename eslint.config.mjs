@@ -18,7 +18,12 @@ export default defineConfig([
   // TODO: Remove this.
   { rules: { "@typescript-eslint/no-unused-vars": "off" } },
   // Project specific rules.
-  { rules: { "@typescript-eslint/no-empty-object-type": "off" } },
+  {
+    rules: {
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-namespace": "off",
+    },
+  },
   {
     files: ["**/*.{test,spec}.{ts,mts}"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },

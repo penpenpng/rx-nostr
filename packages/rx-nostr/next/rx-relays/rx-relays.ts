@@ -10,7 +10,7 @@ import {
   once,
   RelaySet,
   RxDisposableStack,
-  SetOp,
+  u,
   type RelayUrl,
 } from "../libs/index.ts";
 
@@ -90,7 +90,7 @@ export class RxRelays {
   static intersection(...rxRelays: RxRelays[]): RxRelays {
     const rxr = new RxRelays();
     const sub = this.combine(...rxRelays).subscribe((sets) => {
-      rxr.set(...SetOp.intersection(...sets));
+      rxr.set(...u.Set.intersection(...sets));
     });
 
     rxr.stack.add(sub);
@@ -101,7 +101,7 @@ export class RxRelays {
   static union(...rxRelays: RxRelays[]): RxRelays {
     const rxr = new RxRelays();
     const sub = this.combine(...rxRelays).subscribe((sets) => {
-      rxr.set(...SetOp.union(...sets));
+      rxr.set(...u.Set.union(...sets));
     });
 
     rxr.stack.add(sub);

@@ -33,9 +33,9 @@ export function reqForward({
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
   const session = new SessionLifecycle(config);
-  const sessionScopeRelays = RxRelays.from(relayInput);
+  const sessionRelays = RxRelays.from(relayInput);
 
-  const warming = sessionScopeRelays.subscribe((destRelays) => {
+  const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       session.prewarm(relay);
     });
@@ -46,10 +46,10 @@ export function reqForward({
       req({
         session,
         relays,
-        sessionScopeRelays,
-        segmentScopeRelays: packet.relays
+        sessionRelays,
+        segmentRelays: packet.relays
           ? RxRelays.from(packet.relays)
-          : RxRelays.from(sessionScopeRelays),
+          : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
@@ -60,7 +60,7 @@ export function reqForward({
     finalize(() => {
       warming.unsubscribe();
       session.dispose();
-      sessionScopeRelays.dispose();
+      sessionRelays.dispose();
     }),
   );
 }
@@ -68,21 +68,21 @@ export function reqForward({
 function req({
   session,
   relays,
-  sessionScopeRelays,
-  segmentScopeRelays,
+  sessionRelays,
+  segmentRelays,
   filters,
   linger,
   skipValidateFilterMatching,
 }: {
   session: SessionLifecycle;
   relays: RelayMapOperator<IRelayCommunication>;
-  sessionScopeRelays: RxRelays;
-  segmentScopeRelays: RxRelays;
+  sessionRelays: RxRelays;
+  segmentRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
   skipValidateFilterMatching: boolean;
 }): Observable<EventPacket> {
-  const warming = segmentScopeRelays.subscribe((destRelays) => {
+  const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       session.prewarm(relay);
     });
@@ -93,7 +93,7 @@ function req({
 
   const stream = new Subject<EventPacket>();
 
-  const relaySub = segmentScopeRelays
+  const relaySub = segmentRelays
     .asObservable()
     .pipe(
       setDiff(),
@@ -101,7 +101,7 @@ function req({
       subscribeOn(asapScheduler),
     )
     .subscribe(({ current, appended, outdated }) => {
-      if (!sessionScopeRelays.disposed) {
+      if (!sessionRelays.disposed) {
         if (!outdated && current.size <= 0) {
           Logger.warn("REQ was issued, but no destination relays is set.");
         }
@@ -132,7 +132,7 @@ function req({
         ongoings.delete(relay.url);
 
         // Forward: Session scope relays are still needed.
-        if (!sessionScopeRelays.has(relay.url)) {
+        if (!sessionRelays.has(relay.url)) {
           session.endSegment(relay, linger);
         }
       });
@@ -151,14 +151,14 @@ function req({
 
       relaySub.unsubscribe();
 
-      relays.forEach(segmentScopeRelays, (relay) => {
-        if (sessionScopeRelays.has(relay.url)) {
+      relays.forEach(segmentRelays, (relay) => {
+        if (sessionRelays.has(relay.url)) {
           return;
         }
         session.endSegment(relay, linger);
       });
 
-      segmentScopeRelays.dispose();
+      segmentRelays.dispose();
 
       stream.complete();
     }),

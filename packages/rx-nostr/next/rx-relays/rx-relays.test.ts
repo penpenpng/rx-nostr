@@ -1,6 +1,6 @@
 import "disposablestack/auto";
-import { expect, test } from "vitest";
-import { subscribe } from "../__test__/helper/rxjs.ts";
+import { test } from "vitest";
+import { ObservableInspector } from "../__test__/helper/index.ts";
 import { RxRelays } from "./rx-relays.ts";
 
 test("RxRelays emits a relay URL", async () => {
@@ -9,9 +9,10 @@ test("RxRelays emits a relay URL", async () => {
   const relay1 = "wss://relay1.example.com";
   rxr.append(relay1);
 
-  const obs = subscribe<Set<string>>(rxr.asObservable());
+  const obs = new ObservableInspector(rxr.asObservable());
+  obs.subscribe();
 
-  await expect(obs.pop()).resolves.toEqual(new Set([relay1]));
+  await obs.expectNext(new Set([relay1]));
 });
 
 test(RxRelays.union.name, async () => {
@@ -24,14 +25,15 @@ test(RxRelays.union.name, async () => {
   rxr1.append(relay1);
   rxr2.append(relay2);
 
-  const obs = subscribe<Set<string>>(rxr.asObservable());
+  const obs = new ObservableInspector(rxr.asObservable());
+  obs.subscribe();
 
-  await expect(obs.pop()).resolves.toEqual(new Set([relay1, relay2]));
+  await obs.expectNext(new Set([relay1, relay2]));
 
   const relay3 = "wss://relay3.example.com";
   rxr1.append(relay3);
-  await expect(obs.pop()).resolves.toEqual(new Set([relay1, relay2, relay3]));
+  await obs.expectNext(new Set([relay1, relay2, relay3]));
 
   rxr2.dispose();
-  await expect(obs.pop()).resolves.toEqual(new Set([relay1, relay3]));
+  await obs.expectNext(new Set([relay1, relay3]));
 });

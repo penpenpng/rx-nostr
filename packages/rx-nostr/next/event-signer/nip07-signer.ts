@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import {
   ensureEventFields,
-  inlineThrow,
+  raise,
   RxNostrEnvironmentError,
 } from "../libs/index.ts";
 import type { EventSigner } from "./event-signer.interface.ts";
@@ -17,7 +17,7 @@ export class Nip07Signer implements EventSigner {
       pubkey:
         params.pubkey ??
         (await window?.nostr?.getPublicKey()) ??
-        inlineThrow(
+        raise(
           new RxNostrEnvironmentError(
             "window.nostr.getPublicKey() is not found",
           ),
@@ -32,7 +32,7 @@ export class Nip07Signer implements EventSigner {
 
     return (
       (await window?.nostr?.signEvent(event)) ??
-      inlineThrow(
+      raise(
         new RxNostrEnvironmentError("window.nostr.signEvent() is not found"),
       )
     );
@@ -40,7 +40,7 @@ export class Nip07Signer implements EventSigner {
   getPublicKey() {
     return (
       window?.nostr?.getPublicKey() ??
-      inlineThrow(
+      raise(
         new RxNostrEnvironmentError("window.nostr.getPublicKey() is not found"),
       )
     );

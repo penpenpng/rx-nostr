@@ -1,5 +1,5 @@
 import { Subject, type Observable } from "rxjs";
-import type { RelayUrl } from "../../libs";
+import { AwaitableQueue, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, ProgressActivity } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
 
@@ -7,6 +7,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
   refCount = 0;
   connectedCount = 0;
   releasedCount = 0;
+  channels = new AwaitableQueue<Observable<EventPacket>>();
 
   constructor(public url: RelayUrl) {}
 
@@ -21,28 +22,24 @@ export class RelayCommunicationMock implements IRelayCommunication {
     this.refCount--;
   }
 
-  channels: Array<{
-    stream: Observable<EventPacket>;
-    resolve: () => void;
-  }> = [];
-
   vreq(): Observable<EventPacket> {
-    const ch = this.channels.pop();
-    if (!ch) {
+    try {
+      return this.channels.dequeueSync();
+    } catch {
       throw new Error("No scheduled event stream available.");
     }
-
-    ch.resolve();
-
-    return ch.stream;
   }
 
-  attachNextEventStream(stream: Observable<EventPacket>): Promise<void> {
-    const { promise, resolve } = Promise.withResolvers<void>();
+  attachNextStream() {
+    const stream = new Subject<EventPacket>();
 
-    this.channels.push({ stream, resolve });
+    const subscribed = this.channels.enqueue(stream, 100);
 
-    return promise;
+    return Object.assign(stream, {
+      subscribed: subscribed.catch(() => {
+        throw new Error(`Stream was not subscribed (${this.url})`);
+      }),
+    });
   }
 
   eventOut = new Subject<ProgressActivity>();
@@ -52,22 +49,4 @@ export class RelayCommunicationMock implements IRelayCommunication {
   }
 
   sendProgress(): void {}
-}
-
-export function attachNextStream(relay: RelayCommunicationMock) {
-  const stream = new Subject<EventPacket>();
-  const popped = relay.attachNextEventStream(stream);
-
-  const { promise, resolve, reject } = Promise.withResolvers<void>();
-
-  const timer = setTimeout(() => {
-    reject(new Error(`Stream was not subscribed (${relay.url})`));
-  }, 100);
-  popped.then(() => {
-    clearTimeout(timer);
-    resolve();
-  });
-
-  // Emit EventPacket to the stream to emulate relay response.
-  return Object.assign(stream, { ready: promise });
 }
