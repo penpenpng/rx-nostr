@@ -1,4 +1,4 @@
-import { Subject, type Observable } from "rxjs";
+import { filter, Subject, type Observable } from "rxjs";
 import { AwaitableQueue, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, ProgressActivity } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
@@ -7,6 +7,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
   refCount = 0;
   connectedCount = 0;
   releasedCount = 0;
+  isHot = false;
   channels = new AwaitableQueue<Observable<EventPacket>>();
 
   constructor(public url: RelayUrl) {}
@@ -24,7 +25,12 @@ export class RelayCommunicationMock implements IRelayCommunication {
 
   vreq(): Observable<EventPacket> {
     try {
-      return this.channels.dequeueSync();
+      return (
+        this.channels
+          .dequeueSync()
+          // emulate that closed stream (refCount <= 0) provides no events.
+          .pipe(filter(() => this.refCount > 0 || this.isHot))
+      );
     } catch {
       throw new Error("No scheduled event stream available.");
     }

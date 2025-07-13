@@ -60,9 +60,9 @@ export class ObservableInspector<T> {
       }
     } catch (err) {
       if (err instanceof u.Promise.TimeoutError) {
-        throw err;
-      } else {
         assert.fail("timeout", expected);
+      } else {
+        throw err;
       }
     }
   }
