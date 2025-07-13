@@ -1,13 +1,12 @@
 import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import type { RelayUrl } from "../libs/relay-urls.ts";
+import type { Latch, RelayUrl } from "../libs/index.ts";
 import type { EventPacket, ProgressActivity } from "../packets/index.ts";
 
 export interface IRelayCommunication {
   url: RelayUrl;
-  connect(): Promise<void>;
-  release(): void;
+  latch: Latch;
   vreq(
     strategy: "forward" | "backward",
     filters: LazyFilter[],

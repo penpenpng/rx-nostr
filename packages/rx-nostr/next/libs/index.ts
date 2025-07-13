@@ -4,6 +4,7 @@
 export * from "./awaitable-queue.ts";
 export * from "./deferrer.ts";
 export * from "./error.ts";
+export * from "./latch.ts";
 export * from "./nostr/event.ts";
 export * from "./nostr/filter.ts";
 export * from "./nostr/nip11.ts";

@@ -1,5 +1,5 @@
 import "disposablestack/auto";
-import { expect, test } from "vitest";
+import { assert, expect, test } from "vitest";
 import {
   Faker,
   getTestReqOptions,
@@ -32,8 +32,7 @@ test("single relay", async () => {
     }),
   );
 
-  // prewarming (defer=false)
-  expect(relay.refCount).toBe(1);
+  assert(relay.latch.isLatched, "Relay should be prewarmed (defer=false)");
 
   const sub = obs.subscribe();
 
@@ -59,8 +58,7 @@ test("single relay", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "4" }));
 
   sub.unsubscribe();
-  expect(relay.connectedCount).toBe(1);
-  expect(relay.refCount).toBe(0);
+  assert(!relay.latch.isLatched, "Relay should be released");
 });
 
 test("single relay, defer=true", async () => {
@@ -82,8 +80,7 @@ test("single relay, defer=true", async () => {
     }),
   );
 
-  // prewarming (defer=true)
-  expect(relay.refCount).toBe(0);
+  assert(!relay.latch.isLatched, "Relay should not be prewarmed (defer=true)");
 
   const sub = obs.subscribe();
 
@@ -91,15 +88,17 @@ test("single relay, defer=true", async () => {
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
 
-  // begin segment (defer=true)
-  expect(relay.refCount).toBe(1);
+  assert(
+    relay.latch.isLatched,
+    "Relay should be warmed up just before a segment (defer=true)",
+  );
 
   req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
-  expect(relay.connectedCount).toBe(1);
-  expect(relay.refCount).toBe(0);
+  expect(relay.latchedCount).toBe(1);
+  assert(!relay.latch.isLatched, "Relay should be released");
 });
 
 test("single relay, weak=true", async () => {
@@ -121,8 +120,7 @@ test("single relay, weak=true", async () => {
     }),
   );
 
-  // prewarming (weak=true)
-  expect(relay.refCount).toBe(0);
+  assert(!relay.latch.isLatched, "Relay should not be held (weak=true)");
 
   const sub = obs.subscribe();
 
@@ -130,8 +128,7 @@ test("single relay, weak=true", async () => {
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
 
-  // begin segment (weak=true)
-  expect(relay.refCount).toBe(0);
+  assert(!relay.latch.isLatched, "Relay should not be held (weak=true)");
 
   req1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   relay.isHot = true;
@@ -139,8 +136,8 @@ test("single relay, weak=true", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
-  expect(relay.connectedCount).toBe(0);
-  expect(relay.refCount).toBe(0);
+  expect(relay.latchedCount).toBe(0);
+  assert(!relay.latch.isLatched, "Relay should be released");
 });
 
 test("dynamic relays", async () => {
@@ -169,10 +166,10 @@ test("dynamic relays", async () => {
   const relay2 = relays.get(relayUrl2);
 
   const req1relay1 = relay1.attachNextStream();
-  expect(relay1.refCount).toBe(0);
+  expect(relay1.latch.isLatched).toBe(false);
   sessionRelays.append(relayUrl1);
-  expect(relay1.refCount).toBe(1);
-  expect(relay2.refCount).toBe(0);
+  expect(relay1.latch.isLatched).toBe(true);
+  expect(relay2.latch.isLatched).toBe(false);
   rxReq.emit([{ kinds: [1] }]);
   await req1relay1.subscribed;
 
@@ -180,10 +177,10 @@ test("dynamic relays", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   const req1relay2 = relay2.attachNextStream();
-  expect(relay2.refCount).toBe(0);
+  expect(relay2.latch.isLatched).toBe(false);
   sessionRelays.append(relayUrl2);
-  expect(relay1.refCount).toBe(1);
-  expect(relay2.refCount).toBe(1);
+  expect(relay1.latch.isLatched).toBe(true);
+  expect(relay2.latch.isLatched).toBe(true);
   await req1relay2.subscribed;
 
   req1relay2.next(Faker.eventPacket({ id: "2" }));
@@ -205,15 +202,15 @@ test("dynamic relays", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
 
   sessionRelays.remove(relayUrl1);
-  expect(relay1.refCount).toBe(0);
+  expect(relay1.latch.isLatched).toBe(false);
 
   req2relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   req2relay2.next(Faker.eventPacket({ id: "6" }));
   await obs.expectNext(Expect.eventPacket({ id: "6" }));
 
   sub.unsubscribe();
-  expect(relay1.refCount).toBe(0);
-  expect(relay2.refCount).toBe(0);
+  expect(relay1.latch.isLatched).toBe(false);
+  expect(relay2.latch.isLatched).toBe(false);
 });
 
 test("segment scope relays", async () => {
@@ -254,8 +251,8 @@ test("segment scope relays", async () => {
 
   rxReq.emit({ kinds: [1] }, { relays: segmentRelays });
   await stream2.subscribed;
-  expect(relay1.refCount).toBe(1);
-  expect(relay2.refCount).toBe(1);
+  expect(relay1.latch.isLatched).toBe(true);
+  expect(relay2.latch.isLatched).toBe(true);
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "1" }));
@@ -263,7 +260,7 @@ test("segment scope relays", async () => {
 
   segmentRelays.append(relayUrl3);
   await stream3.subscribed;
-  expect(relay3.refCount).toBe(1);
+  expect(relay3.latch.isLatched).toBe(true);
 
   stream3.next(Faker.eventPacket({ id: "2" }));
   await obs.expectNext(Expect.eventPacket({ id: "2" }));

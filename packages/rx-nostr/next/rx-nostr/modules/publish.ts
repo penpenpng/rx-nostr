@@ -13,10 +13,10 @@ import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
+import { QuerySession, type QuerySegment } from "../query-session.ts";
 import { type IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
 import type { RelayInput } from "../rx-nostr.interface.ts";
-import { SessionLifecycle } from "../session-lifecycle.ts";
 
 export function publish({
   relays,
@@ -36,10 +36,12 @@ export function publish({
     return EMPTY;
   }
 
-  const session = new SessionLifecycle({
+  const session = new QuerySession({
     defer: false,
     weak: config.weak,
   });
+  // Assume that `relay.url` is normalized.
+  const segments = new Map<string, QuerySegment>();
 
   const stream = new Subject<ProgressActivity>();
   let sub: Subscription;
@@ -52,12 +54,13 @@ export function publish({
     .signEvent(params)
     .then((event) => {
       relays.forEach(destRelays, (relay) => {
-        session.beginSegment(relay);
+        const segment = session.beginSegment(relay, config.linger);
+        segments.set(relay.url, segment);
       });
 
       const progress = relays.map(destRelays, (relay) =>
         relay.event(event).pipe(
-          finalize(() => void session.endSegment(relay, config.linger)),
+          finalize(() => void segments.get(relay.url)?.endSegment()),
           timeout(config.timeout),
           timeoutWith({
             state: "timeout",

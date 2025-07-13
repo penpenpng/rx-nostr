@@ -137,6 +137,16 @@ export class RxRelays {
     }
   }
 
+  static set(
+    relays: RxRelays | Iterable<string> | null | undefined,
+  ): Set<RelayUrl> {
+    if (!relays) {
+      return new Set();
+    }
+
+    return new RelaySet(relays).toSet();
+  }
+
   static array(
     relays: RxRelays | Iterable<string> | null | undefined,
   ): RelayUrl[] {
