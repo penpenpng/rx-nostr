@@ -65,19 +65,16 @@ class QuerySessionPerRelay {
     }
 
     this.warmed = true;
-    const drop = this.holdLatch();
-
-    this.dropPrewarming = () => {
-      drop();
-      this.dropPrewarming = undefined;
-    };
+    this.dropPrewarming = this.holdLatch();
   }
 
   beginSegment(linger: number): () => void {
     this.warmed = true;
 
     if (this.dropPrewarming) {
-      return this.lingered(this.dropPrewarming, linger);
+      const drop = this.dropPrewarming;
+      this.dropPrewarming = undefined;
+      return this.lingered(drop, linger);
     } else {
       const drop = this.holdLatch();
       return this.lingered(drop, linger);
@@ -85,6 +82,7 @@ class QuerySessionPerRelay {
   }
 
   private holdLatch() {
+    console.log("hold", this.relay.url);
     const drop = this.relay.latch.hold();
 
     const id = this.nextId;

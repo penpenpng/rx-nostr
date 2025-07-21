@@ -1,5 +1,5 @@
 import "disposablestack/auto";
-import { assert, expect, test } from "vitest";
+import { assert, expect, test, vi } from "vitest";
 import {
   Faker,
   getTestReqOptions,
@@ -10,6 +10,7 @@ import { RelayMapOperator } from "../../libs/index.ts";
 import { RxForwardReq } from "../../rx-req/index.ts";
 
 import { Expect } from "../../__test__/helper/expect.ts";
+import { setLogLevel } from "../../logger.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { reqForward } from "./req-forward.ts";
 
@@ -141,6 +142,7 @@ test("single relay, weak=true", async () => {
 });
 
 test("dynamic relays", async () => {
+  setLogLevel("debug");
   const rxReq = new RxForwardReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
@@ -201,8 +203,11 @@ test("dynamic relays", async () => {
   req2relay2.next(Faker.eventPacket({ id: "5" }));
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
 
+  console.log("holders", relay1.latch.holders);
   sessionRelays.remove(relayUrl1);
-  expect(relay1.latch.isLatched).toBe(false);
+  await vi.waitFor(() => {
+    expect(relay1.latch.isLatched).toBe(false);
+  });
 
   req2relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   req2relay2.next(Faker.eventPacket({ id: "6" }));

@@ -19,20 +19,27 @@ function logLevel() {
   }
 }
 
+function debug(...args: unknown[]) {
+  if (logLevel() <= 0) {
+    console.debug("[rx-nostr]", ...args);
+  }
+}
+function warn(...args: unknown[]) {
+  if (logLevel() <= 1) {
+    console.warn("[rx-nostr]", ...args);
+  }
+}
+function error(...args: unknown[]) {
+  if (logLevel() <= 2) {
+    console.error("[rx-nostr]", ...args);
+  }
+}
+
 export class Logger {
-  static debug(...args: unknown[]) {
-    if (logLevel() <= 0) {
-      console.debug("[rx-nostr]", ...args);
-    }
+  static trace(traceTag: unknown, ...args: unknown[]) {
+    debug(`[:${traceTag}]`, ...args);
   }
-  static warn(...args: unknown[]) {
-    if (logLevel() <= 1) {
-      console.warn("[rx-nostr]", ...args);
-    }
-  }
-  static error(...args: unknown[]) {
-    if (logLevel() <= 2) {
-      console.error("[rx-nostr]", ...args);
-    }
-  }
+  static debug = debug;
+  static warn = warn;
+  static error = error;
 }

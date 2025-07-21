@@ -1,7 +1,10 @@
 import { once } from "./once.ts";
 
 export class Latch {
-  private holders = 0;
+  private _holders = 0;
+  get holders(): number {
+    return this._holders;
+  }
 
   constructor(
     private handlers: {
@@ -10,15 +13,15 @@ export class Latch {
     },
   ) {}
 
-  hold() {
-    if (this.holders <= 0) {
+  hold(): () => void {
+    if (this._holders <= 0) {
       this.handlers.onLatched?.();
     }
-    this.holders++;
+    this._holders++;
 
     const drop = once(() => {
-      this.holders--;
-      if (this.holders <= 0) {
+      this._holders--;
+      if (this._holders <= 0) {
         this.handlers.onUnlatched?.();
       }
     });
@@ -27,6 +30,6 @@ export class Latch {
   }
 
   get isLatched(): boolean {
-    return this.holders > 0;
+    return this._holders > 0;
   }
 }

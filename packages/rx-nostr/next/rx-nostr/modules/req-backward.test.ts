@@ -16,6 +16,7 @@ import { reqBackward } from "./req-backward.ts";
 import { reqForward } from "./req-forward.ts";
 
 test("single relay", async () => {
+  setLogLevel("debug");
   const rxReq = new RxBackwardReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
@@ -34,15 +35,13 @@ test("single relay", async () => {
     }),
   );
 
-  setLogLevel("debug");
-
   // prewarming (defer=false)
   assert(relay.latch.isLatched, "Relay should be prewarmed");
 
   const sub = obs.subscribe();
 
   const req1 = relay.attachNextStream();
-  rxReq.emit([{ kinds: [1] }]);
+  rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await req1.subscribed;
 
   req1.next(Faker.eventPacket({ id: "1" }));
@@ -51,7 +50,7 @@ test("single relay", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "2" }));
 
   const req2 = relay.attachNextStream();
-  rxReq.emit([{ kinds: [2] }]);
+  rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await req2.subscribed;
 
   // The first subscription is still active.

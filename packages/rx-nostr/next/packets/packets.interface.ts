@@ -23,7 +23,7 @@ export interface ReqOptions {
   // reqId を使って本来やりたかったこと is 何
   // -> EOSE の見分け？
   // -> Logging？
-  traceId?: string;
+  traceTag?: string | number;
 }
 
 export interface ProgressPacket {

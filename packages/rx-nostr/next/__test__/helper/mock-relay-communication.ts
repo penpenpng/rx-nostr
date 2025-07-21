@@ -19,13 +19,27 @@ export class RelayCommunicationMock implements IRelayCommunication {
 
   constructor(public url: RelayUrl) {}
 
-  vreq(): Observable<EventPacket> {
+  vreq(...args: unknown[]): Observable<EventPacket> {
+    console.log("called vreq", ...args);
     try {
       return (
         this.channels
           .dequeueSync()
           // emulate that closed stream provides no events.
-          .pipe(filter(() => this.latch.isLatched || this.isHot))
+          .pipe(
+            filter((packet) => {
+              const flag = this.latch.isLatched || this.isHot;
+              if (!flag) {
+                console.warn(
+                  this.url,
+                  this.latch.isLatched,
+                  this.isHot,
+                  packet.event.id,
+                );
+              }
+              return flag;
+            }),
+          )
       );
     } catch {
       throw new Error("No scheduled event stream available.");

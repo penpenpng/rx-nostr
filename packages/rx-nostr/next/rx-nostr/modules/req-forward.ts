@@ -3,15 +3,19 @@ import {
   finalize,
   identity,
   map,
+  reduce,
+  scan,
   Subject,
   subscribeOn,
   switchAll,
+  tap,
   type Observable,
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { type RelayMapOperator, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
+import { mapStored } from "../../operators/general/map-stored.ts";
 import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
@@ -42,6 +46,9 @@ export function reqForward({
   });
 
   return rxReq.asObservable().pipe(
+    tap((packet) => {
+      Logger.trace(packet.traceTag, "new forward REQ session");
+    }),
     map((packet) =>
       req({
         session,
@@ -54,6 +61,27 @@ export function reqForward({
         linger: config.linger ?? packet.linger ?? 0,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
       }),
+    ),
+    // Forward: To keep the latch, we need to subsccribe next stream before the previous one ends.
+    mapStored(
+      (obs, cleanupPrev) => {
+        const stream = new Subject<EventPacket>();
+        const sub = obs.subscribe(stream);
+        cleanupPrev();
+        return [
+          stream,
+          () => {
+            sub.unsubscribe();
+            stream.complete();
+          },
+        ];
+      },
+      {
+        initialStore: () => {},
+        cleanup: (cleanupLast) => {
+          cleanupLast();
+        },
+      },
     ),
     // Forward: New coming req unsubscribes the previous one.
     switchAll(),
@@ -72,6 +100,7 @@ function req({
   segmentRelays,
   filters,
   linger,
+  traceTag,
   skipValidateFilterMatching,
 }: {
   session: QuerySession;
@@ -80,15 +109,17 @@ function req({
   segmentRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
+  traceTag?: string | number;
   skipValidateFilterMatching: boolean;
 }): Observable<EventPacket> {
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
+      Logger.trace(traceTag, `prewarm ${relay.url}`);
       session.prewarm(relay);
     });
   });
 
-  // Assume that `relay.url` is normalized.
+  // Use Map because we assume that `relay.url` is normalized.
   // Forward: Only one subscription (segment) at most is held on the same relay.
   const ongoings = new Map<
     RelayUrl,
@@ -105,6 +136,12 @@ function req({
       subscribeOn(asapScheduler),
     )
     .subscribe(({ current, appended, outdated }) => {
+      Logger.trace(traceTag, "updated dest relays", {
+        current,
+        appended,
+        outdated,
+      });
+
       if (!sessionRelays.disposed) {
         if (!outdated && current.size <= 0) {
           Logger.warn("REQ was issued, but no destination relays is set.");
@@ -116,11 +153,12 @@ function req({
         }
       }
 
-      // Forward:
       // Begin new segment before the previous segment ends
       // to prevent WebSocket blinks when `linger` is 0.
       relays.forEach(appended, (relay) => {
         const segment = session.beginSegment(relay, linger);
+        Logger.trace(traceTag, `new segment on ${relay.url}`);
+
         const sub = relay
           .vreq("forward", filters)
           .pipe(skipValidateFilterMatching ? identity : filterBy(filters))
@@ -136,11 +174,10 @@ function req({
         query?.sub.unsubscribe();
 
         // Forward: Session scope relays are still needed.
-        if (!sessionRelays.has(relay.url)) {
-          console.log("relay endSegment", !!query?.segment, relay.url);
-          // Forward: End segment on session scope relays.
-          query?.segment.endSegment();
-        }
+        // if (!sessionRelays.has(relay.url)) {
+        query?.segment.endSegment();
+        Logger.trace(traceTag, `end segment on ${relay.url}`);
+        // }
       });
     });
 
@@ -157,7 +194,8 @@ function req({
       relaySub.unsubscribe();
 
       RxRelays.set(segmentRelays)
-        .difference(RxRelays.set(sessionRelays))
+        // これしないと segment の解放漏れが発生する → latch が瞬断しないか確認
+        // .difference(RxRelays.set(sessionRelays))
         .forEach((relay) => {
           ongoings.get(relay)?.segment.endSegment();
         });
@@ -166,6 +204,7 @@ function req({
       segmentRelays.dispose();
 
       stream.complete();
+      Logger.trace(traceTag, "finalized segment");
     }),
   );
 }
