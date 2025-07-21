@@ -1,4 +1,5 @@
 import { filter, Subject, type Observable } from "rxjs";
+import type { LazyFilter } from "../../index.ts";
 import { AwaitableQueue, Latch, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, ProgressActivity } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
@@ -19,7 +20,10 @@ export class RelayCommunicationMock implements IRelayCommunication {
 
   constructor(public url: RelayUrl) {}
 
-  vreq(...args: unknown[]): Observable<EventPacket> {
+  vreq(
+    _strategy: "forward" | "backward",
+    filters: LazyFilter[],
+  ): Observable<EventPacket> {
     try {
       return (
         this.channels

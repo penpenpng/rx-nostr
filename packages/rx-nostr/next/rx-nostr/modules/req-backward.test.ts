@@ -34,7 +34,6 @@ test("single relay", async () => {
     }),
   );
 
-  // prewarming (defer=false)
   assert(relay.latch.isLatched, "Relay should be prewarmed (defer=false)");
 
   const sub = obs.subscribe();
@@ -89,8 +88,7 @@ test("single relay, defer=true", async () => {
     }),
   );
 
-  // prewarming (defer=true)
-  assert(!relay.latch.isLatched, "Relay should be disconnected (defer=true)");
+  assert(!relay.latch.isLatched, "Relay should not be prewarmed (defer=true)");
 
   const sub = obs.subscribe();
 
@@ -98,7 +96,6 @@ test("single relay, defer=true", async () => {
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await req1.subscribed;
 
-  // begin segment (defer=true)
   assert(
     relay.latch.isLatched,
     "Relay should be connected just before a segment (defer=true)",
@@ -144,8 +141,7 @@ test("single relay, weak=true", async () => {
     }),
   );
 
-  // prewarming (weak=true)
-  assert(!relay.latch.isLatched, "Relay should be disconnected (weak=true)");
+  assert(!relay.latch.isLatched, "Relay should not be prewarmed (weak=true)");
 
   const sub = obs.subscribe();
 
@@ -153,8 +149,10 @@ test("single relay, weak=true", async () => {
   rxReq.emit([{ kinds: [0] }]);
   await stream1.subscribed;
 
-  // begin segment (weak=true)
-  assert(!relay.latch.isLatched, "Relay should be disconnected (weak=true)");
+  assert(
+    !relay.latch.isLatched,
+    "Relay should keep to be disconnected (weak=true)",
+  );
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   relay.isHot = true;
@@ -195,71 +193,56 @@ test("dynamic relays", async () => {
   const relay2 = relays.get(relayUrl2);
 
   // append relay1, and emit a REQ
-  const stream1 = relay1.attachNextStream();
-  assert(
-    !relay1.latch.isLatched,
-    "Relay1 should be disconnected before being added",
-  );
+  const req1relay1 = relay1.attachNextStream();
+  assert(!relay1.latch.isLatched, "Relay1 should still be offline");
   sessionRelays.append(relayUrl1);
-  assert(
-    relay1.latch.isLatched,
-    "Relay1 should be connected after being added",
-  );
-  assert(!relay2.latch.isLatched, "Relay2 should be disconnected");
-  rxReq.emit([{ kinds: [0] }]);
-  await stream1.subscribed;
+  assert(relay1.latch.isLatched, "Relay1 should be prewarmed");
+  assert(!relay2.latch.isLatched, "Relay2 should still be offline");
+  rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
+  await req1relay1.subscribed;
 
   // expect to observe events from relay1
-  stream1.next(Faker.eventPacket({ id: "1" }));
+  req1relay1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   // append relay2
-  const stream2 = relay2.attachNextStream();
-  assert(
-    !relay2.latch.isLatched,
-    "Relay2 should be disconnected before being added",
-  );
+  const req1relay2 = relay2.attachNextStream();
+  assert(!relay2.latch.isLatched, "Relay2 should still be offline");
   sessionRelays.append(relayUrl2);
-  assert(relay1.latch.isLatched, "Relay1 should still be connected");
-  assert(
-    relay2.latch.isLatched,
-    "Relay2 should be connected after being added",
-  );
+  assert(relay1.latch.isLatched, "Relay1 should keep to be connected");
+  assert(relay2.latch.isLatched, "Relay2 should be prewarmed");
   // expect to emit the same REQ to relay2
-  await stream2.subscribed;
+  await req1relay2.subscribed;
 
   // expect to observe events from the both relays
-  stream2.next(Faker.eventPacket({ id: "2" }));
+  req1relay2.next(Faker.eventPacket({ id: "2" }));
   await obs.expectNext(Expect.eventPacket({ id: "2" }));
-  stream1.next(Faker.eventPacket({ id: "3" }));
+  req1relay1.next(Faker.eventPacket({ id: "3" }));
   await obs.expectNext(Expect.eventPacket({ id: "3" }));
 
   // emit a new REQ
-  const stream3 = relay1.attachNextStream();
-  const stream4 = relay2.attachNextStream();
+  const req2relay1 = relay1.attachNextStream();
+  const req2relay2 = relay2.attachNextStream();
   rxReq.emit([{ kinds: [1] }]);
-  await stream3.subscribed;
-  await stream4.subscribed;
+  await req2relay1.subscribed;
+  await req2relay2.subscribed;
 
   // expect to observe events from the all streams
-  stream1.next(Faker.eventPacket({ id: "4" }));
+  req1relay1.next(Faker.eventPacket({ id: "4" }));
   await obs.expectNext(Expect.eventPacket({ id: "4" }));
-  stream2.next(Faker.eventPacket({ id: "5" }));
+  req1relay2.next(Faker.eventPacket({ id: "5" }));
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
-  stream3.next(Faker.eventPacket({ id: "6" }));
+  req2relay1.next(Faker.eventPacket({ id: "6" }));
   await obs.expectNext(Expect.eventPacket({ id: "6" }));
-  stream4.next(Faker.eventPacket({ id: "7" }));
+  req2relay2.next(Faker.eventPacket({ id: "7" }));
   await obs.expectNext(Expect.eventPacket({ id: "7" }));
 
   // remove relay2
   sessionRelays.remove(relayUrl2);
-  assert(
-    !relay2.latch.isLatched,
-    "Relay2 should be disconnected after being removed",
-  );
+  assert(!relay2.latch.isLatched, "Relay2 should be released");
 
-  stream4.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
-  stream3.next(Faker.eventPacket({ id: "8" }));
+  req2relay2.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  req2relay1.next(Faker.eventPacket({ id: "8" }));
   await obs.expectNext(Expect.eventPacket({ id: "8" }));
 
   sub.unsubscribe();
