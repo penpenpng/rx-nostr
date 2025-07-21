@@ -15,6 +15,7 @@ import { RxRelays } from "../../rx-relays/index.ts";
 import { reqForward } from "./req-forward.ts";
 
 test("single relay", async () => {
+  setLogLevel("debug");
   const rxReq = new RxForwardReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
@@ -38,7 +39,7 @@ test("single relay", async () => {
   const sub = obs.subscribe();
 
   const req1 = relay.attachNextStream();
-  rxReq.emit([{ kinds: [1] }]);
+  rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await req1.subscribed;
 
   req1.next(Faker.eventPacket({ id: "1" }));
@@ -47,7 +48,7 @@ test("single relay", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "2" }));
 
   const req2 = relay.attachNextStream();
-  rxReq.emit([{ kinds: [2] }]);
+  rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await req2.subscribed;
 
   // The second subscription overrides the first one.
@@ -59,6 +60,10 @@ test("single relay", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "4" }));
 
   sub.unsubscribe();
+  assert(
+    relay.latchedCount === 1,
+    "Only one attempt should be made to connect to the relay",
+  );
   assert(!relay.latch.isLatched, "Relay should be released");
 });
 
@@ -98,7 +103,10 @@ test("single relay, defer=true", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
-  expect(relay.latchedCount).toBe(1);
+  assert(
+    relay.latchedCount === 1,
+    "Only one attempt should be made to connect to the relay",
+  );
   assert(!relay.latch.isLatched, "Relay should be released");
 });
 
@@ -203,7 +211,6 @@ test("dynamic relays", async () => {
   req2relay2.next(Faker.eventPacket({ id: "5" }));
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
 
-  console.log("holders", relay1.latch.holders);
   sessionRelays.remove(relayUrl1);
   await vi.waitFor(() => {
     expect(relay1.latch.isLatched).toBe(false);

@@ -20,7 +20,6 @@ export class RelayCommunicationMock implements IRelayCommunication {
   constructor(public url: RelayUrl) {}
 
   vreq(...args: unknown[]): Observable<EventPacket> {
-    console.log("called vreq", ...args);
     try {
       return (
         this.channels

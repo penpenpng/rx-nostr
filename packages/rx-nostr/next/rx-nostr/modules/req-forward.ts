@@ -3,8 +3,6 @@ import {
   finalize,
   identity,
   map,
-  reduce,
-  scan,
   Subject,
   subscribeOn,
   switchAll,
@@ -13,9 +11,14 @@ import {
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
-import { type RelayMapOperator, type RelayUrl } from "../../libs/index.ts";
+import {
+  once,
+  type RelayMapOperator,
+  type RelayUrl,
+} from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { mapStored } from "../../operators/general/map-stored.ts";
+import { tapOnce } from "../../operators/general/tap-once.ts";
 import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
@@ -36,18 +39,20 @@ export function reqForward({
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
+  Logger.debug("new forward REQ session");
   const session = new QuerySession(config);
   const sessionRelays = RxRelays.from(relayInput);
 
   const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
+      Logger.debug("session prewarm", relay.url);
       session.prewarm(relay);
     });
   });
 
   return rxReq.asObservable().pipe(
     tap((packet) => {
-      Logger.trace(packet.traceTag, "new forward REQ session");
+      Logger.trace(packet.traceTag, "new forward REQ segment");
     }),
     map((packet) =>
       req({
@@ -59,6 +64,7 @@ export function reqForward({
           : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: config.linger ?? packet.linger ?? 0,
+        traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
       }),
     ),
@@ -66,14 +72,15 @@ export function reqForward({
     mapStored(
       (obs, cleanupPrev) => {
         const stream = new Subject<EventPacket>();
-        const sub = obs.subscribe(stream);
-        cleanupPrev();
+        const sub = obs
+          .pipe(tapOnce(cleanupPrev), finalize(cleanupPrev))
+          .subscribe(stream);
         return [
           stream,
-          () => {
+          once(() => {
             sub.unsubscribe();
             stream.complete();
-          },
+          }),
         ];
       },
       {
@@ -114,7 +121,7 @@ function req({
 }): Observable<EventPacket> {
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      Logger.trace(traceTag, `prewarm ${relay.url}`);
+      Logger.trace(traceTag, `segment prewarm ${relay.url}`);
       session.prewarm(relay);
     });
   });
@@ -174,10 +181,8 @@ function req({
         query?.sub.unsubscribe();
 
         // Forward: Session scope relays are still needed.
-        // if (!sessionRelays.has(relay.url)) {
         query?.segment.endSegment();
         Logger.trace(traceTag, `end segment on ${relay.url}`);
-        // }
       });
     });
 
@@ -193,12 +198,9 @@ function req({
 
       relaySub.unsubscribe();
 
-      RxRelays.set(segmentRelays)
-        // これしないと segment の解放漏れが発生する → latch が瞬断しないか確認
-        // .difference(RxRelays.set(sessionRelays))
-        .forEach((relay) => {
-          ongoings.get(relay)?.segment.endSegment();
-        });
+      relays.forEach(sessionRelays, (relay) => {
+        ongoings.get(relay.url)?.segment.endSegment();
+      });
       ongoings.clear();
 
       segmentRelays.dispose();

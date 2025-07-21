@@ -7,13 +7,12 @@ import {
   RelayCommunicationMock,
 } from "../../__test__/helper/index.ts";
 import { RelayMapOperator } from "../../libs/index.ts";
-import { RxBackwardReq, RxForwardReq } from "../../rx-req/index.ts";
+import { RxBackwardReq } from "../../rx-req/index.ts";
 
 import { Expect } from "../../__test__/helper/expect.ts";
 import { setLogLevel } from "../../logger.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { reqBackward } from "./req-backward.ts";
-import { reqForward } from "./req-forward.ts";
 
 test("single relay", async () => {
   setLogLevel("debug");
@@ -95,19 +94,32 @@ test("single relay, defer=true", async () => {
 
   const sub = obs.subscribe();
 
-  const stream1 = relay.attachNextStream();
-  rxReq.emit([{ kinds: [0] }]);
-  await stream1.subscribed;
+  const req1 = relay.attachNextStream();
+  rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
+  await req1.subscribed;
 
   // begin segment (defer=true)
   expect(relay.latch.isLatched).toBe(true);
 
-  stream1.next(Faker.eventPacket({ id: "1" }));
+  req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
+  const req2 = relay.attachNextStream();
+  rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
+  await req2.subscribed;
+
+  // The first subscription is still active.
+  req1.next(Faker.eventPacket({ id: "2" }));
+  await obs.expectNext(Expect.eventPacket({ id: "2" }));
+  req2.next(Faker.eventPacket({ id: "3" }));
+  await obs.expectNext(Expect.eventPacket({ id: "3" }));
+
   sub.unsubscribe();
-  expect(relay.latchedCount).toBe(1);
-  expect(relay.latch.isLatched).toBe(false);
+  assert(
+    relay.latchedCount === 1,
+    "Only one attempt should be made to connect to the relay",
+  );
+  assert(!relay.latch.isLatched, "Relay should be released");
 });
 
 test("single relay, weak=true", async () => {
@@ -235,12 +247,12 @@ test("dynamic relays", async () => {
 });
 
 test("segment scope relays", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxBackwardReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
-    reqForward({
+    reqBackward({
       relays,
       rxReq,
       relayInput: sessionRelays,

@@ -42,6 +42,7 @@ export function reqBackward({
 
   const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
+      Logger.debug("session prewarm", relay.url);
       session.prewarm(relay);
     });
   });
@@ -99,7 +100,7 @@ function req({
 }): Observable<EventPacket> {
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      Logger.trace(traceTag, `prewarm ${relay.url}`);
+      Logger.trace(traceTag, `segment prewarm ${relay.url}`);
       session.prewarm(relay);
     });
   });
