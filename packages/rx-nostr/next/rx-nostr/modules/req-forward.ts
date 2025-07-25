@@ -6,7 +6,6 @@ import {
   Subject,
   subscribeOn,
   switchAll,
-  tap,
   type Observable,
   type Subscription,
 } from "rxjs";
@@ -45,15 +44,14 @@ export function reqForward({
 
   const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      Logger.debug("session prewarm", relay.url);
-      session.prewarm(relay);
+      const prewarmed = session.prewarm(relay);
+      if (prewarmed) {
+        Logger.debug("session prewarm", relay.url);
+      }
     });
   });
 
   return rxReq.asObservable().pipe(
-    tap((packet) => {
-      Logger.trace(packet.traceTag, "new forward REQ segment");
-    }),
     map((packet) =>
       req({
         session,
@@ -119,10 +117,14 @@ function req({
   traceTag?: string | number;
   skipValidateFilterMatching: boolean;
 }): Observable<EventPacket> {
+  Logger.trace(traceTag, "new forward REQ segment");
+
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      Logger.trace(traceTag, `segment prewarm ${relay.url}`);
-      session.prewarm(relay);
+      const prewarmed = session.prewarm(relay);
+      if (prewarmed) {
+        Logger.trace(traceTag, `segment prewarm ${relay.url}`);
+      }
     });
   });
 

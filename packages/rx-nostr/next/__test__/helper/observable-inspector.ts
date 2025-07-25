@@ -56,6 +56,7 @@ export class ObservableInspector<T> {
         this.errorPopped = true;
         assert.fail(this.error, expected);
       } else {
+        // FIXME: Use toMatchObject(). And fix Faker.
         expect(value).toEqual(expected);
       }
     } catch (err) {

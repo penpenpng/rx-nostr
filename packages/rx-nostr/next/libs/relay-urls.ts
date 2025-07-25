@@ -256,7 +256,11 @@ export class RelayMapOperator<T> {
     }
 
     for (const relay of relays) {
-      callback(this.get(relay));
+      try {
+        callback(this.get(relay));
+      } catch (err) {
+        console.error(err);
+      }
     }
   }
 
@@ -271,7 +275,11 @@ export class RelayMapOperator<T> {
     const results: R[] = [];
 
     for (const relay of relays) {
-      results.push(project(this.get(relay)));
+      try {
+        results.push(project(this.get(relay)));
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     return results;

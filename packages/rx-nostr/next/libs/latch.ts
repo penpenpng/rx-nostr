@@ -8,28 +8,28 @@ export class Latch {
 
   constructor(
     private handlers: {
-      onLatched?: () => void;
-      onUnlatched?: () => void;
+      onHeldUp?: () => void;
+      onDropped?: () => void;
     },
   ) {}
 
   hold(): () => void {
     if (this._holders <= 0) {
-      this.handlers.onLatched?.();
+      this.handlers.onHeldUp?.();
     }
     this._holders++;
 
     const drop = once(() => {
       this._holders--;
       if (this._holders <= 0) {
-        this.handlers.onUnlatched?.();
+        this.handlers.onDropped?.();
       }
     });
 
     return drop;
   }
 
-  get isLatched(): boolean {
+  get isHeld(): boolean {
     return this._holders > 0;
   }
 }

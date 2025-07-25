@@ -1,5 +1,5 @@
 import "disposablestack/auto";
-import { assert, test, vi } from "vitest";
+import { assert, test } from "vitest";
 import {
   Faker,
   getTestReqOptions,
@@ -34,13 +34,14 @@ test("single relay", async () => {
     }),
   );
 
-  assert(relay.latch.isLatched, "Relay should be prewarmed (defer=false)");
+  assert(relay.latch.isHeld, "Relay should be prewarmed (defer=false)");
 
   const sub = obs.subscribe();
 
   const req1 = relay.attachNextStream();
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
 
   req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
@@ -50,6 +51,7 @@ test("single relay", async () => {
   const req2 = relay.attachNextStream();
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await req2.subscribed;
+  await relay.expectFilters([{ kinds: [2] }]);
 
   // The second subscription overrides the first one.
   // so this is expected to be ignored.
@@ -64,7 +66,7 @@ test("single relay", async () => {
     relay.latchedCount === 1,
     "Only one attempt should be made to connect to the relay",
   );
-  assert(!relay.latch.isLatched, "Relay should be released");
+  assert(!relay.latch.isHeld, "Relay should be released");
 });
 
 test("single relay, defer=true", async () => {
@@ -86,16 +88,17 @@ test("single relay, defer=true", async () => {
     }),
   );
 
-  assert(!relay.latch.isLatched, "Relay should not be prewarmed (defer=true)");
+  assert(!relay.latch.isHeld, "Relay should not be prewarmed (defer=true)");
 
   const sub = obs.subscribe();
 
   const req1 = relay.attachNextStream();
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
 
   assert(
-    relay.latch.isLatched,
+    relay.latch.isHeld,
     "Relay should be warmed up just before a segment (defer=true)",
   );
 
@@ -107,7 +110,7 @@ test("single relay, defer=true", async () => {
     relay.latchedCount === 1,
     "Only one attempt should be made to connect to the relay",
   );
-  assert(!relay.latch.isLatched, "Relay should be released");
+  assert(!relay.latch.isHeld, "Relay should be released");
 });
 
 test("single relay, weak=true", async () => {
@@ -129,15 +132,16 @@ test("single relay, weak=true", async () => {
     }),
   );
 
-  assert(!relay.latch.isLatched, "Relay should be disconnected (weak=true)");
+  assert(!relay.latch.isHeld, "Relay should be disconnected (weak=true)");
 
   const sub = obs.subscribe();
 
   const req1 = relay.attachNextStream();
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
 
-  assert(!relay.latch.isLatched, "Relay should be disconnected (weak=true)");
+  assert(!relay.latch.isHeld, "Relay should be disconnected (weak=true)");
 
   req1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   relay.isHot = true;
@@ -149,7 +153,7 @@ test("single relay, weak=true", async () => {
     relay.latchedCount === 0,
     "No connection attempts should be made (weak=true)",
   );
-  assert(!relay.latch.isLatched, "Relay should be released");
+  assert(!relay.latch.isHeld, "Relay should be released");
 });
 
 test("dynamic relays", async () => {
@@ -180,33 +184,29 @@ test("dynamic relays", async () => {
 
   const req1relay1 = relay1.attachNextStream();
   assert(
-    !relay1.latch.isLatched,
+    !relay1.latch.isHeld,
     "Relay1 should be disconnected before being added",
   );
   sessionRelays.append(relayUrl1);
-  assert(
-    relay1.latch.isLatched,
-    "Relay1 should be connected after being added",
-  );
-  assert(!relay2.latch.isLatched, "Relay2 should be disconnected");
+  assert(relay1.latch.isHeld, "Relay1 should be connected after being added");
+  assert(!relay2.latch.isHeld, "Relay2 should be disconnected");
   rxReq.emit([{ kinds: [1] }]);
   await req1relay1.subscribed;
+  await relay1.expectFilters([{ kinds: [1] }]);
 
   req1relay1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   const req1relay2 = relay2.attachNextStream();
   assert(
-    !relay2.latch.isLatched,
+    !relay2.latch.isHeld,
     "Relay2 should be disconnected before being added",
   );
   sessionRelays.append(relayUrl2);
-  assert(relay1.latch.isLatched, "Relay1 should still be connected");
-  assert(
-    relay2.latch.isLatched,
-    "Relay2 should be connected after being added",
-  );
+  assert(relay1.latch.isHeld, "Relay1 should still be connected");
+  assert(relay2.latch.isHeld, "Relay2 should be connected after being added");
   await req1relay2.subscribed;
+  await relay2.expectFilters([{ kinds: [1] }]);
 
   req1relay2.next(Faker.eventPacket({ id: "2" }));
   await obs.expectNext(Expect.eventPacket({ id: "2" }));
@@ -218,6 +218,8 @@ test("dynamic relays", async () => {
   rxReq.emit([{ kinds: [2] }]);
   await req2relay1.subscribed;
   await req2relay2.subscribed;
+  await relay1.expectFilters([{ kinds: [2] }]);
+  await relay2.expectFilters([{ kinds: [2] }]);
 
   req1relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   req1relay2.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
@@ -227,20 +229,18 @@ test("dynamic relays", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
 
   sessionRelays.remove(relayUrl1);
-  await vi.waitFor(() => {
-    assert(
-      !relay1.latch.isLatched,
-      "Relay1 should be disconnected after being removed",
-    );
-  });
+  assert(
+    !relay1.latch.isHeld,
+    "Relay1 should be disconnected after being removed",
+  );
 
   req2relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   req2relay2.next(Faker.eventPacket({ id: "6" }));
   await obs.expectNext(Expect.eventPacket({ id: "6" }));
 
   sub.unsubscribe();
-  assert(!relay1.latch.isLatched, "Relay1 should be released");
-  assert(!relay2.latch.isLatched, "Relay2 should be released");
+  assert(!relay1.latch.isHeld, "Relay1 should be released");
+  assert(!relay2.latch.isHeld, "Relay2 should be released");
 });
 
 test("segment scope relays", async () => {
@@ -281,8 +281,9 @@ test("segment scope relays", async () => {
 
   rxReq.emit({ kinds: [1] }, { relays: segmentRelays });
   await stream2.subscribed;
-  assert(relay1.latch.isLatched, "Relay1 should be connected (session scope)");
-  assert(relay2.latch.isLatched, "Relay2 should be connected (segment scope)");
+  await relay2.expectFilters([{ kinds: [1] }]);
+  assert(relay1.latch.isHeld, "Relay1 should be connected (session scope)");
+  assert(relay2.latch.isHeld, "Relay2 should be connected (segment scope)");
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "1" }));
@@ -290,13 +291,15 @@ test("segment scope relays", async () => {
 
   segmentRelays.append(relayUrl3);
   await stream3.subscribed;
-  assert(relay3.latch.isLatched, "Relay3 should be connected (segment scope)");
+  await relay3.expectFilters([{ kinds: [1] }]);
+  assert(relay3.latch.isHeld, "Relay3 should be connected (segment scope)");
 
   stream3.next(Faker.eventPacket({ id: "2" }));
   await obs.expectNext(Expect.eventPacket({ id: "2" }));
 
   rxReq.emit({ kinds: [2] });
   await stream1.subscribed;
+  await relay1.expectFilters([{ kinds: [2] }]);
 
   stream1.next(Faker.eventPacket({ id: "3" }));
   await obs.expectNext(Expect.eventPacket({ id: "3" }));

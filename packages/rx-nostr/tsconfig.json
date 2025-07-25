@@ -28,7 +28,8 @@
   },
   "include": [
     "src/**/*.ts",
-    "next/**/*.ts"
+    "next/**/*.ts",
+    "vitest.setup.ts"
   ],
   "exclude": [
     "__test__/**/*.ts",

@@ -15,9 +15,9 @@ export class QuerySession {
     this.weak = params.weak;
   }
 
-  prewarm(relay: IRelayCommunication): void {
+  prewarm(relay: IRelayCommunication): boolean {
     if (this.weak || this.defer) {
-      return;
+      return false;
     }
 
     this.relays.get(relay.url);
@@ -59,13 +59,14 @@ class QuerySessionPerRelay {
 
   constructor(private relay: IRelayCommunication) {}
 
-  prewarm(): void {
+  prewarm(): boolean {
     if (this.warmed) {
-      return;
+      return false;
     }
 
     this.warmed = true;
     this.dropPrewarming = this.holdLatch();
+    return true;
   }
 
   beginSegment(linger: number): () => void {

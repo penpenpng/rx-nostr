@@ -19,5 +19,6 @@ export default defineConfig({
   test: {
     hookTimeout: 1000,
     include: ["next/**/*.{test,spec}.{ts,mts}", "next/__test__/*.{ts,mts}"],
+    setupFiles: ["./vitest.setup.ts"],
   },
 });
