@@ -1,5 +1,10 @@
 export type * from "./config/index.js";
-export { nip07Signer, noopSigner, noopVerifier } from "./config/index.js";
+export {
+  emptyVerifier,
+  nip07Signer,
+  noopSigner,
+  noopVerifier,
+} from "./config/index.js";
 export * from "./error.js";
 export * from "./lazy-filter.js";
 export { Nip11Registry } from "./nip11.js";
