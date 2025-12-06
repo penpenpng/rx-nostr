@@ -23,8 +23,11 @@ import {
   makeRxNostrConfig,
   type RxNostrConfig,
 } from "../config/index.js";
-import { NostrConnection, type REQMode } from "../connection/index.js";
-import { FinPacket } from "../connection/index.js";
+import {
+  FinPacket,
+  NostrConnection,
+  type REQMode,
+} from "../connection/index.js";
 import {
   RxNostrAlreadyDisposedError,
   RxNostrInvalidUsageError,
