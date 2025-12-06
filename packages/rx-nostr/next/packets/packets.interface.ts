@@ -63,20 +63,25 @@ export interface MessagePacketBase<
 > {
   from: RelayUrl;
   type: T;
-  message: Nostr.ToClientMessage.Message<T>;
+  raw: Nostr.ToClientMessage.Message<T>;
 }
 
 /**
  * Packets from websocket that represents an EVENT.
  */
 export interface EventPacket extends MessagePacketBase<"EVENT"> {
+  subId: string;
   event: Nostr.Event;
 }
 
-export interface EosePacket extends MessagePacketBase<"EOSE"> {}
+export interface EosePacket extends MessagePacketBase<"EOSE"> {
+  subId: string;
+}
 
 export interface ClosedPacket extends MessagePacketBase<"CLOSED"> {
+  subId: string;
   notice: string;
+  noticeType?: Nostr.MachineReadablePrefix;
 }
 
 /**
@@ -86,12 +91,13 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
   eventId: string;
   ok: boolean;
   notice?: string;
+  noticeType?: Nostr.MachineReadablePrefix;
 }
 
 export interface UnknownMessagePacket {
   from: RelayUrl;
   type: "unknown";
-  message: unknown;
+  raw: unknown;
 }
 
 export interface NoticePacket extends MessagePacketBase<"NOTICE"> {
@@ -103,6 +109,7 @@ export interface AuthPacket extends MessagePacketBase<"AUTH"> {
 }
 
 export interface CountPacket extends MessagePacketBase<"COUNT"> {
+  subId: string;
   count: Nostr.CountResponse;
 }
 

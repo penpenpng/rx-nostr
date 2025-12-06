@@ -22,6 +22,10 @@ export class RelayCommunicationMock implements IRelayCommunication {
 
   constructor(public url: RelayUrl) {}
 
+  hold() {
+    return this.latch.hold();
+  }
+
   vreq(
     _strategy: "forward" | "backward",
     filters: LazyFilter[],

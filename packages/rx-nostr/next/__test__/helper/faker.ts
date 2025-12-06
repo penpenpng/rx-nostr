@@ -24,7 +24,7 @@ export class Faker {
       from: from ?? "wss://faker.example.com",
       type: "EVENT",
       event: Faker.event(event),
-      message: ["EVENT", "sub-id", Faker.event(event)],
+      raw: ["EVENT", "sub-id", Faker.event(event)],
     };
   }
 }

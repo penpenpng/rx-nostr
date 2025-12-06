@@ -36,4 +36,28 @@ export namespace u {
       return ret.promise;
     }
   }
+
+  export namespace Iterable {
+    type Iterable<T> = globalThis.Iterable<T>;
+    export function zip<T, U>(
+      a: Iterable<T>,
+      b: Iterable<U>,
+    ): Iterable<[T, U]> {
+      return {
+        [Symbol.iterator]: function* () {
+          const ia = a[Symbol.iterator]();
+          const ib = b[Symbol.iterator]();
+
+          while (true) {
+            const na = ia.next();
+            const nb = ib.next();
+            if (na.done || nb.done) {
+              break;
+            }
+            yield [na.value, nb.value];
+          }
+        },
+      };
+    }
+  }
 }

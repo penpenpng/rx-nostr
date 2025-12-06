@@ -83,7 +83,7 @@ class QuerySessionPerRelay {
   }
 
   private holdLatch() {
-    const drop = this.relay.latch.hold();
+    const drop = this.relay.hold();
 
     const id = this.nextId;
     this.nextId++;
