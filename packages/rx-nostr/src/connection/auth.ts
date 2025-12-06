@@ -61,7 +61,7 @@ export class AuthProxy {
       this.ongoings.add(event.id);
       this.relay.send(["AUTH", event]);
     } catch {
-      // do nothing
+      this.authResult$.next(false);
     }
   }
 
