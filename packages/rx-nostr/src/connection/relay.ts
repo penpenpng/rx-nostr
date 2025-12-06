@@ -102,7 +102,8 @@ export class RelayConnection {
     let hasConnected = false;
 
     const isAutoRetry = retryCount > 0;
-    const isManualRetry = this.state === "error" || this.state === "rejected";
+    const isManualRetry =
+      !isAutoRetry && (this.state === "error" || this.state === "rejected");
 
     if (isAutoRetry) {
       this.setState("retrying");
@@ -118,6 +119,7 @@ export class RelayConnection {
 
       this.setState("connected");
       hasConnected = true;
+      retryCount = 0;
 
       if (isAutoRetry || isManualRetry) {
         this.reconnected$.next(this.unsent);
