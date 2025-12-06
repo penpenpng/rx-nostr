@@ -3,8 +3,14 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ESNext", "DOM"],
-    "types": ["vitest/importMeta"],
+    "lib": [
+      "ESNext",
+      "DOM",
+      "WebWorker"
+    ],
+    "types": [
+      "vitest/importMeta"
+    ],
     "moduleResolution": "bundler",
     "strict": true,
     "resolveJsonModule": true,
@@ -17,8 +23,17 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/__test__/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "next/**/*.ts",
+    "vitest.setup.ts"
+  ],
+  "exclude": [
+    "__test__/**/*.ts",
+    "*.spec.ts",
+    "*.test.ts"
+  ]
 }

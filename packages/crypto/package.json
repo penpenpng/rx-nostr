@@ -11,22 +11,12 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./index.cjs",
-  "module": "./dist/rx-nostr-crypto.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/rx-nostr-crypto.js"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "node": "./dist/rx-nostr-crypto.cjs",
-        "default": "./dist/rx-nostr-crypto.umd.cjs"
-      }
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/rx-nostr-crypto.js"
     },
-    "./src": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -43,18 +33,21 @@
   "scripts": {
     "build": "vite build",
     "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src"
+    "lint:fix": "eslint --fix ./src && prettier --write ./src",
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "vite": "^5.3.3",
-    "vite-plugin-dts": "^4.0.0"
+    "typescript": "^5.8.3",
+    "vite": "^6.2.6",
+    "vite-plugin-dts": "^4.5.3",
+    "vitest": "^3.1.1"
   },
   "dependencies": {
     "@noble/curves": "^1.0.0",
     "@noble/hashes": "^1.3.0",
     "@scure/base": "^1.1.1",
-    "nostr-typedef": "^0.9.0"
+    "nostr-typedef": "^0.13.0"
   },
   "peerDependencies": {
     "rx-nostr": "~3"

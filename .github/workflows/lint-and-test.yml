@@ -11,9 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ vars.NODE_VERSION }}
+          # Promise.withResolvers is only available in Node 22+
+          node-version: ">=22"
           registry-url: https://registry.npmjs.org
       - uses: crate-ci/typos@master
       - run: npm ci

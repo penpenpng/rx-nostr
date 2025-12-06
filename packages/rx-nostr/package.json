@@ -14,22 +14,12 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./index.cjs",
-  "module": "./dist/rx-nostr.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/rx-nostr.js"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "node": "./dist/rx-nostr.cjs",
-        "default": "./dist/rx-nostr.umd.cjs"
-      }
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/rx-nostr.js"
     },
-    "./src": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -43,22 +33,22 @@
   },
   "scripts": {
     "build": "vite build",
-    "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src",
-    "test": "vitest --run",
-    "test:watch": "vitest"
+    "lint": "eslint ./next && prettier --check ./next",
+    "lint:fix": "eslint --fix ./next && prettier --write ./next",
+    "test": "vitest ./next",
+    "test:dev": "vitest --ui ./next"
   },
   "devDependencies": {
     "@types/node": "^18.15.10",
-    "typescript": "^5.4.5",
-    "vite": "^4.2.0",
-    "vite-plugin-dts": "^4.0.0",
-    "vitest": "^1.6.0",
-    "vitest-nostr": "^0.4.1",
-    "vitest-websocket-mock": "^0.2.1"
+    "@vitest/ui": "^3.2.4",
+    "disposablestack": "^1.1.7",
+    "typescript": "^5.8.3",
+    "vite": "^6.2.6",
+    "vite-plugin-dts": "^4.5.3",
+    "vitest": "^3.1.1"
   },
   "dependencies": {
-    "nostr-typedef": "^0.9.0",
-    "rxjs": "^7.8.0"
+    "nostr-typedef": "^0.13.0",
+    "rxjs": "^7.8.2"
   }
 }

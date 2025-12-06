@@ -1,0 +1,9 @@
+_extends: rx-nostr:.github/release-drafter/base.yml
+
+header: https://www.npmjs.com/package/@rx-nostr/crypto-wasm/v/$RESOLVED_VERSION
+
+name-template: crypto-wasm@$RESOLVED_VERSION
+tag-template: crypto-wasm@$RESOLVED_VERSION
+tag-prefix: crypto-wasm@
+include-paths:
+  - packages/crypto-wasm
