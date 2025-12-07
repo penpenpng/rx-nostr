@@ -72,7 +72,7 @@ export function createRxNostr(config: RxNostrConfig): RxNostr {
 class RxNostrImpl implements RxNostr {
   private connections = new UrlMap<NostrConnection>();
   private defaultRelays = new UrlMap<DefaultRelayConfig>();
-  private get defaultReadables(): NostrConnection[] {
+  private get defaultReadableConnections(): NostrConnection[] {
     const conns: NostrConnection[] = [];
     for (const { url, read } of this.defaultRelays.values()) {
       const conn = this.connections.get(url);
@@ -82,7 +82,7 @@ class RxNostrImpl implements RxNostr {
     }
     return conns;
   }
-  private get defaultWritables(): NostrConnection[] {
+  private get defaultWritableConnections(): NostrConnection[] {
     const conns: NostrConnection[] = [];
     for (const { url, write } of this.defaultRelays.values()) {
       const conn = this.connections.get(url);
@@ -171,7 +171,7 @@ class RxNostrImpl implements RxNostr {
     nextReadableConnections: NostrConnection[],
   ): void {
     const noLongerNeededConnections = subtract(
-      this.defaultReadables,
+      this.defaultReadableConnections,
       nextReadableConnections,
     );
 
@@ -281,7 +281,7 @@ class RxNostrImpl implements RxNostr {
         targetConnections:
           (emitScopeRelays ?? useScopeRelays)?.map((url) =>
             this.ensureNostrConnection(url),
-          ) ?? this.defaultReadables,
+          ) ?? this.defaultReadableConnections,
         mode:
           emitScopeRelays === undefined && useScopeRelays === undefined
             ? "default"
@@ -483,7 +483,7 @@ class RxNostrImpl implements RxNostr {
 
     const targetRelays =
       relays === undefined
-        ? this.defaultWritables
+        ? this.defaultWritableConnections
         : relays.map((url) => this.ensureNostrConnection(url));
     const subject = new Subject<OkPacketAgainstEvent>();
     const finishedRelays = new Set<string>();
