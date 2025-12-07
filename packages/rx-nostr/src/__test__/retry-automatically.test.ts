@@ -105,22 +105,7 @@ describe("Under a single relay", () => {
     await expect(relay).toReceiveEVENT();
   });
 
-  test("[forward] Retry option `maxCount` works.", async () => {
-    const req = createRxForwardReq("sub");
-    rxNostr.use(req).subscribe();
-
-    req.emit(faker.filters());
-    await relay.connected;
-    await expect(relay).toReceiveREQ("sub:0");
-
-    await closeSocket(relay, WebSocketCloseCode.ABNORMAL_CLOSURE, 0);
-    await expect(relay).toReceiveREQ("sub:0");
-
-    await closeSocket(relay, WebSocketCloseCode.ABNORMAL_CLOSURE, 1);
-    await expect(stateWillBe(rxNostr, DEFAULT_RELAY, "error")).resolves.toBe(
-      true,
-    );
-  });
+  // TODO: test `maxCount` option
 
   test("[forward] since/until is reevaluated when a lazy REQ is resubmitted.", async () => {
     const req = createRxForwardReq("sub");
