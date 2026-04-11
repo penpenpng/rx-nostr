@@ -112,12 +112,30 @@ class RxNostrImpl implements RxNostr {
   constructor(private config: FilledRxNostrConfig) {}
 
   // #region defaultRelays getter/setter
-  getDefaultRelays(): Record<string, DefaultRelayConfig> {
+  getDefaultRelays(options?: {
+    filter?: "read-only" | "write-only" | "all";
+  }): Record<string, DefaultRelayConfig> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
-    return this.defaultRelays.toObject();
+    const relays = this.defaultRelays.toObject();
+
+    if (!options?.filter || options?.filter === "all") {
+      return relays;
+    } else if (options.filter === "read-only") {
+      const filtered = Object.values(relays)
+        .filter(({ read, write }) => read && !write)
+        .map((config): [string, DefaultRelayConfig] => [config.url, config]);
+
+      return Object.fromEntries(filtered);
+    } else {
+      const filtered = Object.values(relays)
+        .filter(({ read, write }) => !read && write)
+        .map((config): [string, DefaultRelayConfig] => [config.url, config]);
+
+      return Object.fromEntries(filtered);
+    }
   }
   getDefaultRelay(url: string): DefaultRelayConfig | undefined {
     return this.defaultRelays.get(url);

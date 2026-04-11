@@ -27,7 +27,9 @@ export interface RxNostr {
    * The record's keys are **normalized** URL, so may be different from ones you set.
    * Use `getDefaultRelay(url)` instead to ensure that you get the value associated with a given URL.
    */
-  getDefaultRelays(): Record<string, DefaultRelayConfig>;
+  getDefaultRelays(options?: {
+    filter?: "read-only" | "write-only" | "all";
+  }): Record<string, DefaultRelayConfig>;
   /**
    * Return a config object of the given relay if it exists.
    */
