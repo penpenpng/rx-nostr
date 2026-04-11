@@ -5,7 +5,7 @@ import type {
   VerificationResponse,
   VerificationServiceStatus,
 } from "./types.js";
-import { Batch } from "./uitls/batch.js";
+import { Batch } from "./utils/batch.js";
 import { type EventVerifier, verifier as defaultVerifier } from "./verifier.js";
 
 type PingMessage = "ping";
