@@ -113,29 +113,36 @@ class RxNostrImpl implements RxNostr {
 
   // #region defaultRelays getter/setter
   getDefaultRelays(options?: {
-    filter?: "read-only" | "write-only" | "all";
+    filter?: "read-only" | "write-only" | "read-all" | "write-all" | "all";
   }): Record<string, DefaultRelayConfig> {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
 
+    const filter = ({ read, write }: { read: boolean; write: boolean }) => {
+      if (!options?.filter) {
+        return true;
+      }
+      switch (options.filter) {
+        case "all":
+          return true;
+        case "read-all":
+          return read;
+        case "write-all":
+          return write;
+        case "read-only":
+          return read && !write;
+        case "write-only":
+          return !read && write;
+      }
+    };
+
     const relays = this.defaultRelays.toObject();
+    const filtered = Object.values(relays)
+      .filter(filter)
+      .map((config): [string, DefaultRelayConfig] => [config.url, config]);
 
-    if (!options?.filter || options?.filter === "all") {
-      return relays;
-    } else if (options.filter === "read-only") {
-      const filtered = Object.values(relays)
-        .filter(({ read, write }) => read && !write)
-        .map((config): [string, DefaultRelayConfig] => [config.url, config]);
-
-      return Object.fromEntries(filtered);
-    } else {
-      const filtered = Object.values(relays)
-        .filter(({ read, write }) => !read && write)
-        .map((config): [string, DefaultRelayConfig] => [config.url, config]);
-
-      return Object.fromEntries(filtered);
-    }
+    return Object.fromEntries(filtered);
   }
   getDefaultRelay(url: string): DefaultRelayConfig | undefined {
     return this.defaultRelays.get(url);
