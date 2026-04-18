@@ -10,18 +10,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ vars.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
-      - name: cache node_modules
-        id: node_modules_cache_id
-        uses: actions/cache@v2
-        with:
-          path: |
-            node_modules
-          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
-      - run: yarn install
-      - run: yarn lint
-      - run: yarn test
+      - uses: crate-ci/typos@master
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build

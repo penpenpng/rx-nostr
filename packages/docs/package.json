@@ -1,0 +1,13 @@
+{
+  "name": "@rx-nostr/docs",
+  "private": true,
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "author": "penpenpng",
+  "devDependencies": {
+    "vitepress": "^1.3.4"
+  }
+}

@@ -2,28 +2,35 @@ name: npm publish
 
 on:
   release:
-    types: [created]
+    types: [released]
 
 jobs:
   npm-publish:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ vars.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
-      - name: cache node_modules
-        id: node_modules_cache_id
-        uses: actions/cache@v2
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+      - id: parse
+        uses: ./.github/actions/parse-git-tag
+      - name: publish package
+        uses: ./.github/actions/publish-package
         with:
-          path: |
-            node_modules
-          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/yarn.lock')) }}
-      - run: yarn install
-      - run: yarn lint
-      - run: yarn test
-      - run: yarn build
-      - run: npx -y can-npm-publish && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NODE_AUTH_TOKEN}}
+          version: ${{ steps.parse.outputs.version }}
+          package: ${{ steps.parse.outputs.package }}

@@ -1,0 +1,67 @@
+{
+  "name": "@rx-nostr/crypto",
+  "version": "3.1.4",
+  "author": "penpenpng",
+  "keywords": [
+    "rx-nostr"
+  ],
+  "homepage": "https://github.com/penpenpng/rx-nostr/tree/main/packages/crypto",
+  "bugs": {
+    "url": "https://github.com/penpenpng/rx-nostr/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.cjs",
+  "module": "./dist/rx-nostr-crypto.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/rx-nostr-crypto.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "node": "./dist/rx-nostr-crypto.cjs",
+        "default": "./dist/rx-nostr-crypto.umd.cjs"
+      }
+    },
+    "./src": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/penpenpng/rx-nostr.git"
+  },
+  "scripts": {
+    "build": "vite build",
+    "lint": "eslint ./src && prettier --check ./src",
+    "lint:fix": "eslint --fix ./src && prettier --write ./src"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.3.3",
+    "vite-plugin-dts": "^4.0.0"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.0.0",
+    "@noble/hashes": "^1.3.0",
+    "@scure/base": "^1.1.1",
+    "nostr-typedef": "^0.9.0"
+  },
+  "peerDependencies": {
+    "rx-nostr": "~3"
+  },
+  "peerDependenciesMeta": {
+    "rx-nostr": {
+      "optional": true
+    }
+  }
+}

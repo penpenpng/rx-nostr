@@ -1,0 +1,64 @@
+{
+  "name": "rx-nostr",
+  "version": "3.7.1",
+  "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
+  "author": "penpenpng",
+  "keywords": [
+    "rxjs",
+    "rxjs7",
+    "nostr"
+  ],
+  "homepage": "https://github.com/penpenpng/rx-nostr",
+  "bugs": {
+    "url": "https://github.com/penpenpng/rx-nostr/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.cjs",
+  "module": "./dist/rx-nostr.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/rx-nostr.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "node": "./dist/rx-nostr.cjs",
+        "default": "./dist/rx-nostr.umd.cjs"
+      }
+    },
+    "./src": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "!src/__test__"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/penpenpng/rx-nostr.git"
+  },
+  "scripts": {
+    "build": "vite build",
+    "lint": "eslint ./src && prettier --check ./src",
+    "lint:fix": "eslint --fix ./src && prettier --write ./src",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.10",
+    "typescript": "^5.4.5",
+    "vite": "^4.2.0",
+    "vite-plugin-dts": "^4.0.0",
+    "vitest": "^1.6.0",
+    "vitest-nostr": "^0.4.1",
+    "vitest-websocket-mock": "^0.2.1"
+  },
+  "dependencies": {
+    "nostr-typedef": "^0.9.0",
+    "rxjs": "^7.8.0"
+  }
+}

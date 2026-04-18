@@ -1,0 +1,25 @@
+name: parse git tag
+
+description: Parse git tag.
+
+outputs:
+  version:
+    value: ${{ steps.parse.outputs.version }}
+  package:
+    value: ${{ steps.parse.outputs.package }}
+
+runs:
+  using: composite
+  steps:
+    - if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      name: exit job because no tag
+      shell: bash
+      run: exit 1
+    - id: parse
+      name: get package name
+      shell: bash
+      run: |
+        tag=${{ github.ref_name }}
+        arr=(${tag//@/ })
+        echo "package=${arr[0]}" >> $GITHUB_OUTPUT
+        echo "version=${arr[1]}" >> $GITHUB_OUTPUT

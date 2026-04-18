@@ -1,0 +1,34 @@
+name: publish package
+
+description: Publish the target package
+
+# Requirement:
+#   - uses: actions/setup-node@v5
+#   - permissions:
+#       actions: write
+#       checks: write
+#       contents: write
+#       id-token: write
+
+inputs:
+  version:
+    description: Version string.
+    required: true
+  package:
+    description: Package name.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: push new commit that updating package's version.
+      uses: ./.github/actions/update-package-version
+      with:
+        version: ${{ inputs.version }}
+        package: packages/${{ inputs.package }}
+        commit_message_template: "version(${{ inputs.package }}): $VERSION"
+        tag_template: ${{ inputs.package }}@$VERSION
+        tag_force: true
+    - name: npm publish
+      shell: bash
+      run: npx -y can-npm-publish packages/${{ inputs.package }} && npm publish -w packages/${{ inputs.package }} --provenance --access public

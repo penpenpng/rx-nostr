@@ -1,0 +1,33 @@
+name: update release draft
+
+on:
+  push:
+    # branches to consider in the event; optional, defaults to all
+    branches:
+      - main
+  # pull_request event is required only for autolabeler
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  update_release_draft:
+    permissions:
+      # write permission is required to create a github release
+      contents: write
+      # write permission is required for autolabeler
+      pull-requests: write
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Update release draft for rx-nostr
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter/rx-nostr.yml
+      - name: Update release draft for @rx-nostr/crypto
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter/@rx-nostr/crypto.yml

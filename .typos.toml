@@ -1,0 +1,9 @@
+[files]
+extend-exclude = [
+  "node_modules",
+  "dist",
+]
+
+[default.extend-words]
+# Prevent false positives "CLOSEs"
+CLOS = "CLOS"
