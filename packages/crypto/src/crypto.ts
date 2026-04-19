@@ -1,10 +1,11 @@
-import { schnorr as _schnorr } from "@noble/curves/secp256k1";
-import { sha256 as _sha256 } from "@noble/hashes/sha256";
-import { bytesToHex } from "@noble/hashes/utils";
+import { schnorr as _schnorr } from "@noble/curves/secp256k1.js";
+import { sha256 as _sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 import * as Nostr from "nostr-typedef";
 
 const utf8Encoder = new TextEncoder();
+const encode = (m: string) => utf8Encoder.encode(m);
 
 export function sha256(m: string): string {
   return bytesToHex(_sha256(utf8Encoder.encode(m)));
@@ -18,9 +19,11 @@ export interface Schnorr {
 
 export const schnorr: Schnorr = {
   sign: (m: string, seckey: string): string =>
-    bytesToHex(_schnorr.sign(m, seckey)),
-  verify: _schnorr.verify,
-  getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(seckey)),
+    bytesToHex(_schnorr.sign(encode(m), encode(seckey))),
+  verify: (sig: string, m: string, pubkey: string) =>
+    _schnorr.verify(encode(sig), encode(m), encode(pubkey)),
+  getPublicKey: (seckey: string) =>
+    bytesToHex(_schnorr.getPublicKey(encode(seckey))),
 };
 
 /** Calculate and return public key in HEX format. */
@@ -58,7 +61,7 @@ export function verify(event: Nostr.Event): boolean {
 
 /** Convert bech32 format string to HEX format string. */
 export function toHex(str: string): string {
-  const { words } = bech32.decode(str);
+  const { words } = bech32.decode(str as `${string}1${string}`);
   const data = new Uint8Array(bech32.fromWords(words));
   return bytesToHex(data);
 }
