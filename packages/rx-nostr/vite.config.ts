@@ -9,7 +9,7 @@ export default defineConfig({
   },
   build: {
     lib: {
-      name: "rx-nostr",
+      name: "RxNostr",
       entry: path.resolve(__dirname, "src/index.ts"),
       formats: ["es", "cjs", "umd"],
     },

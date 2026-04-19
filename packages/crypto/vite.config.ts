@@ -5,7 +5,7 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   build: {
     lib: {
-      name: "rx-nostr-crypto",
+      name: "RxNostrCrypto",
       entry: path.resolve(__dirname, "src/index.ts"),
       formats: ["es", "cjs", "umd"],
     },
