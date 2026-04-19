@@ -58,7 +58,7 @@
     "vitest-websocket-mock": "^0.2.1"
   },
   "dependencies": {
-    "nostr-typedef": "^0.9.0",
+    "nostr-typedef": "^0.13.0",
     "rxjs": "^7.8.0"
   }
 }
