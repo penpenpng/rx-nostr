@@ -8,6 +8,7 @@ export default defineConfig({
     "import.meta.vitest": "undefined",
   },
   build: {
+    minify: false,
     lib: {
       name: "rx-nostr",
       entry: path.resolve(__dirname, "src/index.ts"),
