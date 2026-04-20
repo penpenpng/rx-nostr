@@ -43,12 +43,14 @@
   "scripts": {
     "build": "vite build",
     "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src"
+    "lint:fix": "eslint --fix ./src && prettier --write ./src",
+    "test": "vitest --run"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
     "vite": "^5.3.3",
-    "vite-plugin-dts": "^4.0.0"
+    "vite-plugin-dts": "^4.0.0",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

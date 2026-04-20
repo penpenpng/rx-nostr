@@ -1,11 +1,10 @@
 import { schnorr as _schnorr } from "@noble/curves/secp256k1.js";
 import { sha256 as _sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 import * as Nostr from "nostr-typedef";
 
 const utf8Encoder = new TextEncoder();
-const encode = (m: string) => utf8Encoder.encode(m);
 
 export function sha256(m: string): string {
   return bytesToHex(_sha256(utf8Encoder.encode(m)));
@@ -19,11 +18,11 @@ export interface Schnorr {
 
 export const schnorr: Schnorr = {
   sign: (m: string, seckey: string): string =>
-    bytesToHex(_schnorr.sign(encode(m), encode(seckey))),
+    bytesToHex(_schnorr.sign(hexToBytes(m), hexToBytes(seckey))),
   verify: (sig: string, m: string, pubkey: string) =>
-    _schnorr.verify(encode(sig), encode(m), encode(pubkey)),
+    _schnorr.verify(hexToBytes(sig), hexToBytes(m), hexToBytes(pubkey)),
   getPublicKey: (seckey: string) =>
-    bytesToHex(_schnorr.getPublicKey(encode(seckey))),
+    bytesToHex(_schnorr.getPublicKey(hexToBytes(seckey))),
 };
 
 /** Calculate and return public key in HEX format. */
