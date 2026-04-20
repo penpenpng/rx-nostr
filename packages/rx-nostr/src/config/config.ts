@@ -2,11 +2,12 @@ import { fill } from "../utils/config.js";
 import type { IWebSocketConstructor } from "../websocket.js";
 import { AuthenticatorConfig } from "./authenticator.js";
 import { EventSigner, nip07Signer } from "./signer.js";
-import { EventVerifier } from "./verifier.js";
+import { emptyVerifier, EventVerifier } from "./verifier.js";
 
 export const makeRxNostrConfig = (config: RxNostrConfig) =>
   fill(config, {
     signer: nip07Signer(),
+    verifier: emptyVerifier,
     connectionStrategy: "lazy",
     retry: {
       strategy: "exponential",
@@ -35,7 +36,7 @@ export interface RxNostrConfig {
   /**
    * Default verifier, which is used to verify event's signature.
    */
-  verifier: EventVerifier;
+  verifier?: EventVerifier;
   authenticator?:
     | AuthenticatorConfig
     | ((relay: string) => AuthenticatorConfig);
