@@ -65,8 +65,8 @@ import {
 } from "./utils.js";
 
 /** Create a RxNostr object. This is the only way to create that. */
-export function createRxNostr(config: RxNostrConfig): RxNostr {
-  return new RxNostrImpl(makeRxNostrConfig(config ?? {}));
+export function createRxNostr(config: RxNostrConfig = {}): RxNostr {
+  return new RxNostrImpl(makeRxNostrConfig(config));
 }
 
 class RxNostrImpl implements RxNostr {
