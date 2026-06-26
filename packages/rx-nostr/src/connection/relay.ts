@@ -234,6 +234,9 @@ export class RelayConnection {
     socket?.addEventListener("open", onopen);
     socket?.addEventListener("message", onmessage);
     socket?.addEventListener("close", onclose);
+    // Some implementation(e.g. `ws`) throws if an "error" event has no listener.
+    // Attach a no-op handler to suppress that behavior.
+    socket?.addEventListener("error", () => {});
 
     return socket;
   }
