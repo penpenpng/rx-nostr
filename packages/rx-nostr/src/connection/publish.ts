@@ -90,7 +90,7 @@ export class PublishProxy {
       return;
     }
 
-    if (!this.pubs.has(eventId)) {
+    if (this.pubs.has(eventId)) {
       this.pubs.delete(eventId);
       this.count$.decrement();
     }
