@@ -66,3 +66,23 @@ test("[forward] Removing a new default relay affects existing REQ.", async () =>
   await rxNostr.removeDefaultRelays([RELAY_URL2]);
   await expect(relay2).toReceiveCLOSE("sub:0");
 });
+
+test("setDefaultRelays() ignores non-r tags mixed with NIP-65 relay tags.", () => {
+  rxNostr.setDefaultRelays([
+    ["r", RELAY_URL3, "read"],
+    ["client", "Some Client"],
+  ]);
+
+  expect(rxNostr.getDefaultRelays()).toEqual({
+    [RELAY_URL3]: { url: RELAY_URL3, read: true, write: false },
+  });
+});
+
+test("addDefaultRelays() ignores input containing only non-r tags.", () => {
+  const defaultRelays = rxNostr.getDefaultRelays();
+
+  rxNostr.addDefaultRelays([["client", "Some Client"]]);
+
+  expect(rxNostr.getDefaultRelays()).toEqual(defaultRelays);
+  expect(rxNostr.getDefaultRelay("Some Client")).toBeUndefined();
+});

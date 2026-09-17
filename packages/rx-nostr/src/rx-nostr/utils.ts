@@ -31,7 +31,7 @@ export function normalizeRelaysConfig(
   config: AcceptableDefaultRelaysConfig,
 ): Record<string, DefaultRelayConfig> {
   if (Array.isArray(config)) {
-    const arr = config.map((urlOrConfig) => {
+    const arr = config.flatMap((urlOrConfig) => {
       let url = "";
       let read = false;
       let write = false;
@@ -40,6 +40,10 @@ export function normalizeRelaysConfig(
         read = true;
         write = true;
       } else if (Array.isArray(urlOrConfig)) {
+        if (urlOrConfig[0] !== "r") {
+          return [];
+        }
+
         const mode = urlOrConfig[2];
         url = urlOrConfig[1];
         read = !mode || mode === "read";
