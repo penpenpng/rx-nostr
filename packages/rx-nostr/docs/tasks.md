@@ -6,8 +6,8 @@
 
 | ID  | Task                                                                       | Depends on | Decision gate                 | Status              |
 | --- | -------------------------------------------------------------------------- | ---------- | ----------------------------- | ------------------- |
-| 00  | [Baseline と contract matrix](./tasks/00-baseline-contracts.md)            | -          | D8                            | ready               |
-| 01  | [Public model と config の固定](./tasks/01-public-model.md)                | 00         | D1, D5, D6, D9, D10, D13, D14 | waiting for Task 00 |
+| 00  | [Baseline と contract matrix](./tasks/00-baseline-contracts.md)            | -          | D8                            | complete            |
+| 01  | [Public model と config の固定](./tasks/01-public-model.md)                | 00         | D1, D5, D6, D9, D10, D13, D14 | ready               |
 | 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                   | 00, 01     | D4, D11                       | waiting for tasks   |
 | 03  | [RelayPool、lease、hot relays](./tasks/03-relay-pool-hot.md)               | 02         | D9, D14                       | waiting for Task 02 |
 | 04  | [RelayDirectory](./tasks/04-relay-directory.md)                            | 01         | D2, D3, D12                   | waiting for Task 01 |

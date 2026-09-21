@@ -34,3 +34,23 @@
 - 未完成 module の型 error を dummy 実装で隠すこと
 - v3 compatibility layer の実装
 - unipls submodule の変更
+
+## 実施結果
+
+- Status: **completed at 2026-09-21**
+- v3/v4 の対応を [behavior matrix](../behavior-matrix.md) に分類した。
+- production の対象を `next` に限定し、tests も検査する `tsconfig.check.json` を追加した。
+- unit (`*.test.ts`) と public contract (`next/__test__/contract/**/*.spec.ts`) を Vitest project として分離した。
+- contract spec から production code を parent-relative import しない lint rule と、package entry point `rx-nostr` の test alias を追加した。
+- declaration diagnostics を Vite の失敗へ反映し、独立 typecheck を build の前段に置いた。
+- 現在の診断、direct WebSocket 残骸、controlled transport 方針、runtime 注意点を [typecheck baseline](../typecheck-baseline.md) に記録した。
+
+検証結果:
+
+- `npm run test:unit -w packages/rx-nostr`: 5 files / 19 tests passed
+- `npm run test:contract -w packages/rx-nostr`: 1 file / 1 test passed
+- `npm test -w packages/rx-nostr`: 6 files / 20 tests passed
+- `npm run lint -w packages/rx-nostr`: passed
+- `npm run typecheck -w packages/rx-nostr`: expected failure (exit 2, 38 known v4 diagnostics)
+- `npm run build -w packages/rx-nostr`: expected failure (exit 2 at typecheck)
+- direct `vite build`: expected failure (exit 1 at declaration diagnostics)

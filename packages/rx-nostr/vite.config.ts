@@ -15,10 +15,44 @@ export default defineConfig({
     },
     sourcemap: true,
   },
-  plugins: [dts()],
+  plugins: [
+    dts({
+      afterDiagnostic(diagnostics) {
+        if (diagnostics.length > 0) {
+          throw new Error(
+            `Declaration generation failed with ${diagnostics.length} diagnostic(s).`,
+          );
+        }
+      },
+      logDiagnostics: true,
+      skipDiagnostics: false,
+      tsconfigPath: "./tsconfig.json",
+    }),
+  ],
+  resolve: {
+    alias: {
+      "rx-nostr": path.resolve(__dirname, "next/index.ts"),
+    },
+  },
   test: {
     hookTimeout: 1000,
-    include: ["next/**/*.{test,spec}.{ts,mts}", "next/__test__/*.{ts,mts}"],
-    setupFiles: ["./vitest.setup.ts"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          include: ["next/__test__/contract/**/*.spec.{ts,mts}"],
+          name: "contract",
+          setupFiles: ["./vitest.setup.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          include: ["next/**/*.test.{ts,mts}"],
+          name: "unit",
+          setupFiles: ["./vitest.setup.ts"],
+        },
+      },
+    ],
   },
 });

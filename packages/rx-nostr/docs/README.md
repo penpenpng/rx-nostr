@@ -8,6 +8,8 @@
 2. [architecture.md](./architecture.md): v4 の責務分割、用語、守るべき不変条件
 3. [decisions.md](./decisions.md): 実装前に利用者の判断が必要な事項
 4. [tasks.md](./tasks.md): 実装タスクの依存順と進捗一覧
+5. [behavior-matrix.md](./behavior-matrix.md): v3 の能力を v4 で維持・置換・廃止・延期する一覧
+6. [typecheck-baseline.md](./typecheck-baseline.md): Task 00 時点の型エラー分類
 
 ## この資料の扱い
 

@@ -1,0 +1,58 @@
+# Task 00 typecheck baseline
+
+## Snapshot
+
+- Date: 2026-09-21
+- Base commit: `6821d47`
+- Scope: v4 production code and tests under `packages/rx-nostr/next`
+- Command: `npm run typecheck -w packages/rx-nostr`
+- Result: exit code 2, 38 diagnostics in 11 files
+
+This is an intentional failing baseline, not a list of accepted errors. `tsconfig.check.json` includes v4 tests so that their type drift is visible. The production declaration configuration excludes tests and reports 37 diagnostics. Neither configuration includes the incomplete v3 `src`; no baseline diagnostic originates there.
+
+## Diagnostic ownership
+
+| Area / file                                       | Count | Cause at this snapshot                                                                    | Owning task |
+| ------------------------------------------------- | ----: | ----------------------------------------------------------------------------------------- | ----------- |
+| `next/__test__/helper/faker.ts`                   |     1 | `EventPacket` fixture still assumes the provisional public `subId` shape                  | 01          |
+| `next/operators/req-packet/batch.ts`              |     1 | relay input and operator key types disagree                                               | 01          |
+| `next/relay-directory/{relay-directory,relay}.ts` |     2 | placeholder parameters are unused                                                         | 04          |
+| `next/rx-nostr/modules/publish.ts`                |     2 | progress/timeout union is inconsistent and `summarize` is missing                         | 08          |
+| `next/rx-nostr/modules/relay-warmer.ts`           |     3 | provisional warmer calls missing connection lease methods                                 | 03          |
+| `next/rx-nostr/relay-communication.ts`            |     9 | unfinished direct-socket implementation and missing return paths                          | 02          |
+| `next/rx-nostr/rx-nostr.legacy.ts`                |    10 | incomplete v3 compatibility surface; D1 requires removing it instead of repairing aliases | 01          |
+| `next/rx-nostr/rx-nostr.ts`                       |     1 | connection-state facade is a placeholder                                                  | 09          |
+| `next/rx-nostr/websocket.ts`                      |     8 | unfinished direct WebSocket implementation                                                | 02          |
+| `next/rx-req/rx-req.ts`                           |     1 | stale `traceId`; the public correlation field is `traceTag`                               | 01          |
+
+Each owning task must remove its diagnostics through the intended contract or implementation. Dummy returns, broad casts, and disabling diagnostics do not satisfy that task.
+
+## Build failure propagation
+
+The two supported build paths now reject this baseline:
+
+- `npm run build -w packages/rx-nostr`: exit code 2 at the independent typecheck gate.
+- direct `vite build` in `packages/rx-nostr`: exit code 1; declaration generation throws after reporting 37 production diagnostics.
+
+This prevents the previous behavior where declaration diagnostics were printed while the build exited successfully.
+
+## Direct WebSocket removal inventory
+
+Task 02 must remove production WebSocket ownership from rx-nostr and route transport through unipls. The concrete remnants are:
+
+- `next/websocket.ts`: public-looking structural WebSocket interfaces.
+- `next/rx-nostr/websocket.ts`: direct socket construction, event handling, protocol parsing, and close-code definitions.
+- `next/rx-nostr/relay-communication.ts`: direct `NostrWebsocket` ownership.
+- `next/rx-nostr/rx-nostr.config.ts` and `rx-nostr.interface.ts`: provisional constructor plumbing. The capability may remain in an rx-nostr-owned config type, but no unipls type may enter the public API.
+
+WebSocket wording in packet comments and error names is not itself direct transport access, but Task 01/02 should review whether those public concepts still describe the v4 abstraction accurately.
+
+## Controlled transport policy
+
+rx-nostr tests must not deep-import `packages/unipls/tests/support`. That directory is not an exported unipls contract. Task 02 will either add an rx-nostr-owned, protocol-level controlled fixture or propose a public unipls test-support export. The latter requires consulting the user before changing unipls.
+
+## Runtime note
+
+The compiler emits ES2022 and uses `ESNext` library declarations because current code calls the new Set methods (`difference`, `intersection`, `symmetricDifference`, and `union`). The adopted unipls floor is Node >= 22.4, Deno >= 2, Bun >= 1.2, and the latest two major browser versions. A smoke check passed on Node 24.14.1 at this snapshot.
+
+Task 10 must exercise these Set calls in every supported runtime lane. If any minimum runtime in the adopted matrix lacks them, replace the calls with internal helpers rather than raising the runtime floor silently.

@@ -28,6 +28,25 @@ export default defineConfig([
     files: ["**/*.{test,spec}.{ts,mts}"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
+  // Contract specs may use local test support, but production APIs must be
+  // imported through the package entry point (`rx-nostr`).
+  {
+    files: ["packages/rx-nostr/next/__test__/contract/**/*.spec.{ts,mts}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["../../*", "../../../*"],
+              message:
+                "Contract specs must import production APIs from `rx-nostr`.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Import path must have `.ts` extension
   // for a case that TypeScript is executed directly by Node.js, deno, etc.
   {
