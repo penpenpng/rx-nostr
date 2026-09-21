@@ -1,30 +1,35 @@
 import { type Subscription } from "rxjs";
-import {
-  once,
-  type RelayMapOperator,
-  type RelayUrl,
-} from "../../libs/index.ts";
-import { setDiff } from "../../operators/index.ts";
+import { once, type RelayUrl } from "../../libs/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
-import type { RelayCommunication } from "../relay-communication.ts";
 import type { RelayInput } from "../../types/index.ts";
+import type { IRelayCommunication } from "../relay-communication.ts";
+import type { RelayCommunicationCollection } from "../relay-pool.ts";
 
+/** Owns exactly one long-lived lease for every relay in the current hot set. */
 export class RelayWarmer {
-  private sub?: Subscription;
-  private lastValue?: Set<RelayUrl>;
+  readonly #leases = new Map<RelayUrl, () => void>();
+  #sub?: Subscription;
 
-  constructor(private relays: RelayMapOperator<RelayCommunication>) {}
+  constructor(
+    private readonly relays: RelayCommunicationCollection<IRelayCommunication>,
+  ) {}
 
   setHotRelays(relays: RelayInput): void {
-    this.sub?.unsubscribe();
-    this.sub = RxRelays.observable(relays)
-      .pipe(setDiff({ seed: this.lastValue }))
-      .subscribe(({ current, appended, outdated }) => {
-        this.lastValue = current;
-
-        this.relays.forEach(appended, (relay) => relay.connect());
-        this.relays.forEach(outdated, (relay) => relay.release());
-      });
+    this.#sub?.unsubscribe();
+    this.#sub = RxRelays.observable(relays).subscribe((current) => {
+      // Acquire first so replacing aliases or sets cannot introduce a gap.
+      for (const url of current) {
+        if (!this.#leases.has(url)) {
+          this.#leases.set(url, this.relays.get(url).hold());
+        }
+      }
+      for (const [url, release] of this.#leases) {
+        if (!current.has(url)) {
+          release();
+          this.#leases.delete(url);
+        }
+      }
+    });
   }
 
   unsetHotRelays(): void {
@@ -32,8 +37,9 @@ export class RelayWarmer {
   }
 
   [Symbol.dispose] = once(() => {
-    this.sub?.unsubscribe();
-    this.relays.forEach(this.lastValue, (relay) => relay.release());
+    this.#sub?.unsubscribe();
+    for (const release of this.#leases.values()) release();
+    this.#leases.clear();
   });
   dispose = this[Symbol.dispose];
 }

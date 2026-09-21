@@ -1,7 +1,7 @@
 import * as Nostr from "nostr-typedef";
 import { defer, identity, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import { once, RelayMapOperator, RxDisposableStack } from "../libs/index.ts";
+import { once, RxDisposableStack } from "../libs/index.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
@@ -14,6 +14,7 @@ import {
   reqForward,
 } from "./modules/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
+import { RelayPool } from "./relay-pool.ts";
 import {
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
@@ -28,19 +29,20 @@ import type {
 
 export class RxNostr implements IRxNostr {
   protected stack = new RxDisposableStack();
-  protected relays: RelayMapOperator<RelayCommunication>;
+  protected relays: RelayPool<RelayCommunication>;
   protected config: FilledRxNostrConfig;
   protected warmer: RelayWarmer;
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
-    this.relays = new RelayMapOperator(
+    this.relays = new RelayPool(
       (url) =>
         new RelayCommunication(url, {
           WebSocket: this.config.WebSocket,
           retryer: this.config.retry,
         }),
     );
+    this.stack.use(this.relays);
 
     this.warmer = new RelayWarmer(this.relays);
     this.stack.use(this.warmer);

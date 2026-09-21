@@ -1,5 +1,7 @@
 # Task 03: RelayPool、lease、hot relays
 
+Status: **complete (2026-09-21)**
+
 ## 目的
 
 宛先集合と connection lifetime を分離し、query/publish/hot relay が同じ lease mechanism を共有する。
@@ -37,3 +39,12 @@
 - global connection sharing
 - 一 URL の multiple physical connections
 - reconnect policy の詳細（Task 05）
+
+## 実装結果
+
+- per-instance `RelayPool` が URL を再正規化し、一つの normalized URL に一つの `RelayCommunication` を割り当てる。
+- 初期 v4 では pool entry を idle eviction しない。entry は RxNostr instance の dispose まで保持し、pool dispose で全 entry を一度だけ破棄する。
+- `ConnectionLeaseController` が idempotent lease disposer と 0→1 open / 1→0 close を管理する。最後の release による close は microtask まで保留し、同一 turn の再取得で stale close を無効化する。
+- query の `linger` は `QuerySession` が lease の release を遅延させる。session dispose は timer を取り消して即時 release し、pool/communication dispose 後の callback は transport を再操作しない。
+- `RelayWarmer` は hot relay ごとの lease disposer を直接所有し、dynamic `RxRelays` の追加・削除・集合置換に追従する。hot 専用 connection API は持たない。
+- hot/query の二重 lease、active query 中の hot removal、linger、weak、URL alias、empty set、rapid reacquire、dispose を unit test で検証した。

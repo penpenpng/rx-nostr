@@ -60,6 +60,8 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 
 ひとつの `RxNostr` instance が所有する normalized URL -> `RelayCommunication` の map です。v4 初期リリースでは同じ instance/URL に一つの `RelayCommunication` と一つの unipls client を持ちます。将来の多重化は `RelayCommunication` 内の planner/physical connection 層で追加し、上位 API を変えません。
 
+初期 v4 では idle entry の eviction は行わず、RxNostr instance の dispose まで entry を保持します。これにより active lease/query の誤 eviction と、同じ URL の再生成による transport state の分裂を避けます。idle eviction が必要になった場合は、lease count と active protocol operation の両方を確認する pool 内部 policy として追加します。
+
 ### RelayCommunication
 
 単一 relay に対する Nostr protocol adapter です。次を所有します。
@@ -76,6 +78,8 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 ### connection lease と hot relays
 
 query、publish、hot relay はすべて同じ lease を取得します。最初の lease で unipls session を `open()` し、最後の lease が解放された後に linger policy に従って `close()` します。
+
+最後の lease の release は close を microtask まで保留します。同じ turn で lease が再取得された場合は close を取り消すため、動的 relay の remove/re-add や forward segment の交代で不要な socket blink を起こしません。より長い `linger` は query session が lease 自体を保持し続けることで表現します。
 
 - hot relay: hot 集合に含まれる間、長寿命 lease を保持
 - normal query: segment 中 lease を保持

@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジック、公開 model/config の固定に加えて、unipls を使う Nostr transport adapter まで完成しています。一方、`RxNostr` facade、publish、relay directory、connection state 集約はスケッチ段階です。Task 02 完了時点では 54 unit tests と 4 public contract tests が通り、controlled transport で通信断と再接続を検証しています。
+v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジック、公開 model/config、unipls transport adapter、per-instance pool と connection lease まで完成しています。一方、`RxNostr` facade、publish、relay directory、connection state 集約はスケッチ段階です。Task 03 完了時点では 70 unit tests と 4 public contract tests が通り、controlled transport で通信断、再接続、hot/query lease の競合を検証しています。
 
 ## モジュール別状況
 
@@ -12,7 +12,8 @@ v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジッ�
 | `rx-relays`                           | 概ね維持           | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                                    |
 | signer/verifier/lazy-filter/operators | 概ね維持           | v4 向けに分離済み。Task 01 で public export を監査し、明確な型欠陥だけを修正した。                                                      |
 | forward/backward REQ                  | 上位ロジックあり   | mock 通信層を用いた動的 relay、segment relay、weak/defer/linger のテストがある。                                                        |
-| query session / hot relays            | 部分実装           | ref-count 相当の `Latch` と hot relay 用 `connect()`/`release()` は transport へ接続済み。pool ownership と完全な dispose は Task 03。  |
+| query session / hot relays            | 実装済み           | query/publish/hot が同じ idempotent lease を使用し、prewarm、weak、linger、rapid reacquire、dispose を検証済み。                        |
+| relay pool                            | 実装済み           | instance ごと・normalized URL ごとに一 entry。初期 v4 は idle eviction せず instance dispose で一括解放する。                           |
 | relay communication                   | transport 移行済み | unipls adapter 上で REQ/EVENT の最小 wire 動作と unsubscribe 時の CLOSE 順序を実装済み。完全な query/publish semantics は Tasks 06/08。 |
 | publish                               | 未実装             | `summarize()` が存在せず、timeout packet の型も不一致。                                                                                 |
 | authenticator                         | 部品のみ           | AUTH event を署名する部品はあるが、challenge 監視、再送、timeout が通信層へ接続されていない。                                           |
@@ -26,7 +27,7 @@ v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジッ�
 
 2026-09-21 に次を実行しました。
 
-- `npm run test:unit -w packages/rx-nostr`: 10 files / 54 tests が成功
+- `npm run test:unit -w packages/rx-nostr`: 14 files / 70 tests が成功
 - `npm run test:contract -w packages/rx-nostr`: 1 file / 4 tests が成功
 - `npm run lint -w packages/rx-nostr`: 成功
 - `npm run typecheck -w packages/rx-nostr`: 6 件の後続 task 所有 error を報告して exit 2

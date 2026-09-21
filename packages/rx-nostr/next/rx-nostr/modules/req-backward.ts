@@ -9,11 +9,7 @@ import {
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
-import {
-  RelaySet,
-  type RelayMapOperator,
-  type RelayUrl,
-} from "../../libs/index.ts";
+import { RelaySet, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
@@ -21,7 +17,7 @@ import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayInput } from "../../types/index.ts";
 import { QuerySession, type QuerySegment } from "../query-session.ts";
-import type { IRelayCommunication } from "../relay-communication.ts";
+import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 
 export function reqBackward({
@@ -30,7 +26,7 @@ export function reqBackward({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<IRelayCommunication>;
+  relays: RelayCommunicationCollection;
   rxReq: RxReq;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
@@ -87,7 +83,7 @@ function req({
   eoseTimeout,
 }: {
   session: QuerySession;
-  relays: RelayMapOperator<IRelayCommunication>;
+  relays: RelayCommunicationCollection;
   sessionRelays: RxRelays;
   segmentRelays: RxRelays;
   filters: LazyFilter[];

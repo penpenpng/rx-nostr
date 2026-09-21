@@ -8,14 +8,13 @@ import {
   timeout,
   type Subscription,
 } from "rxjs";
-import { RelayMapOperator } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RelayInput } from "../../types/index.ts";
 import { QuerySession, type QuerySegment } from "../query-session.ts";
-import { type IRelayCommunication } from "../relay-communication.ts";
+import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
 
 export function publish({
@@ -24,7 +23,7 @@ export function publish({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<IRelayCommunication>;
+  relays: RelayCommunicationCollection;
   params: Nostr.EventParameters;
   relayInput: RelayInput;
   config: FilledRxNostrPublishOptions;

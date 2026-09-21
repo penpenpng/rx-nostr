@@ -10,11 +10,7 @@ import {
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
-import {
-  once,
-  type RelayMapOperator,
-  type RelayUrl,
-} from "../../libs/index.ts";
+import { once, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { mapStored } from "../../operators/general/map-stored.ts";
 import { tapOnce } from "../../operators/general/tap-once.ts";
@@ -24,7 +20,7 @@ import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayInput } from "../../types/index.ts";
 import { QuerySession, type QuerySegment } from "../query-session.ts";
-import type { IRelayCommunication } from "../relay-communication.ts";
+import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 
 export function reqForward({
@@ -33,7 +29,7 @@ export function reqForward({
   relayInput,
   config,
 }: {
-  relays: RelayMapOperator<IRelayCommunication>;
+  relays: RelayCommunicationCollection;
   rxReq: RxReq;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
@@ -109,7 +105,7 @@ function req({
   skipValidateFilterMatching,
 }: {
   session: QuerySession;
-  relays: RelayMapOperator<IRelayCommunication>;
+  relays: RelayCommunicationCollection;
   sessionRelays: RxRelays;
   segmentRelays: RxRelays;
   filters: LazyFilter[];

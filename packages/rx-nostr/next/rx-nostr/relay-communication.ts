@@ -2,7 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { EMPTY, Observable, filter, map, startWith, take } from "rxjs";
 import type { ConnectionRetryer } from "../connection-retryer/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
-import { Latch, type RelayUrl } from "../libs/index.ts";
+import { once, type RelayUrl } from "../libs/index.ts";
 import type {
   EventMessagePacket,
   EventPacket,
@@ -10,6 +10,7 @@ import type {
   ProgressActivity,
 } from "../packets/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
+import { ConnectionLeaseController } from "./connection-lease.ts";
 import { NostrTransport } from "./transport/index.ts";
 
 export interface IRelayCommunication {
@@ -30,8 +31,7 @@ export interface RelayCommunicationOptions {
 // 将来、接続を多重化することがあればこのレイヤーで実装する
 export class RelayCommunication implements IRelayCommunication {
   readonly #transport: NostrTransport;
-  readonly #latch: Latch;
-  #hotRelease?: () => void;
+  readonly #leases: ConnectionLeaseController;
   #nextSubId = 0;
 
   constructor(
@@ -43,30 +43,22 @@ export class RelayCommunication implements IRelayCommunication {
       WebSocket: options.WebSocket,
       retryer: options.retryer,
     });
-    this.#latch = new Latch({
-      onHeldUp: () => void this.#transport.open().catch(() => {}),
-      onDropped: () => void this.#transport.close().catch(() => {}),
+    this.#leases = new ConnectionLeaseController({
+      onFirstLease: () => void this.#transport.open().catch(() => {}),
+      onLastRelease: () => void this.#transport.close().catch(() => {}),
+      onDispose: () => void this.#transport.dispose().catch(() => {}),
     });
   }
 
   hold(): () => void {
-    return this.#latch.hold();
-  }
-
-  connect(): void {
-    this.#hotRelease ??= this.hold();
-  }
-
-  release(): void {
-    this.#hotRelease?.();
-    this.#hotRelease = undefined;
+    return this.#leases.hold();
   }
 
   vreq(
     strategy: "forward" | "backward",
     filters: LazyFilter[],
   ): Observable<EventPacket> {
-    if (!this.#latch.isHeld) return EMPTY;
+    if (this.#leases.count === 0) return EMPTY;
 
     const subId = `rx-nostr:${this.#nextSubId++}`;
     const query: Nostr.ToRelayMessage.REQ = [
@@ -107,7 +99,7 @@ export class RelayCommunication implements IRelayCommunication {
   }
 
   event(event: Nostr.Event): Observable<ProgressActivity> {
-    if (!this.#latch.isHeld) return EMPTY;
+    if (this.#leases.count === 0) return EMPTY;
 
     return this.#transport
       .subscribe({
@@ -132,8 +124,11 @@ export class RelayCommunication implements IRelayCommunication {
     return this.#transport.state$.asObservable();
   }
 
-  async dispose(): Promise<void> {
-    this.release();
-    await this.#transport.dispose();
+  /** @internal */
+  get leaseCount(): number {
+    return this.#leases.count;
   }
+
+  [Symbol.dispose] = once(() => this.#leases.dispose());
+  dispose = this[Symbol.dispose];
 }

@@ -4,6 +4,20 @@ import { NoopRetryer } from "../connection-retryer/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 
 describe("RelayCommunication transport integration", () => {
+  test("does not create a connection for a weak/disconnected operation", () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const complete = vi.fn();
+
+    relay.vreq("forward", [{}]).subscribe({ complete });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(server.connections).toHaveLength(0);
+    relay.dispose();
+  });
+
   test("sends REQ and sends protocol CLOSE before ending the local stream", async () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
@@ -44,6 +58,9 @@ describe("RelayCommunication transport integration", () => {
     expect(complete).not.toHaveBeenCalled();
 
     release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
     server.current.acknowledgeClose();
   });
 
@@ -83,6 +100,9 @@ describe("RelayCommunication transport integration", () => {
     expect(packets[0]).not.toHaveProperty("message");
 
     release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
     server.current.acknowledgeClose();
   });
 
@@ -109,6 +129,55 @@ describe("RelayCommunication transport integration", () => {
       { from: "wss://relay.example.com", state: "ok", ok: true },
     ]);
     release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
+  test("coalesces rapid release and reacquire without a socket blink", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const first = relay.hold();
+    server.current.open();
+    await Promise.resolve();
+
+    first();
+    const second = relay.hold();
+    await Promise.resolve();
+
+    expect(server.connections).toHaveLength(1);
+    expect(server.current.closeRequests).toHaveLength(0);
+    expect(relay.leaseCount).toBe(1);
+
+    second();
+    second();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    expect(relay.leaseCount).toBe(0);
+    server.current.acknowledgeClose();
+  });
+
+  test("dispose invalidates outstanding lease callbacks", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const release = relay.hold();
+    server.current.open();
+    await Promise.resolve();
+
+    relay.dispose();
+    expect(server.current.closeRequests).toHaveLength(1);
+    release();
+    release();
+    await Promise.resolve();
+
+    expect(relay.leaseCount).toBe(0);
+    expect(server.current.closeRequests).toHaveLength(1);
     server.current.acknowledgeClose();
   });
 });
