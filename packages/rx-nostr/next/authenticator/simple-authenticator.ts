@@ -5,7 +5,7 @@ import type { Authenticator } from "./authenticator.interface.ts";
 export class SimpleAuthenticator implements Authenticator {
   constructor(private readonly signer: EventSigner) {}
 
-  challenge(relay: string, challenge: string): Promise<Nostr.Event> {
+  challenge(relay: string, challenge: string): Promise<Nostr.Event<22242>> {
     return this.signer.signEvent({
       kind: 22242,
       content: "",

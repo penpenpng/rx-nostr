@@ -6,9 +6,8 @@ import {
   type Subscription,
   filter,
   map,
-  startWith,
-  take,
 } from "rxjs";
+import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionRetryer } from "../connection-retryer/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
 import { isFiltered, once, type RelayUrl } from "../libs/index.ts";
@@ -25,6 +24,7 @@ import type {
   ProgressActivity,
 } from "../packets/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
+import { AuthenticationFailure, AuthCoordinator } from "./auth-coordinator.ts";
 import { ConnectionLeaseController } from "./connection-lease.ts";
 import {
   NostrTransport,
@@ -40,21 +40,27 @@ export interface IRelayCommunication {
     options?: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
+      authenticator?: AuthenticatorInput;
     }>,
   ): Observable<EventPacket>;
-  event(event: Nostr.Event): Observable<ProgressActivity>;
+  event(
+    event: Nostr.Event,
+    options?: Readonly<{ authenticator?: AuthenticatorInput }>,
+  ): Observable<ProgressActivity>;
 }
 
 export interface RelayCommunicationOptions {
   readonly WebSocket?: WebSocketConstructor;
   readonly retryer?: ConnectionRetryer;
   readonly relayDirectory?: RelayDirectory;
+  readonly authTimeout?: number;
 }
 
 // 将来、接続を多重化することがあればこのレイヤーで実装する
 export class RelayCommunication implements IRelayCommunication {
   readonly #transport: NostrTransport;
   readonly #leases: ConnectionLeaseController;
+  readonly #auth: AuthCoordinator;
   readonly #directorySubscription?: Subscription;
   readonly #pendingQueries: QueryTask[] = [];
   readonly #activeQueries = new Set<QueryTask>();
@@ -100,6 +106,11 @@ export class RelayCommunication implements IRelayCommunication {
       onLastRelease: () => void this.#transport.close().catch(() => {}),
       onDispose: () => void this.#transport.dispose().catch(() => {}),
     });
+    this.#auth = new AuthCoordinator(
+      url,
+      this.#transport,
+      options.authTimeout ?? 30_000,
+    );
     if (relayDirectory) {
       this.#directorySubscription = relayDirectory.observe(url).subscribe({
         next: (entry) => {
@@ -124,6 +135,7 @@ export class RelayCommunication implements IRelayCommunication {
     options: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
+      authenticator?: AuthenticatorInput;
     }> = {},
   ): Observable<EventPacket> {
     if (this.#leases.count === 0) return EMPTY;
@@ -132,94 +144,161 @@ export class RelayCommunication implements IRelayCommunication {
     return this.#scheduleQuery(() => {
       let evaluatedFilters: Nostr.Filter[] = [];
       let queryEvaluated = false;
-      const packets = this.#transport.subscribe({
-        query: () => {
-          try {
-            evaluatedFilters = evalFilters(filters);
-          } catch (cause) {
-            throw new RxNostrCallbackError("filter", cause);
-          }
-          queryEvaluated = true;
-          return ["REQ", subId, ...evaluatedFilters];
-        },
-        selector: (packet) => packet.type === "EVENT" && packet.subId === subId,
-        terminator: (packet) =>
-          (packet.type === "CLOSED" && packet.subId === subId) ||
-          (strategy === "backward" &&
-            packet.type === "EOSE" &&
-            packet.subId === subId),
-        ...(strategy === "backward" &&
-        options.timeout !== undefined &&
-        Number.isFinite(options.timeout)
-          ? {
-              timeout:
-                options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
-            }
-          : {}),
-        retry: "resend",
-      });
-
       return new Observable<EventPacket>((subscriber) => {
+        let stopped = false;
         let remoteTerminated = false;
-        const subscription = packets
-          .pipe(
-            filter(
-              (packet): packet is EventMessagePacket => packet.type === "EVENT",
-            ),
-            filter(
-              (packet) =>
-                options.validateFilterMatching !== true ||
-                isFiltered(packet.event, evaluatedFilters),
-            ),
-            map((packet) => ({
-              from: packet.from,
-              type: "EVENT" as const,
-              event: packet.event,
-            })),
-          )
-          .subscribe({
-            next: (packet) => subscriber.next(packet),
-            complete: () => {
-              remoteTerminated = true;
-              subscriber.complete();
+        let authRetried = false;
+        const authAbort = new AbortController();
+        let subscription: Subscription | undefined;
+        const start = () => {
+          let terminalAuthRequired = false;
+          remoteTerminated = false;
+          const packets = this.#transport.subscribe({
+            query: () => {
+              try {
+                evaluatedFilters = evalFilters(filters);
+              } catch (cause) {
+                throw new RxNostrCallbackError("filter", cause);
+              }
+              queryEvaluated = true;
+              return ["REQ", subId, ...evaluatedFilters];
             },
-            error: (error) => {
-              const callbackError = callbackErrorFrom(error);
-              if (callbackError) subscriber.error(callbackError);
-              else subscriber.complete();
+            selector: (packet) =>
+              packet.type === "EVENT" && packet.subId === subId,
+            terminator: (packet) => {
+              const terminal =
+                (packet.type === "CLOSED" && packet.subId === subId) ||
+                (strategy === "backward" &&
+                  packet.type === "EOSE" &&
+                  packet.subId === subId);
+              terminalAuthRequired =
+                terminal &&
+                packet.type === "CLOSED" &&
+                packet.noticeType === "auth-required";
+              return terminal;
             },
+            ...(strategy === "backward" &&
+            options.timeout !== undefined &&
+            Number.isFinite(options.timeout)
+              ? {
+                  timeout:
+                    options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
+                }
+              : {}),
+            retry: "resend",
           });
+          subscription = packets
+            .pipe(
+              filter(
+                (packet): packet is EventMessagePacket =>
+                  packet.type === "EVENT",
+              ),
+              filter(
+                (packet) =>
+                  options.validateFilterMatching !== true ||
+                  isFiltered(packet.event, evaluatedFilters),
+              ),
+              map((packet) => ({
+                from: packet.from,
+                type: "EVENT" as const,
+                event: packet.event,
+              })),
+            )
+            .subscribe({
+              next: (packet) => subscriber.next(packet),
+              complete: () => {
+                remoteTerminated = true;
+                if (terminalAuthRequired && !authRetried) {
+                  authRetried = true;
+                  void this.#auth
+                    .authenticate(options.authenticator, authAbort.signal)
+                    .then(
+                      () => {
+                        if (!stopped && !subscriber.closed) start();
+                      },
+                      (error) => finishAfterAuthentication(error, subscriber),
+                    );
+                } else {
+                  subscriber.complete();
+                }
+              },
+              error: (error) => {
+                const callbackError = callbackErrorFrom(error);
+                if (callbackError) subscriber.error(callbackError);
+                else subscriber.complete();
+              },
+            });
+        };
+        start();
 
         return () => {
+          stopped = true;
+          authAbort.abort();
           if (!remoteTerminated && queryEvaluated) {
             void this.#transport.cast(["CLOSE", subId]).catch(() => {});
           }
-          subscription.unsubscribe();
+          subscription?.unsubscribe();
         };
       });
     });
   }
 
-  event(event: Nostr.Event): Observable<ProgressActivity> {
+  event(
+    event: Nostr.Event,
+    options: Readonly<{ authenticator?: AuthenticatorInput }> = {},
+  ): Observable<ProgressActivity> {
     if (this.#leases.count === 0) return EMPTY;
 
-    return this.#transport
-      .subscribe({
-        query: ["EVENT", event],
-        selector: (packet) =>
-          packet.type === "OK" && packet.eventId === event.id,
-        retry: "resend",
-      })
-      .pipe(
-        filter((packet): packet is OkPacket => packet.type === "OK"),
-        map((packet) => ({
-          from: this.url,
-          state: "ok" as const,
-          ok: packet.ok,
-        })),
-        take(1),
-        startWith({ from: this.url, state: "sent" as const }),
-      );
+    return new Observable((subscriber) => {
+      let stopped = false;
+      let authRetried = false;
+      const authAbort = new AbortController();
+      let subscription: Subscription | undefined;
+      const start = () => {
+        subscriber.next({ from: this.url, state: "sent" });
+        subscription = this.#transport
+          .subscribe({
+            query: ["EVENT", event],
+            selector: (packet) =>
+              packet.type === "OK" && packet.eventId === event.id,
+            retry: "resend",
+          })
+          .pipe(filter((packet): packet is OkPacket => packet.type === "OK"))
+          .subscribe({
+            next: (packet) => {
+              const authRequired =
+                !packet.ok && packet.noticeType === "auth-required";
+              subscriber.next({
+                from: this.url,
+                state: "ok",
+                ok: packet.ok,
+                ...(authRequired ? { reason: "auth" as const } : {}),
+              });
+              subscription?.unsubscribe();
+              if (authRequired && !authRetried) {
+                authRetried = true;
+                void this.#auth
+                  .authenticate(options.authenticator, authAbort.signal)
+                  .then(
+                    () => {
+                      if (!stopped && !subscriber.closed) start();
+                    },
+                    (error) => finishAfterAuthentication(error, subscriber),
+                  );
+              } else {
+                subscriber.complete();
+              }
+            },
+            error: () => subscriber.complete(),
+          });
+      };
+      start();
+      return () => {
+        stopped = true;
+        authAbort.abort();
+        subscription?.unsubscribe();
+      };
+    });
   }
 
   monitorConnectionState(): Observable<ConnectionState> {
@@ -287,6 +366,7 @@ export class RelayCommunication implements IRelayCommunication {
 
   [Symbol.dispose] = once(() => {
     this.#disposed = true;
+    this.#auth.dispose();
     this.#directorySubscription?.unsubscribe();
     for (const task of [...this.#pendingQueries]) task.subscriber.complete();
     for (const task of [...this.#activeQueries]) task.subscriber.complete();
@@ -314,4 +394,14 @@ function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
     return error.cause;
   }
   return undefined;
+}
+
+function finishAfterAuthentication(
+  error: unknown,
+  subscriber: Subscriber<unknown>,
+): void {
+  if (subscriber.closed) return;
+  if (error instanceof RxNostrCallbackError) subscriber.error(error);
+  else if (error instanceof AuthenticationFailure) subscriber.complete();
+  else subscriber.complete();
 }

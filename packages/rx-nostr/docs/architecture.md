@@ -153,6 +153,14 @@ RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の
 - 公開 connection state と RelayDirectory health は同じ unipls lifecycle transition から導出する。`monitorConnectionState()` は監視だけでは pool entry を作らず、既存および後から作られた entry の最新 snapshot を relay ごとに replay する。
 - retry policy には triggering failure を記録した後の RelayDirectory aggregate health を渡すが、decision の実行主体と connection ownership は各 RxNostr instance/unipls session に留める。
 
+### AUTH
+
+- RelayCommunication ごとの coordinator が transport message stream から最新 AUTH challenge を保持する。challenge は connection generation に紐づき、drop/reconnect で無効化する。
+- operation は `auth-required:` CLOSED/OK を受けたときだけ coordinator へ参加する。同じ challenge の参加者は署名、AUTH送信、OK待機を共有するが、`authenticator: false` の operation は参加しない。
+- coordinator は kind 22242 event を `['AUTH', event]` として送り、その event id の OK を root `authTimeout` まで待つ。成功した generation は後続 operation が共有できる。
+- AUTH成功後の元 operation 再送は各 physical REQ/EVENT が一度だけ管理する。coordinator 自身は query/publish state を所有しない。
+- 各参加者は AbortSignal を持ち、最後の waiter が外れれば共有 attempt を中止する。新 challenge、reconnect、dispose も旧 attempt を abort/stale にし、古い結果で operation を再開しない。
+
 ## 不変条件
 
 実装と contract test は少なくとも次を守ります。

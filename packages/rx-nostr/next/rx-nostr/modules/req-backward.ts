@@ -6,6 +6,7 @@ import {
   type Observable,
   type Subscription,
 } from "rxjs";
+import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelaySet, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
@@ -56,6 +57,7 @@ export function reqBackward({
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
         eoseTimeout: config.timeout,
+        authenticator: config.authenticator,
       }),
     ),
     // BackwardReq: New coming req doesn't affect the previous one.
@@ -79,6 +81,7 @@ function req({
   traceTag,
   skipValidateFilterMatching,
   eoseTimeout,
+  authenticator,
 }: {
   session: QuerySession;
   relays: RelayCommunicationCollection;
@@ -89,6 +92,7 @@ function req({
   traceTag?: string | number;
   skipValidateFilterMatching: boolean;
   eoseTimeout: number;
+  authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
   Logger.trace(traceTag, "new backward REQ segment");
 
@@ -163,6 +167,7 @@ function req({
           .vreq("backward", filters, {
             timeout: eoseTimeout,
             validateFilterMatching: !skipValidateFilterMatching,
+            authenticator,
           })
           .pipe(
             map((packet) =>

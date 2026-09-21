@@ -111,3 +111,13 @@ Task 06 connected the public REQ facade to the physical query engine, including 
 - facade return type does not yet implement `Publication`
 
 No diagnostic comes from query scheduling, forward/backward orchestration, Nostr transport query factories, callback error mapping, or their public contract tests.
+
+## Progress after Task 07
+
+Task 07 added the relay-local AUTH coordinator, typed kind 22242 authenticator contract, challenge generation isolation, shared authentication, and one-shot REQ/EVENT replay without introducing diagnostics. The 2026-09-21 check still reports only the same 3 diagnostics owned by Task 08:
+
+- publication progress/timeout type mismatch
+- missing publication `summarize` implementation
+- facade return type does not yet implement `Publication`
+
+No diagnostic comes from AUTH configuration, coordinator cancellation/deduplication, transport AbortSignal wiring, or the AUTH public contract tests.

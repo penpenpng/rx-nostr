@@ -76,6 +76,7 @@ export interface NostrTransportSubscribeOptions {
   readonly selector: (packet: MessagePacket) => boolean;
   readonly terminator?: (packet: MessagePacket) => boolean;
   readonly timeout?: number;
+  readonly signal?: AbortSignal;
   readonly retry?: UniplsRetryStrategy<Nostr.ToRelayMessage.Any, MessagePacket>;
 }
 

@@ -6,6 +6,7 @@ import {
   type Observable,
   type Subscription,
 } from "rxjs";
+import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
@@ -56,6 +57,7 @@ export function reqForward({
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
+        authenticator: config.authenticator,
       }),
     ),
     // Forward: To keep the latch, we need to subsccribe next stream before the previous one ends.
@@ -98,6 +100,7 @@ function req({
   linger,
   traceTag,
   skipValidateFilterMatching,
+  authenticator,
 }: {
   session: QuerySession;
   relays: RelayCommunicationCollection;
@@ -107,6 +110,7 @@ function req({
   linger: number;
   traceTag?: string | number;
   skipValidateFilterMatching: boolean;
+  authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
   Logger.trace(traceTag, "new forward REQ segment");
 
@@ -162,6 +166,7 @@ function req({
         const sub = relay
           .vreq("forward", filters, {
             validateFilterMatching: !skipValidateFilterMatching,
+            authenticator,
           })
           .pipe(
             map((packet) =>

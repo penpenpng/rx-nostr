@@ -28,3 +28,15 @@ relay ごとに AUTH challenge を調停し、同時 operation が安全に認�
 - credential 永続化
 - relay 独自の NIP-42 外認証
 - unipls provisioning phase への Nostr AUTH の移動（AUTH は protocol operation として扱う）
+
+## 実装結果
+
+2026-09-21 に完了。
+
+- relay ごとの internal `AuthCoordinator` が最新 challenge と connection generation を保持する。同じ challenge の同時認証は一つの AUTH event/OK 待機を共有し、異なる challenge または reconnect は旧結果を stale にする。
+- AUTH は明示された authenticator だけを使用する。operation の `false` override は他 operation の認証に便乗せず、その operation の再送を無効化する。authenticator factory は normalized relay URL で解決する。
+- `SimpleAuthenticator` と public `Authenticator` は kind 22242 の event を返し、relay/challenge tag を signer に渡す型契約に固定した。
+- `auth-required:` CLOSED は REQ、同 prefix の `OK false` は EVENT を認証成功後に一度だけ再送する。再送後の二度目の auth-required は loop させず relay-local terminal にする。
+- authenticator/factory の例外は `RxNostrCallbackError("authenticator")`、auth disabled、challenge missing、OK false、timeout、stale generation、transport failure は relay-local authentication failure として operation を終了する。
+- AUTH waiter は AbortSignal と参照数を持つ。最後の operation の unsubscribe または relay dispose で、未送信 AUTH、OK timeout、message listener を解放する。
+- controlled WebSocket の public contract で opt-in、per-operation disable、dedupe、署名内容、OK false、timeout、callback error、新 challenge、reconnect、unsubscribe、再送上限を検証した。publish Task 08 が利用する EVENT/OK substrate も AUTH後の再送と progress を unit test で固定した。

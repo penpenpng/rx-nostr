@@ -58,7 +58,7 @@ export function publish({
       });
 
       const progress = relays.map(destRelays, (relay) =>
-        relay.event(event).pipe(
+        relay.event(event, { authenticator: config.authenticator }).pipe(
           finalize(() => void segments.get(relay.url)?.endSegment()),
           timeout(config.timeout),
           timeoutWith({

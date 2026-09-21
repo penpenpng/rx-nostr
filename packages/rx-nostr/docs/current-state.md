@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 は、relay 集合の動的制御、公開 model/config、unipls transport adapter、per-instance pool と connection lease、共有 RelayDirectory、connection state/retry 集約、forward/backward REQ protocol と physical query queue まで完成しています。一方、NIP-42 AUTH、publish、`RxNostr` facade lifecycle は未実装部分が残っています。Task 06 完了時点では 90 unit tests と 23 public contract tests が通り、controlled transport で通信断、再接続、REQ/CLOSE、lazy filter 再評価、relay-local timeout、NIP-11 query limit、dispose cleanup、hot/query lease の競合と metadata/health 集約を検証しています。
+v4 は、relay 集合の動的制御、公開 model/config、unipls transport adapter、per-instance pool と connection lease、共有 RelayDirectory、connection state/retry 集約、forward/backward REQ protocol、physical query queue、NIP-42 AUTH まで完成しています。一方、publication object と `RxNostr` facade lifecycle は未実装部分が残っています。Task 07 完了時点では 91 unit tests と 32 public contract tests が通り、controlled transport で通信断、再接続、REQ/CLOSE、lazy filter 再評価、relay-local timeout、NIP-11 query limit、AUTH dedupe/replay/cancellation、dispose cleanup、hot/query lease の競合と metadata/health 集約を検証しています。
 
 ## モジュール別状況
 
@@ -16,7 +16,7 @@ v4 は、relay 集合の動的制御、公開 model/config、unipls transport ad
 | relay pool                            | 実装済み           | instance ごと・normalized URL ごとに一 entry。初期 v4 は idle eviction せず instance dispose で一括解放する。                           |
 | relay communication                   | query 実装済み     | unipls adapter 上で resend、relay-local terminal、physical query queue、NIP-11 limit、filter snapshot、dispose cleanup を実装済み。       |
 | publish                               | 未実装             | `summarize()` が存在せず、timeout packet の型も不一致。                                                                                 |
-| authenticator                         | 部品のみ           | AUTH event を署名する部品はあるが、challenge 監視、再送、timeout が通信層へ接続されていない。                                           |
+| authenticator                         | 実装済み           | opt-in の relay coordinator が challenge 世代、dedupe、AUTH OK/timeout、REQ/EVENT一回再送、unsubscribe/dispose cleanup を管理する。       |
 | relay directory                       | 実装済み           | global/injected directory、immutable entry、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。 |
 | connection state/retry                | 実装済み           | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。 |
 | `RxNostr` 公開 API                    | 一部実装済み       | `req()` と `monitorConnectionState()` は実装済み。publish と disposed-instance guard を含む facade lifecycle は Tasks 08/09。            |
@@ -27,8 +27,8 @@ v4 は、relay 集合の動的制御、公開 model/config、unipls transport ad
 
 2026-09-21 に次を実行しました。
 
-- `npm run test:unit -w packages/rx-nostr`: 16 files / 90 tests が成功
-- `npm run test:contract -w packages/rx-nostr`: 4 files / 23 tests が成功
+- `npm run test:unit -w packages/rx-nostr`: 16 files / 91 tests が成功
+- `npm run test:contract -w packages/rx-nostr`: 5 files / 32 tests が成功
 - `npm run lint -w packages/rx-nostr`: 成功
 - `npm run typecheck -w packages/rx-nostr`: 3 件の Task 08 所有 error を報告して exit 2
 - `npm run build -w packages/rx-nostr`: typecheck gate で exit 2

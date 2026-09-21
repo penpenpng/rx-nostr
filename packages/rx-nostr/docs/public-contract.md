@@ -91,6 +91,16 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 The `ConnectionRetryer` receives the aggregate health snapshot from the configured RelayDirectory after the triggering failure has been recorded. The directory remains observational: the retryer decision is executed only by the owning RxNostr instance/unipls session.
 
+## NIP-42 authentication
+
+AUTH is opt-in. A root or operation authenticator may be an `Authenticator` or a relay factory; `authenticator: false` disables AUTH for that operation even if another operation authenticates the same connection. The ordinary signer is never used implicitly for AUTH.
+
+- `Authenticator.challenge()` returns a kind 22242 event. `SimpleAuthenticator` asks its signer to sign empty content with the normalized `relay` and received `challenge` tags.
+- The latest challenge is connection-generation scoped. Concurrent operations using the same challenge share one AUTH event and OK result. A new challenge or reconnect invalidates older pending work and an old OK cannot resume a new connection.
+- An `auth-required:` CLOSED retries the affected REQ once after successful AUTH. An `auth-required:` `OK false` remains observable with `reason: "auth"`, then retries the affected EVENT once. A second auth-required result is final and cannot form a loop.
+- Disabled/missing authentication, AUTH `OK false`, AUTH timeout, stale work, and transport failure terminate only that relay effort. Factory or authenticator exceptions are `RxNostrCallbackError` with callback kind `authenticator`.
+- Unsubscribing the last waiting operation aborts an unsent AUTH or active OK wait. Relay disposal also removes the challenge/state listeners and aborts all attempts.
+
 ## Error boundaries
 
 - Invalid relay strings are filtered as described above; they are not callback or transport errors.

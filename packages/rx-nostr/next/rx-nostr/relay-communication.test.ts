@@ -415,6 +415,66 @@ describe("RelayCommunication transport integration", () => {
     server.current.acknowledgeClose();
   });
 
+  test("authenticates and resends an EVENT once after auth-required", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      authTimeout: 1_000,
+    });
+    const release = relay.hold();
+    server.current.open();
+    const event = Faker.event({ id: "event" });
+    const authEvent = {
+      ...Faker.event({
+        id: "auth-event",
+        kind: 22242,
+        tags: [
+          ["relay", relay.url],
+          ["challenge", "challenge"],
+        ],
+      }),
+      kind: 22242 as const,
+    };
+    const activities: object[] = [];
+    const complete = vi.fn();
+    relay
+      .event(event, { authenticator: { challenge: async () => authEvent } })
+      .subscribe({ next: (activity) => activities.push(activity), complete });
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    server.current.message(JSON.stringify(["AUTH", "challenge"]));
+    server.current.message(
+      JSON.stringify(["OK", "event", false, "auth-required: login"]),
+    );
+
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
+    expect(JSON.parse(server.current.sent[1] as string)).toEqual([
+      "AUTH",
+      authEvent,
+    ]);
+    server.current.message(
+      JSON.stringify(["OK", "auth-event", true, "authenticated"]),
+    );
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(3));
+    expect(JSON.parse(server.current.sent[2] as string)).toEqual([
+      "EVENT",
+      event,
+    ]);
+    server.current.message(JSON.stringify(["OK", "event", true, "saved"]));
+
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    expect(activities).toEqual([
+      { from: relay.url, state: "sent" },
+      { from: relay.url, state: "ok", ok: false, reason: "auth" },
+      { from: relay.url, state: "sent" },
+      { from: relay.url, state: "ok", ok: true },
+    ]);
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
   test("coalesces rapid release and reacquire without a socket blink", async () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
