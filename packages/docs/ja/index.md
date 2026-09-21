@@ -6,6 +6,9 @@ hero:
   tagline: Nostrリレーとの高品質かつ柔軟な通信のためのライブラリ。
   actions:
     - theme: brand
+      text: ドキュメント v4.x
+      link: /ja/v4/
+    - theme: alt
       text: ドキュメント v3.x
       link: /ja/v3/
     - theme: alt

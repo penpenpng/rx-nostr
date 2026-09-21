@@ -109,4 +109,45 @@ export const content = defineContent({
       ],
     },
   ],
+  4: [
+    {
+      text: "Introduction",
+      items: [
+        { text: "Overview", link: "" },
+        { text: "Installation", link: "installation" },
+        { text: "Getting Started", link: "getting-started" },
+        { text: "Migration from v3", link: "migration-guide" },
+      ],
+    },
+    {
+      text: "Operations",
+      items: [
+        { text: "Query", link: "query" },
+        { text: "Publish", link: "publish" },
+        { text: "Relay Management", link: "relay-management" },
+      ],
+    },
+    {
+      text: "Security",
+      items: [
+        { text: "Sign / Verify", link: "signer-verifier" },
+        { text: "NIP-42 AUTH", link: "auth" },
+      ],
+    },
+    {
+      text: "Connection / Metadata",
+      items: [
+        { text: "Connection Management", link: "connection-management" },
+        { text: "Relay Directory", link: "relay-directory" },
+      ],
+    },
+    {
+      text: "Reference",
+      items: [
+        { text: "Configuration", link: "configuration" },
+        { text: "Operators", link: "operators" },
+        { text: "Dispose", link: "dispose" },
+      ],
+    },
+  ],
 });
