@@ -27,7 +27,8 @@
 
 ## 非目標
 
-- package artifact/runtime matrix（Task 10）
+- source/workspace/dependency/release tooling の整理（Task 10）
+- package artifact/runtime matrix（Task 11）
 - 利用者向け全ドキュメントの翻訳
 
 ## 実装結果

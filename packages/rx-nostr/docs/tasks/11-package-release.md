@@ -1,4 +1,4 @@
-# Task 10: Package、contract test、release readiness
+# Task 11: Package、contract test、release readiness
 
 ## 目的
 
@@ -6,8 +6,8 @@ repository 内で動くだけでなく、配布 artifact を利用者環境か�
 
 ## 作業
 
-- 完成した `next` 構成を release 時の `src`/build entry へ昇格する手順を決め、残存 v3 files と direct WebSocket files を除去する。
-- package version、exports、types、files、sideEffects、engines、dependencies/peerDependencies を v4 に更新する。
+- Task 10 で正式化した `src`/build entry を監査し、残存 v3 files、`next/` path、direct WebSocket files が artifact と public declaration に含まれないことを確認する。
+- package version、exports、types、files、sideEffects、engines、dependencies/peerDependencies を v4 の最終配布契約として監査する。
 - unipls submodule/workspace development と npm published dependency の両方で解決が再現できる構成にする。
 - packed tarball を一時 consumer project へ install し、root import、types、Node runtime、deep import rejection を検証する。
 - D8 の Node/Deno/Bun/browser matrix を CI に置く。WebSocket constructor/global の両経路を検証する。
@@ -19,7 +19,7 @@ repository 内で動くだけでなく、配布 artifact を利用者環境か�
 
 ## release gate
 
-- clean checkout/submodule initialization から install が再現できる。
+- clean checkout/submodule initialization から pnpm install が再現できる。
 - lint、format check、typecheck、unit tests、contract tests、package tests、docs build がすべて成功する。
 - build/declaration diagnostics が 0 で、失敗時は process が非 0。
 - tarball に test、dev docs、submodule source、古い v3 source が誤って含まれない。
