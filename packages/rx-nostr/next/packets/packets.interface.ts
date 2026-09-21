@@ -130,6 +130,6 @@ export interface ErrorPacket {
  * Packets emitted when WebSocket connection state is changed.
  */
 export interface ConnectionStatePacket {
-  from: RelayUrl;
-  state: ConnectionState;
+  readonly from: RelayUrl;
+  readonly state: ConnectionState;
 }

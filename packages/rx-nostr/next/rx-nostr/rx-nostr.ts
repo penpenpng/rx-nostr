@@ -1,5 +1,5 @@
 import * as Nostr from "nostr-typedef";
-import { defer, identity, Observable } from "rxjs";
+import { defer, identity, map, mergeMap, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
@@ -40,6 +40,7 @@ export class RxNostr implements IRxNostr {
         new RelayCommunication(url, {
           WebSocket: this.config.WebSocket,
           retryer: this.config.retry,
+          relayDirectory: this.config.relayDirectory,
         }),
     );
     this.stack.use(this.relays);
@@ -107,7 +108,17 @@ export class RxNostr implements IRxNostr {
     this.warmer.unsetHotRelays();
   }
 
-  monitorConnectionState(): Observable<ConnectionStatePacket> {}
+  monitorConnectionState(): Observable<ConnectionStatePacket> {
+    return this.relays
+      .observeEntries()
+      .pipe(
+        mergeMap((relay) =>
+          relay
+            .monitorConnectionState()
+            .pipe(map((state) => Object.freeze({ from: relay.url, state }))),
+        ),
+      );
+  }
 
   [Symbol.dispose] = once(() => {
     this.stack.dispose();

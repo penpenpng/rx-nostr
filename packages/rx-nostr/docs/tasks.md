@@ -11,10 +11,10 @@
 | 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                   | 00, 01     | D4, D11                       | complete            |
 | 03  | [RelayPool、lease、hot relays](./tasks/03-relay-pool-hot.md)               | 02         | D9, D14                       | complete            |
 | 04  | [RelayDirectory](./tasks/04-relay-directory.md)                            | 01         | D2, D3, D12                   | complete            |
-| 05  | [Reconnect と connection state](./tasks/05-reconnect-state.md)             | 02, 04     | D2, D4, D5, D11               | ready               |
-| 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                 | 03, 05     | D5, D9, D12, D13, D14         | waiting for tasks   |
+| 05  | [Reconnect と connection state](./tasks/05-reconnect-state.md)             | 02, 04     | D2, D4, D5, D11               | complete            |
+| 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                 | 03, 05     | D5, D9, D12, D13, D14         | ready               |
 | 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                          | 06         | D7                            | waiting for Task 06 |
-| 08  | [Publish pipeline](./tasks/08-publish.md)                                  | 03, 05, 07 | D5, D6, D10, D11, D14         | waiting for tasks   |
+| 08  | [Publish pipeline](./tasks/08-publish.md)                                  | 03, 05, 07 | D5, D6, D10, D11, D14         | waiting for Task 07 |
 | 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)               | 06, 08     | D1                            | waiting for tasks   |
 | 10  | [Package、contract test、release readiness](./tasks/10-package-release.md) | 09         | D8                            | waiting for Task 09 |
 

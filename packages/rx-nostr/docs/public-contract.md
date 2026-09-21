@@ -78,6 +78,15 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 `ConnectionState` is an immutable rx-nostr discriminated union: `dormant`, `connecting`, `connected`, `waiting-for-retry`, `retrying`, `failed`, or `disposed`. Retry states carry one-based attempts; wait state carries its delay; failure states contain only an rx-nostr `ConnectionFailure` snapshot. Transport implementation objects are not exposed.
 
+`monitorConnectionState()` observes every relay entry that already exists in the instance pool and entries created later. Subscribing does not itself create a relay entry or open a connection. Each relay stream replays its latest state to a new observer; identical consecutive snapshots are suppressed, while relay ordering remains independent.
+
+- `dormant` means there is no connection demand; it is not a failure.
+- `connecting` is the first physical attempt. `waiting-for-retry` is emitted after the retry policy chooses a valid delay, and `retrying` identifies the corresponding one-based retry attempt.
+- `failed` is an unexpected terminal outcome and contains a transport-independent failure snapshot. Peer close code/reason may be copied, but mutable transport errors and unipls identifiers are not exposed.
+- Releasing the final lease produces `dormant` and never starts automatic retry. Disposing emits `disposed` to existing observers and prevents a pending retry from creating another socket.
+
+The `ConnectionRetryer` receives the aggregate health snapshot from the configured RelayDirectory after the triggering failure has been recorded. The directory remains observational: the retryer decision is executed only by the owning RxNostr instance/unipls session.
+
 ## Error boundaries
 
 - Invalid relay strings are filtered as described above; they are not callback or transport errors.

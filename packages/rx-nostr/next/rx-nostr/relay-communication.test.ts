@@ -1,9 +1,68 @@
 import { describe, expect, test, vi } from "vitest";
 import { ControlledWebSocketServer, Faker } from "../__test__/helper/index.ts";
 import { NoopRetryer } from "../connection-retryer/index.ts";
+import { RelayDirectory } from "../relay-directory/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 
 describe("RelayCommunication transport integration", () => {
+  test("reports the same lifecycle to RelayDirectory health", async () => {
+    let now = 1;
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory({ clock: () => now });
+    const retry = vi.fn(() => ({ action: "retry", delay: 0 }) as const);
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      retryer: { retry },
+      relayDirectory: directory,
+    });
+    const release = relay.hold();
+    server.current.open();
+    await vi.waitFor(() =>
+      expect(directory.get(relay.url)).toMatchObject({
+        lastConnectedAt: 1,
+        liveConnections: 1,
+      }),
+    );
+
+    now = 2;
+    server.current.peerClose(1000, "restart", true);
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    expect(directory.get(relay.url)).toMatchObject({
+      lastFailureAt: 2,
+      consecutiveFailures: 1,
+      liveConnections: 0,
+    });
+    expect(retry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        health: {
+          consecutiveFailures: 1,
+          lastConnectedAt: 1,
+          lastFailureAt: 2,
+        },
+      }),
+    );
+
+    now = 3;
+    server.current.open();
+    await vi.waitFor(() =>
+      expect(directory.get(relay.url)).toMatchObject({
+        lastConnectedAt: 3,
+        consecutiveFailures: 0,
+        liveConnections: 1,
+      }),
+    );
+
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+    await vi.waitFor(() =>
+      expect(directory.get(relay.url)?.liveConnections).toBe(0),
+    );
+    expect(directory.get(relay.url)?.lastFailureAt).toBe(2);
+  });
+
   test("does not create a connection for a weak/disconnected operation", () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {

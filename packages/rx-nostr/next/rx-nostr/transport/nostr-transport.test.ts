@@ -1,5 +1,5 @@
 import { firstValueFrom, toArray } from "rxjs";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   ControlledWebSocketServer,
   Faker,
@@ -11,6 +11,8 @@ import {
 } from "./nostr-transport.ts";
 
 const relay = "wss://relay.example.com" as const;
+
+afterEach(() => vi.useRealTimers());
 
 async function openTransport(
   server: ControlledWebSocketServer,
@@ -37,6 +39,121 @@ async function closeTransport(
 }
 
 describe("NostrTransport", () => {
+  test("replays and maps the initial, retry, ready, and idle lifecycle", async () => {
+    const server = new ControlledWebSocketServer();
+    const transport = new NostrTransport({
+      url: relay,
+      WebSocket: server.WebSocket,
+      retryer: { retry: () => ({ action: "retry", delay: 0 }) },
+    });
+    const states: import("../../connection-state.ts").ConnectionState[] = [];
+    transport.state$.subscribe((state) => states.push(state));
+
+    const opened = transport.open();
+    server.current.peerClose(1006, "offline");
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    server.current.open();
+    await opened;
+
+    expect(states).toEqual([
+      { state: "dormant" },
+      { state: "connecting", attempt: 1 },
+      {
+        state: "waiting-for-retry",
+        attempt: 1,
+        delay: 0,
+        reason: {
+          kind: "connection-dropped",
+          code: 1006,
+          message: "offline",
+        },
+      },
+      { state: "retrying", attempt: 1 },
+      { state: "connected" },
+    ]);
+
+    await closeTransport(transport, server);
+    expect(states.at(-1)).toEqual({ state: "dormant" });
+  });
+
+  test("exposes an exact retry delay and a typed terminal failure", async () => {
+    vi.useFakeTimers();
+    const server = new ControlledWebSocketServer();
+    const transport = new NostrTransport({
+      url: relay,
+      WebSocket: server.WebSocket,
+      retryer: { retry: () => ({ action: "retry", delay: 100 }) },
+    });
+    const states: import("../../connection-state.ts").ConnectionState[] = [];
+    transport.state$.subscribe((state) => states.push(state));
+
+    const opened = transport.open();
+    server.current.peerClose(1000, "try later", true);
+    await vi.waitFor(() =>
+      expect(states).toContainEqual(
+        expect.objectContaining({
+          state: "waiting-for-retry",
+          attempt: 1,
+          delay: 100,
+        }),
+      ),
+    );
+    expect(server.connections).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(server.connections).toHaveLength(2);
+    server.current.open();
+    await opened;
+    await closeTransport(transport, server);
+
+    const terminalServer = new ControlledWebSocketServer();
+    const terminal = new NostrTransport({
+      url: "wss://terminal.example.com",
+      WebSocket: terminalServer.WebSocket,
+      retryer: { retry: () => ({ action: "exhaust" }) },
+    });
+    const terminalStates: import("../../connection-state.ts").ConnectionState[] =
+      [];
+    terminal.state$.subscribe((state) => terminalStates.push(state));
+    const terminalOpen = terminal.open();
+    terminalServer.current.peerClose(1000, "maintenance", true);
+    await expect(terminalOpen).rejects.toMatchObject({
+      name: "UniplsOpenError",
+    });
+    expect(terminalStates.at(-1)).toEqual({
+      state: "failed",
+      attempt: 1,
+      reason: {
+        kind: "retry-exhausted",
+        code: 1000,
+        message: "maintenance",
+      },
+    });
+
+    await terminal.dispose();
+  });
+
+  test("cancels a pending retry when disposed", async () => {
+    vi.useFakeTimers();
+    const server = new ControlledWebSocketServer();
+    const transport = new NostrTransport({
+      url: relay,
+      WebSocket: server.WebSocket,
+      retryer: { retry: () => ({ action: "retry", delay: 100 }) },
+    });
+    const states: string[] = [];
+    transport.state$.subscribe((state) => states.push(state.state));
+
+    const opened = transport.open();
+    server.current.peerClose(1006, "offline");
+    void opened.catch(() => {});
+    await vi.waitFor(() => expect(states).toContain("waiting-for-retry"));
+    await transport.dispose();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(server.connections).toHaveLength(1);
+    expect(states.at(-1)).toBe("disposed");
+  });
+
   test("opens, decodes messages, casts tuples, and closes by user", async () => {
     const server = new ControlledWebSocketServer();
     const transport = await openTransport(server);
@@ -52,7 +169,7 @@ describe("NostrTransport", () => {
     expect(server.current.sent).toEqual(['["CLOSE","sub"]']);
 
     await closeTransport(transport, server);
-    expect(states).toContain("closed");
+    expect(states).toContain("dormant");
   });
 
   test.each([
@@ -152,8 +269,15 @@ describe("NostrTransport", () => {
     const newSocket = server.current;
     newSocket.open();
     await vi.waitFor(() => expect(retryer.retry).toHaveBeenCalledOnce());
+    expect(retryer.retry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: "recovery",
+        attempt: 1,
+        health: expect.objectContaining({ consecutiveFailures: 1 }),
+      }),
+    );
     await vi.waitFor(() =>
-      expect(states.filter((state) => state === "connected")).toHaveLength(1),
+      expect(states.filter((state) => state === "connected")).toHaveLength(2),
     );
 
     oldSocket.message('["NOTICE","stale"]');
@@ -221,7 +345,7 @@ describe("NostrTransport", () => {
     server.current.error(new Error("offline"));
 
     await expect(result).rejects.toBeInstanceOf(NostrTransportOperationError);
-    expect(states).toContain("dropped");
+    expect(states).toContain("failed");
   });
 
   test("dispose is idempotent and completes adapter-owned streams", async () => {

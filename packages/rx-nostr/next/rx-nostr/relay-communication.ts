@@ -3,6 +3,11 @@ import { EMPTY, Observable, filter, map, startWith, take } from "rxjs";
 import type { ConnectionRetryer } from "../connection-retryer/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../libs/index.ts";
+import {
+  getRelayDirectoryReporter,
+  type RelayDirectory,
+} from "../relay-directory/relay-directory.ts";
+import type { ConnectionState } from "../connection-state.ts";
 import type {
   EventMessagePacket,
   EventPacket,
@@ -26,6 +31,7 @@ export interface IRelayCommunication {
 export interface RelayCommunicationOptions {
   readonly WebSocket?: WebSocketConstructor;
   readonly retryer?: ConnectionRetryer;
+  readonly relayDirectory?: RelayDirectory;
 }
 
 // 将来、接続を多重化することがあればこのレイヤーで実装する
@@ -38,10 +44,34 @@ export class RelayCommunication implements IRelayCommunication {
     public readonly url: RelayUrl,
     options: RelayCommunicationOptions = {},
   ) {
+    const relayDirectory = options.relayDirectory;
+    const directoryReporter = relayDirectory
+      ? getRelayDirectoryReporter(relayDirectory)
+      : undefined;
     this.#transport = new NostrTransport({
       url,
       WebSocket: options.WebSocket,
       retryer: options.retryer,
+      onConnectionOpened: directoryReporter
+        ? () => directoryReporter.connectionOpened(url)
+        : undefined,
+      onConnectionFailed: directoryReporter
+        ? () => directoryReporter.connectionFailed(url)
+        : undefined,
+      getConnectionHealth: relayDirectory
+        ? () => {
+            const entry = relayDirectory.getOrCreate(url);
+            return Object.freeze({
+              consecutiveFailures: entry.consecutiveFailures,
+              ...(entry.lastConnectedAt === undefined
+                ? {}
+                : { lastConnectedAt: entry.lastConnectedAt }),
+              ...(entry.lastFailureAt === undefined
+                ? {}
+                : { lastFailureAt: entry.lastFailureAt }),
+            });
+          }
+        : undefined,
     });
     this.#leases = new ConnectionLeaseController({
       onFirstLease: () => void this.#transport.open().catch(() => {}),
@@ -120,7 +150,7 @@ export class RelayCommunication implements IRelayCommunication {
       );
   }
 
-  monitorConnectionState() {
+  monitorConnectionState(): Observable<ConnectionState> {
     return this.#transport.state$.asObservable();
   }
 

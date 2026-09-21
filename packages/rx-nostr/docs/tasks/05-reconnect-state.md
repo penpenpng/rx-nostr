@@ -1,5 +1,7 @@
 # Task 05: Reconnect と connection state
 
+Status: **complete (2026-09-21)**
+
 ## 目的
 
 unipls の lifecycle/reconnector を唯一の transport state source とし、rx-nostr 利用者に Nostr application 向けの安定した state/diagnostic を提供する。
@@ -35,3 +37,14 @@ unipls の lifecycle/reconnector を唯一の transport state source とし、rx
 
 - RxJS で別の reconnect engine を再実装すること
 - relay score による policy 自動選択
+
+## 実装結果
+
+- unipls lifecycle snapshot を唯一の transport state source とし、rx-nostr の immutable `ConnectionState` へ写像した。初回接続と retry attempt を分け、policy が確定した正確な delay を `waiting-for-retry` に保持する。
+- `monitorConnectionState()` は pool に存在する relay と subscription 後に作られた relay を統合する。監視だけでは pool entry/connection を作らず、relay ごとの最新 state は replay される。
+- 同一 state の重複 emission を抑え、idle/user close は `dormant`、retry terminal は typed failure を持つ `failed`、instance cleanup は `disposed` として区別した。
+- retryer は引き続き rx-nostr 独自 I/F とし、unipls reconnector への adapter 内で wait/cancel/exhaust と AbortSignal を扱う。pending timer は close/dispose で中断される。
+- RelayDirectory reporter を同じ lifecycle transition に接続した。ready connection ごとの冪等 close handle と、drop/attempt failure report により live count と failure counter を公開 state と同期し、更新後の共有 health snapshot を retryer context に渡す。
+- controlled transport で初回失敗、ready、peer close code 1000、retry wait/attempt、exhaustion、idle close、dispose 中断、複数 relay の failure isolation を検証した。
+
+Task 06/08 が利用する operation recovery は、Nostr transport の `resend`/`fail` policy seam を維持している。NIP-42 を含む具体的な resend 条件は各後続 task が実装する。

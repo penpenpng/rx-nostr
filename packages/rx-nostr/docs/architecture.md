@@ -147,6 +147,8 @@ connection の再試行を直接命令する API は、directory と pool の責
 - active REQ/EVENT の resend 内容は rx-nostr が unipls operation の recovery policy/query factory を通じて決める。
 - lazy filter は resend の直前に再評価する。
 - RelayDirectory は lifecycle event を観測して health を更新するが、reconnect engine にはならない。
+- 公開 connection state と RelayDirectory health は同じ unipls lifecycle transition から導出する。`monitorConnectionState()` は監視だけでは pool entry を作らず、既存および後から作られた entry の最新 snapshot を relay ごとに replay する。
+- retry policy には triggering failure を記録した後の RelayDirectory aggregate health を渡すが、decision の実行主体と connection ownership は各 RxNostr instance/unipls session に留める。
 
 ## 不変条件
 

@@ -51,4 +51,23 @@ describe("RelayPool", () => {
       "Attempted to access a disposed resource",
     );
   });
+
+  test("observes existing and future entries without creating any", () => {
+    const pool = new RelayPool((url) => new FakeRelay(url));
+    const first = pool.get("wss://one.example.com");
+    const observed: FakeRelay[] = [];
+    const complete = vi.fn();
+
+    pool.observeEntries().subscribe({
+      next: (relay) => observed.push(relay),
+      complete,
+    });
+    expect(observed).toEqual([first]);
+    expect(pool.size).toBe(1);
+
+    const second = pool.get("wss://two.example.com");
+    expect(observed).toEqual([first, second]);
+    pool.dispose();
+    expect(complete).toHaveBeenCalledOnce();
+  });
 });

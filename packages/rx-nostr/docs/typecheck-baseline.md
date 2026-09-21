@@ -91,3 +91,13 @@ Task 04 replaced the RelayDirectory placeholders and removed both diagnostics in
 - Task 09: connection-state facade placeholder (1)
 
 No diagnostic comes from RelayDirectory, its snapshot and NIP-11 implementation, public config, or their tests.
+
+## Progress after Task 05
+
+Task 05 implemented `monitorConnectionState()` while wiring the unipls lifecycle to rx-nostr state and RelayDirectory health. This also removed the diagnostic previously assigned to Task 09's connection-state facade. The 2026-09-21 check now reports only 3 diagnostics, all owned by Task 08:
+
+- publication progress/timeout type mismatch
+- missing publication `summarize` implementation
+- facade return type does not yet implement `Publication`
+
+No diagnostic comes from lifecycle mapping, retry policy integration, RelayDirectory reporting, relay pool observation, or connection-state contract tests.
