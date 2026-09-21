@@ -1,22 +1,13 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import * as publicApi from "rx-nostr";
-import type {
-  EventPacket,
-  IRxNostr,
-  OkPacket,
-  Publication,
-  RelayInput,
-  RelayUrl,
-} from "rx-nostr";
+import type { EventPacket, IRxNostr, OkPacket, Publication, RelayInput, RelayUrl } from "rx-nostr";
 
 describe("public entry point", () => {
   test("can be imported by contract tests", () => {
     expect(publicApi).toBeTypeOf("object");
     expect(publicApi.createRxNostr).toBeTypeOf("function");
     expect(publicApi.RelayDirectory).toBeTypeOf("function");
-    expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(
-      publicApi.RelayDirectory,
-    );
+    expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(publicApi.RelayDirectory);
     expect(publicApi).not.toHaveProperty("RxNostr");
     expect(publicApi).not.toHaveProperty("NostrTransport");
     expect(publicApi).not.toHaveProperty("Unipls");
@@ -24,9 +15,7 @@ describe("public entry point", () => {
 
   test("exposes the v4 operation model", () => {
     expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<Publication>();
-    expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<
-      Promise<void>
-    >();
+    expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
     expectTypeOf<string>().toMatchTypeOf<RelayInput>();
     expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
     expectTypeOf<"ws://relay.example">().toMatchTypeOf<RelayUrl>();

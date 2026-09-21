@@ -35,10 +35,7 @@ describe("Nostr relay codec", () => {
     ],
     [["NOTICE", "maintenance"], { type: "NOTICE", notice: "maintenance" }],
     [["AUTH", "challenge"], { type: "AUTH", challenge: "challenge" }],
-    [
-      ["COUNT", "sub", { count: 3 }],
-      { type: "COUNT", subId: "sub", count: { count: 3 } },
-    ],
+    [["COUNT", "sub", { count: 3 }], { type: "COUNT", subId: "sub", count: { count: 3 } }],
   ])("decodes %s", (message, expected) => {
     expect(decodeRelayMessage(JSON.stringify(message), relay)).toMatchObject({
       from: relay,
@@ -53,9 +50,7 @@ describe("Nostr relay codec", () => {
     [JSON.stringify(["EVENT", "sub"]), "invalid-tuple"],
     [JSON.stringify(["UNKNOWN"]), "invalid-tuple"],
   ])("rejects unsupported input without widening packets", (input, code) => {
-    expect(() => decodeRelayMessage(input, relay)).toThrowError(
-      expect.objectContaining({ code }),
-    );
+    expect(() => decodeRelayMessage(input, relay)).toThrowError(expect.objectContaining({ code }));
   });
 
   test("serializes a to-relay tuple as JSON", () => {

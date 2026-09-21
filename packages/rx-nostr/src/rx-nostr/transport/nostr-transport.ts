@@ -13,14 +13,8 @@ import {
   type UniplsRetryStrategy,
   type WebSocketConstructor as UniplsWebSocketConstructor,
 } from "unipls";
-import type {
-  ConnectionRetryContext,
-  ConnectionRetryer,
-} from "../../connection-retryer/index.ts";
-import type {
-  ConnectionFailure,
-  ConnectionState,
-} from "../../connection-state.ts";
+import type { ConnectionRetryContext, ConnectionRetryer } from "../../connection-retryer/index.ts";
+import type { ConnectionFailure, ConnectionState } from "../../connection-state.ts";
 import type { RelayUrl } from "../../libs/relay-urls.ts";
 import type { MessagePacket } from "../../packets/index.ts";
 import type { WebSocketConstructor } from "../../types/index.ts";
@@ -88,9 +82,7 @@ export interface NostrTransportSubscribeOptions {
  */
 export class NostrTransport {
   readonly messages$ = new Subject<MessagePacket>();
-  readonly state$ = new BehaviorSubject<NostrTransportState>(
-    Object.freeze({ state: "dormant" }),
-  );
+  readonly state$ = new BehaviorSubject<NostrTransportState>(Object.freeze({ state: "dormant" }));
   readonly diagnostics$ = new Subject<NostrTransportDiagnostic>();
 
   readonly #client: Unipls<Nostr.ToRelayMessage.Any, MessagePacket>;
@@ -117,9 +109,7 @@ export class NostrTransport {
 
     this.#removeListeners.push(
       this.#client.on("message", ({ message }) => this.messages$.next(message)),
-      this.#client.on("lifecycle", ({ previous, current }) =>
-        this.#onLifecycle(previous, current),
-      ),
+      this.#client.on("lifecycle", ({ previous, current }) => this.#onLifecycle(previous, current)),
       this.#client.on("diagnostic", (diagnostic) =>
         this.diagnostics$.next(mapDiagnostic(diagnostic)),
       ),
@@ -146,17 +136,11 @@ export class NostrTransport {
   }
 
   listen(options: NostrTransportListenOptions = {}): Observable<MessagePacket> {
-    return createStreamObservable((next) =>
-      this.#client.listen({ ...options, next }),
-    );
+    return createStreamObservable((next) => this.#client.listen({ ...options, next }));
   }
 
-  subscribe(
-    options: NostrTransportSubscribeOptions,
-  ): Observable<MessagePacket> {
-    return createStreamObservable((next) =>
-      this.#client.subscribe({ ...options, next }),
-    );
+  subscribe(options: NostrTransportSubscribeOptions): Observable<MessagePacket> {
+    return createStreamObservable((next) => this.#client.subscribe({ ...options, next }));
   }
 
   dispose(): Promise<void> {
@@ -175,19 +159,13 @@ export class NostrTransport {
     return this.#disposePromise;
   }
 
-  #onLifecycle(
-    previous: UniplsLifecycleSnapshot,
-    current: UniplsLifecycleSnapshot,
-  ): void {
+  #onLifecycle(previous: UniplsLifecycleSnapshot, current: UniplsLifecycleSnapshot): void {
     this.#reportHealth(previous, current);
     const state = stateFromLifecycle(current);
     if (state) this.#emitState(state);
   }
 
-  #reportHealth(
-    previous: UniplsLifecycleSnapshot,
-    current: UniplsLifecycleSnapshot,
-  ): void {
+  #reportHealth(previous: UniplsLifecycleSnapshot, current: UniplsLifecycleSnapshot): void {
     if (current.phase === "open") {
       this.#closeDirectoryConnection?.();
       this.#closeDirectoryConnection = this.options.onConnectionOpened?.();
@@ -275,11 +253,7 @@ function createUniplsReconnector(
       switch (decision.action) {
         case "retry":
           if (!Number.isFinite(decision.delay) || decision.delay < 0) {
-            actions.exhaust(
-              new RangeError(
-                "A retry delay must be a finite non-negative number.",
-              ),
-            );
+            actions.exhaust(new RangeError("A retry delay must be a finite non-negative number."));
             return;
           }
           emitState(
@@ -294,9 +268,7 @@ function createUniplsReconnector(
             await abortableDelay(decision.delay, context.signal);
           }
           if (!context.signal.aborted) {
-            emitState(
-              Object.freeze({ state: "retrying", attempt: context.attempt }),
-            );
+            emitState(Object.freeze({ state: "retrying", attempt: context.attempt }));
             actions.reconnect();
           }
           return;
@@ -311,10 +283,7 @@ function createUniplsReconnector(
   };
 }
 
-function abortableDelay(
-  milliseconds: number,
-  signal: AbortSignal,
-): Promise<void> {
+function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(done, milliseconds);
     signal.addEventListener("abort", done, { once: true });
@@ -327,9 +296,7 @@ function abortableDelay(
   });
 }
 
-function stateFromLifecycle(
-  snapshot: UniplsLifecycleSnapshot,
-): ConnectionState | undefined {
+function stateFromLifecycle(snapshot: UniplsLifecycleSnapshot): ConnectionState | undefined {
   switch (snapshot.phase) {
     case "open":
       return Object.freeze({ state: "connected" });
@@ -341,10 +308,7 @@ function stateFromLifecycle(
         }
         return Object.freeze({
           state: "retrying",
-          attempt:
-            snapshot.origin === "initial"
-              ? snapshot.attempt - 1
-              : snapshot.attempt,
+          attempt: snapshot.origin === "initial" ? snapshot.attempt - 1 : snapshot.attempt,
         });
       }
       return undefined;
@@ -382,15 +346,12 @@ function terminalFailure(
   >,
 ): ConnectionFailure {
   const exhausted =
-    snapshot.outcome === "attempts-exhausted" ||
-    snapshot.outcome === "recovery-exhausted";
+    snapshot.outcome === "attempts-exhausted" || snapshot.outcome === "recovery-exhausted";
   if (exhausted) {
     const causeFailure = failureFromCause("retry-exhausted", snapshot.cause);
     return Object.freeze({
       ...causeFailure,
-      ...(snapshot.drop?.close?.reason
-        ? { message: snapshot.drop.close.reason }
-        : {}),
+      ...(snapshot.drop?.close?.reason ? { message: snapshot.drop.close.reason } : {}),
       ...(snapshot.drop?.close ? { code: snapshot.drop.close.code } : {}),
     });
   }
@@ -398,23 +359,15 @@ function terminalFailure(
   return failureFromCause("connection-failed", snapshot.cause);
 }
 
-function latestFailureAttempt(
-  attempts: readonly ConnectionAttemptSnapshot[],
-): number {
-  const lastReady = attempts.findLastIndex(
-    (candidate) => candidate.outcome === "ready",
-  );
+function latestFailureAttempt(attempts: readonly ConnectionAttemptSnapshot[]): number {
+  const lastReady = attempts.findLastIndex((candidate) => candidate.outcome === "ready");
   return (
-    attempts
-      .slice(lastReady + 1)
-      .findLast((candidate) => candidate.outcome === "failed")?.attempt ?? 1
+    attempts.slice(lastReady + 1).findLast((candidate) => candidate.outcome === "failed")
+      ?.attempt ?? 1
   );
 }
 
-function sameConnectionState(
-  left: ConnectionState,
-  right: ConnectionState,
-): boolean {
+function sameConnectionState(left: ConnectionState, right: ConnectionState): boolean {
   if (left.state !== right.state) return false;
   if (left.state === "dormant" || left.state === "disposed") return true;
   if (right.state === "dormant" || right.state === "disposed") return false;
@@ -422,10 +375,7 @@ function sameConnectionState(
     return left.state === right.state;
   }
   if (left.attempt !== right.attempt) return false;
-  if (
-    left.state === "waiting-for-retry" &&
-    right.state === "waiting-for-retry"
-  ) {
+  if (left.state === "waiting-for-retry" && right.state === "waiting-for-retry") {
     return left.delay === right.delay && sameFailure(left.reason, right.reason);
   }
   if (left.state === "failed" && right.state === "failed") {
@@ -434,20 +384,11 @@ function sameConnectionState(
   return left.state === right.state;
 }
 
-function sameFailure(
-  left: ConnectionFailure,
-  right: ConnectionFailure,
-): boolean {
-  return (
-    left.kind === right.kind &&
-    left.message === right.message &&
-    left.code === right.code
-  );
+function sameFailure(left: ConnectionFailure, right: ConnectionFailure): boolean {
+  return left.kind === right.kind && left.message === right.message && left.code === right.code;
 }
 
-function retryHealth(
-  context: ReconnectionContext,
-): ConnectionRetryContext["health"] {
+function retryHealth(context: ReconnectionContext): ConnectionRetryContext["health"] {
   let consecutiveFailures = 0;
   let lastConnectedAt: number | undefined;
   let lastFailureAt: number | undefined;
@@ -463,10 +404,7 @@ function retryHealth(
   }
   if (context.origin === "recovery" && context.drop) {
     consecutiveFailures++;
-    lastFailureAt = Math.max(
-      lastFailureAt ?? context.drop.detectedAt,
-      context.drop.detectedAt,
-    );
+    lastFailureAt = Math.max(lastFailureAt ?? context.drop.detectedAt, context.drop.detectedAt);
   }
 
   return Object.freeze({
@@ -484,10 +422,7 @@ function failureFromDrop(drop: UniplsDrop): ConnectionFailure {
   });
 }
 
-function failureFromCause(
-  kind: ConnectionFailure["kind"],
-  cause: unknown,
-): ConnectionFailure {
+function failureFromCause(kind: ConnectionFailure["kind"], cause: unknown): ConnectionFailure {
   return Object.freeze({
     kind,
     ...(cause instanceof Error ? { message: cause.message } : {}),

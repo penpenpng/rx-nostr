@@ -4,9 +4,7 @@ import { Observable, type MonoTypeOperatorFunction } from "rxjs";
  * Executes a side effect only once for the first emitted value.
  * Subsequent values pass through without triggering the side effect.
  */
-export function tapOnce<T>(
-  callback: (value: T) => void,
-): MonoTypeOperatorFunction<T> {
+export function tapOnce<T>(callback: (value: T) => void): MonoTypeOperatorFunction<T> {
   return (source: Observable<T>) =>
     new Observable<T>((subscriber) => {
       let hasExecuted = false;

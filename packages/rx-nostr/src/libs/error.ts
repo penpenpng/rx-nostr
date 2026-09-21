@@ -1,10 +1,6 @@
 export abstract class RxNostrError extends Error {}
 
-export type RxNostrCallbackKind =
-  | "authenticator"
-  | "filter"
-  | "signer"
-  | "verifier";
+export type RxNostrCallbackKind = "authenticator" | "filter" | "signer" | "verifier";
 
 /** A user-provided callback failed while an operation was running. */
 export class RxNostrCallbackError extends RxNostrError {
@@ -40,9 +36,7 @@ export class RxNostrPublicationError extends RxNostrError {
  */
 export class RxNostrWebSocketError extends RxNostrError {
   constructor(public code?: number) {
-    super(
-      `RxNostrWebSocketError: WebSocket was closed with code ${code} by relay.`,
-    );
+    super(`RxNostrWebSocketError: WebSocket was closed with code ${code} by relay.`);
     this.name = "RxNostrWebSocketError";
   }
 }
@@ -131,9 +125,7 @@ export class RxNostrLogicError extends RxNostrError {
  */
 export class RxNostrAlreadyDisposedError extends RxNostrError {
   constructor() {
-    super(
-      "RxNostrAlreadyDisposedError: Attempted to access a disposed resource.",
-    );
+    super("RxNostrAlreadyDisposedError: Attempted to access a disposed resource.");
     this.name = "RxNostrAlreadyDisposedError";
   }
 }

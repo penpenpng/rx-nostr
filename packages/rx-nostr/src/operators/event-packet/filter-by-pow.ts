@@ -14,10 +14,7 @@ export function filterByPow<P extends EventPacket>(
   },
 ): MonoTypeOperatorFunction<P> {
   return filter(({ event }) =>
-    xor(
-      validatePow(event, difficulty, !!options?.requireTargetDifficulty),
-      options?.not ?? false,
-    ),
+    xor(validatePow(event, difficulty, !!options?.requireTargetDifficulty), options?.not ?? false),
   );
 }
 

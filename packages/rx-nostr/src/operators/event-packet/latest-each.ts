@@ -1,10 +1,4 @@
-import {
-  groupBy,
-  map,
-  mergeAll,
-  pipe,
-  type MonoTypeOperatorFunction,
-} from "rxjs";
+import { groupBy, map, mergeAll, pipe, type MonoTypeOperatorFunction } from "rxjs";
 import type { EventPacket } from "../../packets/index.ts";
 import { latest } from "./latest.ts";
 

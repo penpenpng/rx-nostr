@@ -2,26 +2,20 @@
   "name": "rx-nostr",
   "version": "3.6.1",
   "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
-  "author": "penpenpng",
   "keywords": [
+    "nostr",
     "rxjs",
-    "rxjs7",
-    "nostr"
+    "rxjs7"
   ],
   "homepage": "https://github.com/penpenpng/rx-nostr",
   "bugs": {
     "url": "https://github.com/penpenpng/rx-nostr/issues"
   },
   "license": "MIT",
-  "type": "module",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "@rx-nostr/development": "./src/index.ts",
-      "import": "./dist/rx-nostr.js"
-    },
-    "./package.json": "./package.json"
+  "author": "penpenpng",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/penpenpng/rx-nostr.git"
   },
   "files": [
     "src",
@@ -30,32 +24,35 @@
     "!src/**/*.spec.ts",
     "!src/**/*.test.ts"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/penpenpng/rx-nostr.git"
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "pnpm typecheck && vite build",
+    "build": "pnpm typecheck && vp pack",
     "test": "vitest run",
     "test:contract": "vitest run --project contract",
     "test:dev": "vitest --ui",
     "test:unit": "vitest run --project unit",
     "typecheck": "tsc --project tsconfig.check.json"
   },
-  "devDependencies": {
-    "@types/node": "^26.6.2",
-    "@typescript/typescript6": "^6.0.2",
-    "@vitest/ui": "^5.0.1",
-    "disposablestack": "^1.1.8",
-    "nostr-typedef": "^0.13.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0",
-    "vite-plugin-dts": "^5.1.1",
-    "vitest": "^5.0.1"
-  },
   "dependencies": {
     "rxjs": "^7.8.2",
     "unipls": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@vitest/ui": "^5.0.1",
+    "disposablestack": "^1.1.8",
+    "nostr-typedef": "^0.13.0",
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0"

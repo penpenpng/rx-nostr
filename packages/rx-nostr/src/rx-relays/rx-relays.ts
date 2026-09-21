@@ -1,25 +1,10 @@
-import {
-  BehaviorSubject,
-  combineLatest,
-  concat,
-  EMPTY,
-  of,
-  type Observable,
-} from "rxjs";
-import {
-  once,
-  RelaySet,
-  RxDisposableStack,
-  u,
-  type RelayUrl,
-} from "../libs/index.ts";
+import { BehaviorSubject, combineLatest, concat, EMPTY, of, type Observable } from "rxjs";
+import { once, RelaySet, RxDisposableStack, u, type RelayUrl } from "../libs/index.ts";
 
 export class RxRelays {
   protected stack = new RxDisposableStack();
   protected relays = new RelaySet();
-  protected stream: BehaviorSubject<Set<RelayUrl>> = this.stack.add(
-    new BehaviorSubject(new Set()),
-  );
+  protected stream: BehaviorSubject<Set<RelayUrl>> = this.stack.add(new BehaviorSubject(new Set()));
 
   constructor(relays?: Iterable<string>) {
     if (!relays) {
@@ -70,9 +55,7 @@ export class RxRelays {
   }
 
   protected static combine(...rxRelays: RxRelays[]) {
-    return combineLatest(
-      rxRelays.map((rxr) => concat(rxr.asObservable(), of(new Set<string>()))),
-    );
+    return combineLatest(rxRelays.map((rxr) => concat(rxr.asObservable(), of(new Set<string>()))));
   }
 
   static difference(rxRelaysX: RxRelays, rxRelaysY: RxRelays): RxRelays {
@@ -109,9 +92,7 @@ export class RxRelays {
     return rxr;
   }
 
-  static from(
-    relays: RxRelays | Iterable<string> | null | undefined,
-  ): RxRelays {
+  static from(relays: RxRelays | Iterable<string> | null | undefined): RxRelays {
     if (!relays) {
       return RxRelays.empty();
     }
@@ -137,9 +118,7 @@ export class RxRelays {
     }
   }
 
-  static set(
-    relays: RxRelays | Iterable<string> | null | undefined,
-  ): Set<RelayUrl> {
+  static set(relays: RxRelays | Iterable<string> | null | undefined): Set<RelayUrl> {
     if (!relays) {
       return new Set();
     }
@@ -147,9 +126,7 @@ export class RxRelays {
     return new RelaySet(relays).toSet();
   }
 
-  static array(
-    relays: RxRelays | Iterable<string> | null | undefined,
-  ): RelayUrl[] {
+  static array(relays: RxRelays | Iterable<string> | null | undefined): RelayUrl[] {
     if (!relays) {
       return [];
     }

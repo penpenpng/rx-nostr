@@ -1,9 +1,6 @@
 import type { Subscription } from "rxjs";
 import { filter, firstValueFrom, take } from "rxjs";
-import type {
-  Authenticator,
-  AuthenticatorInput,
-} from "../authenticator/index.ts";
+import type { Authenticator, AuthenticatorInput } from "../authenticator/index.ts";
 import { RxNostrCallbackError } from "../libs/error.ts";
 import type { RelayUrl } from "../libs/index.ts";
 import type { OkPacket } from "../packets/index.ts";
@@ -58,10 +55,7 @@ export class AuthCoordinator {
     );
   }
 
-  authenticate(
-    input: AuthenticatorInput | undefined,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  authenticate(input: AuthenticatorInput | undefined, signal?: AbortSignal): Promise<void> {
     if (this.#disposed || input === undefined) {
       return Promise.reject(new AuthenticationFailure("disabled"));
     }
@@ -84,9 +78,7 @@ export class AuthCoordinator {
 
     const shared = this.#attempts.get(challenge.version);
     if (shared) {
-      return waitForAttempt(shared, signal, () =>
-        this.#abandonAttempt(challenge.version, shared),
-      );
+      return waitForAttempt(shared, signal, () => this.#abandonAttempt(challenge.version, shared));
     }
 
     const controller = new AbortController();
@@ -107,9 +99,7 @@ export class AuthCoordinator {
         attempt.settled = true;
       });
     this.#attempts.set(challenge.version, attempt);
-    return waitForAttempt(attempt, signal, () =>
-      this.#abandonAttempt(challenge.version, attempt),
-    );
+    return waitForAttempt(attempt, signal, () => this.#abandonAttempt(challenge.version, attempt));
   }
 
   #abandonAttempt(version: number, attempt: AuthenticationAttempt): void {
@@ -135,8 +125,7 @@ export class AuthCoordinator {
         this.transport
           .subscribe({
             query: ["AUTH", event],
-            selector: (packet) =>
-              packet.type === "OK" && packet.eventId === event.id,
+            selector: (packet) => packet.type === "OK" && packet.eventId === event.id,
             ...(Number.isFinite(this.timeout)
               ? {
                   timeout: this.timeout === 0 ? Number.MIN_VALUE : this.timeout,

@@ -1,11 +1,4 @@
-import {
-  BehaviorSubject,
-  finalize,
-  Subject,
-  Subscription,
-  take,
-  takeUntil,
-} from "rxjs";
+import { BehaviorSubject, finalize, Subject, Subscription, take, takeUntil } from "rxjs";
 import { RxNostrInvalidUsageError } from "../error.ts";
 
 export class RxDisposableStack extends DisposableStack {
@@ -21,9 +14,7 @@ export class RxDisposableStack extends DisposableStack {
   }
 
   move(): DisposableStack {
-    throw new RxNostrInvalidUsageError(
-      "`move()` is not supported in `RxDisposableStack`.",
-    );
+    throw new RxNostrInvalidUsageError("`move()` is not supported in `RxDisposableStack`.");
   }
 
   /**
@@ -31,16 +22,11 @@ export class RxDisposableStack extends DisposableStack {
    * Note that RxJS Subscriptions added here will be unsubscribe before the all other resources are disposed.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  add<T extends Subscription | Subject<any> | BehaviorSubject<any>>(
-    resource: T,
-  ): T {
+  add<T extends Subscription | Subject<any> | BehaviorSubject<any>>(resource: T): T {
     if (this._disposed) {
       if (resource instanceof Subscription) {
         resource.unsubscribe();
-      } else if (
-        resource instanceof Subject ||
-        resource instanceof BehaviorSubject
-      ) {
+      } else if (resource instanceof Subject || resource instanceof BehaviorSubject) {
         resource.complete();
       }
 
@@ -49,10 +35,7 @@ export class RxDisposableStack extends DisposableStack {
 
     if (resource instanceof Subscription) {
       this.subs.add(resource);
-    } else if (
-      resource instanceof Subject ||
-      resource instanceof BehaviorSubject
-    ) {
+    } else if (resource instanceof Subject || resource instanceof BehaviorSubject) {
       this.defer(() => {
         resource.complete();
       });

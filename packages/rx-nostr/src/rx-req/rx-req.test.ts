@@ -16,9 +16,7 @@ test("RxReq emits a filter", async () => {
 
 test("Piped RxReq emits a filter", async () => {
   const rxq = new RxBackwardReq();
-  const obs = new ObservableInspector(
-    rxq.pipe(filter((_, idx) => idx % 2 === 0)).asObservable(),
-  );
+  const obs = new ObservableInspector(rxq.pipe(filter((_, idx) => idx % 2 === 0)).asObservable());
   obs.subscribe();
 
   rxq.emit({ kinds: [0] });
@@ -37,9 +35,7 @@ test("Extended RxReq emits a filter", async () => {
   }
 
   const rxq = new RxCustomReq();
-  const obs = new ObservableInspector(
-    rxq.pipe(filter((_, idx) => idx % 2 === 0)).asObservable(),
-  );
+  const obs = new ObservableInspector(rxq.pipe(filter((_, idx) => idx % 2 === 0)).asObservable());
   obs.subscribe();
 
   rxq.fetchByKind(0);

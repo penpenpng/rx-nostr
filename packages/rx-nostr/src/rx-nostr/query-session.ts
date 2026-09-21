@@ -42,10 +42,7 @@ export class QuerySession {
   dispose = this[Symbol.dispose];
 
   private getSessionPerRelay(relay: IRelayCommunication) {
-    return this.relays.setDefault(
-      relay.url,
-      () => new QuerySessionPerRelay(relay),
-    );
+    return this.relays.setDefault(relay.url, () => new QuerySessionPerRelay(relay));
   }
 }
 

@@ -1,7 +1,4 @@
-export function tryOrDefault<T, U>(
-  f: () => T,
-  g: U | ((err: unknown) => U),
-): T | U {
+export function tryOrDefault<T, U>(f: () => T, g: U | ((err: unknown) => U)): T | U {
   try {
     return f();
   } catch (err) {

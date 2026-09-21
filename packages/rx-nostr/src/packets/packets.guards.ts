@@ -9,9 +9,7 @@ import type {
   OkPacket,
 } from "./packets.interface.ts";
 
-export function isEventMessagePacket(
-  packet: MessagePacket,
-): packet is EventMessagePacket {
+export function isEventMessagePacket(packet: MessagePacket): packet is EventMessagePacket {
   return packet.type === "EVENT";
 }
 

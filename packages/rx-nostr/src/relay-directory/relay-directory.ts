@@ -33,10 +33,8 @@ export class RelayDirectory implements IRelayDirectory {
     reporters.set(
       this,
       Object.freeze({
-        connectionOpened: (url: string) =>
-          this.#getOrCreate(url).connectionOpened(),
-        connectionFailed: (url: string) =>
-          this.#getOrCreate(url).connectionFailed(),
+        connectionOpened: (url: string) => this.#getOrCreate(url).connectionOpened(),
+        connectionFailed: (url: string) => this.#getOrCreate(url).connectionFailed(),
       }),
     );
   }
@@ -76,10 +74,7 @@ export class RelayDirectory implements IRelayDirectory {
     return this.#getOrCreate(url).fetchNip11(options.refresh ?? false);
   }
 
-  setNip11(
-    url: string,
-    info: Nostr.Nip11.RelayInfo,
-  ): Readonly<Nostr.Nip11.RelayInfo> {
+  setNip11(url: string, info: Nostr.Nip11.RelayInfo): Readonly<Nostr.Nip11.RelayInfo> {
     return this.#getOrCreate(url).setNip11(info);
   }
 
@@ -113,9 +108,7 @@ export class RelayDirectory implements IRelayDirectory {
 }
 
 /** @internal Used by RelayCommunication integration without widening public API. */
-export function getRelayDirectoryReporter(
-  directory: RelayDirectory,
-): RelayDirectoryReporter {
+export function getRelayDirectoryReporter(directory: RelayDirectory): RelayDirectoryReporter {
   const reporter = reporters.get(directory);
   if (!reporter) throw new TypeError("Unknown RelayDirectory implementation.");
   return reporter;
@@ -128,11 +121,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
   try {
     value = JSON.parse(data);
   } catch (cause) {
-    throw new RelayDirectorySnapshotError(
-      "invalid-json",
-      "Snapshot is not valid JSON.",
-      { cause },
-    );
+    throw new RelayDirectorySnapshotError("invalid-json", "Snapshot is not valid JSON.", { cause });
   }
   if (!isObject(value)) return invalidSchema("Snapshot must be an object.");
   assertOnlyKeys(value, ["version", "relays"]);
@@ -152,8 +141,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
   const entries: RelayDirectorySnapshotEntry[] = [];
   const urls = new Set<RelayUrl>();
   for (const candidate of value.relays) {
-    if (!isObject(candidate))
-      return invalidSchema("Relay entry must be an object.");
+    if (!isObject(candidate)) return invalidSchema("Relay entry must be an object.");
     assertOnlyKeys(candidate, [
       "url",
       "nip11",
@@ -175,14 +163,9 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
     if (nip11 !== undefined && !isObject(nip11)) {
       return invalidSchema("nip11 must be a JSON object.");
     }
-    const nip11FetchedAt = optionalTimestamp(
-      candidate.nip11FetchedAt,
-      "nip11FetchedAt",
-    );
+    const nip11FetchedAt = optionalTimestamp(candidate.nip11FetchedAt, "nip11FetchedAt");
     if ((nip11 === undefined) !== (nip11FetchedAt === undefined)) {
-      return invalidSchema(
-        "nip11 and nip11FetchedAt must be present together.",
-      );
+      return invalidSchema("nip11 and nip11FetchedAt must be present together.");
     }
     const consecutiveFailures = candidate.consecutiveFailures;
     if (
@@ -190,39 +173,25 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
       !Number.isInteger(consecutiveFailures) ||
       consecutiveFailures < 0
     ) {
-      return invalidSchema(
-        "consecutiveFailures must be a non-negative integer.",
-      );
+      return invalidSchema("consecutiveFailures must be a non-negative integer.");
     }
-    const lastConnectedAt = optionalTimestamp(
-      candidate.lastConnectedAt,
-      "lastConnectedAt",
-    );
-    const lastFailureAt = optionalTimestamp(
-      candidate.lastFailureAt,
-      "lastFailureAt",
-    );
+    const lastConnectedAt = optionalTimestamp(candidate.lastConnectedAt, "lastConnectedAt");
+    const lastFailureAt = optionalTimestamp(candidate.lastFailureAt, "lastFailureAt");
     if (consecutiveFailures > 0 && lastFailureAt === undefined) {
-      return invalidSchema(
-        "lastFailureAt is required when consecutiveFailures is non-zero.",
-      );
+      return invalidSchema("lastFailureAt is required when consecutiveFailures is non-zero.");
     }
     if (
       consecutiveFailures > 0 &&
       lastConnectedAt !== undefined &&
       lastConnectedAt >= (lastFailureAt as number)
     ) {
-      return invalidSchema(
-        "consecutiveFailures must be zero after the latest connection success.",
-      );
+      return invalidSchema("consecutiveFailures must be zero after the latest connection success.");
     }
 
     entries.push(
       Object.freeze({
         url,
-        ...(nip11 === undefined
-          ? {}
-          : { nip11: cloneRelayInfo(nip11 as Nostr.Nip11.RelayInfo) }),
+        ...(nip11 === undefined ? {} : { nip11: cloneRelayInfo(nip11 as Nostr.Nip11.RelayInfo) }),
         ...(nip11FetchedAt === undefined ? {} : { nip11FetchedAt }),
         ...optionalTimestampProperty(candidate, "nip11FailedAt"),
         ...(lastConnectedAt === undefined ? {} : { lastConnectedAt }),
@@ -234,9 +203,10 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
   return entries;
 }
 
-function optionalTimestampProperty<
-  K extends "nip11FailedAt" | "lastConnectedAt" | "lastFailureAt",
->(object: Record<string, unknown>, key: K): Partial<Record<K, number>> {
+function optionalTimestampProperty<K extends "nip11FailedAt" | "lastConnectedAt" | "lastFailureAt">(
+  object: Record<string, unknown>,
+  key: K,
+): Partial<Record<K, number>> {
   const value = optionalTimestamp(object[key], key);
   return value === undefined ? {} : ({ [key]: value } as Record<K, number>);
 }
@@ -249,14 +219,10 @@ function optionalTimestamp(value: unknown, name: string): number | undefined {
   return value;
 }
 
-function assertOnlyKeys(
-  object: Record<string, unknown>,
-  allowed: readonly string[],
-): void {
+function assertOnlyKeys(object: Record<string, unknown>, allowed: readonly string[]): void {
   const allowedSet = new Set(allowed);
   for (const key of Object.keys(object)) {
-    if (!allowedSet.has(key))
-      invalidSchema(`Unknown relay entry field: ${key}.`);
+    if (!allowedSet.has(key)) invalidSchema(`Unknown relay entry field: ${key}.`);
   }
 }
 

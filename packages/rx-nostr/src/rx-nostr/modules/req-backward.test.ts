@@ -110,10 +110,7 @@ test("single relay, defer=true", async () => {
   await relay.expectFilters([{ kinds: [1] }]);
   await req1.subscribed;
 
-  assert(
-    relay.latch.isHeld,
-    "Relay should be connected just before a segment (defer=true)",
-  );
+  assert(relay.latch.isHeld, "Relay should be connected just before a segment (defer=true)");
 
   req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
@@ -130,10 +127,7 @@ test("single relay, defer=true", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "3" }));
 
   sub.unsubscribe();
-  assert(
-    relay.latchedCount === 1,
-    "Only one attempt should be made to connect to the relay",
-  );
+  assert(relay.latchedCount === 1, "Only one attempt should be made to connect to the relay");
   assert(!relay.latch.isHeld, "Relay should be released");
 });
 
@@ -165,10 +159,7 @@ test("single relay, weak=true", async () => {
   await relay.expectFilters([{ kinds: [0] }]);
   await stream1.subscribed;
 
-  assert(
-    !relay.latch.isHeld,
-    "Relay should keep to be disconnected (weak=true)",
-  );
+  assert(!relay.latch.isHeld, "Relay should keep to be disconnected (weak=true)");
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   relay.isHot = true;
@@ -176,10 +167,7 @@ test("single relay, weak=true", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
   sub.unsubscribe();
-  assert(
-    relay.latchedCount === 0,
-    "No connection attempts should be made (weak=true)",
-  );
+  assert(relay.latchedCount === 0, "No connection attempts should be made (weak=true)");
   assert(!relay.latch.isHeld, "Relay should be released");
 });
 
@@ -273,10 +261,7 @@ test("dynamic relays", async () => {
 test("removing an unfinished relay completes a segment whose other relay finished", async () => {
   const rxReq = new RxBackwardReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
-  const sessionRelays = new RxRelays([
-    "wss://relay1.example.com",
-    "wss://relay2.example.com",
-  ]);
+  const sessionRelays = new RxRelays(["wss://relay1.example.com", "wss://relay2.example.com"]);
   const relay1 = relays.get("wss://relay1.example.com");
   const relay2 = relays.get("wss://relay2.example.com");
   const req1 = relay1.attachNextStream();

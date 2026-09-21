@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 の core implementation と Task 10 の source/workspace/dependency/release-tooling 整理まで完成しています。v4 implementation は正式な `src` にあり、v3 test契約の全件監査、pnpm workspace、minimum release age、TypeScript 7、`nostr-typedef` peer dependency、Changesetsへの移行が完了しました。残る作業は、Task 11 の linter/formatter再設計と、Task 12 の package artifact、runtime matrix、migration/release documentationの最終監査です。
+v4 の core implementation と Task 11 の静的品質ゲートまで完成しています。v4 implementation は正式な `src` にあり、v3 test契約の全件監査、pnpm workspace、minimum release age、`nostr-typedef` peer dependency、Changesets、Vite+ build/lint/formatへの移行が完了しました。TypeScript は Vite+ が安定 API として扱える6.0.2に統一しています。残る作業は、Task 12 の package artifact、runtime matrix、migration/release documentationの最終監査です。
 
 ## モジュール別状況
 
@@ -21,11 +21,11 @@ v4 の core implementation と Task 10 の source/workspace/dependency/release-t
 | connection state/retry                | 実装済み       | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。 |
 | `RxNostr` 公開 API                    | 実装済み       | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local pool を検証済み。              |
 | WebSocket 抽象化                      | 移行済み       | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                           |
-| package/build                         | 基盤移行済み   | `src`、pnpm、TypeScript 7、peer dependency、Changesetsへ移行済み。Task 11で静的品質ゲート、Task 12で配布 artifactを最終監査する。          |
+| package/build                         | 品質ゲート済み | `src`、pnpm、TypeScript 6、Vite+ pack/Oxlint/Oxfmt、peer dependency、Changesetsへ移行済み。Task 12で配布 artifactを最終監査する。          |
 
 ## 現在確認できる品質ゲート
 
-2026-09-22 の Task 10 完了時に次を実行しました。
+2026-09-22 の Task 11 完了時に次を実行しました。
 
 - `pnpm --filter rx-nostr typecheck`: 成功
 - `pnpm --filter rx-nostr test:unit`: 17 files / 95 tests が成功
@@ -34,9 +34,12 @@ v4 の core implementation と Task 10 の source/workspace/dependency/release-t
 - `pnpm build`: workspace全体で成功
 - `pnpm install --frozen-lockfile --ignore-scripts`: 成功
 - `pnpm changeset:status`: 成功
-- packed rx-nostrの一時consumerでTypeScript 7 typecheckとNode importが成功
+- `pnpm lint`: 成功（Oxlint default ruleのwarning 6件、error 0件）
+- `pnpm format:check`: 成功
+- rx-nostr/crypto の `vp pack`: 各4 artifactだけを生成し、test/spec pathを含まない
+- 生成したrx-nostr/crypto declarationをTypeScript 6 consumerからimportする型検査: 成功
 
-Task 00 で記録した38 diagnosticsはTasks 01–08ですべて解消済みです。lint/format gateはTypeScript 7対応toolを選定するTask 11へ明示的に移し、package artifactとruntime matrixの完全なrelease gateはTask 12で実施します。
+Task 00 で記録した38 diagnosticsはTasks 01–08ですべて解消済みです。package artifactとruntime matrixの完全なrelease gateはTask 12で実施します。
 
 ## v3 から保持すべき問題領域
 
@@ -72,4 +75,4 @@ v4 は破壊的変更を許容するため v3 の API 形状そのものは維�
 
 ## 作業ツリー上の注意
 
-Task 10で`package-lock.json`を`pnpm-lock.yaml`へ移行しました。利用者指定により`crypto-wasm`の依存version更新は対象外とし、unipls submoduleも変更していません。今後uniplsの変更が必要になった場合は、従来どおり着手前に根拠と代替案を利用者へ提示します。
+Task 10で`package-lock.json`を`pnpm-lock.yaml`へ移行しました。利用者指定により`crypto-wasm`の依存version更新は対象外とし、unipls submoduleも変更していません。Task 11ではcrypto-wasmをOxfmtの対象に含めましたが、依存versionとbuild/test toolchainは維持しています。今後uniplsの変更が必要になった場合は、従来どおり着手前に根拠と代替案を利用者へ提示します。

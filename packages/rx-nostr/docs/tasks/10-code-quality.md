@@ -65,6 +65,8 @@ Task 11 の静的品質ゲート再設計と Task 12 の配布・release 監査�
 - release-drafterと旧tag駆動publish actionsを除去し、Changesets 3、v4 major changeset、version PR/publish workflowを追加した。`pnpm changeset:status` はrx-nostrのmajor bumpを認識する。
 - TypeScript 7未対応のESLint/typescript-eslint/Prettierは一旦除去した。選定とCI gate復旧はTask 11で扱う。
 
+後続のTask 11でVite+のdeclaration generatorとの安定互換性を優先し、TypeScriptは6.0.2へ変更した。
+
 検証結果:
 
 - `pnpm --filter rx-nostr typecheck`: passed

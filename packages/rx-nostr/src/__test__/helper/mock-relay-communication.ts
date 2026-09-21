@@ -26,10 +26,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
     return this.latch.hold();
   }
 
-  vreq(
-    _strategy: "forward" | "backward",
-    filters: LazyFilter[],
-  ): Observable<EventPacket> {
+  vreq(_strategy: "forward" | "backward", filters: LazyFilter[]): Observable<EventPacket> {
     try {
       this.queryLog.enqueue(filters);
 

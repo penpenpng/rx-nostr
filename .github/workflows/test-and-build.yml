@@ -21,5 +21,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - uses: crate-ci/typos@master
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
       - run: pnpm test
       - run: pnpm build

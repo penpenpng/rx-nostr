@@ -7,10 +7,7 @@ import type { RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { QuerySession } from "../query-session.ts";
-import {
-  RelayCommunication,
-  type IRelayCommunication,
-} from "../relay-communication.ts";
+import { RelayCommunication, type IRelayCommunication } from "../relay-communication.ts";
 import { RelayPool, type RelayCommunicationCollection } from "../relay-pool.ts";
 import { RelayWarmer } from "./relay-warmer.ts";
 
@@ -50,17 +47,11 @@ class LeaseRelayCollection implements RelayCommunicationCollection<LeaseRelay> {
     return relay;
   }
 
-  forEach(
-    relays: Iterable<RelayUrl> | null | undefined,
-    callback: (relay: LeaseRelay) => void,
-  ) {
+  forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (relay: LeaseRelay) => void) {
     if (relays) for (const relay of relays) callback(this.get(relay));
   }
 
-  map<R>(
-    relays: Iterable<RelayUrl> | null | undefined,
-    project: (relay: LeaseRelay) => R,
-  ) {
+  map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (relay: LeaseRelay) => R) {
     return relays ? [...relays].map((relay) => project(this.get(relay))) : [];
   }
 }
@@ -145,9 +136,7 @@ describe("RelayWarmer", () => {
     expect(server.current.sent).toEqual([]);
 
     warmer.unsetHotRelays();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     warmer.dispose();
     pool.dispose();

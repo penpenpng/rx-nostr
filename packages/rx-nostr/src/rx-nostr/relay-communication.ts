@@ -1,12 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import {
-  EMPTY,
-  Observable,
-  type Subscriber,
-  type Subscription,
-  filter,
-  map,
-} from "rxjs";
+import { EMPTY, Observable, type Subscriber, type Subscription, filter, map } from "rxjs";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionRetryer } from "../connection-retryer/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
@@ -17,18 +10,11 @@ import {
   type RelayDirectory,
 } from "../relay-directory/relay-directory.ts";
 import type { ConnectionState } from "../connection-state.ts";
-import type {
-  EventMessagePacket,
-  EventPacket,
-  OkPacket,
-} from "../packets/index.ts";
+import type { EventMessagePacket, EventPacket, OkPacket } from "../packets/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
 import { AuthenticationFailure, AuthCoordinator } from "./auth-coordinator.ts";
 import { ConnectionLeaseController } from "./connection-lease.ts";
-import {
-  NostrTransport,
-  NostrTransportOperationError,
-} from "./transport/index.ts";
+import { NostrTransport, NostrTransportOperationError } from "./transport/index.ts";
 
 export interface IRelayCommunication {
   url: RelayUrl;
@@ -96,9 +82,7 @@ export class RelayCommunication implements IRelayCommunication {
               ...(entry.lastConnectedAt === undefined
                 ? {}
                 : { lastConnectedAt: entry.lastConnectedAt }),
-              ...(entry.lastFailureAt === undefined
-                ? {}
-                : { lastFailureAt: entry.lastFailureAt }),
+              ...(entry.lastFailureAt === undefined ? {} : { lastFailureAt: entry.lastFailureAt }),
             });
           }
         : undefined,
@@ -108,11 +92,7 @@ export class RelayCommunication implements IRelayCommunication {
       onLastRelease: () => void this.#transport.close().catch(() => {}),
       onDispose: () => void this.#transport.dispose().catch(() => {}),
     });
-    this.#auth = new AuthCoordinator(
-      url,
-      this.#transport,
-      options.authTimeout ?? 30_000,
-    );
+    this.#auth = new AuthCoordinator(url, this.#transport, options.authTimeout ?? 30_000);
     if (relayDirectory) {
       this.#directorySubscription = relayDirectory.observe(url).subscribe({
         next: (entry) => {
@@ -165,36 +145,27 @@ export class RelayCommunication implements IRelayCommunication {
               queryEvaluated = true;
               return ["REQ", subId, ...evaluatedFilters];
             },
-            selector: (packet) =>
-              packet.type === "EVENT" && packet.subId === subId,
+            selector: (packet) => packet.type === "EVENT" && packet.subId === subId,
             terminator: (packet) => {
               const terminal =
                 (packet.type === "CLOSED" && packet.subId === subId) ||
-                (strategy === "backward" &&
-                  packet.type === "EOSE" &&
-                  packet.subId === subId);
+                (strategy === "backward" && packet.type === "EOSE" && packet.subId === subId);
               terminalAuthRequired =
-                terminal &&
-                packet.type === "CLOSED" &&
-                packet.noticeType === "auth-required";
+                terminal && packet.type === "CLOSED" && packet.noticeType === "auth-required";
               return terminal;
             },
             ...(strategy === "backward" &&
             options.timeout !== undefined &&
             Number.isFinite(options.timeout)
               ? {
-                  timeout:
-                    options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
+                  timeout: options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
                 }
               : {}),
             retry: "resend",
           });
           subscription = packets
             .pipe(
-              filter(
-                (packet): packet is EventMessagePacket =>
-                  packet.type === "EVENT",
-              ),
+              filter((packet): packet is EventMessagePacket => packet.type === "EVENT"),
               filter(
                 (packet) =>
                   options.validateFilterMatching !== true ||
@@ -212,14 +183,12 @@ export class RelayCommunication implements IRelayCommunication {
                 remoteTerminated = true;
                 if (terminalAuthRequired && !authRetried) {
                   authRetried = true;
-                  void this.#auth
-                    .authenticate(options.authenticator, authAbort.signal)
-                    .then(
-                      () => {
-                        if (!stopped && !subscriber.closed) start();
-                      },
-                      (error) => finishAfterAuthentication(error, subscriber),
-                    );
+                  void this.#auth.authenticate(options.authenticator, authAbort.signal).then(
+                    () => {
+                      if (!stopped && !subscriber.closed) start();
+                    },
+                    (error) => finishAfterAuthentication(error, subscriber),
+                  );
                 } else {
                   subscriber.complete();
                 }
@@ -263,13 +232,10 @@ export class RelayCommunication implements IRelayCommunication {
         subscription = this.#transport
           .subscribe({
             query: ["EVENT", event],
-            selector: (packet) =>
-              packet.type === "OK" && packet.eventId === event.id,
-            ...(options.timeout !== undefined &&
-            Number.isFinite(options.timeout)
+            selector: (packet) => packet.type === "OK" && packet.eventId === event.id,
+            ...(options.timeout !== undefined && Number.isFinite(options.timeout)
               ? {
-                  timeout:
-                    options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
+                  timeout: options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
                 }
               : {}),
             retry: "resend",
@@ -277,20 +243,17 @@ export class RelayCommunication implements IRelayCommunication {
           .pipe(filter((packet): packet is OkPacket => packet.type === "OK"))
           .subscribe({
             next: (packet) => {
-              const authRequired =
-                !packet.ok && packet.noticeType === "auth-required";
+              const authRequired = !packet.ok && packet.noticeType === "auth-required";
               subscriber.next(packet);
               subscription?.unsubscribe();
               if (authRequired && !authRetried) {
                 authRetried = true;
-                void this.#auth
-                  .authenticate(options.authenticator, authAbort.signal)
-                  .then(
-                    () => {
-                      if (!stopped && !subscriber.closed) start();
-                    },
-                    (error) => finishAfterAuthentication(error, subscriber),
-                  );
+                void this.#auth.authenticate(options.authenticator, authAbort.signal).then(
+                  () => {
+                    if (!stopped && !subscriber.closed) start();
+                  },
+                  (error) => finishAfterAuthentication(error, subscriber),
+                );
               } else {
                 subscriber.complete();
               }
@@ -316,9 +279,7 @@ export class RelayCommunication implements IRelayCommunication {
     return this.#leases.count;
   }
 
-  #scheduleQuery(
-    create: () => Observable<EventPacket>,
-  ): Observable<EventPacket> {
+  #scheduleQuery(create: () => Observable<EventPacket>): Observable<EventPacket> {
     return new Observable((subscriber) => {
       if (this.#disposed) {
         subscriber.complete();
@@ -344,10 +305,7 @@ export class RelayCommunication implements IRelayCommunication {
       for (const task of unavailable) task.subscriber.complete();
       return;
     }
-    while (
-      this.#pendingQueries.length > 0 &&
-      this.#activeQueries.size < limit
-    ) {
+    while (this.#pendingQueries.length > 0 && this.#activeQueries.size < limit) {
       const task = this.#pendingQueries.shift()!;
       if (task.finished) continue;
       task.started = true;
@@ -402,10 +360,7 @@ function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
   return undefined;
 }
 
-function finishAfterAuthentication(
-  error: unknown,
-  subscriber: Subscriber<unknown>,
-): void {
+function finishAfterAuthentication(error: unknown, subscriber: Subscriber<unknown>): void {
   if (subscriber.closed) return;
   if (error instanceof RxNostrCallbackError) subscriber.error(error);
   else if (error instanceof AuthenticationFailure) subscriber.complete();

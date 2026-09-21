@@ -15,9 +15,7 @@ describe("RxNostr connection state", () => {
       WebSocket: server.WebSocket,
     });
     const packets: ConnectionStatePacket[] = [];
-    rxNostr
-      .monitorConnectionState()
-      .subscribe((packet) => packets.push(packet));
+    rxNostr.monitorConnectionState().subscribe((packet) => packets.push(packet));
 
     expect(server.connections).toHaveLength(0);
     rxNostr.setHotRelays(["wss://one.example.com", "wss://two.example.com"]);
@@ -38,33 +36,25 @@ describe("RxNostr connection state", () => {
     server.connections[0]?.open();
     server.connections[1]?.open();
     await vi.waitFor(() =>
-      expect(
-        packets.filter((packet) => packet.state.state === "connected"),
-      ).toHaveLength(2),
+      expect(packets.filter((packet) => packet.state.state === "connected")).toHaveLength(2),
     );
 
     server.connections[0]?.peerClose(1006, "one failed");
     await vi.waitFor(() =>
       expect(
         packets.find(
-          (packet) =>
-            packet.from === "wss://one.example.com" &&
-            packet.state.state === "failed",
+          (packet) => packet.from === "wss://one.example.com" && packet.state.state === "failed",
         ),
       ).toBeDefined(),
     );
     expect(
       packets.filter(
-        (packet) =>
-          packet.from === "wss://two.example.com" &&
-          packet.state.state === "failed",
+        (packet) => packet.from === "wss://two.example.com" && packet.state.state === "failed",
       ),
     ).toHaveLength(0);
 
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() =>
-      expect(server.connections[1]?.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.connections[1]?.closeRequests).toHaveLength(1));
     server.connections[1]?.acknowledgeClose();
     rxNostr.dispose();
   });

@@ -30,10 +30,7 @@ export function batch(
   });
 }
 
-export type MergeFilterFunction = (
-  a: LazyFilter[],
-  b: LazyFilter[],
-) => LazyFilter[];
+export type MergeFilterFunction = (a: LazyFilter[], b: LazyFilter[]) => LazyFilter[];
 
 function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];

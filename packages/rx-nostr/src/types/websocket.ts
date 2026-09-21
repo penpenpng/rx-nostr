@@ -3,11 +3,7 @@ export interface WebSocketBlob {
   readonly type?: string;
 }
 
-export type WebSocketData =
-  | string
-  | ArrayBufferLike
-  | WebSocketBlob
-  | ArrayBufferView;
+export type WebSocketData = string | ArrayBufferLike | WebSocketBlob | ArrayBufferView;
 
 export interface WebSocketOpenEvent {
   readonly type?: string;

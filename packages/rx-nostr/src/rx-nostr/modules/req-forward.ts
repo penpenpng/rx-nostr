@@ -1,11 +1,4 @@
-import {
-  finalize,
-  map,
-  Subject,
-  switchAll,
-  type Observable,
-  type Subscription,
-} from "rxjs";
+import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
@@ -50,9 +43,7 @@ export function reqForward({
         session,
         relays,
         sessionRelays,
-        segmentRelays: packet.relays
-          ? RxRelays.from(packet.relays)
-          : RxRelays.from(sessionRelays),
+        segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
@@ -125,10 +116,7 @@ function req({
 
   // Use Map because we assume that `relay.url` is normalized.
   // Forward: Only one subscription (segment) at most is held on the same relay.
-  const ongoings = new Map<
-    RelayUrl,
-    { segment: QuerySegment; sub: Subscription }
-  >();
+  const ongoings = new Map<RelayUrl, { segment: QuerySegment; sub: Subscription }>();
 
   const stream = new Subject<EventPacket>();
 
@@ -149,9 +137,7 @@ function req({
           return;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
-          Logger.warn(
-            "The last relay was removed; no destination relays remain.",
-          );
+          Logger.warn("The last relay was removed; no destination relays remain.");
         }
       }
 
@@ -169,9 +155,7 @@ function req({
             authenticator,
           })
           .pipe(
-            map((packet) =>
-              traceTag === undefined ? packet : { ...packet, traceTag },
-            ),
+            map((packet) => (traceTag === undefined ? packet : { ...packet, traceTag })),
             finalize(() => {
               finalized = true;
               const currentQuery = ongoings.get(relay.url);

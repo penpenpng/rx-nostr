@@ -53,13 +53,9 @@ describe("RelayCommunication transport integration", () => {
     );
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
-    await vi.waitFor(() =>
-      expect(directory.get(relay.url)?.liveConnections).toBe(0),
-    );
+    await vi.waitFor(() => expect(directory.get(relay.url)?.liveConnections).toBe(0));
     expect(directory.get(relay.url)?.lastFailureAt).toBe(2);
   });
 
@@ -88,38 +84,25 @@ describe("RelayCommunication transport integration", () => {
     const events: string[] = [];
     const complete = vi.fn();
 
-    const subscription = relay
-      .vreq("forward", [{ kinds: [1], since: () => 10 }])
-      .subscribe({
-        next: (packet) => events.push(packet.event.id),
-        complete,
-      });
+    const subscription = relay.vreq("forward", [{ kinds: [1], since: () => 10 }]).subscribe({
+      next: (packet) => events.push(packet.event.id),
+      complete,
+    });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const req = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-      object,
-    ];
+    const req = JSON.parse(server.current.sent[0] as string) as ["REQ", string, object];
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1], since: 10 });
 
-    server.current.message(
-      JSON.stringify(["EVENT", req[1], Faker.event({ id: "event" })]),
-    );
+    server.current.message(JSON.stringify(["EVENT", req[1], Faker.event({ id: "event" })]));
     expect(events).toEqual(["event"]);
 
     subscription.unsubscribe();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
-    expect(JSON.parse(server.current.sent[1] as string)).toEqual([
-      "CLOSE",
-      req[1],
-    ]);
+    expect(JSON.parse(server.current.sent[1] as string)).toEqual(["CLOSE", req[1]]);
     expect(complete).not.toHaveBeenCalled();
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -138,13 +121,8 @@ describe("RelayCommunication transport integration", () => {
       complete,
     });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
-    server.current.message(
-      JSON.stringify(["EVENT", subId, Faker.event({ id: "event" })]),
-    );
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
+    server.current.message(JSON.stringify(["EVENT", subId, Faker.event({ id: "event" })]));
     server.current.message(JSON.stringify(["EOSE", subId]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
@@ -159,9 +137,7 @@ describe("RelayCommunication transport integration", () => {
     expect(packets[0]).not.toHaveProperty("message");
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -174,9 +150,7 @@ describe("RelayCommunication transport integration", () => {
     const release = relay.hold();
     server.current.open();
     let since = 1;
-    const subscription = relay
-      .vreq("forward", [{ since: () => since }])
-      .subscribe();
+    const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
     expect(JSON.parse(server.current.sent[0] as string)[2]).toMatchObject({
       since: 1,
@@ -194,9 +168,7 @@ describe("RelayCommunication transport integration", () => {
     subscription.unsubscribe();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -218,26 +190,17 @@ describe("RelayCommunication transport integration", () => {
         complete,
       });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
 
-    server.current.message(
-      JSON.stringify(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]),
-    );
-    server.current.message(
-      JSON.stringify(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]),
-    );
+    server.current.message(JSON.stringify(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]));
+    server.current.message(JSON.stringify(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]));
     server.current.message(JSON.stringify(["EOSE", subId]));
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(events).toEqual(["right"]);
     expect(server.current.sent).toHaveLength(1);
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -258,15 +221,11 @@ describe("RelayCommunication transport integration", () => {
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(error).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
-    const [req, close] = server.current.sent.map((value) =>
-      JSON.parse(value as string),
-    );
+    const [req, close] = server.current.sent.map((value) => JSON.parse(value as string));
     expect(close).toEqual(["CLOSE", req[1]]);
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -293,10 +252,7 @@ describe("RelayCommunication transport integration", () => {
     const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe();
     cancelled.unsubscribe();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const first = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const first = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
     server.current.message(JSON.stringify(["EOSE", first[1]]));
 
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
@@ -312,9 +268,7 @@ describe("RelayCommunication transport integration", () => {
     expect(server.current.sent).toHaveLength(2);
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -380,9 +334,7 @@ describe("RelayCommunication transport integration", () => {
     expect(server.current.sent).toEqual([]);
 
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -398,10 +350,7 @@ describe("RelayCommunication transport integration", () => {
 
     relay.event(event).subscribe((packet) => packets.push(packet));
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    expect(JSON.parse(server.current.sent[0] as string)).toEqual([
-      "EVENT",
-      event,
-    ]);
+    expect(JSON.parse(server.current.sent[0] as string)).toEqual(["EVENT", event]);
     server.current.message('["OK","event",true,"saved"]');
 
     expect(packets).toEqual([
@@ -415,9 +364,7 @@ describe("RelayCommunication transport integration", () => {
       },
     ]);
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -448,23 +395,13 @@ describe("RelayCommunication transport integration", () => {
       .subscribe({ next: (packet) => packets.push(packet), complete });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
     server.current.message(JSON.stringify(["AUTH", "challenge"]));
-    server.current.message(
-      JSON.stringify(["OK", "event", false, "auth-required: login"]),
-    );
+    server.current.message(JSON.stringify(["OK", "event", false, "auth-required: login"]));
 
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
-    expect(JSON.parse(server.current.sent[1] as string)).toEqual([
-      "AUTH",
-      authEvent,
-    ]);
-    server.current.message(
-      JSON.stringify(["OK", "auth-event", true, "authenticated"]),
-    );
+    expect(JSON.parse(server.current.sent[1] as string)).toEqual(["AUTH", authEvent]);
+    server.current.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(3));
-    expect(JSON.parse(server.current.sent[2] as string)).toEqual([
-      "EVENT",
-      event,
-    ]);
+    expect(JSON.parse(server.current.sent[2] as string)).toEqual(["EVENT", event]);
     server.current.message(JSON.stringify(["OK", "event", true, "saved"]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
@@ -488,9 +425,7 @@ describe("RelayCommunication transport integration", () => {
       },
     ]);
     release();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
   });
 
@@ -513,9 +448,7 @@ describe("RelayCommunication transport integration", () => {
 
     second();
     second();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     expect(relay.leaseCount).toBe(0);
     server.current.acknowledgeClose();
   });

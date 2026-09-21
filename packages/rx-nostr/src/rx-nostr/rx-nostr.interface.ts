@@ -17,10 +17,7 @@ export interface IRxNostr {
     filters: LazyFilter | Iterable<LazyFilter>,
     config: RxNostrReqConfig,
   ): Observable<EventPacket>;
-  publish(
-    params: Nostr.EventParameters,
-    config: RxNostrPublishConfig,
-  ): Publication;
+  publish(params: Nostr.EventParameters, config: RxNostrPublishConfig): Publication;
   setHotRelays(relays: RelayInput): void;
   unsetHotRelays(): void;
   monitorConnectionState(): Observable<ConnectionStatePacket>;

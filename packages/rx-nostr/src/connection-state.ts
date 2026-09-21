@@ -1,10 +1,6 @@
 /** Transport-independent failure information exposed by rx-nostr. */
 export interface ConnectionFailure {
-  readonly kind:
-    | "connection-failed"
-    | "connection-dropped"
-    | "retry-exhausted"
-    | "protocol-error";
+  readonly kind: "connection-failed" | "connection-dropped" | "retry-exhausted" | "protocol-error";
   readonly message?: string;
   readonly code?: number;
 }

@@ -1,11 +1,4 @@
-import {
-  finalize,
-  map,
-  mergeAll,
-  Subject,
-  type Observable,
-  type Subscription,
-} from "rxjs";
+import { finalize, map, mergeAll, Subject, type Observable, type Subscription } from "rxjs";
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelaySet, type RelayUrl } from "../../libs/index.ts";
@@ -49,9 +42,7 @@ export function reqBackward({
         session,
         relays,
         sessionRelays,
-        segmentRelays: packet.relays
-          ? RxRelays.from(packet.relays)
-          : RxRelays.from(sessionRelays),
+        segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
@@ -106,10 +97,7 @@ function req({
   });
 
   // Use Map because we assume that `relay.url` is normalized.
-  const ongoings = new Map<
-    RelayUrl,
-    { segment: QuerySegment; sub: Subscription }
-  >();
+  const ongoings = new Map<RelayUrl, { segment: QuerySegment; sub: Subscription }>();
   const started = new RelaySet();
   const finished = new RelaySet();
 
@@ -137,9 +125,7 @@ function req({
           nomore = true;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
-          Logger.warn(
-            "The last relay was removed; no destination relays remain.",
-          );
+          Logger.warn("The last relay was removed; no destination relays remain.");
           nomore = true;
         }
         if (nomore) {
@@ -170,9 +156,7 @@ function req({
             authenticator,
           })
           .pipe(
-            map((packet) =>
-              traceTag === undefined ? packet : { ...packet, traceTag },
-            ),
+            map((packet) => (traceTag === undefined ? packet : { ...packet, traceTag })),
             // Backward: When a REQ on a relay is done or times out...
             finalize(() => {
               finalized = true;

@@ -2,12 +2,7 @@ import { lastValueFrom, of, toArray } from "rxjs";
 import { describe, expect, test } from "vitest";
 import { Faker } from "../__test__/helper/faker.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
-import {
-  dropExpiredEvents,
-  filterByType,
-  latestEach,
-  tie,
-} from "./index.ts";
+import { dropExpiredEvents, filterByType, latestEach, tie } from "./index.ts";
 
 describe("operators preserved from v3", () => {
   test("latestEach emits only newer events for each key", async () => {
@@ -38,9 +33,7 @@ describe("operators preserved from v3", () => {
       { type: "NOTICE", notice: "Nostr" },
     ];
 
-    const actual = await lastValueFrom(
-      of(...packets).pipe(filterByType("NOTICE"), toArray()),
-    );
+    const actual = await lastValueFrom(of(...packets).pipe(filterByType("NOTICE"), toArray()));
 
     expect(actual).toEqual([packets[0], packets[3]]);
   });

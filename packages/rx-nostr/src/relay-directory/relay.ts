@@ -1,10 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { BehaviorSubject, type Observable } from "rxjs";
 import { once, type RelayUrl } from "../libs/index.ts";
-import type {
-  RelayDirectoryEntry,
-  RelayDirectorySnapshotEntry,
-} from "./relay.interface.ts";
+import type { RelayDirectoryEntry, RelayDirectorySnapshotEntry } from "./relay.interface.ts";
 
 export type Nip11Fetcher = (url: string) => Promise<Nostr.Nip11.RelayInfo>;
 
@@ -33,18 +30,10 @@ export class RelayRecord {
     return Object.freeze({
       url: this.url,
       ...(this.#nip11 === undefined ? {} : { nip11: this.#nip11 }),
-      ...(this.#nip11FetchedAt === undefined
-        ? {}
-        : { nip11FetchedAt: this.#nip11FetchedAt }),
-      ...(this.#nip11FailedAt === undefined
-        ? {}
-        : { nip11FailedAt: this.#nip11FailedAt }),
-      ...(this.#lastConnectedAt === undefined
-        ? {}
-        : { lastConnectedAt: this.#lastConnectedAt }),
-      ...(this.#lastFailureAt === undefined
-        ? {}
-        : { lastFailureAt: this.#lastFailureAt }),
+      ...(this.#nip11FetchedAt === undefined ? {} : { nip11FetchedAt: this.#nip11FetchedAt }),
+      ...(this.#nip11FailedAt === undefined ? {} : { nip11FailedAt: this.#nip11FailedAt }),
+      ...(this.#lastConnectedAt === undefined ? {} : { lastConnectedAt: this.#lastConnectedAt }),
+      ...(this.#lastFailureAt === undefined ? {} : { lastFailureAt: this.#lastFailureAt }),
       consecutiveFailures: this.#consecutiveFailures,
       liveConnections: this.#liveConnections,
       ...(maxSubscriptions === undefined ? {} : { maxSubscriptions }),
@@ -55,18 +44,10 @@ export class RelayRecord {
     return Object.freeze({
       url: this.url,
       ...(this.#nip11 === undefined ? {} : { nip11: this.#nip11 }),
-      ...(this.#nip11FetchedAt === undefined
-        ? {}
-        : { nip11FetchedAt: this.#nip11FetchedAt }),
-      ...(this.#nip11FailedAt === undefined
-        ? {}
-        : { nip11FailedAt: this.#nip11FailedAt }),
-      ...(this.#lastConnectedAt === undefined
-        ? {}
-        : { lastConnectedAt: this.#lastConnectedAt }),
-      ...(this.#lastFailureAt === undefined
-        ? {}
-        : { lastFailureAt: this.#lastFailureAt }),
+      ...(this.#nip11FetchedAt === undefined ? {} : { nip11FetchedAt: this.#nip11FetchedAt }),
+      ...(this.#nip11FailedAt === undefined ? {} : { nip11FailedAt: this.#nip11FailedAt }),
+      ...(this.#lastConnectedAt === undefined ? {} : { lastConnectedAt: this.#lastConnectedAt }),
+      ...(this.#lastFailureAt === undefined ? {} : { lastFailureAt: this.#lastFailureAt }),
       consecutiveFailures: this.#consecutiveFailures,
     });
   }
@@ -127,8 +108,7 @@ export class RelayRecord {
     if (
       entry.nip11 &&
       entry.nip11FetchedAt !== undefined &&
-      (this.#nip11FetchedAt === undefined ||
-        entry.nip11FetchedAt >= this.#nip11FetchedAt)
+      (this.#nip11FetchedAt === undefined || entry.nip11FetchedAt >= this.#nip11FetchedAt)
     ) {
       this.#nip11 = cloneRelayInfo(entry.nip11);
       this.#nip11FetchedAt = entry.nip11FetchedAt;
@@ -137,15 +117,11 @@ export class RelayRecord {
 
     const currentFailureAt = this.#lastFailureAt;
     const importedFailureAt = entry.lastFailureAt;
-    this.#lastConnectedAt = maxDefined(
-      this.#lastConnectedAt,
-      entry.lastConnectedAt,
-    );
+    this.#lastConnectedAt = maxDefined(this.#lastConnectedAt, entry.lastConnectedAt);
     this.#lastFailureAt = maxDefined(currentFailureAt, importedFailureAt);
     if (
       this.#lastFailureAt !== undefined &&
-      (this.#lastConnectedAt === undefined ||
-        this.#lastFailureAt > this.#lastConnectedAt)
+      (this.#lastConnectedAt === undefined || this.#lastFailureAt > this.#lastConnectedAt)
     ) {
       if (importedFailureAt === this.#lastFailureAt) {
         this.#consecutiveFailures =
@@ -201,15 +177,10 @@ function readMaxSubscriptions(
   info: Readonly<Nostr.Nip11.RelayInfo> | undefined,
 ): number | undefined {
   const value = info?.limitation?.max_subscriptions;
-  return typeof value === "number" && Number.isInteger(value) && value >= 0
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
 }
 
-function maxDefined(
-  left: number | undefined,
-  right: number | undefined,
-): number | undefined {
+function maxDefined(left: number | undefined, right: number | undefined): number | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
   return Math.max(left, right);

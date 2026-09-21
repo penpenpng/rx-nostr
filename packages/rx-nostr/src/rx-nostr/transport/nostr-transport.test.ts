@@ -1,23 +1,14 @@
 import { firstValueFrom, toArray } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import {
-  ControlledWebSocketServer,
-  Faker,
-} from "../../__test__/helper/index.ts";
+import { ControlledWebSocketServer, Faker } from "../../__test__/helper/index.ts";
 import type { ConnectionRetryer } from "../../connection-retryer/index.ts";
-import {
-  NostrTransport,
-  NostrTransportOperationError,
-} from "./nostr-transport.ts";
+import { NostrTransport, NostrTransportOperationError } from "./nostr-transport.ts";
 
 const relay = "wss://relay.example.com" as const;
 
 afterEach(() => vi.useRealTimers());
 
-async function openTransport(
-  server: ControlledWebSocketServer,
-  retryer?: ConnectionRetryer,
-) {
+async function openTransport(server: ControlledWebSocketServer, retryer?: ConnectionRetryer) {
   const transport = new NostrTransport({
     url: relay,
     WebSocket: server.WebSocket,
@@ -29,10 +20,7 @@ async function openTransport(
   return transport;
 }
 
-async function closeTransport(
-  transport: NostrTransport,
-  server: ControlledWebSocketServer,
-) {
+async function closeTransport(transport: NostrTransport, server: ControlledWebSocketServer) {
   const closed = transport.close();
   server.current.acknowledgeClose();
   await closed;
@@ -111,8 +99,7 @@ describe("NostrTransport", () => {
       WebSocket: terminalServer.WebSocket,
       retryer: { retry: () => ({ action: "exhaust" }) },
     });
-    const terminalStates: import("../../connection-state.ts").ConnectionState[] =
-      [];
+    const terminalStates: import("../../connection-state.ts").ConnectionState[] = [];
     terminal.state$.subscribe((state) => terminalStates.push(state));
     const terminalOpen = terminal.open();
     terminalServer.current.peerClose(1000, "maintenance", true);
@@ -172,11 +159,7 @@ describe("NostrTransport", () => {
     expect(states).toContain("dormant");
   });
 
-  test.each([
-    "not-json",
-    '["EVENT","missing-event"]',
-    new Uint8Array([1, 2, 3]),
-  ])(
+  test.each(["not-json", '["EVENT","missing-event"]', new Uint8Array([1, 2, 3])])(
     "reports invalid input as a diagnostic and keeps the session alive",
     async (input) => {
       const server = new ControlledWebSocketServer();
@@ -189,9 +172,7 @@ describe("NostrTransport", () => {
       server.current.message(input);
       server.current.message('["NOTICE","still alive"]');
 
-      await vi.waitFor(() =>
-        expect(diagnostics).toEqual(["message-deserialization-failed"]),
-      );
+      await vi.waitFor(() => expect(diagnostics).toEqual(["message-deserialization-failed"]));
       expect(messages).toEqual(["NOTICE"]);
       await closeTransport(transport, server);
     },
@@ -207,8 +188,7 @@ describe("NostrTransport", () => {
       .subscribe({
         query: ["REQ", "sub", {}],
         selector: (packet) => packet.type === "EVENT" && packet.subId === "sub",
-        terminator: (packet) =>
-          packet.type === "EOSE" && packet.subId === "sub",
+        terminator: (packet) => packet.type === "EOSE" && packet.subId === "sub",
       })
       .subscribe({
         next: (packet) => received.push(packet.type),
@@ -242,9 +222,7 @@ describe("NostrTransport", () => {
 
     const dropServer = new ControlledWebSocketServer();
     const dropTransport = await openTransport(dropServer);
-    const dropped = firstValueFrom(
-      dropTransport.listen({ retry: "fail" }).pipe(toArray()),
-    );
+    const dropped = firstValueFrom(dropTransport.listen({ retry: "fail" }).pipe(toArray()));
     dropServer.current.peerClose(1006, "network lost");
     await expect(dropped).rejects.toMatchObject({
       name: "NostrTransportOperationError",
@@ -276,9 +254,7 @@ describe("NostrTransport", () => {
         health: expect.objectContaining({ consecutiveFailures: 1 }),
       }),
     );
-    await vi.waitFor(() =>
-      expect(states.filter((state) => state === "connected")).toHaveLength(2),
-    );
+    await vi.waitFor(() => expect(states.filter((state) => state === "connected")).toHaveLength(2));
 
     oldSocket.message('["NOTICE","stale"]');
     newSocket.message('["NOTICE","current"]');
@@ -338,9 +314,7 @@ describe("NostrTransport", () => {
     const transport = await openTransport(server);
     const states: string[] = [];
     transport.state$.subscribe((state) => states.push(state.state));
-    const result = firstValueFrom(
-      transport.listen({ retry: "fail" }).pipe(toArray()),
-    );
+    const result = firstValueFrom(transport.listen({ retry: "fail" }).pipe(toArray()));
 
     server.current.error(new Error("offline"));
 

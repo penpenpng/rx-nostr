@@ -13,9 +13,7 @@ export function chunk(
 ): MonoTypeOperatorFunction<ReqPacket> {
   return mergeMap((packet) =>
     predicate(packet.filters)
-      ? from(
-          toChunks(packet.filters).map((filters) => ({ ...packet, filters })),
-        )
+      ? from(toChunks(packet.filters).map((filters) => ({ ...packet, filters })))
       : of(packet),
   );
 }

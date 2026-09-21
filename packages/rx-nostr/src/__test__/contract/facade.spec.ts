@@ -45,16 +45,12 @@ describe("RxNostr facade lifecycle", () => {
     const connection = server.current;
     connection.open();
     await vi.waitFor(() =>
-      expect(states.some((packet) => packet.state.state === "connected")).toBe(
-        true,
-      ),
+      expect(states.some((packet) => packet.state.state === "connected")).toBe(true),
     );
 
     const request = new RxForwardReq();
     const reqComplete = vi.fn();
-    rxNostr
-      .req(request, { relays: relay })
-      .subscribe({ complete: reqComplete });
+    rxNostr.req(request, { relays: relay }).subscribe({ complete: reqComplete });
     request.emit([{}]);
     const delayedReq = rxNostr.req([{}], { relays: relay });
     const delayedMonitor = rxNostr.monitorConnectionState();
@@ -78,9 +74,7 @@ describe("RxNostr facade lifecycle", () => {
     expect(reqComplete).toHaveBeenCalledOnce();
     expect(publicationComplete).toHaveBeenCalledOnce();
     await cancelled;
-    expect(() => rxNostr.setHotRelays(relay)).toThrow(
-      RxNostrAlreadyDisposedError,
-    );
+    expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
     expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
     expect(() =>
       rxNostr.publish(signedEvent, {
@@ -91,26 +85,18 @@ describe("RxNostr facade lifecycle", () => {
 
     const delayedReqError = vi.fn();
     delayedReq.subscribe({ error: delayedReqError });
-    expect(delayedReqError).toHaveBeenCalledWith(
-      expect.any(RxNostrAlreadyDisposedError),
-    );
+    expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const newReqError = vi.fn();
     rxNostr.req([{}], { relays: relay }).subscribe({ error: newReqError });
-    expect(newReqError).toHaveBeenCalledWith(
-      expect.any(RxNostrAlreadyDisposedError),
-    );
+    expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const monitorError = vi.fn();
     delayedMonitor.subscribe({ error: monitorError });
-    expect(monitorError).toHaveBeenCalledWith(
-      expect.any(RxNostrAlreadyDisposedError),
-    );
+    expect(monitorError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
 
     await vi.waitFor(() => expect(connection.closeRequests).toHaveLength(1));
     connection.acknowledgeClose();
     await vi.waitFor(() => {
-      expect(states.some((packet) => packet.state.state === "disposed")).toBe(
-        true,
-      );
+      expect(states.some((packet) => packet.state.state === "disposed")).toBe(true);
       expect(stateComplete).toHaveBeenCalledOnce();
     });
   });
@@ -141,28 +127,18 @@ describe("RxNostr facade lifecycle", () => {
     expect(firstServer.current).not.toBe(secondServer.current);
     firstServer.current.open();
     secondServer.current.open();
-    await vi.waitFor(() =>
-      expect(directory.get(relay)?.liveConnections).toBe(2),
-    );
+    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(2));
 
     first.dispose();
-    await vi.waitFor(() =>
-      expect(firstServer.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(firstServer.current.closeRequests).toHaveLength(1));
     firstServer.current.acknowledgeClose();
-    await vi.waitFor(() =>
-      expect(directory.get(relay)?.liveConnections).toBe(1),
-    );
+    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(1));
     expect(secondServer.current.closeRequests).toHaveLength(0);
 
     second.dispose();
-    await vi.waitFor(() =>
-      expect(secondServer.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(secondServer.current.closeRequests).toHaveLength(1));
     secondServer.current.acknowledgeClose();
-    await vi.waitFor(() =>
-      expect(directory.get(relay)?.liveConnections).toBe(0),
-    );
+    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(0));
   });
 
   test("applies packet, operation, root-default precedence", async () => {
@@ -201,17 +177,10 @@ describe("RxNostr facade lifecycle", () => {
     expect(server.current.url).toBe("wss://packet.example.com");
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
     const now = Math.floor(Date.now() / 1_000);
     server.current.message(
-      JSON.stringify([
-        "EVENT",
-        subId,
-        { ...signedEvent, id: "mismatch", kind: 2 },
-      ]),
+      JSON.stringify(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]),
     );
     server.current.message(
       JSON.stringify([
@@ -224,9 +193,7 @@ describe("RxNostr facade lifecycle", () => {
         },
       ]),
     );
-    server.current.message(
-      JSON.stringify(["EVENT", subId, { ...signedEvent, id: "accepted" }]),
-    );
+    server.current.message(JSON.stringify(["EVENT", subId, { ...signedEvent, id: "accepted" }]));
     server.current.message(JSON.stringify(["EOSE", subId]));
 
     await vi.waitFor(() => expect(packets).toHaveLength(1));
@@ -235,13 +202,8 @@ describe("RxNostr facade lifecycle", () => {
       event: { id: "accepted" },
     });
     expect(rootVerify).not.toHaveBeenCalled();
-    expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual([
-      "expired",
-      "accepted",
-    ]);
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual(["expired", "accepted"]);
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });

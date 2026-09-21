@@ -16,10 +16,7 @@ export namespace u {
 
     export class TimeoutError extends Error {}
 
-    export function timeout<T>(
-      promise: Promise<T>,
-      timeout: number,
-    ): Promise<T> {
+    export function timeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
       const ret = Promise.withResolvers<T>();
 
       const timer = setTimeout(() => {
@@ -39,10 +36,7 @@ export namespace u {
 
   export namespace Iterable {
     type Iterable<T> = globalThis.Iterable<T>;
-    export function zip<T, U>(
-      a: Iterable<T>,
-      b: Iterable<U>,
-    ): Iterable<[T, U]> {
+    export function zip<T, U>(a: Iterable<T>, b: Iterable<U>): Iterable<[T, U]> {
       return {
         [Symbol.iterator]: function* () {
           const ia = a[Symbol.iterator]();

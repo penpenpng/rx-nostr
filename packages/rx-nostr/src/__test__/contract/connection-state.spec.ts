@@ -1,10 +1,6 @@
 import type { Observable } from "rxjs";
 import { describe, expectTypeOf, test } from "vitest";
-import type {
-  ConnectionState,
-  ConnectionStatePacket,
-  IRxNostr,
-} from "rx-nostr";
+import type { ConnectionState, ConnectionStatePacket, IRxNostr } from "rx-nostr";
 
 describe("connection state public contract", () => {
   test("uses rx-nostr-owned replayable state snapshots", () => {

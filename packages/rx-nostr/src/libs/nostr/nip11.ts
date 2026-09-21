@@ -18,14 +18,9 @@ export async function fetchRelayInfo(
     }
     endpoint.protocol = endpoint.protocol === "wss:" ? "https:" : "http:";
   } catch (cause) {
-    throw new RxNostrNip11Error(
-      "invalid-url",
-      `Invalid relay URL: ${url}`,
-      undefined,
-      {
-        cause,
-      },
-    );
+    throw new RxNostrNip11Error("invalid-url", `Invalid relay URL: ${url}`, undefined, {
+      cause,
+    });
   }
 
   const fetcher = options.fetch ?? globalThis.fetch;
@@ -55,12 +50,9 @@ export async function fetchRelayInfo(
   try {
     value = await response.json();
   } catch (cause) {
-    throw new RxNostrNip11Error(
-      "parse",
-      "Relay information was not valid JSON.",
-      response.status,
-      { cause },
-    );
+    throw new RxNostrNip11Error("parse", "Relay information was not valid JSON.", response.status, {
+      cause,
+    });
   }
 
   if (!isObject(value)) {

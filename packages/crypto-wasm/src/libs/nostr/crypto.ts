@@ -31,9 +31,7 @@ export function signEvent<K extends number>(
     .tags((tags ?? []).map((tag) => Tag.parse(tag)))
     .customCreatedAt(Timestamp.fromSecs(created_at));
 
-  const signedEvent: Nostr.Event<K> = JSON.parse(
-    event.signWithKeys(Keys.parse(seckey)).asJson(),
-  );
+  const signedEvent: Nostr.Event<K> = JSON.parse(event.signWithKeys(Keys.parse(seckey)).asJson());
 
   if (id) {
     signedEvent.id = id;

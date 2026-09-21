@@ -9,10 +9,7 @@ import {
   type EventSigner,
   type OkPacket,
 } from "rx-nostr";
-import {
-  ContractWebSocket,
-  ContractWebSocketServer,
-} from "./support/controlled-websocket.ts";
+import { ContractWebSocket, ContractWebSocketServer } from "./support/controlled-websocket.ts";
 
 const relay1 = "wss://relay1.example.com";
 const relay2 = "wss://relay2.example.com";
@@ -30,13 +27,8 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
   };
 }
 
-function socket(
-  server: ContractWebSocketServer,
-  url: string,
-): ContractWebSocket {
-  const result = server.connections.find(
-    (connection) => connection.url === url,
-  );
+function socket(server: ContractWebSocketServer, url: string): ContractWebSocket {
+  const result = server.connections.find((connection) => connection.url === url);
   if (!result) throw new Error(`No connection for ${url}`);
   return result;
 }
@@ -63,9 +55,7 @@ describe("Publication public contract", () => {
       timeout: 1_000,
     });
     const firstPackets: OkPacket[] = [];
-    const firstObserver = publication.subscribe((packet) =>
-      firstPackets.push(packet),
-    );
+    const firstObserver = publication.subscribe((packet) => firstPackets.push(packet));
     const all = publication.waitFor("all");
     const any = publication.waitFor("any");
     let allSettled = false;
@@ -119,12 +109,10 @@ describe("Publication public contract", () => {
       linger: 0,
       timeout: 1_000,
     });
-    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject(
-      {
-        code: "not-all-accepted",
-        failures: [{ relay: relay1, kind: "rejected" }],
-      },
-    );
+    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
+      code: "not-all-accepted",
+      failures: [{ relay: relay1, kind: "rejected" }],
+    });
     const any = publication.waitFor("any");
     const first = socket(server, relay1);
     const second = socket(server, relay2);
@@ -154,12 +142,10 @@ describe("Publication public contract", () => {
       linger: 0,
       timeout: 100,
     });
-    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject(
-      {
-        code: "not-all-accepted",
-        failures: [{ relay: relay2, kind: "timeout" }],
-      },
-    );
+    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
+      code: "not-all-accepted",
+      failures: [{ relay: relay2, kind: "timeout" }],
+    });
     const any = publication.waitFor("any");
     const first = socket(server, relay1);
     const second = socket(server, relay2);
@@ -217,9 +203,7 @@ describe("Publication public contract", () => {
       callback: "signer",
       cause,
     });
-    await expect(failed.waitFor("any")).rejects.toBeInstanceOf(
-      RxNostrCallbackError,
-    );
+    await expect(failed.waitFor("any")).rejects.toBeInstanceOf(RxNostrCallbackError);
     expect(observerError).toHaveBeenCalledWith(
       expect.objectContaining({ callback: "signer", cause }),
     );
@@ -360,17 +344,15 @@ describe("Publication public contract", () => {
       linger: 0,
       timeout: 1_000,
     });
-    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject(
-      {
-        code: "not-all-accepted",
-        failures: [
-          {
-            relay: relay2,
-            kind: expect.stringMatching(/^(dropped|retry-exhausted)$/),
-          },
-        ],
-      },
-    );
+    const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
+      code: "not-all-accepted",
+      failures: [
+        {
+          relay: relay2,
+          kind: expect.stringMatching(/^(dropped|retry-exhausted)$/),
+        },
+      ],
+    });
     const any = publication.waitFor("any");
     const first = socket(server, relay1);
     const second = socket(server, relay2);
@@ -411,16 +393,12 @@ describe("Publication public contract", () => {
     connection.open();
     await expectEventSent(connection);
     connection.message(JSON.stringify(["AUTH", "challenge"]));
-    connection.message(
-      JSON.stringify(["OK", "event", false, "auth-required: login"]),
-    );
+    connection.message(JSON.stringify(["OK", "event", false, "auth-required: login"]));
     await vi.waitFor(() => expect(connection.sent).toHaveLength(2));
     expect(settled).toBe(false);
     expect(packets).toHaveLength(1);
 
-    connection.message(
-      JSON.stringify(["OK", "auth-event", true, "authenticated"]),
-    );
+    connection.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
     await vi.waitFor(() => expect(connection.sent).toHaveLength(3));
     connection.message(JSON.stringify(["OK", "event", true, "saved"]));
     await expect(all).resolves.toBeUndefined();

@@ -126,4 +126,4 @@ No diagnostic comes from AUTH configuration, coordinator cancellation/deduplicat
 
 Task 08 replaced the provisional progress Observable with the decided hot `Publication` object and removed all remaining baseline diagnostics. On 2026-09-21, `npm run typecheck -w packages/rx-nostr` exits 0, and `npm run build -w packages/rx-nostr` completes JavaScript and declaration generation successfully.
 
-All 38 diagnostics recorded at Task 00 have now been removed through their owning implementation tasks. Task 10 owns the source/workspace/dependency/release-tooling migration, Task 11 owns the TypeScript 7-compatible static quality gates, and Task 12 owns package artifact inspection and cross-runtime release tests; zero diagnostics alone does not complete those audits.
+All 38 diagnostics recorded at Task 00 have now been removed through their owning implementation tasks. Task 10 completed the source/workspace/dependency/release-tooling migration, and Task 11 completed the TypeScript 6 and Vite+ static quality gates. Task 12 owns package artifact inspection and cross-runtime release tests; zero diagnostics alone does not complete that audit.

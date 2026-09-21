@@ -1,8 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-  RelayDirectory,
-  getRelayDirectoryReporter,
-} from "./relay-directory.ts";
+import { RelayDirectory, getRelayDirectoryReporter } from "./relay-directory.ts";
 
 describe("RelayDirectory health reporter", () => {
   test("tracks independent live connections and resets failures on success", () => {

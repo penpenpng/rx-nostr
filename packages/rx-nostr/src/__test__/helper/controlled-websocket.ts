@@ -1,8 +1,4 @@
-import type {
-  WebSocketConstructor,
-  WebSocketData,
-  WebSocketLike,
-} from "../../types/index.ts";
+import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "../../types/index.ts";
 
 type Handler<T> = ((event: T) => unknown) | null;
 
@@ -22,8 +18,7 @@ export class ControlledWebSocket implements WebSocketLike {
   constructor(readonly url: string) {}
 
   send(data: WebSocketData): void {
-    if (this.readyState !== 1)
-      throw new Error("The controlled socket is not open.");
+    if (this.readyState !== 1) throw new Error("The controlled socket is not open.");
     this.sent.push(data);
   }
 

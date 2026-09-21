@@ -1,8 +1,4 @@
-import {
-  distinct,
-  type MonoTypeOperatorFunction,
-  type ObservableInput,
-} from "rxjs";
+import { distinct, type MonoTypeOperatorFunction, type ObservableInput } from "rxjs";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

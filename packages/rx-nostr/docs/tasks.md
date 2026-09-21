@@ -17,8 +17,8 @@
 | 08  | [Publish pipeline](./tasks/08-publish.md)                                     | 03, 05, 07 | D5, D6, D10, D11, D14         | complete |
 | 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)                  | 06, 08     | D1                            | complete |
 | 10  | [Source、workspace、依存関係、release 管理の整理](./tasks/10-code-quality.md) | 09         | -                             | complete |
-| 11  | [Linter、formatter、静的品質ゲートの再設計](./tasks/11-lint-format.md)       | 10         | -                             | ready    |
-| 12  | [Package、contract test、release readiness](./tasks/12-package-release.md)    | 11         | D8                            | pending  |
+| 11  | [Linter、formatter、静的品質ゲートの再設計](./tasks/11-lint-format.md)        | 10         | -                             | complete |
+| 12  | [Package、contract test、release readiness](./tasks/12-package-release.md)    | 11         | D8                            | ready    |
 
 ## Milestones
 
@@ -40,7 +40,7 @@ Task 10。v4 source を正式な `src` へ移し、v3 test 契約を全件監査
 
 ### M5: 静的品質ゲートの完成
 
-Task 11。TypeScript 7 と pnpm workspace に適合する linter、formatter、import boundary、CI gate を完成させる状態。
+Task 11。TypeScript 6、pnpm workspace、Vite+ に適合する build、linter、formatter、CI gate を完成させる状態。
 
 ### M6: 配布可能
 

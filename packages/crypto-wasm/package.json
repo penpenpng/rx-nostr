@@ -1,7 +1,6 @@
 {
   "name": "@rx-nostr/crypto-wasm",
   "version": "4.0.0-beta.0",
-  "author": "penpenpng",
   "keywords": [
     "rx-nostr"
   ],
@@ -10,6 +9,15 @@
     "url": "https://github.com/penpenpng/rx-nostr/issues"
   },
   "license": "MIT",
+  "author": "penpenpng",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/penpenpng/rx-nostr.git"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
   "type": "module",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -19,21 +27,16 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "src",
-    "dist"
-  ],
   "publishConfig": {
     "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/penpenpng/rx-nostr.git"
   },
   "scripts": {
     "build": "vite build",
     "test": "vitest --run",
     "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@rust-nostr/nostr-sdk": "^0.41.1"
   },
   "devDependencies": {
     "nostr-typedef": "^0.13.0",
@@ -41,9 +44,6 @@
     "vite": "^6.2.6",
     "vite-plugin-dts": "^4.5.3",
     "vitest": "^3.1.1"
-  },
-  "dependencies": {
-    "@rust-nostr/nostr-sdk": "^0.41.1"
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0",

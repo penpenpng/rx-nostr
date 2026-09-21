@@ -7,14 +7,7 @@ export type PublicationSettlePolicy = "all" | "any";
 
 export type PublicationFailure = Readonly<{
   relay: RelayUrl;
-  kind:
-    | "rejected"
-    | "timeout"
-    | "dropped"
-    | "retry-exhausted"
-    | "cancelled"
-    | "auth"
-    | "failed";
+  kind: "rejected" | "timeout" | "dropped" | "retry-exhausted" | "cancelled" | "auth" | "failed";
   ok?: OkPacket;
   cause?: unknown;
 }>;

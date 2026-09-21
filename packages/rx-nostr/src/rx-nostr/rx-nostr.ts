@@ -1,31 +1,15 @@
 import * as Nostr from "nostr-typedef";
-import {
-  defer,
-  identity,
-  map,
-  mergeMap,
-  Observable,
-  Subject,
-  takeUntil,
-} from "rxjs";
+import { defer, identity, map, mergeMap, Observable, Subject, takeUntil } from "rxjs";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
-import {
-  RxNostrAlreadyDisposedError,
-  RxNostrCallbackError,
-} from "../libs/error.ts";
+import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
 import { RxOneshotReq, RxReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
-import {
-  publish,
-  RelayWarmer,
-  reqBackward,
-  reqForward,
-} from "./modules/index.ts";
+import { publish, RelayWarmer, reqBackward, reqForward } from "./modules/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 import { RelayPool } from "./relay-pool.ts";
 import {

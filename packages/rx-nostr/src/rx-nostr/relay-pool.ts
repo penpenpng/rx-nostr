@@ -4,24 +4,16 @@ import { RxNostrAlreadyDisposedError } from "../libs/error.ts";
 import { normalizeRelayUrl } from "../libs/relay-urls.ts";
 import type { IRelayCommunication } from "./relay-communication.ts";
 
-export interface RelayCommunicationCollection<
-  T extends IRelayCommunication = IRelayCommunication,
-> {
+export interface RelayCommunicationCollection<T extends IRelayCommunication = IRelayCommunication> {
   get(relay: RelayUrl): T;
-  forEach(
-    relays: Iterable<RelayUrl> | null | undefined,
-    callback: (value: T) => void,
-  ): void;
-  map<R>(
-    relays: Iterable<RelayUrl> | null | undefined,
-    project: (value: T) => R,
-  ): R[];
+  forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (value: T) => void): void;
+  map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (value: T) => R): R[];
 }
 
 /** Per-RxNostr owner of one RelayCommunication for each normalized URL. */
-export class RelayPool<T extends IRelayCommunication & Disposable>
-  implements RelayCommunicationCollection<T>
-{
+export class RelayPool<
+  T extends IRelayCommunication & Disposable,
+> implements RelayCommunicationCollection<T> {
   readonly #entries = new RelayMap<T>();
   readonly #created = new Subject<T>();
   #disposed = false;
@@ -42,18 +34,12 @@ export class RelayPool<T extends IRelayCommunication & Disposable>
     return created;
   }
 
-  forEach(
-    relays: Iterable<RelayUrl> | null | undefined,
-    callback: (value: T) => void,
-  ): void {
+  forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (value: T) => void): void {
     if (!relays) return;
     for (const relay of relays) callback(this.get(relay));
   }
 
-  map<R>(
-    relays: Iterable<RelayUrl> | null | undefined,
-    project: (value: T) => R,
-  ): R[] {
+  map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (value: T) => R): R[] {
     if (!relays) return [];
     return [...relays].map((relay) => project(this.get(relay)));
   }

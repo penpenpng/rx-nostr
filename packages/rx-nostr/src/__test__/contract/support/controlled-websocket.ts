@@ -1,8 +1,4 @@
-import type {
-  WebSocketConstructor,
-  WebSocketData,
-  WebSocketLike,
-} from "rx-nostr";
+import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "rx-nostr";
 
 type Handler<T> = ((event: T) => unknown) | null;
 

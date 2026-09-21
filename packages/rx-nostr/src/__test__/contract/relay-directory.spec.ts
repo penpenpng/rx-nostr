@@ -29,9 +29,7 @@ describe("RelayDirectory public contract", () => {
       }),
     );
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
 
@@ -46,9 +44,7 @@ describe("RelayDirectory public contract", () => {
     await Promise.resolve();
     expect(fetcher).toHaveBeenCalledOnce();
     skipped.unsetHotRelays();
-    await vi.waitFor(() =>
-      expect(skippedServer.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(skippedServer.current.closeRequests).toHaveLength(1));
     skippedServer.current.acknowledgeClose();
     skipped.dispose();
   });
@@ -69,10 +65,7 @@ describe("RelayDirectory public contract", () => {
   });
 
   test("deduplicates NIP-11 requests, caches them, and supports refresh/manual set", async () => {
-    let resolve!: (value: {
-      name: string;
-      limitation: { max_subscriptions: number };
-    }) => void;
+    let resolve!: (value: { name: string; limitation: { max_subscriptions: number } }) => void;
     const fetcher = vi.fn(
       () =>
         new Promise<{
@@ -121,9 +114,9 @@ describe("RelayDirectory public contract", () => {
     expect(() => directory.importSnapshot("not-json")).toThrowError(
       expect.objectContaining({ code: "invalid-json" }),
     );
-    expect(() =>
-      directory.importSnapshot(JSON.stringify({ version: 2, relays: [] })),
-    ).toThrowError(expect.objectContaining({ code: "unsupported-version" }));
+    expect(() => directory.importSnapshot(JSON.stringify({ version: 2, relays: [] }))).toThrowError(
+      expect.objectContaining({ code: "unsupported-version" }),
+    );
     expect(() =>
       directory.importSnapshot(
         JSON.stringify({

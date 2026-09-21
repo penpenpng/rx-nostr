@@ -12,9 +12,7 @@ import {
 export function watchChanges<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   S extends Record<string, ObservableInput<any>>,
->(
-  sources: S,
-): Observable<[keyof S, { [K in keyof S]: ObservedValueOf<S[K]> }]> {
+>(sources: S): Observable<[keyof S, { [K in keyof S]: ObservedValueOf<S[K]> }]> {
   return merge(
     ...Object.entries(sources).map(([key, value$]) =>
       from(value$).pipe(map((value) => ({ key, value }))),
@@ -27,19 +25,12 @@ export function watchChanges<
       ],
       [null, {}] as StagingState<S>,
     ),
-    filter(
-      (
-        output,
-      ): output is [keyof S, { [K in keyof S]: ObservedValueOf<S[K]> }] => {
-        const [key, values] = output;
-        return key !== null && Object.keys(sources).every((k) => k in values);
-      },
-    ),
+    filter((output): output is [keyof S, { [K in keyof S]: ObservedValueOf<S[K]> }] => {
+      const [key, values] = output;
+      return key !== null && Object.keys(sources).every((k) => k in values);
+    }),
   );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StagingState<S extends Record<string, ObservableInput<any>>> = [
-  keyof S | null,
-  Partial<S>,
-];
+type StagingState<S extends Record<string, ObservableInput<any>>> = [keyof S | null, Partial<S>];

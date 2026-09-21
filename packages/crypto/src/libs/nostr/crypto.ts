@@ -22,8 +22,7 @@ const schnorr: Schnorr = {
     bytesToHex(_schnorr.sign(hexToBytes(m), hexToBytes(seckey))),
   verify: (sig: string, m: string, pubkey: string) =>
     _schnorr.verify(hexToBytes(sig), hexToBytes(m), hexToBytes(pubkey)),
-  getPublicKey: (seckey: string) =>
-    bytesToHex(_schnorr.getPublicKey(hexToBytes(seckey))),
+  getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(hexToBytes(seckey))),
 };
 
 export function signEvent<K extends number>(

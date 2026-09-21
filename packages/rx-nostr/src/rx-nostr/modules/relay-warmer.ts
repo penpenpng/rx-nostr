@@ -10,9 +10,7 @@ export class RelayWarmer {
   readonly #leases = new Map<RelayUrl, () => void>();
   #sub?: Subscription;
 
-  constructor(
-    private readonly relays: RelayCommunicationCollection<IRelayCommunication>,
-  ) {}
+  constructor(private readonly relays: RelayCommunicationCollection<IRelayCommunication>) {}
 
   setHotRelays(relays: RelayInput): void {
     this.#sub?.unsubscribe();

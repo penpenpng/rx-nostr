@@ -1,11 +1,6 @@
 import { type Observable, of, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import {
-  createPipeMethod,
-  type IPipeable,
-  once,
-  RxDisposableStack,
-} from "../libs/index.ts";
+import { createPipeMethod, type IPipeable, once, RxDisposableStack } from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 import { normalizeFilters } from "./normalize-filters.ts";
 
@@ -16,10 +11,7 @@ export abstract class RxReq {
   abstract asObservable(): Observable<ReqPacket>;
 }
 
-abstract class RxPipeableReq
-  extends RxReq
-  implements IPipeable<RxReq, ReqPacket>
-{
+abstract class RxPipeableReq extends RxReq implements IPipeable<RxReq, ReqPacket> {
   protected stack = new RxDisposableStack();
   protected stream: Subject<ReqPacket> = this.stack.add(new Subject());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,10 +71,7 @@ export class RxOneshotReq extends RxReq {
   readonly strategy = "backward";
   protected stream: Observable<ReqPacket>;
 
-  constructor(
-    filters: LazyFilter | LazyFilter[],
-    options?: Pick<ReqOptions, "traceTag">,
-  ) {
+  constructor(filters: LazyFilter | LazyFilter[], options?: Pick<ReqOptions, "traceTag">) {
     super();
 
     this.stream = of({

@@ -247,10 +247,7 @@ export class RelayMapOperator<T> {
 
   constructor(private factory: (relay: RelayUrl) => T) {}
 
-  forEach(
-    relays: Iterable<RelayUrl> | null | undefined,
-    callback: (value: T) => void,
-  ): void {
+  forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (value: T) => void): void {
     if (!relays) {
       return;
     }
@@ -264,10 +261,7 @@ export class RelayMapOperator<T> {
     }
   }
 
-  map<R>(
-    relays: Iterable<RelayUrl> | null | undefined,
-    project: (value: T) => R,
-  ): R[] {
+  map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (value: T) => R): R[] {
     if (!relays) {
       return [];
     }

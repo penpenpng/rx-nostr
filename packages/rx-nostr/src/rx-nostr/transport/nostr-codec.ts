@@ -4,10 +4,7 @@ import { ensureEventFields } from "../../libs/nostr/event.ts";
 import type { RelayUrl } from "../../libs/relay-urls.ts";
 import type { MessagePacket } from "../../packets/index.ts";
 
-export type NostrMessageDecodeErrorCode =
-  | "binary-message"
-  | "invalid-json"
-  | "invalid-tuple";
+export type NostrMessageDecodeErrorCode = "binary-message" | "invalid-json" | "invalid-tuple";
 
 export class NostrMessageDecodeError extends Error {
   override readonly name = "NostrMessageDecodeError";
@@ -21,32 +18,22 @@ export class NostrMessageDecodeError extends Error {
   }
 }
 
-export function serializeNostrMessage(
-  message: Nostr.ToRelayMessage.Any,
-): string {
+export function serializeNostrMessage(message: Nostr.ToRelayMessage.Any): string {
   return JSON.stringify(message);
 }
 
-export function decodeRelayMessage(
-  data: WebSocketData,
-  from: RelayUrl,
-): MessagePacket {
+export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): MessagePacket {
   if (typeof data !== "string") {
-    throw new NostrMessageDecodeError(
-      "binary-message",
-      "Nostr relay messages must be JSON text.",
-    );
+    throw new NostrMessageDecodeError("binary-message", "Nostr relay messages must be JSON text.");
   }
 
   let value: unknown;
   try {
     value = JSON.parse(data);
   } catch (cause) {
-    throw new NostrMessageDecodeError(
-      "invalid-json",
-      "The relay message is not valid JSON.",
-      { cause },
-    );
+    throw new NostrMessageDecodeError("invalid-json", "The relay message is not valid JSON.", {
+      cause,
+    });
   }
 
   if (!Array.isArray(value) || typeof value[0] !== "string") {
@@ -55,11 +42,7 @@ export function decodeRelayMessage(
 
   switch (value[0]) {
     case "EVENT": {
-      if (
-        value.length !== 3 ||
-        typeof value[1] !== "string" ||
-        !isEvent(value[2])
-      ) {
+      if (value.length !== 3 || typeof value[1] !== "string" || !isEvent(value[2])) {
         return invalidTuple();
       }
       const message = value as Nostr.ToClientMessage.EVENT;
@@ -99,11 +82,7 @@ export function decodeRelayMessage(
       };
     }
     case "CLOSED": {
-      if (
-        value.length !== 3 ||
-        typeof value[1] !== "string" ||
-        typeof value[2] !== "string"
-      ) {
+      if (value.length !== 3 || typeof value[1] !== "string" || typeof value[2] !== "string") {
         return invalidTuple();
       }
       const message = value as Nostr.ToClientMessage.CLOSED;
@@ -131,11 +110,7 @@ export function decodeRelayMessage(
       return { from, type: "AUTH", message, challenge: message[1] };
     }
     case "COUNT": {
-      if (
-        value.length !== 3 ||
-        typeof value[1] !== "string" ||
-        !isCountResponse(value[2])
-      ) {
+      if (value.length !== 3 || typeof value[1] !== "string" || !isCountResponse(value[2])) {
         return invalidTuple();
       }
       const message = value as Nostr.ToClientMessage.COUNT;
@@ -161,9 +136,7 @@ function invalidTuple(): never {
 
 function isEvent(value: unknown): value is Nostr.Event {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    ensureEventFields(value as Partial<Nostr.Event>)
+    typeof value === "object" && value !== null && ensureEventFields(value as Partial<Nostr.Event>)
   );
 }
 
@@ -186,9 +159,7 @@ const machinePrefixes = new Set<Nostr.MachineReadablePrefix>([
   "restricted",
 ]);
 
-function readMachinePrefix(
-  message: string,
-): Nostr.MachineReadablePrefix | undefined {
+function readMachinePrefix(message: string): Nostr.MachineReadablePrefix | undefined {
   const prefix = message.slice(0, message.indexOf(":"));
   return machinePrefixes.has(prefix as Nostr.MachineReadablePrefix)
     ? (prefix as Nostr.MachineReadablePrefix)

@@ -46,11 +46,7 @@ describe("REQ public contract", () => {
     request.over();
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const req = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-      object,
-    ];
+    const req = JSON.parse(server.current.sent[0] as string) as ["REQ", string, object];
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1] });
 
@@ -71,9 +67,7 @@ describe("REQ public contract", () => {
     expect(packets[0]).not.toHaveProperty("message");
     expect(server.current.sent).toHaveLength(1);
 
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });
@@ -87,37 +81,27 @@ describe("REQ public contract", () => {
       WebSocket: server.WebSocket,
     });
     const request = new RxForwardReq();
-    const subscription = rxNostr
-      .req(request, { relays: relay, linger: 0 })
-      .subscribe();
+    const subscription = rxNostr.req(request, { relays: relay, linger: 0 }).subscribe();
     request.emit([{ kinds: [1] }]);
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const first = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const first = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
 
     request.emit([{ kinds: [2] }]);
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(3));
-    const messages = server.current.sent.map((value) =>
-      JSON.parse(value as string),
-    );
-    const second = messages.find(
-      (message) => message[0] === "REQ" && message[1] !== first[1],
-    );
+    const messages = server.current.sent.map((value) => JSON.parse(value as string));
+    const second = messages.find((message) => message[0] === "REQ" && message[1] !== first[1]);
     expect(messages).toContainEqual(["CLOSE", first[1]]);
     expect(second?.[2]).toEqual({ kinds: [2] });
 
     subscription.unsubscribe();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(4));
-    expect(
-      server.current.sent.map((value) => JSON.parse(value as string)),
-    ).toContainEqual(["CLOSE", second?.[1]]);
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    expect(server.current.sent.map((value) => JSON.parse(value as string))).toContainEqual([
+      "CLOSE",
+      second?.[1],
+    ]);
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });
@@ -133,9 +117,7 @@ describe("REQ public contract", () => {
     const error = vi.fn();
     rxNostr.req([{}], { relays: [] }).subscribe({ complete, error });
 
-    await vi.waitFor(() =>
-      expect(complete.mock.calls.length + error.mock.calls.length).toBe(1),
-    );
+    await vi.waitFor(() => expect(complete.mock.calls.length + error.mock.calls.length).toBe(1));
     expect(complete).toHaveBeenCalledOnce();
     expect(error).not.toHaveBeenCalled();
     expect(server.connections).toEqual([]);
@@ -162,10 +144,7 @@ describe("REQ public contract", () => {
       .subscribe({ next: (packet) => packets.push(packet), complete });
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
     const expiredAt = Math.floor(Date.now() / 1000) - 1;
     for (const value of [
       event({ id: "mismatch", kind: 2 }),
@@ -180,9 +159,7 @@ describe("REQ public contract", () => {
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(verified).toEqual(["invalid-signature", "expired", "valid"]);
     expect(packets.map((packet) => packet.event.id)).toEqual(["valid"]);
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });
@@ -201,10 +178,7 @@ describe("REQ public contract", () => {
     });
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
     server.current.message(JSON.stringify(["EVENT", subId, event()]));
 
     await vi.waitFor(() => expect(received).toBeDefined());
@@ -214,13 +188,8 @@ describe("REQ public contract", () => {
       cause,
     });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
-    expect(JSON.parse(server.current.sent[1] as string)).toEqual([
-      "CLOSE",
-      subId,
-    ]);
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    expect(JSON.parse(server.current.sent[1] as string)).toEqual(["CLOSE", subId]);
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });
@@ -243,10 +212,7 @@ describe("REQ public contract", () => {
       .subscribe((packet) => packets.push(packet));
     server.current.open();
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
     server.current.message(
       JSON.stringify([
         "EVENT",
@@ -259,12 +225,8 @@ describe("REQ public contract", () => {
       ]),
     );
     server.current.message(JSON.stringify(["EOSE", subId]));
-    await vi.waitFor(() =>
-      expect(packets.map((packet) => packet.event.id)).toEqual(["skipped"]),
-    );
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["skipped"]));
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
 
@@ -296,9 +258,7 @@ describe("REQ public contract", () => {
       cause,
     });
     expect(callbackServer.current.sent).toEqual([]);
-    await vi.waitFor(() =>
-      expect(callbackServer.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(callbackServer.current.closeRequests).toHaveLength(1));
     callbackServer.current.acknowledgeClose();
     callbackRxNostr.dispose();
   });
@@ -322,20 +282,13 @@ describe("REQ public contract", () => {
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     for (const socket of server.connections) socket.open();
     await vi.waitFor(() =>
-      expect(
-        server.connections.every((socket) => socket.sent.length === 1),
-      ).toBe(true),
+      expect(server.connections.every((socket) => socket.sent.length === 1)).toBe(true),
     );
     const first = server.connections.find((socket) => socket.url === one)!;
     const second = server.connections.find((socket) => socket.url === two)!;
     first.peerClose(1006, "offline");
-    const [, secondSubId] = JSON.parse(second.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
-    second.message(
-      JSON.stringify(["EVENT", secondSubId, event({ id: "from-two" })]),
-    );
+    const [, secondSubId] = JSON.parse(second.sent[0] as string) as ["REQ", string];
+    second.message(JSON.stringify(["EVENT", secondSubId, event({ id: "from-two" })]));
     second.message(JSON.stringify(["EOSE", secondSubId]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
@@ -382,9 +335,7 @@ describe("REQ public contract", () => {
     expect(second[2]).toEqual({ kinds: [2] });
     server.current.message(JSON.stringify(["EOSE", second[1]]));
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    await vi.waitFor(() =>
-      expect(server.current.closeRequests).toHaveLength(1),
-    );
+    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
     server.current.acknowledgeClose();
     rxNostr.dispose();
   });
@@ -418,26 +369,16 @@ describe("REQ public contract", () => {
     await vi.waitFor(() => expect(server.connections[1]?.sent).toHaveLength(1));
     const first = server.connections[0]!;
     const second = server.connections[1]!;
-    const [, firstSubId] = JSON.parse(first.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
-    const [, secondSubId] = JSON.parse(second.sent[0] as string) as [
-      "REQ",
-      string,
-    ];
-    second.message(
-      JSON.stringify(["EVENT", secondSubId, event({ id: "dynamic" })]),
-    );
+    const [, firstSubId] = JSON.parse(first.sent[0] as string) as ["REQ", string];
+    const [, secondSubId] = JSON.parse(second.sent[0] as string) as ["REQ", string];
+    second.message(JSON.stringify(["EVENT", secondSubId, event({ id: "dynamic" })]));
     first.message(JSON.stringify(["EOSE", firstSubId]));
     second.message(JSON.stringify(["EOSE", secondSubId]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);
     await vi.waitFor(() =>
-      expect(
-        server.connections.every((socket) => socket.closeRequests.length === 1),
-      ).toBe(true),
+      expect(server.connections.every((socket) => socket.closeRequests.length === 1)).toBe(true),
     );
     for (const socket of server.connections) socket.acknowledgeClose();
     destinations.dispose();

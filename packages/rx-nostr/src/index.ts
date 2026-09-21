@@ -17,11 +17,7 @@ export type {
   ConnectionState,
   ConnectionStateSymbol,
 } from "./connection-state.ts";
-export {
-  Nip07Signer,
-  NoopSigner,
-  type EventSigner,
-} from "./event-signer/index.ts";
+export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
 export {
   NoopVerifier,
   VerificationClient,
@@ -48,20 +44,10 @@ export {
   type RxNostrNip11ErrorCode,
   type RelayDirectorySnapshotErrorCode,
 } from "./libs/error.ts";
-export {
-  compareEvents,
-  earlierEvent,
-  ensureEventFields,
-  laterEvent,
-} from "./libs/nostr/event.ts";
+export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./libs/nostr/event.ts";
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
 export type { FetchRelayInfoOptions } from "./libs/nostr/nip11.ts";
-export {
-  normalizeRelayUrl,
-  RelayMap,
-  RelaySet,
-  type RelayUrl,
-} from "./libs/relay-urls.ts";
+export { normalizeRelayUrl, RelayMap, RelaySet, type RelayUrl } from "./libs/relay-urls.ts";
 export { RxDisposableStack } from "./libs/rxjs/rx-disposable-stack.ts";
 export { setLogLevel } from "./logger.ts";
 export {
@@ -124,12 +110,7 @@ export {
   type RxNostrReqOptions,
 } from "./rx-nostr/index.ts";
 export { RxRelays } from "./rx-relays/index.ts";
-export {
-  RxBackwardReq,
-  RxForwardReq,
-  RxReq,
-  type RxReqStrategy,
-} from "./rx-req/index.ts";
+export { RxBackwardReq, RxForwardReq, RxReq, type RxReqStrategy } from "./rx-req/index.ts";
 export type {
   RelayInput,
   WebSocketBlob,

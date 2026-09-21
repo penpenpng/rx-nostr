@@ -2,10 +2,7 @@ import { describe, expect, test } from "vitest";
 import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import { RxNostrInvalidUsageError } from "../libs/error.ts";
-import {
-  GlobalRelayDirectory,
-  RelayDirectory,
-} from "../relay-directory/index.ts";
+import { GlobalRelayDirectory, RelayDirectory } from "../relay-directory/index.ts";
 import {
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
@@ -50,10 +47,7 @@ describe("rx-nostr config", () => {
         publish: { linger: Infinity, timeout: 0, weak: true },
       },
     });
-    const req = new FilledRxNostrReqOptions(
-      { defer: false, linger: 0, weak: false },
-      root,
-    );
+    const req = new FilledRxNostrReqOptions({ defer: false, linger: 0, weak: false }, root);
     const publish = new FilledRxNostrPublishOptions(
       { linger: 0, timeout: Infinity, weak: false },
       root,
@@ -88,12 +82,9 @@ describe("rx-nostr config", () => {
     };
     const root = createRoot({ authenticator });
 
-    expect(new FilledRxNostrReqOptions({}, root).authenticator).toBe(
-      authenticator,
-    );
+    expect(new FilledRxNostrReqOptions({}, root).authenticator).toBe(authenticator);
     expect(
-      new FilledRxNostrPublishOptions({ authenticator: false }, root)
-        .authenticator,
+      new FilledRxNostrPublishOptions({ authenticator: false }, root).authenticator,
     ).toBeUndefined();
   });
 
