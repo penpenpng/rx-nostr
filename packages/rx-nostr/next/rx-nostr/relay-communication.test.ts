@@ -165,6 +165,227 @@ describe("RelayCommunication transport integration", () => {
     server.current.acknowledgeClose();
   });
 
+  test("re-evaluates lazy filters when a REQ is resent after reconnect", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      retryer: { retry: () => ({ action: "retry", delay: 0 }) },
+    });
+    const release = relay.hold();
+    server.current.open();
+    let since = 1;
+    const subscription = relay
+      .vreq("forward", [{ since: () => since }])
+      .subscribe();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    expect(JSON.parse(server.current.sent[0] as string)[2]).toMatchObject({
+      since: 1,
+    });
+
+    server.current.peerClose(1006, "offline");
+    since = 2;
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    server.current.open();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    expect(JSON.parse(server.current.sent[0] as string)[2]).toMatchObject({
+      since: 2,
+    });
+
+    subscription.unsubscribe();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
+  test("filters mismatched events and does not CLOSE a remotely terminated REQ", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const release = relay.hold();
+    server.current.open();
+    const events: string[] = [];
+    const complete = vi.fn();
+    relay
+      .vreq("backward", [{ kinds: [1] }], {
+        validateFilterMatching: true,
+      })
+      .subscribe({
+        next: (packet) => events.push(packet.event.id),
+        complete,
+      });
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
+      "REQ",
+      string,
+    ];
+
+    server.current.message(
+      JSON.stringify(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]),
+    );
+    server.current.message(
+      JSON.stringify(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]),
+    );
+    server.current.message(JSON.stringify(["EOSE", subId]));
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    expect(events).toEqual(["right"]);
+    expect(server.current.sent).toHaveLength(1);
+
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
+  test("treats a backward timeout as relay-local completion and sends CLOSE", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const release = relay.hold();
+    server.current.open();
+    const complete = vi.fn();
+    const error = vi.fn();
+    relay.vreq("backward", [{}], { timeout: 5 }).subscribe({
+      complete,
+      error,
+    });
+
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    expect(error).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
+    const [req, close] = server.current.sent.map((value) =>
+      JSON.parse(value as string),
+    );
+    expect(close).toEqual(["CLOSE", req[1]]);
+
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
+  test("queues physical REQs at the NIP-11 max_subscriptions limit", async () => {
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory();
+    directory.setNip11("wss://relay.example.com", {
+      limitation: { max_subscriptions: 1 },
+    });
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+    });
+    const release = relay.hold();
+    server.current.open();
+    const firstComplete = vi.fn();
+    const secondComplete = vi.fn();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe({
+      complete: firstComplete,
+    });
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe({
+      complete: secondComplete,
+    });
+    const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe();
+    cancelled.unsubscribe();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    const first = JSON.parse(server.current.sent[0] as string) as [
+      "REQ",
+      string,
+    ];
+    server.current.message(JSON.stringify(["EOSE", first[1]]));
+
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
+    expect(firstComplete).toHaveBeenCalledOnce();
+    const second = JSON.parse(server.current.sent[1] as string) as [
+      "REQ",
+      string,
+      { kinds: number[] },
+    ];
+    expect(second[2]).toMatchObject({ kinds: [2] });
+    server.current.message(JSON.stringify(["EOSE", second[1]]));
+    await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
+    expect(server.current.sent).toHaveLength(2);
+
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
+  test("dispose completes queued REQs without starting them", async () => {
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory();
+    directory.setNip11("wss://relay.example.com", {
+      limitation: { max_subscriptions: 1 },
+    });
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+    });
+    relay.hold();
+    server.current.open();
+    const firstComplete = vi.fn();
+    const queuedComplete = vi.fn();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe({
+      complete: firstComplete,
+    });
+    const queued = relay.vreq("backward", [{ kinds: [2] }]);
+    queued.subscribe({ complete: queuedComplete });
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+
+    relay.dispose();
+
+    expect(firstComplete).toHaveBeenCalledOnce();
+    expect(queuedComplete).toHaveBeenCalledOnce();
+    expect(
+      server.current.sent
+        .map((value) => JSON.parse(value as string))
+        .filter(([type]) => type === "REQ"),
+    ).toHaveLength(1);
+    queued.subscribe({ complete: queuedComplete });
+    expect(queuedComplete).toHaveBeenCalledTimes(2);
+  });
+
+  test("wraps a lazy filter exception without sending a REQ or CLOSE", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+    });
+    const release = relay.hold();
+    server.current.open();
+    const cause = new Error("filter failed");
+    let received: unknown;
+    relay
+      .vreq("backward", [
+        {
+          since: () => {
+            throw cause;
+          },
+        },
+      ])
+      .subscribe({ error: (error) => (received = error) });
+
+    await vi.waitFor(() => expect(received).toBeDefined());
+    expect(received).toMatchObject({
+      name: "RxNostrCallbackError",
+      callback: "filter",
+      cause,
+    });
+    expect(server.current.sent).toEqual([]);
+
+    release();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+  });
+
   test("sends EVENT and maps the matching OK", async () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {

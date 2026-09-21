@@ -69,6 +69,7 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 - unipls client
 - connection demand の lease count
 - physical subId allocator と active query registry
+- RelayDirectory の `maxSubscriptions` に従う physical query queue
 - Nostr message codec
 - AUTH coordinator
 - RelayDirectory への lifecycle/health report
@@ -124,12 +125,14 @@ connection の再試行を直接命令する API は、directory と pool の責
 
 1. `RxNostr.req()` の subscription ごとに query session を作る。
 2. RxRelays の差分から relay segment を開始/終了する。
-3. segment は relay lease を取り、ready 後に physical subId を確保する。
-4. unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。
+3. segment は relay lease と physical subId を取り、NIP-11 subscription limit に空きがなければ relay-local FIFO queue で待つ。
+4. queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
 5. selector は同じ subId の EVENT/EOSE/CLOSED だけを受ける。
 6. backward は EOSE/CLOSED/timeout で終端、forward は次の ReqPacket または unsubscribe まで継続する。
 7. local unsubscribe 時、現在 ready な connection 上の active physical REQ には Nostr `CLOSE` を enqueue してから local handle を解放する。既に drop 済みなら stale connection へは送らない。
 8. packet は filter match、signature、NIP-40 の順序を明示した pipeline を通し、internal subId/vreqId を除いて利用者指定 `traceTag` を付与する。
+
+RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の cached NIP-11 fetch を開始します。metadata 取得は query の送信をブロックせず、取得後の `maxSubscriptions` は以後の queue drain に反映されます。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
 
 ### publish
 

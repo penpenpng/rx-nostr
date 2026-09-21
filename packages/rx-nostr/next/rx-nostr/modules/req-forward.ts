@@ -1,10 +1,7 @@
 import {
-  asapScheduler,
   finalize,
-  identity,
   map,
   Subject,
-  subscribeOn,
   switchAll,
   type Observable,
   type Subscription,
@@ -13,8 +10,7 @@ import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
 import { mapStored } from "../../operators/general/map-stored.ts";
-import { tapOnce } from "../../operators/general/tap-once.ts";
-import { filterBy, setDiff } from "../../operators/index.ts";
+import { setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -66,9 +62,8 @@ export function reqForward({
     mapStored(
       (obs, cleanupPrev) => {
         const stream = new Subject<EventPacket>();
-        const sub = obs
-          .pipe(tapOnce(cleanupPrev), finalize(cleanupPrev))
-          .subscribe(stream);
+        const sub = obs.subscribe(stream);
+        cleanupPrev();
         return [
           stream,
           once(() => {
@@ -135,11 +130,7 @@ function req({
 
   const relaySub = segmentRelays
     .asObservable()
-    .pipe(
-      setDiff(),
-      // The subscription must be started after the stream is returned.
-      subscribeOn(asapScheduler),
-    )
+    .pipe(setDiff())
     .subscribe(({ current, appended, outdated }) => {
       Logger.trace(traceTag, "updated dest relays", {
         current,
@@ -148,8 +139,10 @@ function req({
       });
 
       if (!sessionRelays.disposed) {
-        if (!outdated && current.size <= 0) {
+        if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           Logger.warn("REQ was issued, but no destination relays is set.");
+          stream.complete();
+          return;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
           Logger.warn(
@@ -164,15 +157,31 @@ function req({
         const segment = session.beginSegment(relay, linger);
         Logger.trace(traceTag, `new segment on ${relay.url}`);
 
+        let finalized = false;
+        const queryRef: { sub?: Subscription } = {};
         const sub = relay
-          .vreq("forward", filters)
+          .vreq("forward", filters, {
+            validateFilterMatching: !skipValidateFilterMatching,
+          })
           .pipe(
-            skipValidateFilterMatching ? identity : filterBy(filters),
-            map((packet) => ({ ...packet, traceTag })),
+            map((packet) =>
+              traceTag === undefined ? packet : { ...packet, traceTag },
+            ),
+            finalize(() => {
+              finalized = true;
+              const currentQuery = ongoings.get(relay.url);
+              if (currentQuery?.sub === queryRef.sub) {
+                ongoings.delete(relay.url);
+              }
+              segment.endSegment();
+            }),
           )
-          .subscribe(stream);
-
-        ongoings.set(relay.url, { segment, sub });
+          .subscribe({
+            next: (packet) => stream.next(packet),
+            error: (error) => stream.error(error),
+          });
+        queryRef.sub = sub;
+        if (!finalized) ongoings.set(relay.url, { segment, sub });
       });
 
       relays.forEach(outdated, (relay) => {

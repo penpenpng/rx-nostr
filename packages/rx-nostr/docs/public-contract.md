@@ -12,6 +12,9 @@ This document fixes the public model used by Tasks 02–10. Later tasks may add 
 - Physical `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.
 - The public result pipeline is filter matching, signature verification, then NIP-40 expiration filtering. A disabled stage is skipped in that same position.
 - A relay-local timeout, drop, CLOSED, or retry exhaustion terminates only that relay segment. It does not error a merged query while another relay can still produce results.
+- Lazy filters are evaluated immediately before each physical send, including a reconnect resend. Local unsubscribe/removal/replacement sends CLOSE for an active physical REQ; EOSE or CLOSED terminal completion does not send a redundant CLOSE.
+- A finite backward timeout starts only when its physical REQ leaves the NIP-11 queue. `0` requests immediate timeout and `Infinity` disables it. Timeout is relay-local completion and sends CLOSE for the active REQ.
+- `RelayDirectory.maxSubscriptions` limits concurrent physical REQs per relay. Excess work is FIFO queued, queued cancellation never sends REQ/CLOSE, and a zero limit completes queued work instead of leaving it pending. Disposal completes both active and queued work without starting another REQ.
 
 ### Publication
 
@@ -64,6 +67,7 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 - A normalized relay URL identifies one record. `get()` and iteration return immutable snapshots; `observe()` emits a new immutable snapshot when that record changes.
 - NIP-11 reads are cached and concurrent requests for one relay are deduplicated. `{ refresh: true }` bypasses a completed cache, while `setNip11()` installs application-provided metadata. Successful and failed fetch times are tracked separately, and a valid non-negative integer `limitation.max_subscriptions` is exposed as `maxSubscriptions`.
+- Creating a relay pool entry starts the cached NIP-11 fetch unless `skipFetchNip11` is true. Fetch failure does not fail the operation. Skipping fetch does not disable metadata already present in the configured directory, including `maxSubscriptions`.
 - Connection health contains the latest successful/failed timestamps, consecutive failures, and the currently observed connection count across reporters. A successful connection resets consecutive failures. Public entries expose no socket, retry operation, or mutable reporter.
 - `exportSnapshot()` returns version 1 JSON. `importSnapshot()` validates the complete input before merging it with newer/live local data. NIP-11 metadata and health timestamps/counters are persistent; live connection counts and handles are not. Invalid JSON, schema, and unsupported versions are typed errors.
 

@@ -101,3 +101,13 @@ Task 05 implemented `monitorConnectionState()` while wiring the unipls lifecycle
 - facade return type does not yet implement `Publication`
 
 No diagnostic comes from lifecycle mapping, retry policy integration, RelayDirectory reporting, relay pool observation, or connection-state contract tests.
+
+## Progress after Task 06
+
+Task 06 connected the public REQ facade to the physical query engine, including lazy filter resend, filter verification, relay-local finalization, NIP-11 queueing, and automatic metadata fetch. The 2026-09-21 check still reports only the same 3 diagnostics owned by Task 08:
+
+- publication progress/timeout type mismatch
+- missing publication `summarize` implementation
+- facade return type does not yet implement `Publication`
+
+No diagnostic comes from query scheduling, forward/backward orchestration, Nostr transport query factories, callback error mapping, or their public contract tests.

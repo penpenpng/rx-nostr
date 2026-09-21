@@ -39,3 +39,15 @@
 
 - D9 で deferred とした automatic splitting/multiplexing
 - COUNT query など REQ 以外の新規 high-level API
+
+## 実装結果
+
+2026-09-21 に完了。
+
+- `RelayCommunication` が physical subId、REQ/CLOSE、relay-local terminator、NIP-11 `max_subscriptions` queue を所有する。queue 待機中は timeout を開始せず、取消・zero capacity・dispose で未開始 query を残さない。
+- lazy filter は初回送信と reconnect resend の直前に再評価する。filter callback 例外と verifier callback 例外は callback kind を保持した `RxNostrCallbackError` にする。
+- backward の EOSE/CLOSED/timeout と relay-local transport failure はその relay segment だけを完了する。local unsubscribe、relay removal、forward replacement は対象 physical subId に CLOSE を送り、remote terminal 後は重複 CLOSE を送らない。
+- forward replacement は新 segment を開始してから旧 segment を終了する。empty destination は接続を作らず即 complete する。
+- filter matching は relay へ実際に送った filter snapshot に対して行い、その後 verifier、NIP-40 expiration の順に処理する。公開 packet には指定時だけ `traceTag` を付け、subId/vreqId は含めない。
+- pool entry の初回利用時に NIP-11 を自動取得する。`skipFetchNip11` は取得だけを無効化し、注入済み RelayDirectory metadata の利用は妨げない。
+- public contract は複数 relay、forward replacement、backward completion、CLOSE、reconnect、filter callback、validation option、timeout、queue、empty destination、NIP-11 fetch を controlled WebSocket で検証する。

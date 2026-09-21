@@ -27,11 +27,11 @@ export class QuerySession {
 
   beginSegment(relay: IRelayCommunication, linger: number): QuerySegment {
     if (this.weak) {
-      return { endSegment: () => {} };
+      return { endSegment: once(() => {}) };
     }
 
     const endSegment = this.getSessionPerRelay(relay).beginSegment(linger);
-    return { endSegment };
+    return { endSegment: once(endSegment) };
   }
 
   [Symbol.dispose] = once(() => {

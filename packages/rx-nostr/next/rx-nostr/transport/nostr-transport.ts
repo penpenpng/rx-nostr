@@ -72,7 +72,7 @@ export interface NostrTransportListenOptions {
 }
 
 export interface NostrTransportSubscribeOptions {
-  readonly query: Nostr.ToRelayMessage.Any;
+  readonly query: Nostr.ToRelayMessage.Any | (() => Nostr.ToRelayMessage.Any);
   readonly selector: (packet: MessagePacket) => boolean;
   readonly terminator?: (packet: MessagePacket) => boolean;
   readonly timeout?: number;
@@ -137,7 +137,11 @@ export class NostrTransport {
     query: Nostr.ToRelayMessage.Any,
     options: { readonly timeout?: number; readonly signal?: AbortSignal } = {},
   ): Promise<void> {
-    return this.#client.cast({ query, ...options });
+    try {
+      return this.#client.cast({ query, ...options });
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   listen(options: NostrTransportListenOptions = {}): Observable<MessagePacket> {

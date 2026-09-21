@@ -2,13 +2,57 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RelayDirectory,
   RelayDirectorySnapshotError,
+  NoopVerifier,
+  createRxNostr,
   fetchRelayInfo,
   type IRelayDirectory,
   type RelayDirectoryEntry,
   type RxNostrConfig,
 } from "rx-nostr";
+import { ContractWebSocketServer } from "./support/controlled-websocket.ts";
 
 describe("RelayDirectory public contract", () => {
+  test("RxNostr populates metadata on first use unless fetching is skipped", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
+    const directory = new RelayDirectory({ fetcher });
+    const server = new ContractWebSocketServer();
+    const rxNostr = createRxNostr({
+      verifier: new NoopVerifier(),
+      relayDirectory: directory,
+      WebSocket: server.WebSocket,
+    });
+    rxNostr.setHotRelays(["wss://relay.example.com"]);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(directory.get("wss://relay.example.com")?.nip11).toEqual({
+        name: "relay",
+      }),
+    );
+    rxNostr.unsetHotRelays();
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+    rxNostr.dispose();
+
+    const skippedServer = new ContractWebSocketServer();
+    const skipped = createRxNostr({
+      verifier: new NoopVerifier(),
+      relayDirectory: directory,
+      skipFetchNip11: true,
+      WebSocket: skippedServer.WebSocket,
+    });
+    skipped.setHotRelays(["wss://skipped.example.com"]);
+    await Promise.resolve();
+    expect(fetcher).toHaveBeenCalledOnce();
+    skipped.unsetHotRelays();
+    await vi.waitFor(() =>
+      expect(skippedServer.current.closeRequests).toHaveLength(1),
+    );
+    skippedServer.current.acknowledgeClose();
+    skipped.dispose();
+  });
+
   test("normalizes aliases and exposes immutable read snapshots", () => {
     const directory: IRelayDirectory = new RelayDirectory({ clock: () => 10 });
     const first = directory.getOrCreate("wss://RELAY.example.com/");

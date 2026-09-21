@@ -1,7 +1,9 @@
 import * as Nostr from "nostr-typedef";
 import { defer, identity, map, mergeMap, Observable } from "rxjs";
+import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
+import { RxNostrCallbackError } from "../libs/error.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
@@ -35,14 +37,16 @@ export class RxNostr implements IRxNostr {
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
-    this.relays = new RelayPool(
-      (url) =>
-        new RelayCommunication(url, {
-          WebSocket: this.config.WebSocket,
-          retryer: this.config.retry,
-          relayDirectory: this.config.relayDirectory,
-        }),
-    );
+    this.relays = new RelayPool((url) => {
+      if (!this.config.skipFetchNip11) {
+        void this.config.relayDirectory.fetchNip11(url).catch(() => {});
+      }
+      return new RelayCommunication(url, {
+        WebSocket: this.config.WebSocket,
+        retryer: this.config.retry,
+        relayDirectory: this.config.relayDirectory,
+      });
+    });
     this.stack.use(this.relays);
 
     this.warmer = new RelayWarmer(this.relays);
@@ -80,8 +84,8 @@ export class RxNostr implements IRxNostr {
         relayInput: relays,
         relays: this.relays,
       }).pipe(
-        verify(options.verifier ?? this.config.verifier),
-        options.skipExpirationCheck ? identity : dropExpiredEvents(),
+        verify(callbackSafeVerifier(config.verifier)),
+        config.skipExpirationCheck ? identity : dropExpiredEvents(),
       ),
     );
   }
@@ -128,4 +132,16 @@ export class RxNostr implements IRxNostr {
 
 export function createRxNostr(config: RxNostrConfig): IRxNostr {
   return new RxNostr(config);
+}
+
+function callbackSafeVerifier(verifier: EventVerifier): EventVerifier {
+  return {
+    async verifyEvent(event) {
+      try {
+        return await verifier.verifyEvent(event);
+      } catch (cause) {
+        throw new RxNostrCallbackError("verifier", cause);
+      }
+    },
+  };
 }

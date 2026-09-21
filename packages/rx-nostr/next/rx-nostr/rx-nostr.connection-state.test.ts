@@ -11,6 +11,7 @@ describe("RxNostr connection state", () => {
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
+      skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
     const packets: ConnectionStatePacket[] = [];

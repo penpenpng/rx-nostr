@@ -1,17 +1,15 @@
 import {
   finalize,
-  identity,
   map,
   mergeAll,
   Subject,
-  timeout,
   type Observable,
   type Subscription,
 } from "rxjs";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { RelaySet, type RelayUrl } from "../../libs/index.ts";
 import { Logger } from "../../logger.ts";
-import { filterBy, setDiff } from "../../operators/index.ts";
+import { setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
@@ -112,6 +110,11 @@ function req({
   const finished = new RelaySet();
 
   const stream = new Subject<EventPacket>();
+  const completeIfFinished = () => {
+    if ([...segmentRelays].every((url) => finished.has(url))) {
+      stream.complete();
+    }
+  };
 
   const sub = segmentRelays
     .asObservable()
@@ -125,7 +128,7 @@ function req({
 
       if (!sessionRelays.disposed) {
         let nomore = false;
-        if (!outdated && current.size <= 0) {
+        if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           Logger.warn("REQ was issued, but no destination relays is set.");
           nomore = true;
         }
@@ -154,27 +157,37 @@ function req({
         const segment = session.beginSegment(relay, linger);
         Logger.trace(traceTag, `new segment on ${relay.url}`);
 
+        let finalized = false;
+        const queryRef: { sub?: Subscription } = {};
         const sub = relay
-          .vreq("backward", filters)
+          .vreq("backward", filters, {
+            timeout: eoseTimeout,
+            validateFilterMatching: !skipValidateFilterMatching,
+          })
           .pipe(
-            skipValidateFilterMatching ? identity : filterBy(filters),
-            map((packet) => ({ ...packet, traceTag })),
-            // Backward: If it times out, the REQ should be terminated.
-            timeout(eoseTimeout),
+            map((packet) =>
+              traceTag === undefined ? packet : { ...packet, traceTag },
+            ),
             // Backward: When a REQ on a relay is done or times out...
             finalize(() => {
+              finalized = true;
+              const currentQuery = ongoings.get(relay.url);
+              if (currentQuery?.sub === queryRef.sub) {
+                ongoings.delete(relay.url);
+              }
               segment.endSegment();
               Logger.trace(traceTag, `end segment on ${relay.url}`);
               finished.add(relay.url);
 
-              if ([...segmentRelays].every((url) => finished.has(url))) {
-                stream.complete();
-              }
+              completeIfFinished();
             }),
           )
-          .subscribe(stream);
-
-        ongoings.set(relay.url, { segment, sub });
+          .subscribe({
+            next: (packet) => stream.next(packet),
+            error: (error) => stream.error(error),
+          });
+        queryRef.sub = sub;
+        if (!finalized) ongoings.set(relay.url, { segment, sub });
       });
 
       relays.forEach(outdated, (relay) => {
@@ -185,6 +198,7 @@ function req({
         query?.sub.unsubscribe();
         query?.segment.endSegment();
       });
+      completeIfFinished();
     });
 
   return stream.pipe(

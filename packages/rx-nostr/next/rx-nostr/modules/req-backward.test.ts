@@ -270,6 +270,38 @@ test("dynamic relays", async () => {
   assert(!relay2.latch.isHeld, "Relay2 should be released");
 });
 
+test("removing an unfinished relay completes a segment whose other relay finished", async () => {
+  const rxReq = new RxBackwardReq();
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const sessionRelays = new RxRelays([
+    "wss://relay1.example.com",
+    "wss://relay2.example.com",
+  ]);
+  const relay1 = relays.get("wss://relay1.example.com");
+  const relay2 = relays.get("wss://relay2.example.com");
+  const req1 = relay1.attachNextStream();
+  const req2 = relay2.attachNextStream();
+  const obs = new ObservableInspector(
+    reqBackward({
+      relays,
+      rxReq,
+      relayInput: sessionRelays,
+      config: getTestReqOptions({ linger: 0, defer: false, weak: false }),
+    }),
+  );
+  const sub = obs.subscribe();
+
+  rxReq.emit([{}]);
+  await req1.subscribed;
+  await req2.subscribed;
+  req1.complete();
+
+  sessionRelays.remove("wss://relay2.example.com");
+  rxReq.over();
+  await obs.expectComplete();
+  sub.unsubscribe();
+});
+
 test("dynamic relays - uncompleted REQ should be performed on added relays", async () => {
   const rxReq = new RxBackwardReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
@@ -325,6 +357,7 @@ test("dynamic relays - uncompleted REQ should be performed on added relays", asy
 
   // All REQs reach EOSE
   req1relay1.complete();
+  req2relay1.complete();
   stream1.complete();
   stream2.complete();
 
