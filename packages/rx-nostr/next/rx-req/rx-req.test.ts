@@ -1,8 +1,8 @@
 import "disposablestack/auto";
 import { filter } from "rxjs";
-import { test } from "vitest";
+import { expect, test } from "vitest";
 import { ObservableInspector } from "../__test__/helper/index.ts";
-import { RxBackwardReq } from "./rx-req.ts";
+import { RxBackwardReq, RxOneshotReq } from "./rx-req.ts";
 
 test("RxReq emits a filter", async () => {
   const rxq = new RxBackwardReq();
@@ -48,4 +48,16 @@ test("Extended RxReq emits a filter", async () => {
 
   await obs.expectNext({ filters: [{ kinds: [0] }] });
   await obs.expectNext({ filters: [{ kinds: [2] }] });
+});
+
+test("one-shot requests are backward and preserve traceTag", async () => {
+  const rxq = new RxOneshotReq({ kinds: [1] }, { traceTag: "profile" });
+  const obs = new ObservableInspector(rxq.asObservable());
+  obs.subscribe();
+
+  expect(rxq.strategy).toBe("backward");
+  await obs.expectNext({
+    filters: [{ kinds: [1] }],
+    traceTag: "profile",
+  });
 });

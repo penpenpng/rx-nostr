@@ -3,7 +3,7 @@ export {
   isClosedPacket,
   isCountPacket,
   isEosePacket,
-  isEventPacket,
+  isEventMessagePacket,
   isNoticePacket,
   isOkPacket,
 } from "./packets.guards.ts";
@@ -14,6 +14,7 @@ export type {
   CountPacket,
   EosePacket,
   ErrorPacket,
+  EventMessagePacket,
   EventPacket,
   MessagePacket,
   MessagePacketBase,

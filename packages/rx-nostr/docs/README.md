@@ -10,6 +10,7 @@
 4. [tasks.md](./tasks.md): 実装タスクの依存順と進捗一覧
 5. [behavior-matrix.md](./behavior-matrix.md): v3 の能力を v4 で維持・置換・廃止・延期する一覧
 6. [typecheck-baseline.md](./typecheck-baseline.md): Task 00 時点の型エラー分類
+7. [public-contract.md](./public-contract.md): Task 01 で固定した公開型・operation・error の契約
 
 ## この資料の扱い
 

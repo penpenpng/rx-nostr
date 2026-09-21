@@ -3,7 +3,7 @@ import * as Nostr from "nostr-typedef";
 import type { ConnectionState } from "../connection-state.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
-import type { RxRelays } from "../rx-relays/index.ts";
+import type { RelayInput } from "../types/index.ts";
 
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
@@ -17,12 +17,8 @@ export interface ReqPacket extends ReqOptions {
 }
 
 export interface ReqOptions {
-  relays?: RxRelays | Iterable<string>;
+  relays?: RelayInput;
   linger?: number;
-  // TODO: reqId が意味を失うので reqId を使って本来やりたかったことをするために用意する？
-  // reqId を使って本来やりたかったこと is 何
-  // -> EOSE の見分け？
-  // -> Logging？
   traceTag?: string | number;
 }
 
@@ -49,7 +45,7 @@ export interface ProgressActivity {
  * Packets from websocket that represents all raw incoming messages.
  */
 export type MessagePacket =
-  | EventPacket
+  | EventMessagePacket
   | EosePacket
   | OkPacket
   | ClosedPacket
@@ -63,13 +59,22 @@ export interface MessagePacketBase<
 > {
   from: RelayUrl;
   type: T;
-  raw: Nostr.ToClientMessage.Message<T>;
+  message: Nostr.ToClientMessage.Message<T>;
 }
 
 /**
- * Packets from websocket that represents an EVENT.
+ * A public query result. Physical subscription identifiers and their raw
+ * tuples are intentionally kept out of this type.
  */
-export interface EventPacket extends MessagePacketBase<"EVENT"> {
+export interface EventPacket {
+  from: RelayUrl;
+  type: "EVENT";
+  traceTag?: string | number;
+  event: Nostr.Event;
+}
+
+/** @internal */
+export interface EventMessagePacket extends MessagePacketBase<"EVENT"> {
   subId: string;
   event: Nostr.Event;
 }
@@ -97,7 +102,7 @@ export interface OkPacket extends MessagePacketBase<"OK"> {
 export interface UnknownMessagePacket {
   from: RelayUrl;
   type: "unknown";
-  raw: unknown;
+  message: unknown;
 }
 
 export interface NoticePacket extends MessagePacketBase<"NOTICE"> {

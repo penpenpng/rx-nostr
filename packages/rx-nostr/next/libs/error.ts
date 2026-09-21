@@ -1,5 +1,39 @@
 export abstract class RxNostrError extends Error {}
 
+export type RxNostrCallbackKind =
+  | "authenticator"
+  | "filter"
+  | "signer"
+  | "verifier";
+
+/** A user-provided callback failed while an operation was running. */
+export class RxNostrCallbackError extends RxNostrError {
+  constructor(
+    public readonly callback: RxNostrCallbackKind,
+    cause: unknown,
+  ) {
+    super(`RxNostrCallbackError: ${callback} callback failed.`, { cause });
+    this.name = "RxNostrCallbackError";
+  }
+}
+
+export type RxNostrPublicationErrorCode =
+  | "cancelled"
+  | "no-relays"
+  | "not-all-accepted"
+  | "all-failed";
+
+/** A publication's requested all/any success condition cannot be met. */
+export class RxNostrPublicationError extends RxNostrError {
+  constructor(
+    public readonly code: RxNostrPublicationErrorCode,
+    public readonly failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
+  ) {
+    super(`RxNostrPublicationError: publication failed (${code}).`);
+    this.name = "RxNostrPublicationError";
+  }
+}
+
 /**
  * This is thrown when WebSocket connection is closed unexpectedly.
  * You may see them in a stream made by `rxNostr.createAllErrorObservable()`.

@@ -1,6 +1,6 @@
 import { tryOrDefault } from "./try.ts";
 
-export type RelayUrl = `ws://${number}` | `wss://${string}`;
+export type RelayUrl = `ws://${string}` | `wss://${string}`;
 
 export class RelayMap<T> {
   #map = new Map<RelayUrl, T>();

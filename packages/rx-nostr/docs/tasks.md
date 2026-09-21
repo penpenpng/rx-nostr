@@ -7,10 +7,10 @@
 | ID  | Task                                                                       | Depends on | Decision gate                 | Status              |
 | --- | -------------------------------------------------------------------------- | ---------- | ----------------------------- | ------------------- |
 | 00  | [Baseline と contract matrix](./tasks/00-baseline-contracts.md)            | -          | D8                            | complete            |
-| 01  | [Public model と config の固定](./tasks/01-public-model.md)                | 00         | D1, D5, D6, D9, D10, D13, D14 | ready               |
-| 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                   | 00, 01     | D4, D11                       | waiting for tasks   |
+| 01  | [Public model と config の固定](./tasks/01-public-model.md)                | 00         | D1, D5, D6, D9, D10, D13, D14 | complete            |
+| 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                   | 00, 01     | D4, D11                       | ready               |
 | 03  | [RelayPool、lease、hot relays](./tasks/03-relay-pool-hot.md)               | 02         | D9, D14                       | waiting for Task 02 |
-| 04  | [RelayDirectory](./tasks/04-relay-directory.md)                            | 01         | D2, D3, D12                   | waiting for Task 01 |
+| 04  | [RelayDirectory](./tasks/04-relay-directory.md)                            | 01         | D2, D3, D12                   | ready               |
 | 05  | [Reconnect と connection state](./tasks/05-reconnect-state.md)             | 02, 04     | D2, D4, D5, D11               | waiting for tasks   |
 | 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                 | 03, 05     | D5, D9, D12, D13, D14         | waiting for tasks   |
 | 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                          | 06         | D7                            | waiting for Task 06 |

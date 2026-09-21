@@ -1,14 +1,19 @@
 export {
   SimpleAuthenticator,
   type Authenticator,
+  type AuthenticatorFactory,
+  type AuthenticatorInput,
 } from "./authenticator/index.ts";
 export {
   NoopRetryer,
+  type ConnectionRetryContext,
+  type ConnectionRetryDecision,
   type ConnectionRetryer,
 } from "./connection-retryer/index.ts";
-export {
+export type {
+  ConnectionFailure,
   ConnectionState,
-  type ConnectionStateSymbol,
+  ConnectionStateSymbol,
 } from "./connection-state.ts";
 export {
   Nip07Signer,
@@ -28,11 +33,14 @@ export {
 export { evalFilters, type LazyFilter } from "./lazy-filter/index.ts";
 export {
   RxNostrAlreadyDisposedError,
+  RxNostrCallbackError,
   RxNostrEnvironmentError,
   RxNostrError,
   RxNostrInvalidUsageError,
   RxNostrLogicError,
-  RxNostrWebSocketError,
+  RxNostrPublicationError,
+  type RxNostrCallbackKind,
+  type RxNostrPublicationErrorCode,
 } from "./libs/error.ts";
 export {
   compareEvents,
@@ -75,46 +83,25 @@ export {
   type MergeFilterFunction,
   type SetDiff,
 } from "./operators/index.ts";
-export {
-  isAuthPacket,
-  isClosedPacket,
-  isCountPacket,
-  isEosePacket,
-  isEventPacket,
-  isNoticePacket,
-  isOkPacket,
-} from "./packets/index.ts";
 export type {
-  AuthPacket,
-  ClosedPacket,
   ConnectionStatePacket,
-  CountPacket,
-  EosePacket,
-  ErrorPacket,
   EventPacket,
-  MessagePacket,
-  MessagePacketBase,
-  NoticePacket,
   OkPacket,
-  ProgressActivity,
-  ProgressInitialState,
-  ProgressPacket,
   ReqOptions,
   ReqPacket,
-  UnknownMessagePacket,
 } from "./packets/index.ts";
-export {
-  GlobalRelayDirectory,
-  RelayDirectory,
-  type IRelay,
-  type IRelayDirectory,
-} from "./relay-directory/index.ts";
+export type {
+  Publication,
+  PublicationFailure,
+  PublicationSettlePolicy,
+} from "./publication/index.ts";
 export {
   createRxNostr,
   type IRxNostr,
   type RxNostrConfig,
-  type RxNostrEventConfig,
-  type RxNostrEventOptions,
+  type RxNostrDefaultOptions,
+  type RxNostrPublishConfig,
+  type RxNostrPublishOptions,
   type RxNostrReqConfig,
   type RxNostrReqOptions,
 } from "./rx-nostr/index.ts";
@@ -125,3 +112,15 @@ export {
   RxReq,
   type RxReqStrategy,
 } from "./rx-req/index.ts";
+export type {
+  RelayInput,
+  WebSocketBlob,
+  WebSocketCloseEvent,
+  WebSocketConstructor,
+  WebSocketData,
+  WebSocketErrorEvent,
+  WebSocketEventListener,
+  WebSocketLike,
+  WebSocketMessageEvent,
+  WebSocketOpenEvent,
+} from "./types/index.ts";

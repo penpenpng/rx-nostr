@@ -44,9 +44,9 @@ test("single relay", async () => {
   await relay.expectFilters([{ kinds: [1] }]);
 
   req1.next(Faker.eventPacket({ id: "1" }));
-  await obs.expectNext(Expect.eventPacket({ id: "1" }));
+  await obs.expectNext(Expect.eventPacket({ id: "1", traceTag: 1 }));
   req1.next(Faker.eventPacket({ id: "2" }));
-  await obs.expectNext(Expect.eventPacket({ id: "2" }));
+  await obs.expectNext(Expect.eventPacket({ id: "2", traceTag: 1 }));
 
   const req2 = relay.attachNextStream();
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
@@ -57,9 +57,9 @@ test("single relay", async () => {
   // so this is expected to be ignored.
   req1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   req2.next(Faker.eventPacket({ id: "3" }));
-  await obs.expectNext(Expect.eventPacket({ id: "3" }));
+  await obs.expectNext(Expect.eventPacket({ id: "3", traceTag: 2 }));
   req2.next(Faker.eventPacket({ id: "4" }));
-  await obs.expectNext(Expect.eventPacket({ id: "4" }));
+  await obs.expectNext(Expect.eventPacket({ id: "4", traceTag: 2 }));
 
   sub.unsubscribe();
   assert(

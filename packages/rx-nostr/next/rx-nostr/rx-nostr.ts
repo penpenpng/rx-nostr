@@ -3,12 +3,10 @@ import { defer, identity, Observable } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RelayMapOperator, RxDisposableStack } from "../libs/index.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
-import type {
-  ConnectionStatePacket,
-  EventPacket,
-  ProgressPacket,
-} from "../packets/index.ts";
+import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
+import type { Publication } from "../publication/index.ts";
 import { RxOneshotReq, RxReq } from "../rx-req/index.ts";
+import type { RelayInput } from "../types/index.ts";
 import {
   publish,
   RelayWarmer,
@@ -23,7 +21,6 @@ import {
 } from "./rx-nostr.config.ts";
 import type {
   IRxNostr,
-  RelayInput,
   RxNostrConfig,
   RxNostrPublishConfig,
   RxNostrReqConfig,
@@ -82,7 +79,7 @@ export class RxNostr implements IRxNostr {
   publish(
     params: Nostr.EventParameters,
     { relays, ...options }: RxNostrPublishConfig,
-  ): Observable<ProgressPacket> {
+  ): Publication {
     const config = new FilledRxNostrPublishOptions(options, this.config);
 
     return publish({
@@ -107,4 +104,8 @@ export class RxNostr implements IRxNostr {
     this.stack.dispose();
   });
   dispose = this[Symbol.dispose];
+}
+
+export function createRxNostr(config: RxNostrConfig): IRxNostr {
+  return new RxNostr(config);
 }

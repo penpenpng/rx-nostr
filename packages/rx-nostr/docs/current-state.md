@@ -2,43 +2,44 @@
 
 ## 要約
 
-v4 は、relay 集合の動的制御と forward/backward REQ の上位ロジックまで実装が進んでいます。一方、実通信、公開 `RxNostr`、publish、relay directory、connection state/retry はスケッチ段階です。現在通るテストは通信層を mock に置き換えた 19 件で、実 WebSocket/通信断を含む公開契約はまだ固定されていません。
+v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジック、公開 model/config の固定まで進んでいます。一方、実通信、`RxNostr` facade、publish、relay directory、connection state/retry の実装はスケッチ段階です。Task 01 完了時点では 25 unit tests と 4 public contract tests が通りますが、実 WebSocket/通信断の contract はまだありません。
 
 ## モジュール別状況
 
-| 領域                                  | 状況             | 根拠・注意点                                                                                                                     |
-| ------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `rx-req`                              | 概ね維持         | forward/backward、pipe、one-shot が存在する。公開契約テストは不足。`traceId`/`traceTag` の型不整合がある。                       |
-| `rx-relays`                           | 概ね維持         | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                             |
-| signer/verifier/lazy-filter/operators | 概ね維持         | v4 向けに分離済み。統合テストと public export 監査は未実施。                                                                     |
-| forward/backward REQ                  | 上位ロジックあり | mock 通信層を用いた動的 relay、segment relay、weak/defer/linger のテストがある。                                                 |
-| query session / hot relays            | 部分実装         | ref-count 相当の `Latch` はある。`RelayWarmer` は存在しない `connect()`/`release()` を呼んでおり未統合。                         |
-| relay communication                   | 未実装           | `NostrWebsocket` が未定義、backward と publish は空、直接 WebSocket 案の残骸がある。                                             |
-| publish                               | 未実装           | `summarize()` が存在せず、timeout packet の型も不一致。                                                                          |
-| authenticator                         | 部品のみ         | AUTH event を署名する部品はあるが、challenge 監視、再送、timeout が通信層へ接続されていない。                                    |
-| relay directory                       | スケッチ         | serialize/deserialize/retry/state 集計が未実装。`_getOrCreate()` は既存値を確認せず毎回上書きする。                              |
-| connection state/retry                | 仮 I/F           | 独自 state と `Observable<void>` retryer は unipls の lifecycle/reconnector と責務が重複する。                                   |
-| `RxNostr` 公開 API                    | 未完成           | `monitorConnectionState()` は空。実装クラスではなく `rx-nostr.legacy.ts` の宣言だけが `createRxNostr` として export されている。 |
-| WebSocket 抽象化                      | 未移行           | `next/websocket.ts` と `next/rx-nostr/websocket.ts` が直接 WebSocket を扱う未完成コードとして残る。v4 では削除対象。             |
-| package/build                         | 未移行           | package version/dependencies は v3 のままで unipls 依存がない。型生成時に多数の診断が出るが build process は exit 0 になる。     |
+| 領域                                  | 状況             | 根拠・注意点                                                                                                                 |
+| ------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `rx-req`                              | 契約固定         | forward/backward、pipe、one-shot を維持し、one-shot の backward semantics と `traceTag` を検証済み。                         |
+| `rx-relays`                           | 概ね維持         | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                         |
+| signer/verifier/lazy-filter/operators | 概ね維持         | v4 向けに分離済み。Task 01 で public export を監査し、明確な型欠陥だけを修正した。                                           |
+| forward/backward REQ                  | 上位ロジックあり | mock 通信層を用いた動的 relay、segment relay、weak/defer/linger のテストがある。                                             |
+| query session / hot relays            | 部分実装         | ref-count 相当の `Latch` はある。`RelayWarmer` は存在しない `connect()`/`release()` を呼んでおり未統合。                     |
+| relay communication                   | 未実装           | `NostrWebsocket` が未定義、backward と publish は空、直接 WebSocket 案の残骸がある。                                         |
+| publish                               | 未実装           | `summarize()` が存在せず、timeout packet の型も不一致。                                                                      |
+| authenticator                         | 部品のみ         | AUTH event を署名する部品はあるが、challenge 監視、再送、timeout が通信層へ接続されていない。                                |
+| relay directory                       | スケッチ         | serialize/deserialize/retry/state 集計が未実装。`_getOrCreate()` は既存値を確認せず毎回上書きする。                          |
+| connection state/retry                | 公開 model 固定  | rx-nostr 独自 state snapshot と retry decision I/F は固定済み。unipls lifecycle への接続は未実装。                           |
+| `RxNostr` 公開 API                    | model 固定       | v3 placeholder は削除済み。`createRxNostr`/`IRxNostr` は v4 model を公開するが、publish と state monitoring の実装は未完成。 |
+| WebSocket 抽象化                      | 未移行           | root の古い structural file は削除済み。`next/rx-nostr/websocket.ts` の direct WebSocket code は Task 02 の削除対象。        |
+| package/build                         | gate 整備済み    | v4 typecheck と declaration diagnostics は非 0 を返す。package version/dependencies と unipls package 解決はまだ v3 のまま。 |
 
 ## 現在確認できる品質ゲート
 
 2026-09-21 に次を実行しました。
 
-- `npm test -w packages/rx-nostr -- --run`: 5 files / 19 tests が成功
+- `npm test -w packages/rx-nostr`: 7 files / 29 tests が成功
 - `npm run lint -w packages/rx-nostr`: 成功
-- `npm run build -w packages/rx-nostr`: process は exit 0 だが declaration generation が多数の TypeScript error を報告
+- `npm run typecheck -w packages/rx-nostr`: 34 件の後続 task 所有 error を報告して exit 2
+- `npm run build -w packages/rx-nostr`: typecheck gate で exit 2
 
-したがって「build 成功」は現時点では品質ゲートになりません。型検査を独立コマンドにし、診断がある場合は非 0 で終了させる必要があります。
+build/typecheck は未実装を成功扱いにしない品質ゲートになりました。全体成功は後続 task の diagnostics 解消後です。
 
 主な診断は次のとおりです。
 
 - 未完成の relay communication、publish、monitoring、relay directory
 - `RelayWarmer` と `RelayCommunication` の I/F 不一致
-- packet helper の `subId` 欠落、`traceId`/`traceTag` 不一致
-- `tsconfig.json` が欠落した v3 `src` と v4 `next` の両方を対象にしている
-- `rx-nostr.legacy.ts` の解決不能な型
+- direct WebSocket code と未完成 transport adapter
+- publish implementation と facade の `Publication` 不一致
+- connection state monitor、relay warmer、relay directory の placeholder
 
 ## v3 から保持すべき問題領域
 
@@ -74,4 +75,4 @@ v4 は破壊的変更を許容するため v3 の API 形状そのものは維�
 
 ## 作業ツリー上の注意
 
-調査時点で `.gitmodules` と `packages/unipls` は staged、`.nvmrc`、`package-lock.json`、`.npmrc` に利用者の未コミット変更があります。これらを v4 実装の都合で上書き・巻き戻ししてはいけません。依存関係を整えるタスクでは、まずその変更意図と現在の submodule 方針を再確認します。
+計画作成時に `.gitmodules`、`packages/unipls`、`.nvmrc`、`package-lock.json`、`.npmrc` の変更が baseline commit に取り込まれています。特に unipls と lockfile は rx-nostr 実装の都合で無断変更せず、依存関係を整える際は現在の submodule 方針を再確認します。

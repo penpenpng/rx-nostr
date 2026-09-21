@@ -18,13 +18,17 @@ export class Faker {
 
   static eventPacket({
     from,
+    traceTag,
     ...event
-  }: Partial<Nostr.Event> & { from?: RelayUrl }): EventPacket {
+  }: Partial<Nostr.Event> & {
+    from?: RelayUrl;
+    traceTag?: string | number;
+  }): EventPacket {
     return {
       from: from ?? "wss://faker.example.com",
       type: "EVENT",
       event: Faker.event(event),
-      raw: ["EVENT", "sub-id", Faker.event(event)],
+      ...(traceTag === undefined ? {} : { traceTag }),
     };
   }
 }

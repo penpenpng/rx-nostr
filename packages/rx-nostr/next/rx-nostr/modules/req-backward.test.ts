@@ -42,9 +42,9 @@ test("single relay", async () => {
   await req1.subscribed;
 
   req1.next(Faker.eventPacket({ id: "1" }));
-  await obs.expectNext(Expect.eventPacket({ id: "1" }));
+  await obs.expectNext(Expect.eventPacket({ id: "1", traceTag: 1 }));
   req1.next(Faker.eventPacket({ id: "2" }));
-  await obs.expectNext(Expect.eventPacket({ id: "2" }));
+  await obs.expectNext(Expect.eventPacket({ id: "2", traceTag: 1 }));
 
   const req2 = relay.attachNextStream();
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
@@ -53,13 +53,13 @@ test("single relay", async () => {
 
   // The first subscription is still active.
   req1.next(Faker.eventPacket({ id: "3" }));
-  await obs.expectNext(Expect.eventPacket({ id: "3" }));
+  await obs.expectNext(Expect.eventPacket({ id: "3", traceTag: 1 }));
   req2.next(Faker.eventPacket({ id: "4" }));
-  await obs.expectNext(Expect.eventPacket({ id: "4" }));
+  await obs.expectNext(Expect.eventPacket({ id: "4", traceTag: 2 }));
 
   req1.complete();
   req2.next(Faker.eventPacket({ id: "5" }));
-  await obs.expectNext(Expect.eventPacket({ id: "5" }));
+  await obs.expectNext(Expect.eventPacket({ id: "5", traceTag: 2 }));
 
   req2.complete();
   assert(!relay.latch.isHeld, "Relay should be released");
@@ -71,7 +71,7 @@ test("single relay", async () => {
   assert(relay.latch.isHeld, "Relay should be reconnected");
 
   req3.next(Faker.eventPacket({ id: "6" }));
-  await obs.expectNext(Expect.eventPacket({ id: "6" }));
+  await obs.expectNext(Expect.eventPacket({ id: "6", traceTag: 3 }));
 
   req3.complete();
   rxReq.over();

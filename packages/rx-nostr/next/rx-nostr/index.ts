@@ -1,9 +1,10 @@
 export type {
   IRxNostr,
   RxNostrConfig,
-  RxNostrPublishConfig as RxNostrEventConfig,
-  RxNostrPublishOptions as RxNostrEventOptions,
+  RxNostrDefaultOptions,
+  RxNostrPublishConfig,
+  RxNostrPublishOptions,
   RxNostrReqConfig,
   RxNostrReqOptions,
 } from "./rx-nostr.interface.ts";
-export { createRxNostr } from "./rx-nostr.legacy.ts";
+export { createRxNostr } from "./rx-nostr.ts";

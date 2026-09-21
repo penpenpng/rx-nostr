@@ -1,18 +1,14 @@
 import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
-import type { Authenticator } from "../authenticator/index.ts";
+import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionRetryer } from "../connection-retryer/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import type {
-  ConnectionStatePacket,
-  EventPacket,
-  ProgressPacket,
-} from "../packets/index.ts";
-import type { RxRelays } from "../rx-relays/index.ts";
+import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
+import type { Publication } from "../publication/index.ts";
 import type { RxReq } from "../rx-req/index.ts";
-import type { IWebSocketConstructor } from "../websocket.ts";
+import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 
 export interface IRxNostr {
   req(rxReq: RxReq, config: RxNostrReqConfig): Observable<EventPacket>;
@@ -23,11 +19,12 @@ export interface IRxNostr {
   publish(
     params: Nostr.EventParameters,
     config: RxNostrPublishConfig,
-  ): Observable<ProgressPacket>;
+  ): Publication;
   setHotRelays(relays: RelayInput): void;
   unsetHotRelays(): void;
   monitorConnectionState(): Observable<ConnectionStatePacket>;
   [Symbol.dispose](): void;
+  dispose(): void;
 }
 
 export interface RxNostrConfig {
@@ -39,8 +36,8 @@ export interface RxNostrConfig {
    * Default signer, which is used to convert event parameters into signed event.
    */
   signer?: EventSigner;
-  authenticator?: Authenticator;
-  defaultOptions?: { req?: RxNostrReqOptions; publish?: RxNostrPublishOptions };
+  authenticator?: AuthenticatorInput;
+  defaultOptions?: RxNostrDefaultOptions;
   /**
    * Auto reconnection controller.
    */
@@ -53,7 +50,12 @@ export interface RxNostrConfig {
   /**
    * Optional. For environments where `WebSocket` doesn't exist in `globalThis` such as Node.js.
    */
-  WebSocket?: IWebSocketConstructor;
+  WebSocket?: WebSocketConstructor;
+}
+
+export interface RxNostrDefaultOptions {
+  req?: RxNostrReqOptions;
+  publish?: RxNostrPublishOptions;
 }
 
 export interface RxNostrReqOptions {
@@ -80,6 +82,8 @@ export interface RxNostrReqOptions {
 export interface RxNostrReqConfig extends RxNostrReqOptions {
   relays: RelayInput;
   verifier?: EventVerifier;
+  /** Override the instance authenticator, or disable AUTH for this operation. */
+  authenticator?: AuthenticatorInput | false;
 }
 
 export interface RxNostrPublishOptions {
@@ -96,9 +100,6 @@ export interface RxNostrPublishOptions {
 
 export interface RxNostrPublishConfig extends RxNostrPublishOptions {
   relays: RelayInput;
+  /** Override the instance authenticator, or disable AUTH for this operation. */
+  authenticator?: AuthenticatorInput | false;
 }
-
-// TODO:
-// * rx-relays でも同じの使いたいので types/* に移す。
-// * ついでに *.interface.ts 系も全部移す。
-export type RelayInput = RxRelays | Iterable<string> | string;

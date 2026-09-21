@@ -38,3 +38,23 @@
 - socket を開くこと
 - REQ/publish を動作させること
 - v3 alias を decision 以上に実装すること
+
+## 実施結果
+
+- Status: **completed at 2026-09-21**
+- [public-contract.md](../public-contract.md) に operation start、option precedence、relay normalization、pipeline、error semantics を固定した。
+- `RelayInput` と rx-nostr 所有の structural WebSocket types を共通 `types` module へ移した。public declaration は unipls 型を参照しない。
+- `EventPacket` は `from`、`event`、任意の `traceTag` のみにし、`subId`、`vreqId`、それらを含む tuple を public query result から除外した。
+- `Publication`、all/any policy、failure snapshot、typed publication/callback errors を公開 model として追加した。
+- connection state を immutable な rx-nostr 独自 discriminated union に置き換えた。
+- config defaults と merge を一箇所へ集約し、D14 の `defer: true` / `linger: 10_000ms`、AUTH opt-in、operation override を反映した。
+- v3 compatibility placeholder を削除し、concrete `RxNostr` class、未完成 RelayDirectory、physical packet types を root entry point から隠した。
+- `RelayUrl` の `ws://` hostname 型欠陥、`RxOneshotReq` の stale `traceId`、`batch()` の `RelayInput` 型欠陥を修正した。
+
+検証結果:
+
+- `npm run test:unit -w packages/rx-nostr`: 6 files / 25 tests passed
+- `npm run test:contract -w packages/rx-nostr`: 1 file / 4 tests passed
+- `npm run lint -w packages/rx-nostr`: passed
+- typecheck の Task 01 所有 diagnostics: 0
+- repository 全体の v4 typecheck: expected failure（34 diagnostics、すべて Tasks 02/03/04/08/09 所有）

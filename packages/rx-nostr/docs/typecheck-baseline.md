@@ -56,3 +56,15 @@ rx-nostr tests must not deep-import `packages/unipls/tests/support`. That direct
 The compiler emits ES2022 and uses `ESNext` library declarations because current code calls the new Set methods (`difference`, `intersection`, `symmetricDifference`, and `union`). The adopted unipls floor is Node >= 22.4, Deno >= 2, Bun >= 1.2, and the latest two major browser versions. A smoke check passed on Node 24.14.1 at this snapshot.
 
 Task 10 must exercise these Set calls in every supported runtime lane. If any minimum runtime in the adopted matrix lacks them, replace the calls with internal helpers rather than raising the runtime floor silently.
+
+## Progress after Task 01
+
+Task 01 removed all diagnostics assigned to its public-model scope, including the legacy placeholder, `traceId`, fixture packet, and relay-input/operator errors. The 2026-09-21 check now reports 34 diagnostics in seven files:
+
+- Task 02: `relay-communication.ts` and the direct `rx-nostr/websocket.ts` (25)
+- Task 03: `modules/relay-warmer.ts` (3)
+- Task 04: RelayDirectory placeholders (2)
+- Task 08: publication implementation and its facade return (3)
+- Task 09: connection-state facade placeholder (1)
+
+No diagnostic comes from the public contract spec, public config model, v3 `src`, or a Task 01-owned file.

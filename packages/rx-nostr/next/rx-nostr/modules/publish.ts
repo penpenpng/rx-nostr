@@ -13,10 +13,10 @@ import { Logger } from "../../logger.ts";
 import { timeoutWith } from "../../operators/index.ts";
 import type { ProgressActivity, ProgressPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
+import type { RelayInput } from "../../types/index.ts";
 import { QuerySession, type QuerySegment } from "../query-session.ts";
 import { type IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
-import type { RelayInput } from "../rx-nostr.interface.ts";
 
 export function publish({
   relays,

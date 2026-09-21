@@ -22,10 +22,10 @@ import { filterBy, setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
+import type { RelayInput } from "../../types/index.ts";
 import { QuerySession, type QuerySegment } from "../query-session.ts";
 import type { IRelayCommunication } from "../relay-communication.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
-import type { RelayInput } from "../rx-nostr.interface.ts";
 
 export function reqForward({
   relays,
@@ -61,7 +61,7 @@ export function reqForward({
           ? RxRelays.from(packet.relays)
           : RxRelays.from(sessionRelays),
         filters: packet.filters,
-        linger: config.linger ?? packet.linger ?? 0,
+        linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
       }),
@@ -170,7 +170,10 @@ function req({
 
         const sub = relay
           .vreq("forward", filters)
-          .pipe(skipValidateFilterMatching ? identity : filterBy(filters))
+          .pipe(
+            skipValidateFilterMatching ? identity : filterBy(filters),
+            map((packet) => ({ ...packet, traceTag })),
+          )
           .subscribe(stream);
 
         ongoings.set(relay.url, { segment, sub });

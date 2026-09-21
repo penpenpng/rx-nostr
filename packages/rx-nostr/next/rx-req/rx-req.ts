@@ -81,7 +81,7 @@ export class RxOneshotReq extends RxReq {
 
   constructor(
     filters: LazyFilter | LazyFilter[],
-    options?: Pick<ReqOptions, "traceId">,
+    options?: Pick<ReqOptions, "traceTag">,
   ) {
     super();
 

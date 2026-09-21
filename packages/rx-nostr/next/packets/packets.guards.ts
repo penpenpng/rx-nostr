@@ -3,13 +3,15 @@ import type {
   ClosedPacket,
   CountPacket,
   EosePacket,
-  EventPacket,
+  EventMessagePacket,
   MessagePacket,
   NoticePacket,
   OkPacket,
 } from "./packets.interface.ts";
 
-export function isEventPacket(packet: MessagePacket): packet is EventPacket {
+export function isEventMessagePacket(
+  packet: MessagePacket,
+): packet is EventMessagePacket {
   return packet.type === "EVENT";
 }
 
