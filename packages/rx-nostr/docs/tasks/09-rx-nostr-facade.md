@@ -29,3 +29,15 @@
 
 - package artifact/runtime matrix（Task 10）
 - 利用者向け全ドキュメントの翻訳
+
+## 実装結果
+
+2026-09-21 に完了。
+
+- `createRxNostr()` が返す facade に REQ、Publication、hot relay、connection state、directory/retry/auth/transport injection を統合し、legacy class/direct transport は public entry point から露出しない状態を確認した。
+- instance の disposal gate を一元化した。`dispose()` は最初に受付を停止し、active REQ を complete、Publication を `cancelled`、hot lease を release してから pool/RelayCommunication/transport を dispose する。
+- `dispose()` と `[Symbol.dispose]()` は同じ冪等処理。dispose 後の immediate mutator/publish は同期 throw、dispose 前後に作られた cold REQ/monitor は subscribe 時に `RxNostrAlreadyDisposedError` を通知する。
+- dispose 前から active な state monitor は各 relay の `disposed` snapshot を受けてから complete する。pending retry、AUTH、query queue、publication timeout は下位 resource disposal により停止する。
+- Publication は facade 内の active registry で管理し、natural cleanup 後は除去する。これにより instance dispose 時は pool より先に全 publication を cancel する。
+- 同一 URL でも RxNostr instance ごとに別 pool/socket を所有し、注入した RelayDirectory の metadata/health entry だけを共有することを contract test で確認した。
+- ReqPacket relay/traceTag > operation config > root defaults の優先順位と、operation verifier/boolean override が root verifier/default を上書きすることを wire test で固定した。

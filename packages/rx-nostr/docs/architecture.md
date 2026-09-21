@@ -182,6 +182,18 @@ terminal 後は各 segment の linger を維持し、finite linger cleanup 後�
 11. rx-nostr の public declaration に unipls の型を露出させない。
 12. query result に physical subId または logical vreqId を露出させない。
 
+## RxNostr lifecycle
+
+RxNostr instance は disposal gate と active Publication registry を facade に持ちます。dispose 順序は次のとおりです。
+
+1. gate を閉じ、以後の mutator/publish と cold operation subscription を拒否する。
+2. facade の dispose signal で active REQ を complete する。
+3. active Publication を cancel し、send/AUTH/retry/timeout と publication lease を止める。
+4. RelayWarmer を dispose して hot lease を解放する。
+5. RelayPool を dispose し、各 RelayCommunication、transport、state observer を終端する。
+
+pool は instance local であり、同じ relay URL を使う複数 instance も別 socket/session を持ちます。共有可能なのは注入した RelayDirectory の metadata/health record だけです。
+
 ## 明示的な初期スコープ外
 
 - 一つの relay URL に対する physical WebSocket 多重化

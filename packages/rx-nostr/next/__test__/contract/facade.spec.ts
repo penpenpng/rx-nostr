@@ -1,0 +1,248 @@
+import type * as Nostr from "nostr-typedef";
+import { describe, expect, test, vi } from "vitest";
+import {
+  createRxNostr,
+  NoopRetryer,
+  NoopSigner,
+  NoopVerifier,
+  RelayDirectory,
+  RxBackwardReq,
+  RxForwardReq,
+  RxNostrAlreadyDisposedError,
+  type ConnectionStatePacket,
+  type EventPacket,
+} from "rx-nostr";
+import { ContractWebSocketServer } from "./support/controlled-websocket.ts";
+
+const relay = "wss://relay.example.com";
+
+const signedEvent: Nostr.Event = {
+  id: "event",
+  pubkey: "pubkey",
+  created_at: 1,
+  kind: 1,
+  tags: [],
+  content: "",
+  sig: "signature",
+};
+
+describe("RxNostr facade lifecycle", () => {
+  test("disposes active operations before transport and rejects later work", async () => {
+    const server = new ContractWebSocketServer();
+    const rxNostr = createRxNostr({
+      verifier: new NoopVerifier(),
+      retry: new NoopRetryer(),
+      skipFetchNip11: true,
+      WebSocket: server.WebSocket,
+    });
+    const states: ConnectionStatePacket[] = [];
+    const stateComplete = vi.fn();
+    rxNostr.monitorConnectionState().subscribe({
+      next: (packet) => states.push(packet),
+      complete: stateComplete,
+    });
+    rxNostr.setHotRelays(relay);
+    const connection = server.current;
+    connection.open();
+    await vi.waitFor(() =>
+      expect(states.some((packet) => packet.state.state === "connected")).toBe(
+        true,
+      ),
+    );
+
+    const request = new RxForwardReq();
+    const reqComplete = vi.fn();
+    rxNostr
+      .req(request, { relays: relay })
+      .subscribe({ complete: reqComplete });
+    request.emit([{}]);
+    const delayedReq = rxNostr.req([{}], { relays: relay });
+    const delayedMonitor = rxNostr.monitorConnectionState();
+
+    const publication = rxNostr.publish(signedEvent, {
+      relays: relay,
+      signer: new NoopSigner(),
+      linger: 0,
+      timeout: 1_000,
+    });
+    const publicationComplete = vi.fn();
+    publication.subscribe({ complete: publicationComplete });
+    const cancelled = expect(publication.waitFor("all")).rejects.toMatchObject({
+      code: "cancelled",
+    });
+
+    rxNostr.dispose();
+    rxNostr.dispose();
+    rxNostr[Symbol.dispose]();
+
+    expect(reqComplete).toHaveBeenCalledOnce();
+    expect(publicationComplete).toHaveBeenCalledOnce();
+    await cancelled;
+    expect(() => rxNostr.setHotRelays(relay)).toThrow(
+      RxNostrAlreadyDisposedError,
+    );
+    expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
+    expect(() =>
+      rxNostr.publish(signedEvent, {
+        relays: relay,
+        signer: new NoopSigner(),
+      }),
+    ).toThrow(RxNostrAlreadyDisposedError);
+
+    const delayedReqError = vi.fn();
+    delayedReq.subscribe({ error: delayedReqError });
+    expect(delayedReqError).toHaveBeenCalledWith(
+      expect.any(RxNostrAlreadyDisposedError),
+    );
+    const newReqError = vi.fn();
+    rxNostr.req([{}], { relays: relay }).subscribe({ error: newReqError });
+    expect(newReqError).toHaveBeenCalledWith(
+      expect.any(RxNostrAlreadyDisposedError),
+    );
+    const monitorError = vi.fn();
+    delayedMonitor.subscribe({ error: monitorError });
+    expect(monitorError).toHaveBeenCalledWith(
+      expect.any(RxNostrAlreadyDisposedError),
+    );
+
+    await vi.waitFor(() => expect(connection.closeRequests).toHaveLength(1));
+    connection.acknowledgeClose();
+    await vi.waitFor(() => {
+      expect(states.some((packet) => packet.state.state === "disposed")).toBe(
+        true,
+      );
+      expect(stateComplete).toHaveBeenCalledOnce();
+    });
+  });
+
+  test("keeps pools per instance while sharing directory metadata", async () => {
+    const directory = new RelayDirectory();
+    const firstServer = new ContractWebSocketServer();
+    const secondServer = new ContractWebSocketServer();
+    const first = createRxNostr({
+      verifier: new NoopVerifier(),
+      relayDirectory: directory,
+      retry: new NoopRetryer(),
+      skipFetchNip11: true,
+      WebSocket: firstServer.WebSocket,
+    });
+    const second = createRxNostr({
+      verifier: new NoopVerifier(),
+      relayDirectory: directory,
+      retry: new NoopRetryer(),
+      skipFetchNip11: true,
+      WebSocket: secondServer.WebSocket,
+    });
+
+    first.setHotRelays(relay);
+    second.setHotRelays(relay);
+    expect(firstServer.connections).toHaveLength(1);
+    expect(secondServer.connections).toHaveLength(1);
+    expect(firstServer.current).not.toBe(secondServer.current);
+    firstServer.current.open();
+    secondServer.current.open();
+    await vi.waitFor(() =>
+      expect(directory.get(relay)?.liveConnections).toBe(2),
+    );
+
+    first.dispose();
+    await vi.waitFor(() =>
+      expect(firstServer.current.closeRequests).toHaveLength(1),
+    );
+    firstServer.current.acknowledgeClose();
+    await vi.waitFor(() =>
+      expect(directory.get(relay)?.liveConnections).toBe(1),
+    );
+    expect(secondServer.current.closeRequests).toHaveLength(0);
+
+    second.dispose();
+    await vi.waitFor(() =>
+      expect(secondServer.current.closeRequests).toHaveLength(1),
+    );
+    secondServer.current.acknowledgeClose();
+    await vi.waitFor(() =>
+      expect(directory.get(relay)?.liveConnections).toBe(0),
+    );
+  });
+
+  test("applies packet, operation, root-default precedence", async () => {
+    const server = new ContractWebSocketServer();
+    const rootVerify = vi.fn(async (_event: Nostr.Event) => false);
+    const operationVerify = vi.fn(async (_event: Nostr.Event) => true);
+    const rxNostr = createRxNostr({
+      verifier: { verifyEvent: rootVerify },
+      defaultOptions: {
+        req: {
+          skipValidateFilterMatching: true,
+          skipExpirationCheck: true,
+        },
+      },
+      retry: new NoopRetryer(),
+      skipFetchNip11: true,
+      WebSocket: server.WebSocket,
+    });
+    const request = new RxBackwardReq();
+    const packets: EventPacket[] = [];
+    rxNostr
+      .req(request, {
+        relays: relay,
+        verifier: { verifyEvent: operationVerify },
+        skipValidateFilterMatching: false,
+        skipExpirationCheck: false,
+        linger: 0,
+      })
+      .subscribe((packet) => packets.push(packet));
+    request.emit([{ kinds: [1] }], {
+      relays: "wss://packet.example.com",
+      traceTag: "packet",
+    });
+    request.over();
+    expect(server.connections).toHaveLength(1);
+    expect(server.current.url).toBe("wss://packet.example.com");
+    server.current.open();
+    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.current.sent[0] as string) as [
+      "REQ",
+      string,
+    ];
+    const now = Math.floor(Date.now() / 1_000);
+    server.current.message(
+      JSON.stringify([
+        "EVENT",
+        subId,
+        { ...signedEvent, id: "mismatch", kind: 2 },
+      ]),
+    );
+    server.current.message(
+      JSON.stringify([
+        "EVENT",
+        subId,
+        {
+          ...signedEvent,
+          id: "expired",
+          tags: [["expiration", `${now - 1}`]],
+        },
+      ]),
+    );
+    server.current.message(
+      JSON.stringify(["EVENT", subId, { ...signedEvent, id: "accepted" }]),
+    );
+    server.current.message(JSON.stringify(["EOSE", subId]));
+
+    await vi.waitFor(() => expect(packets).toHaveLength(1));
+    expect(packets[0]).toMatchObject({
+      traceTag: "packet",
+      event: { id: "accepted" },
+    });
+    expect(rootVerify).not.toHaveBeenCalled();
+    expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual([
+      "expired",
+      "accepted",
+    ]);
+    await vi.waitFor(() =>
+      expect(server.current.closeRequests).toHaveLength(1),
+    );
+    server.current.acknowledgeClose();
+    rxNostr.dispose();
+  });
+});

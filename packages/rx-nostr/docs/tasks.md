@@ -15,8 +15,8 @@
 | 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                 | 03, 05     | D5, D9, D12, D13, D14         | complete            |
 | 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                          | 06         | D7                            | complete            |
 | 08  | [Publish pipeline](./tasks/08-publish.md)                                  | 03, 05, 07 | D5, D6, D10, D11, D14         | complete            |
-| 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)               | 06, 08     | D1                            | ready               |
-| 10  | [Package、contract test、release readiness](./tasks/10-package-release.md) | 09         | D8                            | waiting for Task 09 |
+| 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)               | 06, 08     | D1                            | complete            |
+| 10  | [Package、contract test、release readiness](./tasks/10-package-release.md) | 09         | D8                            | ready               |
 
 ## Milestones
 

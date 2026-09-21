@@ -1,9 +1,20 @@
 import * as Nostr from "nostr-typedef";
-import { defer, identity, map, mergeMap, Observable } from "rxjs";
+import {
+  defer,
+  identity,
+  map,
+  mergeMap,
+  Observable,
+  Subject,
+  takeUntil,
+} from "rxjs";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
-import { RxNostrCallbackError } from "../libs/error.ts";
+import {
+  RxNostrAlreadyDisposedError,
+  RxNostrCallbackError,
+} from "../libs/error.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
@@ -34,6 +45,9 @@ export class RxNostr implements IRxNostr {
   protected relays: RelayPool<RelayCommunication>;
   protected config: FilledRxNostrConfig;
   protected warmer: RelayWarmer;
+  readonly #dispose$ = new Subject<void>();
+  readonly #publications = new Set<ReturnType<typeof publish>>();
+  #disposed = false;
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
@@ -78,8 +92,9 @@ export class RxNostr implements IRxNostr {
       }
     })();
 
-    return defer(() =>
-      req({
+    return defer(() => {
+      this.#assertActive();
+      return req({
         rxReq,
         config,
         relayInput: relays,
@@ -87,14 +102,15 @@ export class RxNostr implements IRxNostr {
       }).pipe(
         verify(callbackSafeVerifier(config.verifier)),
         config.skipExpirationCheck ? identity : dropExpiredEvents(),
-      ),
-    );
+      );
+    }).pipe(takeUntil(this.#dispose$));
   }
 
   publish(
     params: Nostr.EventParameters,
     { relays, ...options }: RxNostrPublishConfig,
   ): Publication {
+    this.#assertActive();
     const config = new FilledRxNostrPublishOptions(options, this.config);
 
     const publication = publish({
@@ -103,35 +119,49 @@ export class RxNostr implements IRxNostr {
       relayInput: relays,
       relays: this.relays,
     });
-    const forget = this.stack.temporary(publication);
-    void publication.closed.then(forget);
+    this.#publications.add(publication);
+    void publication.closed.then(() => this.#publications.delete(publication));
     return publication;
   }
 
   setHotRelays(relays: RelayInput): void {
+    this.#assertActive();
     this.warmer.setHotRelays(relays);
   }
 
   unsetHotRelays(): void {
+    this.#assertActive();
     this.warmer.unsetHotRelays();
   }
 
   monitorConnectionState(): Observable<ConnectionStatePacket> {
-    return this.relays
-      .observeEntries()
-      .pipe(
-        mergeMap((relay) =>
-          relay
-            .monitorConnectionState()
-            .pipe(map((state) => Object.freeze({ from: relay.url, state }))),
-        ),
-      );
+    return defer(() => {
+      this.#assertActive();
+      return this.relays
+        .observeEntries()
+        .pipe(
+          mergeMap((relay) =>
+            relay
+              .monitorConnectionState()
+              .pipe(map((state) => Object.freeze({ from: relay.url, state }))),
+          ),
+        );
+    });
   }
 
   [Symbol.dispose] = once(() => {
+    this.#disposed = true;
+    this.#dispose$.next();
+    this.#dispose$.complete();
+    for (const publication of this.#publications) publication.cancel();
+    this.#publications.clear();
     this.stack.dispose();
   });
   dispose = this[Symbol.dispose];
+
+  #assertActive(): void {
+    if (this.#disposed) throw new RxNostrAlreadyDisposedError();
+  }
 }
 
 export function createRxNostr(config: RxNostrConfig): IRxNostr {

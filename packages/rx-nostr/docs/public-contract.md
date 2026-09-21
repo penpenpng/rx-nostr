@@ -107,6 +107,6 @@ AUTH is opt-in. A root or operation authenticator may be an `Authenticator` or a
 ## Error boundaries
 
 - Invalid relay strings are filtered as described above; they are not callback or transport errors.
-- A disposed instance rejects new work with `RxNostrAlreadyDisposedError`. Immediate mutators and `publish()` throw at their call boundary; a cold REQ reports the error when subscribed.
+- A disposed instance rejects new work with `RxNostrAlreadyDisposedError`. Immediate mutators and `publish()` throw at their call boundary; a cold REQ or newly subscribed connection-state monitor reports the error when subscribed. A monitor active before disposal observes each existing relay's `disposed` state before completion.
 - Exceptions from lazy filters, signer, verifier, or authenticator are wrapped in `RxNostrCallbackError` with the callback kind and original value as `cause`. Query callback errors shared by the operation may error the whole query; relay-local failures may not.
 - Environment failures such as an unavailable browser signer remain available as the callback error's cause.

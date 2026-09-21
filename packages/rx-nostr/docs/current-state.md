@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 は、relay 集合の動的制御、公開 model/config、unipls transport adapter、per-instance pool と connection lease、共有 RelayDirectory、connection state/retry 集約、forward/backward REQ protocol、physical query queue、NIP-42 AUTH、publication object まで完成しています。残る主要実装は disposed-instance guard を含む `RxNostr` facade lifecycle と package/release gate です。Task 08 完了時点では 91 unit tests と 42 public contract tests が通り、controlled transport で通信断、再接続、REQ/CLOSE、publish all/any/cancel、lazy filter 再評価、relay-local timeout、NIP-11 query limit、AUTH dedupe/replay/cancellation、dispose cleanup、hot/query/publish lease の競合と metadata/health 集約を検証しています。
+v4 の core implementation は、relay 集合、public config、unipls adapter、pool/lease/hot relays、RelayDirectory、connection state/retry、REQ query engine、NIP-42 AUTH、Publication、RxNostr facade lifecycle まで完成しています。残る作業は package artifact、runtime matrix、migration/release documentation の最終監査です。Task 09 完了時点では 91 unit tests と 45 public contract tests が通り、controlled transport で通信断、再接続、REQ/CLOSE、publish all/any/cancel、lazy filter 再評価、relay-local timeout、NIP-11 query limit、AUTH、instance disposal、複数instance分離、設定優先順位を検証しています。
 
 ## モジュール別状況
 
@@ -19,7 +19,7 @@ v4 は、relay 集合の動的制御、公開 model/config、unipls transport ad
 | authenticator                         | 実装済み           | opt-in の relay coordinator が challenge 世代、dedupe、AUTH OK/timeout、REQ/EVENT一回再送、unsubscribe/dispose cleanup を管理する。       |
 | relay directory                       | 実装済み           | global/injected directory、immutable entry、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。 |
 | connection state/retry                | 実装済み           | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。 |
-| `RxNostr` 公開 API                    | ほぼ実装済み       | `req()`、`publish()`、hot relays、state monitoring は実装済み。disposed-instance guard と facade 全体 cleanup は Task 09。                |
+| `RxNostr` 公開 API                    | 実装済み           | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local pool を検証済み。             |
 | WebSocket 抽象化                      | 移行済み           | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                        |
 | package/build                         | gate 整備済み      | runtime dependency は manifest に宣言済み。lockfile 同期と配布 artifact 検証は Task 10。                                                |
 
@@ -28,7 +28,7 @@ v4 は、relay 集合の動的制御、公開 model/config、unipls transport ad
 2026-09-21 に次を実行しました。
 
 - `npm run test:unit -w packages/rx-nostr`: 16 files / 91 tests が成功
-- `npm run test:contract -w packages/rx-nostr`: 6 files / 42 tests が成功
+- `npm run test:contract -w packages/rx-nostr`: 7 files / 45 tests が成功
 - `npm run lint -w packages/rx-nostr`: 成功
 - `npm run typecheck -w packages/rx-nostr`: 成功
 - `npm run build -w packages/rx-nostr`: declaration generation を含め成功
