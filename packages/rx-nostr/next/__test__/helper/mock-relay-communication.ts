@@ -2,7 +2,7 @@ import { filter, Subject, type Observable } from "rxjs";
 import { assert, expect } from "vitest";
 import type { LazyFilter } from "../../index.ts";
 import { AwaitableQueue, Latch, u, type RelayUrl } from "../../libs/index.ts";
-import type { EventPacket, ProgressActivity } from "../../packets";
+import type { EventPacket, OkPacket } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
 
 export class RelayCommunicationMock implements IRelayCommunication {
@@ -83,9 +83,9 @@ export class RelayCommunicationMock implements IRelayCommunication {
     }
   }
 
-  eventOut = new Subject<ProgressActivity>();
+  eventOut = new Subject<OkPacket>();
 
-  event(): Observable<ProgressActivity> {
+  event(): Observable<OkPacket> {
     return this.eventOut.asObservable();
   }
 

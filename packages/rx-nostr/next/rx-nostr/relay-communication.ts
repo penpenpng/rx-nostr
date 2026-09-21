@@ -21,7 +21,6 @@ import type {
   EventMessagePacket,
   EventPacket,
   OkPacket,
-  ProgressActivity,
 } from "../packets/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
 import { AuthenticationFailure, AuthCoordinator } from "./auth-coordinator.ts";
@@ -45,8 +44,11 @@ export interface IRelayCommunication {
   ): Observable<EventPacket>;
   event(
     event: Nostr.Event,
-    options?: Readonly<{ authenticator?: AuthenticatorInput }>,
-  ): Observable<ProgressActivity>;
+    options?: Readonly<{
+      authenticator?: AuthenticatorInput;
+      timeout?: number;
+    }>,
+  ): Observable<OkPacket>;
 }
 
 export interface RelayCommunicationOptions {
@@ -245,8 +247,11 @@ export class RelayCommunication implements IRelayCommunication {
 
   event(
     event: Nostr.Event,
-    options: Readonly<{ authenticator?: AuthenticatorInput }> = {},
-  ): Observable<ProgressActivity> {
+    options: Readonly<{
+      authenticator?: AuthenticatorInput;
+      timeout?: number;
+    }> = {},
+  ): Observable<OkPacket> {
     if (this.#leases.count === 0) return EMPTY;
 
     return new Observable((subscriber) => {
@@ -255,12 +260,18 @@ export class RelayCommunication implements IRelayCommunication {
       const authAbort = new AbortController();
       let subscription: Subscription | undefined;
       const start = () => {
-        subscriber.next({ from: this.url, state: "sent" });
         subscription = this.#transport
           .subscribe({
             query: ["EVENT", event],
             selector: (packet) =>
               packet.type === "OK" && packet.eventId === event.id,
+            ...(options.timeout !== undefined &&
+            Number.isFinite(options.timeout)
+              ? {
+                  timeout:
+                    options.timeout === 0 ? Number.MIN_VALUE : options.timeout,
+                }
+              : {}),
             retry: "resend",
           })
           .pipe(filter((packet): packet is OkPacket => packet.type === "OK"))
@@ -268,12 +279,7 @@ export class RelayCommunication implements IRelayCommunication {
             next: (packet) => {
               const authRequired =
                 !packet.ok && packet.noticeType === "auth-required";
-              subscriber.next({
-                from: this.url,
-                state: "ok",
-                ok: packet.ok,
-                ...(authRequired ? { reason: "auth" as const } : {}),
-              });
+              subscriber.next(packet);
               subscription?.unsubscribe();
               if (authRequired && !authRetried) {
                 authRetried = true;
@@ -289,7 +295,7 @@ export class RelayCommunication implements IRelayCommunication {
                 subscriber.complete();
               }
             },
-            error: () => subscriber.complete(),
+            error: (error) => subscriber.error(error),
           });
       };
       start();

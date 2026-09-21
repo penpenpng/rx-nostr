@@ -22,25 +22,6 @@ export interface ReqOptions {
   traceTag?: string | number;
 }
 
-export interface ProgressPacket {
-  activity: ProgressActivity;
-  progress: Map<RelayUrl, ProgressInitialState | ProgressActivity>;
-  success: number;
-  failure: number;
-}
-
-export interface ProgressInitialState {
-  state: "waiting";
-  relay: RelayUrl;
-}
-
-export interface ProgressActivity {
-  from: RelayUrl;
-  state: "sent" | "ok" | "timeout";
-  ok?: boolean;
-  reason?: "timeout" | "auth";
-}
-
 /**
  * Packets from websocket that represents all raw incoming messages.
  */

@@ -3,7 +3,7 @@ import { EMPTY } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/index.ts";
-import type { EventPacket, ProgressActivity } from "../packets/index.ts";
+import type { EventPacket, OkPacket } from "../packets/index.ts";
 import type { IRelayCommunication } from "./relay-communication.ts";
 import { QuerySession } from "./query-session.ts";
 
@@ -22,7 +22,7 @@ class LeaseRelay implements IRelayCommunication {
     return EMPTY as import("rxjs").Observable<EventPacket>;
   }
   event(_event: Nostr.Event) {
-    return EMPTY as import("rxjs").Observable<ProgressActivity>;
+    return EMPTY as import("rxjs").Observable<OkPacket>;
   }
 }
 

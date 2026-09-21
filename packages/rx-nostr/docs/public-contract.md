@@ -20,11 +20,14 @@ This document fixes the public model used by Tasks 02–10. Later tasks may add 
 
 - `publish()` snapshots normalized destinations and starts signing immediately when called. Later `RxRelays` changes do not affect that publication.
 - The returned `Publication` is one hot operation. `subscribe()` observes the unaggregated `OkPacket` stream; unsubscribing only stops that observer and never cancels delivery.
-- Task 08 must retain OK packets already received by the operation and replay them to a later subscriber before live packets. AUTH-related `OK false` packets remain observable even when a resend is pending.
+- OK packets already received by the operation are replayed to a later subscriber before live packets. AUTH-related `OK false` packets remain observable even when a resend is pending.
 - `cancel()` is idempotent and stops every remaining relay effort.
 - `event` resolves to the immutable signed EVENT actually used by the operation. It rejects if signing cannot produce an EVENT or if there are no destinations.
 - `waitFor("all")` and `waitFor("any")` resolve to `undefined`. `all` resolves only after every destination has final `OK true` and rejects as soon as a non-AUTH-pending final failure makes that impossible. `any` resolves on the first final `OK true` and rejects after every destination has finally failed. Resolving `any` does not cancel other efforts.
 - no relay, cancellation, timeout, drop, retry exhaustion, and final `OK false` reject through `RxNostrPublicationError`; signer callback failure rejects through `RxNostrCallbackError`.
+- The OK stream completes after every relay is terminal and replays prior packets to late subscribers. Signer failure errors that stream; relay-local delivery failures remain settlement failures and do not error or cancel another relay's stream.
+- `PublicationFailure` identifies `rejected`, `timeout`, `dropped`, `retry-exhausted`, `cancelled`, `auth`, or other `failed` relay effort and may carry the final OK and classified cause.
+- The event snapshot is a detached frozen clone, including its tags. Cancel before signing completes prevents transmission but does not discard a valid snapshot produced by the already-running signer.
 
 ## Relay input
 

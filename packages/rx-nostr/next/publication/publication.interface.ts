@@ -7,8 +7,16 @@ export type PublicationSettlePolicy = "all" | "any";
 
 export type PublicationFailure = Readonly<{
   relay: RelayUrl;
-  kind: "rejected" | "timeout" | "dropped" | "retry-exhausted" | "cancelled";
+  kind:
+    | "rejected"
+    | "timeout"
+    | "dropped"
+    | "retry-exhausted"
+    | "cancelled"
+    | "auth"
+    | "failed";
   ok?: OkPacket;
+  cause?: unknown;
 }>;
 
 /** A publish operation that starts when `RxNostr.publish()` is called. */

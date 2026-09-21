@@ -97,12 +97,15 @@ export class RxNostr implements IRxNostr {
   ): Publication {
     const config = new FilledRxNostrPublishOptions(options, this.config);
 
-    return publish({
+    const publication = publish({
       params,
       config,
       relayInput: relays,
       relays: this.relays,
     });
+    const forget = this.stack.temporary(publication);
+    void publication.closed.then(forget);
+    return publication;
   }
 
   setHotRelays(relays: RelayInput): void {

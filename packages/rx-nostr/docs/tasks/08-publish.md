@@ -42,3 +42,16 @@ signing、複数 relay 送信、OK/AUTH/timeout を、一つの publication oper
 
 - v3 `cast()` compatibility（D1 で採用した場合は Task 09 で facade として追加）
 - relay quorum/first-success policy の一般化
+
+## 実装結果
+
+2026-09-21 に完了。
+
+- `publish()` 呼び出し時に宛先を normalized snapshot 化し、接続 prewarm と一回だけの署名を開始する hot `PublicationOperation` を実装した。observer の有無は operation lifecycle に影響しない。
+- signer の戻り値を検証して tag を含む immutable clone を `event` Promise へ返す。no relay は signer を呼ばず `no-relays`、throw/reject/invalid event は cause を保持する `RxNostrCallbackError("signer")` になる。
+- relay ごとの同一 state table から raw `OkPacket` replay stream、`waitFor("all")`、`waitFor("any")` を駆動する。all は最初の final failure で reject、any は最初の acceptance で resolve し、any 成功後も他 relay の努力を継続する。
+- AUTH-related `OK false` は即時に observer へ流すが final failure にせず、AUTH/再送後の final OK または auth failure まで settlement を保留する。
+- timeout、drop/retry exhaustion、rejected、auth callback failure、cancel を relay failure snapshot に分類する。一 relay の terminal failure は他 relay の subscription/lease を終了しない。
+- observer unsubscribe は観測だけを終了する。冪等な `cancel()` と RxNostr disposal は pending signing/send/AUTH/retry/timeout/lease を停止し、保留 settlement を `cancelled` で reject する。
+- finite linger は terminal 後も lease を維持し、cleanup 後に RxNostr の temporary resource registry から外れる。hot relay lease は publish lease と独立して残る。
+- controlled WebSocket の public contract で all accepted、mixed、timeout、drop、no relay、signer failure/invalid return、cancel、observer unsubscribe、AUTH resend、hot/cold、reconnect resend、snapshot/replay を検証した。旧 progress packet model は D6 に従い削除した。

@@ -121,3 +121,9 @@ Task 07 added the relay-local AUTH coordinator, typed kind 22242 authenticator c
 - facade return type does not yet implement `Publication`
 
 No diagnostic comes from AUTH configuration, coordinator cancellation/deduplication, transport AbortSignal wiring, or the AUTH public contract tests.
+
+## Progress after Task 08
+
+Task 08 replaced the provisional progress Observable with the decided hot `Publication` object and removed all remaining baseline diagnostics. On 2026-09-21, `npm run typecheck -w packages/rx-nostr` exits 0, and `npm run build -w packages/rx-nostr` completes JavaScript and declaration generation successfully.
+
+All 38 diagnostics recorded at Task 00 have now been removed through their owning implementation tasks. Task 10 still owns package artifact inspection and cross-runtime release tests; zero diagnostics alone does not complete that release audit.

@@ -394,9 +394,9 @@ describe("RelayCommunication transport integration", () => {
     const release = relay.hold();
     server.current.open();
     const event = Faker.event({ id: "event" });
-    const progress: object[] = [];
+    const packets: object[] = [];
 
-    relay.event(event).subscribe((packet) => progress.push(packet));
+    relay.event(event).subscribe((packet) => packets.push(packet));
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
     expect(JSON.parse(server.current.sent[0] as string)).toEqual([
       "EVENT",
@@ -404,9 +404,15 @@ describe("RelayCommunication transport integration", () => {
     ]);
     server.current.message('["OK","event",true,"saved"]');
 
-    expect(progress).toEqual([
-      { from: "wss://relay.example.com", state: "sent" },
-      { from: "wss://relay.example.com", state: "ok", ok: true },
+    expect(packets).toEqual([
+      {
+        from: "wss://relay.example.com",
+        type: "OK",
+        eventId: "event",
+        ok: true,
+        notice: "saved",
+        message: ["OK", "event", true, "saved"],
+      },
     ]);
     release();
     await vi.waitFor(() =>
@@ -435,11 +441,11 @@ describe("RelayCommunication transport integration", () => {
       }),
       kind: 22242 as const,
     };
-    const activities: object[] = [];
+    const packets: object[] = [];
     const complete = vi.fn();
     relay
       .event(event, { authenticator: { challenge: async () => authEvent } })
-      .subscribe({ next: (activity) => activities.push(activity), complete });
+      .subscribe({ next: (packet) => packets.push(packet), complete });
     await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
     server.current.message(JSON.stringify(["AUTH", "challenge"]));
     server.current.message(
@@ -462,11 +468,24 @@ describe("RelayCommunication transport integration", () => {
     server.current.message(JSON.stringify(["OK", "event", true, "saved"]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(activities).toEqual([
-      { from: relay.url, state: "sent" },
-      { from: relay.url, state: "ok", ok: false, reason: "auth" },
-      { from: relay.url, state: "sent" },
-      { from: relay.url, state: "ok", ok: true },
+    expect(packets).toEqual([
+      {
+        from: relay.url,
+        type: "OK",
+        eventId: "event",
+        ok: false,
+        notice: "auth-required: login",
+        noticeType: "auth-required",
+        message: ["OK", "event", false, "auth-required: login"],
+      },
+      {
+        from: relay.url,
+        type: "OK",
+        eventId: "event",
+        ok: true,
+        notice: "saved",
+        message: ["OK", "event", true, "saved"],
+      },
     ]);
     release();
     await vi.waitFor(() =>

@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { ControlledWebSocketServer } from "../../__test__/helper/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import type { RelayUrl } from "../../libs/index.ts";
-import type { EventPacket, ProgressActivity } from "../../packets/index.ts";
+import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { QuerySession } from "../query-session.ts";
 import {
@@ -34,7 +34,7 @@ class LeaseRelay implements IRelayCommunication {
   }
 
   event(_event: Nostr.Event) {
-    return EMPTY as import("rxjs").Observable<ProgressActivity>;
+    return EMPTY as import("rxjs").Observable<OkPacket>;
   }
 }
 

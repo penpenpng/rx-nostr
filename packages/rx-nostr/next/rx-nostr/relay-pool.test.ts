@@ -1,7 +1,7 @@
 import { EMPTY } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 import type { LazyFilter } from "../lazy-filter/index.ts";
-import type { EventPacket, ProgressActivity } from "../packets/index.ts";
+import type { EventPacket, OkPacket } from "../packets/index.ts";
 import type * as Nostr from "nostr-typedef";
 import { RelayPool } from "./relay-pool.ts";
 
@@ -17,7 +17,7 @@ class FakeRelay implements Disposable {
     return EMPTY as typeof EMPTY & import("rxjs").Observable<EventPacket>;
   }
   event(_event: Nostr.Event) {
-    return EMPTY as typeof EMPTY & import("rxjs").Observable<ProgressActivity>;
+    return EMPTY as typeof EMPTY & import("rxjs").Observable<OkPacket>;
   }
 }
 

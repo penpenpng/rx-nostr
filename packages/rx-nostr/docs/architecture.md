@@ -144,6 +144,10 @@ RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の
 6. publication object は raw `OkPacket` の subscription、明示的 cancel、all/any policy の Promise、EVENT snapshot 取得を提供する。
 7. OK subscription の unsubscribe は観測だけを終了し、送出努力の終了は `cancel()` または RxNostr dispose が担う。
 
+Publication は relay ごとの `pending | accepted | failed` table を一つだけ持ち、raw OK replay と all/any settlement を同じ状態から導出します。AUTH-related `OK false` は table を terminal にせず、認証後の再送結果を待ちます。relay-local timeout/drop/rejection は failure snapshot に変換し、別 relay の subscription を操作しません。署名失敗だけが operation-wide error です。
+
+terminal 後は各 segment の linger を維持し、finite linger cleanup 後に RxNostr の temporary resource registry から外れます。明示 cancel と instance dispose は linger を待たず、subscription、AUTH waiter、timer、lease を即時解放します。
+
 ### reconnect
 
 - socket の再接続時期と terminal 判定は unipls reconnector が決める。
