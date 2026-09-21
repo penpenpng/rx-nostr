@@ -6,10 +6,8 @@
     "lib": ["ESNext", "DOM", "WebWorker"],
     "types": ["vitest/importMeta"],
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
-      "rx-nostr": ["./next/index.ts"],
-      "unipls": ["../unipls/src/index.ts"]
+      "rx-nostr": ["./src/index.ts"]
     },
     "strict": true,
     "resolveJsonModule": true,
@@ -25,6 +23,6 @@
     "sourceMap": true,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["next/**/*.ts"],
-  "exclude": ["next/__test__/**", "next/**/*.spec.ts", "next/**/*.test.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/__test__/**", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

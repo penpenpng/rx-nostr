@@ -1,0 +1,25 @@
+name: test / build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - uses: crate-ci/typos@master
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build

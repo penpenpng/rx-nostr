@@ -17,6 +17,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "@rx-nostr/development": "./src/index.ts",
       "import": "./dist/rx-nostr.js"
     },
@@ -25,16 +26,16 @@
   "files": [
     "src",
     "dist",
-    "!src/__test__"
+    "!src/__test__",
+    "!src/**/*.spec.ts",
+    "!src/**/*.test.ts"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/penpenpng/rx-nostr.git"
   },
   "scripts": {
-    "build": "npm run typecheck && vite build",
-    "lint": "eslint ./next && prettier --check ./next",
-    "lint:fix": "eslint --fix ./next && prettier --write ./next",
+    "build": "pnpm typecheck && vite build",
     "test": "vitest run",
     "test:contract": "vitest run --project contract",
     "test:dev": "vitest --ui",
@@ -42,17 +43,21 @@
     "typecheck": "tsc --project tsconfig.check.json"
   },
   "devDependencies": {
-    "@types/node": "^18.15.10",
-    "@vitest/ui": "^3.2.4",
-    "disposablestack": "^1.1.7",
-    "typescript": "^5.8.3",
-    "vite": "^6.2.6",
-    "vite-plugin-dts": "^4.5.3",
-    "vitest": "^3.1.1"
+    "@types/node": "^26.6.2",
+    "@typescript/typescript6": "^6.0.2",
+    "@vitest/ui": "^5.0.1",
+    "disposablestack": "^1.1.8",
+    "nostr-typedef": "^0.13.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vite-plugin-dts": "^5.1.1",
+    "vitest": "^5.0.1"
   },
   "dependencies": {
-    "nostr-typedef": "^0.13.0",
     "rxjs": "^7.8.2",
-    "unipls": "0.0.0"
+    "unipls": "workspace:*"
+  },
+  "peerDependencies": {
+    "nostr-typedef": "^0.13.0"
   }
 }

@@ -68,6 +68,22 @@ rxReq.emit({ kinds: [1] });
 - Documentation: https://penpenpng.github.io/rx-nostr/
 - Release notes: https://github.com/penpenpng/rx-nostr/releases
 
+## Development
+
+This repository uses the pnpm version declared in `package.json` and the
+workspace defined in `pnpm-workspace.yaml`.
+
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+```
+
+The workspace rejects dependency releases newer than one day by default. Add
+an exception only for an urgent security fix. User-visible changes must include
+a Changesets entry created with `pnpm changeset`.
+
 ## License
 
 [MIT](https://opensource.org/licenses/MIT)

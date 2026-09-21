@@ -28,7 +28,8 @@
 ## 非目標
 
 - source/workspace/dependency/release tooling の整理（Task 10）
-- package artifact/runtime matrix（Task 11）
+- linter/formatter と静的品質ゲート（Task 11）
+- package artifact/runtime matrix（Task 12）
 - 利用者向け全ドキュメントの翻訳
 
 ## 実装結果

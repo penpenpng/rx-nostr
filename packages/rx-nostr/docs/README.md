@@ -11,6 +11,7 @@
 5. [behavior-matrix.md](./behavior-matrix.md): v3 の能力を v4 で維持・置換・廃止・延期する一覧
 6. [typecheck-baseline.md](./typecheck-baseline.md): Task 00 時点の型エラー分類
 7. [public-contract.md](./public-contract.md): Task 01 で固定した公開型・operation・error の契約
+8. [v3-test-audit.md](./v3-test-audit.md): Task 10 で実施した v3 test 契約の全件監査
 
 ## この資料の扱い
 

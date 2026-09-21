@@ -16,8 +16,9 @@
 | 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                             | 06         | D7                            | complete |
 | 08  | [Publish pipeline](./tasks/08-publish.md)                                     | 03, 05, 07 | D5, D6, D10, D11, D14         | complete |
 | 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)                  | 06, 08     | D1                            | complete |
-| 10  | [Source、workspace、依存関係、release 管理の整理](./tasks/10-code-quality.md) | 09         | -                             | ready    |
-| 11  | [Package、contract test、release readiness](./tasks/11-package-release.md)    | 10         | D8                            | pending  |
+| 10  | [Source、workspace、依存関係、release 管理の整理](./tasks/10-code-quality.md) | 09         | -                             | complete |
+| 11  | [Linter、formatter、静的品質ゲートの再設計](./tasks/11-lint-format.md)       | 10         | -                             | ready    |
+| 12  | [Package、contract test、release readiness](./tasks/12-package-release.md)    | 11         | D8                            | pending  |
 
 ## Milestones
 
@@ -37,16 +38,20 @@ Tasks 08–09。publish と RxNostr facade、dispose、複数 relay の failure 
 
 Task 10。v4 source を正式な `src` へ移し、v3 test 契約を全件監査したうえで、pnpm workspace、依存関係、peer dependency、Changesets を整える状態。
 
-### M5: 配布可能
+### M5: 静的品質ゲートの完成
 
-Task 11。型・artifact・runtime・migration docs を含む release gate が、成功と失敗を正しい exit code で表す状態。
+Task 11。TypeScript 7 と pnpm workspace に適合する linter、formatter、import boundary、CI gate を完成させる状態。
+
+### M6: 配布可能
+
+Task 12。型・artifact・runtime・migration docs を含む release gate が、成功と失敗を正しい exit code で表す状態。
 
 ## 全タスク共通の Definition of Done
 
 - 公開契約の追加・変更は `*.spec.ts`、内部アルゴリズムは `*.test.ts` で検証される。
 - direct WebSocket access を production v4 code に追加していない。
 - error、unsubscribe、timeout、drop、dispose の cleanup path を検証している。
-- lint、format、typecheck、対象 test が成功する。
+- typecheck と対象 test が成功する。Task 11 完了後は lint と format check も共通 gate に含める。
 - public export を変更した場合は API fixture と docs を同じタスクで更新する。
 - 実装がこの計画と異なる場合は、コードだけでなく関連 task/decision/architecture 文書も更新する。
 - unipls の不足が見つかった場合は変更せず、再現 test と必要な capability をまとめて利用者へ相談する。

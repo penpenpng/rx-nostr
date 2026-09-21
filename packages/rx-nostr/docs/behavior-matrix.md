@@ -74,11 +74,11 @@
 | NIP-11 manual get/fetch/set/default/forget       | replace           | directory の read/refresh/import/forget と versioned snapshot に再設計する  | 04         |
 | relay metadata の自動永続化                      | remove            | application が versioned JSON export/import の保存先を選ぶ                  | 04         |
 | event signer/verifier extension                  | keep              | v4 の class-based interface を維持する                                      | 01, 07, 08 |
-| worker verifier                                  | keep              | public API と worker lifecycle を contract test する                        | 01, 10, 11 |
+| worker verifier                                  | keep              | public API と worker lifecycle を contract test する                        | 01, 10, 12 |
 | RxJS packet/general operators                    | keep              | 明確な型欠陥を除き既存 v4 API を維持する                                    | 01, 10     |
 | `dispose()` / `Symbol.dispose`                   | keep              | 冪等に operation、lease、transport、observer を終了する                     | 03, 09     |
-| v3 API 名 (`use`, `send`, default relay methods) | remove            | D1 により compatibility alias を置かない                                    | 09, 10, 11 |
+| v3 API 名 (`use`, `send`, default relay methods) | remove            | D1 により compatibility alias を置かない                                    | 09, 10, 12 |
 
 ## Release audit rule
 
-Task 10 では v3 test を全件監査し、各 `keep`/`replace` 行を v4 test に対応付けます。Task 11 では contract spec と migration docs の最終対応を監査します。`remove` は public export/type fixture に残っていないこと、`defer` は将来の追加に public breaking change を要求しないことを確認します。
+Task 10 では v3 test を全件監査し、各 `keep`/`replace` 行を v4 test に対応付けます。Task 12 では contract spec と migration docs の最終対応を監査します。`remove` は public export/type fixture に残っていないこと、`defer` は将来の追加に public breaking change を要求しないことを確認します。

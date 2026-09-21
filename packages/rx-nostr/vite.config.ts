@@ -10,7 +10,7 @@ export default defineConfig({
   build: {
     lib: {
       name: "rx-nostr",
-      entry: path.resolve(__dirname, "next/index.ts"),
+      entry: path.resolve(import.meta.dirname, "src/index.ts"),
       formats: ["es"],
     },
     sourcemap: true,
@@ -31,8 +31,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "rx-nostr": path.resolve(__dirname, "next/index.ts"),
-      unipls: path.resolve(__dirname, "../unipls/src/index.ts"),
+      "rx-nostr": path.resolve(import.meta.dirname, "src/index.ts"),
+      unipls: path.resolve(import.meta.dirname, "../unipls/src/index.ts"),
     },
   },
   test: {
@@ -41,7 +41,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          include: ["next/__test__/contract/**/*.spec.{ts,mts}"],
+          include: ["src/__test__/contract/**/*.spec.{ts,mts}"],
           name: "contract",
           setupFiles: ["./vitest.setup.ts"],
         },
@@ -49,7 +49,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          include: ["next/**/*.test.{ts,mts}"],
+          include: ["src/**/*.test.{ts,mts}"],
           name: "unit",
           setupFiles: ["./vitest.setup.ts"],
         },

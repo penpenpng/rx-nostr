@@ -1,6 +1,6 @@
-import { schnorr as _schnorr } from "@noble/curves/secp256k1";
-import { sha256 as _sha256 } from "@noble/hashes/sha256";
-import { bytesToHex } from "@noble/hashes/utils";
+import { schnorr as _schnorr } from "@noble/curves/secp256k1.js";
+import { sha256 as _sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 import * as Nostr from "nostr-typedef";
 import { ensureEventFields } from "./ensure-event-fields.ts";
@@ -19,9 +19,11 @@ interface Schnorr {
 
 const schnorr: Schnorr = {
   sign: (m: string, seckey: string): string =>
-    bytesToHex(_schnorr.sign(m, seckey)),
-  verify: _schnorr.verify,
-  getPublicKey: (seckey: string) => bytesToHex(_schnorr.getPublicKey(seckey)),
+    bytesToHex(_schnorr.sign(hexToBytes(m), hexToBytes(seckey))),
+  verify: (sig: string, m: string, pubkey: string) =>
+    _schnorr.verify(hexToBytes(sig), hexToBytes(m), hexToBytes(pubkey)),
+  getPublicKey: (seckey: string) =>
+    bytesToHex(_schnorr.getPublicKey(hexToBytes(seckey))),
 };
 
 export function signEvent<K extends number>(

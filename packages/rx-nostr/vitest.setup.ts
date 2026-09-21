@@ -1,5 +1,5 @@
 import { afterEach } from "vitest";
-import { setLogLevel } from "./next/logger.ts";
+import { setLogLevel } from "./src/logger.ts";
 
 afterEach(() => {
   setLogLevel("warn");

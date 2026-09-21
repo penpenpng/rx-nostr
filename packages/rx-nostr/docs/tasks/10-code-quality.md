@@ -2,7 +2,7 @@
 
 ## 目的
 
-Task 11 の配布・release 監査へ入る前に、v4 の正式な source layout、回帰契約、workspace package manager、依存関係、release note 管理を整理する。
+Task 11 の静的品質ゲート再設計と Task 12 の配布・release 監査へ入る前に、v4 の正式な source layout、回帰契約、workspace package manager、依存関係、release note 管理を整理する。
 
 ## 作業
 
@@ -12,7 +12,7 @@ Task 11 の配布・release 監査へ入る前に、v4 の正式な source layou
 - v3 の test case を機械的に移植しない。論理接続維持のための具体的な再接続挙動は v4 で変更されている可能性があるため、v4 の architecture と public contract に従って scenario を再構成する。一方、各設定項目が宣言する契約は、同等の public contract test または必要な unit test で保証する。
 - npm workspace を廃止し、repository を pnpm workspace へ移行する。workspace 定義、lockfile、root/package scripts、CI、開発文書を pnpm に統一する。
 - pnpm workspace の minimum release age 機能を有効にし、採用する期間と例外方針を repository 内に明記する。
-- runtime、build、test、lint、release tooling を含む依存ライブラリを更新し、不要または重複した依存を除去する。
+- runtime、build、test、release tooling を含む依存ライブラリを更新し、不要または重複した依存を除去する。TypeScript 7 未対応の lint/format tooling は Task 11 で再選定する。
 - `nostr-typedef` を通常の runtime dependency から peer dependency へ変更し、package 自身の build/test に必要な宣言方法と、利用者に要求する対応 version range を明確にする。
 - release-drafter の config、workflow、運用前提を除去し、Changesets を導入する。changeset 作成、version 更新、changelog 生成、publish の scripts/CI と開発者向け手順を整える。
 
@@ -31,14 +31,15 @@ Task 11 の配布・release 監査へ入る前に、v4 の正式な source layou
 - v4 で変更された reconnect implementation の詳細に test を固定せず、`defer`、`weak`、`linger`、hot relay、retry policy など各設定が宣言する観測可能な契約を検証している。
 - clean checkout から pnpm だけで install と workspace scripts を実行でき、npm workspace と `package-lock.json` に依存しない。
 - minimum release age の値と例外が設定・文書化され、通常 install でその policy が有効になることを検証している。
-- dependency update 後に duplicate、deprecated、unresolved peer dependency がなく、採用した runtime matrix を引き上げる変更は明記されている。
+- 更新対象 package の dependency update 後に duplicate、deprecated、unresolved peer dependency がなく、採用した runtime matrix を引き上げる変更は明記されている。利用者指定で更新対象外とした `crypto-wasm` と、別 repository/submodule である unipls は残件を記録する。
 - packed package が `nostr-typedef` を peer dependency として宣言し、対応 version の consumer で typecheck/build できる。
 - release-drafter の active config/workflow が残らず、Changesets による changeset check、versioning、changelog、publish の流れが再現できる。
-- format、lint、typecheck、unit tests、public contract tests、build が pnpm 経由で成功する。
+- typecheck、unit tests、public contract tests、build が pnpm 経由で成功する。
 
 ## 非目標
 
-- Task 11 が担当する runtime matrix 全 lane、packed artifact、docs build、release note 内容の最終監査
+- Task 11 が担当する linter、formatter、静的品質ゲートの再設計
+- Task 12 が担当する runtime matrix 全 lane、packed artifact、docs build、release note 内容の最終監査
 - behavior matrix で deferred とした一 relay の多重接続と query splitting の実装
 - v3 compatibility alias の復活
 
@@ -50,3 +51,24 @@ Task 11 の配布・release 監査へ入る前に、v4 の正式な source layou
 - 更新した依存と breaking/runtime impact
 - `nostr-typedef` の peer range と consumer verification
 - Changesets の運用手順と、削除した release-drafter resources
+
+## 実装結果
+
+2026-09-22 に完了。
+
+- 旧 v3 `src` を除去し、v4 `next` を正式な `src` へ移した。Vite、Vitest、TypeScript、package development export の path も `src` に統一し、build/source map と packed artifact から `next/` path を除去した。
+- [v3 test contract audit](../v3-test-audit.md) で旧 test scenario を全件分類した。保持対象で不足していた `latestEach`、`filterByType`、`dropExpiredEvents`、`tie` の test を追加し、`tie` の `isNew` 型と mutable `seenOn` snapshot の回帰も修正した。
+- npm workspace と `package-lock.json` を廃止し、pnpm 10.33.0、`pnpm-workspace.yaml`、`pnpm-lock.yaml` へ移行した。minimum release age は 1 日（1440分）とし、緊急security fixだけを個別例外候補とした。`pnpm install --frozen-lockfile --ignore-scripts` が成功する。
+- rx-nostr と crypto は TypeScript 7、Vite 8、Vitest 5、vite-plugin-dts 5へ更新した。TypeScript 7でCompiler APIを使うtool向けに `@typescript/typescript6` を追加した。crypto は noble/scure 2へ更新し、明示的 `.js` export と byte inputへ適応した。
+- 利用者指定により `crypto-wasm` の依存version更新は対象外とした。uniplsもsubmoduleのため変更していない。`pnpm outdated --recursive` の残件はこの2 packageだけである。
+- `nostr-typedef ^0.13.0` を rx-nostr、crypto、crypto-wasm の peer dependencyへ移し、各packageのbuild/test用dev dependencyとして保持した。packed rx-nostrを一時consumerへinstallし、TypeScript 7 typecheckとNode importを検証した。この過程でroot exportに`types` conditionを追加した。
+- release-drafterと旧tag駆動publish actionsを除去し、Changesets 3、v4 major changeset、version PR/publish workflowを追加した。`pnpm changeset:status` はrx-nostrのmajor bumpを認識する。
+- TypeScript 7未対応のESLint/typescript-eslint/Prettierは一旦除去した。選定とCI gate復旧はTask 11で扱う。
+
+検証結果:
+
+- `pnpm --filter rx-nostr typecheck`: passed
+- `pnpm test`: rx-nostr 24 files / 140 tests、unipls 26 files / 124 tests、crypto 3 tests、crypto-wasm 3 tests passed
+- `pnpm build`: rx-nostr、unipls、crypto、crypto-wasm passed
+- `pnpm changeset:status`: passed
+- packed consumerのTypeScript 7 typecheckとNode root import: passed

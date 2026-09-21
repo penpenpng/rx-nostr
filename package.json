@@ -1,24 +1,18 @@
 {
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "lint": "npm run lint --workspaces --if-present",
-    "lint:fix": "npm run lint:fix --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
-    "docs:dev": "npm run docs:dev -w packages/docs",
-    "docs:build": "npm run docs:build -w packages/docs"
+    "build": "pnpm --recursive --if-present build",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "docs:build": "pnpm --filter @rx-nostr/docs docs:build",
+    "docs:dev": "pnpm --filter @rx-nostr/docs docs:dev",
+    "release": "pnpm build && changeset publish",
+    "test": "pnpm --recursive --if-present test",
+    "version-packages": "changeset version"
   },
   "author": "penpenpng",
-  "workspaces": [
-    "packages/*"
-  ],
   "devDependencies": {
-    "@eslint/js": "^9.24.0",
-    "eslint": "^9.24.0",
-    "eslint-import-resolver-typescript": "^4.3.2",
-    "eslint-plugin-import-x": "^4.10.2",
-    "globals": "^16.0.0",
-    "prettier": "3.5.3",
-    "typescript-eslint": "^8.29.1"
+    "@changesets/cli": "^3.0.3"
   }
 }

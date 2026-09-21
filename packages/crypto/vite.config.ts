@@ -10,7 +10,7 @@ export default defineConfig({
   build: {
     lib: {
       name: "rx-nostr-crypto",
-      entry: path.resolve(__dirname, "src/index.ts"),
+      entry: path.resolve(import.meta.dirname, "src/index.ts"),
       formats: ["es"],
     },
     sourcemap: true,

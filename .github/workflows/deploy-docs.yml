@@ -30,19 +30,16 @@ jobs:
     steps:
       # Build
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
         with:
-          node-version: ${{ vars.NODE_VERSION }}
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
           registry-url: https://registry.npmjs.org
-      - name: cache node_modules
-        id: node_modules_cache_id
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-          key: node-v${{ vars.NODE_VERSION }}-deps-${{ hashFiles(format('{0}{1}', github.workspace, '/package-lock.json')) }}
-      - run: npm ci
-      - run: npm run docs:build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm docs:build
 
       # Deploy
       - uses: actions/configure-pages@v4

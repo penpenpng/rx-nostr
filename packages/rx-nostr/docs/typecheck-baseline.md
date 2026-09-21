@@ -55,7 +55,7 @@ rx-nostr tests must not deep-import `packages/unipls/tests/support`. That direct
 
 The compiler emits ES2022 and uses `ESNext` library declarations because current code calls the new Set methods (`difference`, `intersection`, `symmetricDifference`, and `union`). The adopted unipls floor is Node >= 22.4, Deno >= 2, Bun >= 1.2, and the latest two major browser versions. A smoke check passed on Node 24.14.1 at this snapshot.
 
-Task 11 must exercise these Set calls in every supported runtime lane. If any minimum runtime in the adopted matrix lacks them, replace the calls with internal helpers rather than raising the runtime floor silently.
+Task 12 must exercise these Set calls in every supported runtime lane. If any minimum runtime in the adopted matrix lacks them, replace the calls with internal helpers rather than raising the runtime floor silently.
 
 ## Progress after Task 01
 
@@ -126,4 +126,4 @@ No diagnostic comes from AUTH configuration, coordinator cancellation/deduplicat
 
 Task 08 replaced the provisional progress Observable with the decided hot `Publication` object and removed all remaining baseline diagnostics. On 2026-09-21, `npm run typecheck -w packages/rx-nostr` exits 0, and `npm run build -w packages/rx-nostr` completes JavaScript and declaration generation successfully.
 
-All 38 diagnostics recorded at Task 00 have now been removed through their owning implementation tasks. Task 10 owns the source/workspace/dependency/release-tooling migration, and Task 11 owns package artifact inspection and cross-runtime release tests; zero diagnostics alone does not complete those audits.
+All 38 diagnostics recorded at Task 00 have now been removed through their owning implementation tasks. Task 10 owns the source/workspace/dependency/release-tooling migration, Task 11 owns the TypeScript 7-compatible static quality gates, and Task 12 owns package artifact inspection and cross-runtime release tests; zero diagnostics alone does not complete those audits.

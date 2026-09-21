@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 の core implementation は、relay 集合、public config、unipls adapter、pool/lease/hot relays、RelayDirectory、connection state/retry、REQ query engine、NIP-42 AUTH、Publication、RxNostr facade lifecycle まで完成しています。残る作業は、Task 10 の source layout、v3 test 契約、pnpm workspace、依存関係、peer dependency、Changesets の整理と、Task 11 の package artifact、runtime matrix、migration/release documentation の最終監査です。Task 09 完了時点では 91 unit tests と 45 public contract tests が通り、controlled transport で通信断、再接続、REQ/CLOSE、publish all/any/cancel、lazy filter 再評価、relay-local timeout、NIP-11 query limit、AUTH、instance disposal、複数instance分離、設定優先順位を検証しています。
+v4 の core implementation と Task 10 の source/workspace/dependency/release-tooling 整理まで完成しています。v4 implementation は正式な `src` にあり、v3 test契約の全件監査、pnpm workspace、minimum release age、TypeScript 7、`nostr-typedef` peer dependency、Changesetsへの移行が完了しました。残る作業は、Task 11 の linter/formatter再設計と、Task 12 の package artifact、runtime matrix、migration/release documentationの最終監査です。
 
 ## モジュール別状況
 
@@ -21,19 +21,22 @@ v4 の core implementation は、relay 集合、public config、unipls adapter�
 | connection state/retry                | 実装済み       | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。 |
 | `RxNostr` 公開 API                    | 実装済み       | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local pool を検証済み。              |
 | WebSocket 抽象化                      | 移行済み       | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                           |
-| package/build                         | 基盤移行待ち   | Task 10 で `next` から `src`、npm から pnpm、依存関係と release 管理を整理し、Task 11 で配布 artifact を検証する。                         |
+| package/build                         | 基盤移行済み   | `src`、pnpm、TypeScript 7、peer dependency、Changesetsへ移行済み。Task 11で静的品質ゲート、Task 12で配布 artifactを最終監査する。          |
 
 ## 現在確認できる品質ゲート
 
-2026-09-21 に次を実行しました。
+2026-09-22 の Task 10 完了時に次を実行しました。
 
-- `npm run test:unit -w packages/rx-nostr`: 16 files / 91 tests が成功
-- `npm run test:contract -w packages/rx-nostr`: 7 files / 45 tests が成功
-- `npm run lint -w packages/rx-nostr`: 成功
-- `npm run typecheck -w packages/rx-nostr`: 成功
-- `npm run build -w packages/rx-nostr`: declaration generation を含め成功
+- `pnpm --filter rx-nostr typecheck`: 成功
+- `pnpm --filter rx-nostr test:unit`: 17 files / 95 tests が成功
+- `pnpm --filter rx-nostr test:contract`: 7 files / 45 tests が成功
+- `pnpm test`: workspace全体で成功（rx-nostr 140、unipls 124、crypto 3、crypto-wasm 3 tests）
+- `pnpm build`: workspace全体で成功
+- `pnpm install --frozen-lockfile --ignore-scripts`: 成功
+- `pnpm changeset:status`: 成功
+- packed rx-nostrの一時consumerでTypeScript 7 typecheckとNode importが成功
 
-Task 00 で記録した 38 diagnostics は Tasks 01–08 ですべて解消されました。Task 10 の基盤移行後、package artifact と runtime matrix の完全な release gate は Task 11 で実施します。
+Task 00 で記録した38 diagnosticsはTasks 01–08ですべて解消済みです。lint/format gateはTypeScript 7対応toolを選定するTask 11へ明示的に移し、package artifactとruntime matrixの完全なrelease gateはTask 12で実施します。
 
 ## v3 から保持すべき問題領域
 
@@ -69,4 +72,4 @@ v4 は破壊的変更を許容するため v3 の API 形状そのものは維�
 
 ## 作業ツリー上の注意
 
-計画作成時に `.gitmodules`、`packages/unipls`、`.nvmrc`、`package-lock.json`、`.npmrc` の変更が baseline commit に取り込まれています。Task 10 では npm workspace と `package-lock.json` を pnpm workspace と lockfile へ移行しますが、unipls submodule の変更が必要になった場合は従来どおり着手前に根拠と代替案を利用者へ提示します。
+Task 10で`package-lock.json`を`pnpm-lock.yaml`へ移行しました。利用者指定により`crypto-wasm`の依存version更新は対象外とし、unipls submoduleも変更していません。今後uniplsの変更が必要になった場合は、従来どおり着手前に根拠と代替案を利用者へ提示します。

@@ -1,6 +1,6 @@
 # v4 public model contract
 
-This document fixes the public model used by Tasks 02–11. Later tasks may add completed capabilities, but must not silently change these semantics.
+This document fixes the public model used by Tasks 02–12. Later tasks may add completed capabilities, but must not silently change these semantics.
 
 ## Operations
 
