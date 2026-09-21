@@ -23,4 +23,5 @@ export interface ConnectionRetryContext {
 
 export type ConnectionRetryDecision =
   | Readonly<{ action: "retry"; delay: number }>
-  | Readonly<{ action: "stop" }>;
+  | Readonly<{ action: "cancel" }>
+  | Readonly<{ action: "exhaust"; cause?: unknown }>;

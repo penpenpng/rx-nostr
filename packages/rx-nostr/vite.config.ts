@@ -32,6 +32,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "rx-nostr": path.resolve(__dirname, "next/index.ts"),
+      unipls: path.resolve(__dirname, "../unipls/src/index.ts"),
     },
   },
   test: {

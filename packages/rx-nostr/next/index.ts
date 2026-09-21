@@ -5,10 +5,12 @@ export {
   type AuthenticatorInput,
 } from "./authenticator/index.ts";
 export {
+  ExponentialBackoffRetryer,
   NoopRetryer,
   type ConnectionRetryContext,
   type ConnectionRetryDecision,
   type ConnectionRetryer,
+  type ExponentialBackoffRetryerOptions,
 } from "./connection-retryer/index.ts";
 export type {
   ConnectionFailure,

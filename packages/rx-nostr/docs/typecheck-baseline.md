@@ -68,3 +68,13 @@ Task 01 removed all diagnostics assigned to its public-model scope, including th
 - Task 09: connection-state facade placeholder (1)
 
 No diagnostic comes from the public contract spec, public config model, v3 `src`, or a Task 01-owned file.
+
+## Progress after Task 02
+
+Task 02 removed all diagnostics in `relay-communication.ts`, `rx-nostr/websocket.ts`, and the provisional `RelayWarmer` integration. The direct socket file no longer exists. The 2026-09-21 check now reports 6 diagnostics in four files:
+
+- Task 04: RelayDirectory placeholders (2)
+- Task 08: publication implementation and its facade return (3)
+- Task 09: connection-state facade placeholder (1)
+
+No diagnostic comes from the Nostr codec, unipls adapter, reconnect policy, controlled transport tests, or public contract spec.

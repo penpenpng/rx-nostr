@@ -15,6 +15,8 @@ describe("public entry point", () => {
     expect(publicApi.createRxNostr).toBeTypeOf("function");
     expect(publicApi).not.toHaveProperty("RelayDirectory");
     expect(publicApi).not.toHaveProperty("RxNostr");
+    expect(publicApi).not.toHaveProperty("NostrTransport");
+    expect(publicApi).not.toHaveProperty("Unipls");
   });
 
   test("exposes the v4 operation model", () => {

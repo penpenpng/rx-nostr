@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import { RxNostrInvalidUsageError } from "../libs/error.ts";
 import {
@@ -34,6 +35,7 @@ describe("rx-nostr config", () => {
       weak: false,
     });
     expect(root.authenticator).toBeUndefined();
+    expect(root.retry).toBeInstanceOf(ExponentialBackoffRetryer);
   });
 
   test("preserves explicit false, zero, and Infinity values", () => {

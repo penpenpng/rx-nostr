@@ -28,12 +28,19 @@ import type {
 
 export class RxNostr implements IRxNostr {
   protected stack = new RxDisposableStack();
-  protected relays = new RelayMapOperator((url) => new RelayCommunication(url));
+  protected relays: RelayMapOperator<RelayCommunication>;
   protected config: FilledRxNostrConfig;
   protected warmer: RelayWarmer;
 
   constructor(config: RxNostrConfig) {
     this.config = new FilledRxNostrConfig(config);
+    this.relays = new RelayMapOperator(
+      (url) =>
+        new RelayCommunication(url, {
+          WebSocket: this.config.WebSocket,
+          retryer: this.config.retry,
+        }),
+    );
 
     this.warmer = new RelayWarmer(this.relays);
     this.stack.use(this.warmer);

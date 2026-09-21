@@ -1,5 +1,5 @@
 import {
-  NoopRetryer,
+  ExponentialBackoffRetryer,
   type ConnectionRetryer,
 } from "../connection-retryer/index.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
@@ -54,7 +54,7 @@ export class FilledRxNostrConfig {
     this.verifier = config.verifier;
     this.signer = config.signer ?? new Nip07Signer();
     this.authenticator = config.authenticator;
-    this.retry = config.retry ?? new NoopRetryer();
+    this.retry = config.retry ?? new ExponentialBackoffRetryer();
     this.authTimeout = config.authTimeout ?? RX_NOSTR_DEFAULTS.authTimeout;
     this.skipFetchNip11 =
       config.skipFetchNip11 ?? RX_NOSTR_DEFAULTS.skipFetchNip11;

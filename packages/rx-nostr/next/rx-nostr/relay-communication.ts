@@ -1,8 +1,16 @@
 import type * as Nostr from "nostr-typedef";
-import { EMPTY, merge, Subject, type Observable } from "rxjs";
-import type { LazyFilter } from "../lazy-filter/index.ts";
-import { Latch, RelayUrl, u } from "../libs/index.ts";
-import type { EventPacket, ProgressActivity } from "../packets/index.ts";
+import { EMPTY, Observable, filter, map, startWith, take } from "rxjs";
+import type { ConnectionRetryer } from "../connection-retryer/index.ts";
+import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
+import { Latch, type RelayUrl } from "../libs/index.ts";
+import type {
+  EventMessagePacket,
+  EventPacket,
+  OkPacket,
+  ProgressActivity,
+} from "../packets/index.ts";
+import type { WebSocketConstructor } from "../types/index.ts";
+import { NostrTransport } from "./transport/index.ts";
 
 export interface IRelayCommunication {
   url: RelayUrl;
@@ -14,86 +22,118 @@ export interface IRelayCommunication {
   event(event: Nostr.Event): Observable<ProgressActivity>;
 }
 
+export interface RelayCommunicationOptions {
+  readonly WebSocket?: WebSocketConstructor;
+  readonly retryer?: ConnectionRetryer;
+}
+
 // 将来、接続を多重化することがあればこのレイヤーで実装する
 export class RelayCommunication implements IRelayCommunication {
-  private conn: RelayConnection;
-  private used = false;
-  private latch = new Latch({
-    onHeldUp: () => {
-      this.used = true;
-      this.conn.connect();
-    },
-    onDropped: () => {
-      this.used = false;
-      this.conn.disconnect();
-    },
-  });
+  readonly #transport: NostrTransport;
+  readonly #latch: Latch;
+  #hotRelease?: () => void;
+  #nextSubId = 0;
 
-  constructor(public url: RelayUrl) {
-    this.conn = new RelayConnection(url);
+  constructor(
+    public readonly url: RelayUrl,
+    options: RelayCommunicationOptions = {},
+  ) {
+    this.#transport = new NostrTransport({
+      url,
+      WebSocket: options.WebSocket,
+      retryer: options.retryer,
+    });
+    this.#latch = new Latch({
+      onHeldUp: () => void this.#transport.open().catch(() => {}),
+      onDropped: () => void this.#transport.close().catch(() => {}),
+    });
   }
 
-  hold() {
-    return this.latch.hold();
+  hold(): () => void {
+    return this.#latch.hold();
+  }
+
+  connect(): void {
+    this.#hotRelease ??= this.hold();
+  }
+
+  release(): void {
+    this.#hotRelease?.();
+    this.#hotRelease = undefined;
   }
 
   vreq(
     strategy: "forward" | "backward",
     filters: LazyFilter[],
   ): Observable<EventPacket> {
-    if (!this.used) {
-      return EMPTY;
-    }
+    if (!this.#latch.isHeld) return EMPTY;
 
-    return this.conn.req(strategy, filters);
+    const subId = `rx-nostr:${this.#nextSubId++}`;
+    const query: Nostr.ToRelayMessage.REQ = [
+      "REQ",
+      subId,
+      ...evalFilters(filters),
+    ];
+    const packets = this.#transport.subscribe({
+      query,
+      selector: (packet) => packet.type === "EVENT" && packet.subId === subId,
+      terminator: (packet) =>
+        (packet.type === "CLOSED" && packet.subId === subId) ||
+        (strategy === "backward" &&
+          packet.type === "EOSE" &&
+          packet.subId === subId),
+      retry: "resend",
+    });
+
+    return new Observable<EventPacket>((subscriber) => {
+      const subscription = packets
+        .pipe(
+          filter(
+            (packet): packet is EventMessagePacket => packet.type === "EVENT",
+          ),
+          map((packet) => ({
+            from: packet.from,
+            type: "EVENT" as const,
+            event: packet.event,
+          })),
+        )
+        .subscribe(subscriber);
+
+      return () => {
+        void this.#transport.cast(["CLOSE", subId]).catch(() => {});
+        subscription.unsubscribe();
+      };
+    });
   }
 
   event(event: Nostr.Event): Observable<ProgressActivity> {
-    if (!this.used) {
-      return EMPTY;
-    }
+    if (!this.#latch.isHeld) return EMPTY;
 
-    return this.conn.event(event);
-  }
-}
-
-class RelayConnection {
-  socket: NostrWebsocket;
-
-  constructor(public url: RelayUrl) {
-    this.socket = new NostrWebsocket(url);
-  }
-
-  connect() {
-    this.socket.connect();
-  }
-
-  disconnect() {
-    this.socket.disconnect();
+    return this.#transport
+      .subscribe({
+        query: ["EVENT", event],
+        selector: (packet) =>
+          packet.type === "OK" && packet.eventId === event.id,
+        retry: "resend",
+      })
+      .pipe(
+        filter((packet): packet is OkPacket => packet.type === "OK"),
+        map((packet) => ({
+          from: this.url,
+          state: "ok" as const,
+          ok: packet.ok,
+        })),
+        take(1),
+        startWith({ from: this.url, state: "sent" as const }),
+      );
   }
 
-  req(
-    strategy: "forward" | "backward",
-    filters: LazyFilter[],
-  ): Observable<EventPacket> {
-    if (strategy === "backward") {
-      return;
-    }
-
-    const query = new ReqQuery(filters);
-
-    this.socket.send(query);
-
-    return this.socket.asObservable();
+  monitorConnectionState() {
+    return this.#transport.state$.asObservable();
   }
 
-  event(event: Nostr.Event): Observable<ProgressActivity> {}
-}
-
-class ReqQuery {
-  constructor(public filters: LazyFilter[]) {}
-}
-
-class EventQuery {
-  constructor(public event: Nostr.Event) {}
+  async dispose(): Promise<void> {
+    this.release();
+    await this.#transport.dispose();
+  }
 }

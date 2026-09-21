@@ -8,7 +8,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "rx-nostr": ["./next/index.ts"]
+      "rx-nostr": ["./next/index.ts"],
+      "unipls": ["../unipls/src/index.ts"]
     },
     "strict": true,
     "resolveJsonModule": true,
