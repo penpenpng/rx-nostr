@@ -3,6 +3,10 @@ import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import { RxNostrInvalidUsageError } from "../libs/error.ts";
 import {
+  GlobalRelayDirectory,
+  RelayDirectory,
+} from "../relay-directory/index.ts";
+import {
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
   FilledRxNostrReqOptions,
@@ -36,6 +40,7 @@ describe("rx-nostr config", () => {
     });
     expect(root.authenticator).toBeUndefined();
     expect(root.retry).toBeInstanceOf(ExponentialBackoffRetryer);
+    expect(root.relayDirectory).toBe(GlobalRelayDirectory);
   });
 
   test("preserves explicit false, zero, and Infinity values", () => {
@@ -68,6 +73,11 @@ describe("rx-nostr config", () => {
     expect(root.signer).toBe(root.signer);
     expect(root.retry).toBe(root.retry);
     expect(root.defaultOptions).toBe(root.defaultOptions);
+  });
+
+  test("accepts an injected relay directory", () => {
+    const relayDirectory = new RelayDirectory();
+    expect(createRoot({ relayDirectory }).relayDirectory).toBe(relayDirectory);
   });
 
   test("AUTH is opt-in and can be disabled per operation", () => {

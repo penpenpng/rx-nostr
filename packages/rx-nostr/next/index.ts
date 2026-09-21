@@ -40,9 +40,13 @@ export {
   RxNostrError,
   RxNostrInvalidUsageError,
   RxNostrLogicError,
+  RxNostrNip11Error,
   RxNostrPublicationError,
+  RelayDirectorySnapshotError,
   type RxNostrCallbackKind,
   type RxNostrPublicationErrorCode,
+  type RxNostrNip11ErrorCode,
+  type RelayDirectorySnapshotErrorCode,
 } from "./libs/error.ts";
 export {
   compareEvents,
@@ -51,6 +55,7 @@ export {
   laterEvent,
 } from "./libs/nostr/event.ts";
 export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
+export type { FetchRelayInfoOptions } from "./libs/nostr/nip11.ts";
 export {
   normalizeRelayUrl,
   RelayMap,
@@ -97,6 +102,17 @@ export type {
   PublicationFailure,
   PublicationSettlePolicy,
 } from "./publication/index.ts";
+export {
+  GlobalRelayDirectory,
+  RelayDirectory,
+  type FetchNip11Options,
+  type IRelayDirectory,
+  type RelayDirectoryEntry,
+  type RelayDirectoryOptions,
+  type RelayDirectorySnapshot,
+  type RelayDirectorySnapshotEntry,
+  type RelayDirectorySnapshotV1,
+} from "./relay-directory/index.ts";
 export {
   createRxNostr,
   type IRxNostr,

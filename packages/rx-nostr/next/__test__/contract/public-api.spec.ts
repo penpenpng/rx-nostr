@@ -13,7 +13,10 @@ describe("public entry point", () => {
   test("can be imported by contract tests", () => {
     expect(publicApi).toBeTypeOf("object");
     expect(publicApi.createRxNostr).toBeTypeOf("function");
-    expect(publicApi).not.toHaveProperty("RelayDirectory");
+    expect(publicApi.RelayDirectory).toBeTypeOf("function");
+    expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(
+      publicApi.RelayDirectory,
+    );
     expect(publicApi).not.toHaveProperty("RxNostr");
     expect(publicApi).not.toHaveProperty("NostrTransport");
     expect(publicApi).not.toHaveProperty("Unipls");

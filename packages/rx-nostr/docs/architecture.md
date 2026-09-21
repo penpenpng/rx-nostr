@@ -116,7 +116,7 @@ relay URL 自体に紐づく共有 metadata を持ち、socket を所有しま�
 - 連続失敗回数
 - 現在観測される connection 数（複数 RxNostr instance の合計）
 
-connection の再試行を直接命令する API は、directory と pool の責務を再結合するため置かない案を推奨します。最終決定は `decisions.md` D2 で行います。
+connection の再試行を直接命令する API は、directory と pool の責務を再結合するため置きません。connection lifecycle の書き込みは internal reporter に限定し、public entry は immutable snapshot として公開します（D2）。
 
 ## protocol flow
 

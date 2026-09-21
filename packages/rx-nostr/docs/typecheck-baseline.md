@@ -82,3 +82,12 @@ No diagnostic comes from the Nostr codec, unipls adapter, reconnect policy, cont
 ## Progress after Task 03
 
 Task 03 replaced the provisional generic relay map with the per-instance `RelayPool` and connected query/hot lifetime to one lease contract without introducing new diagnostics. The check still reports the same 6 diagnostics owned by Tasks 04, 08, and 09. No diagnostic comes from pool, lease, warmer, query-session, or their tests.
+
+## Progress after Task 04
+
+Task 04 replaced the RelayDirectory placeholders and removed both diagnostics in that area. The 2026-09-21 check now reports 4 diagnostics in two files:
+
+- Task 08: publication implementation and its facade return (3)
+- Task 09: connection-state facade placeholder (1)
+
+No diagnostic comes from RelayDirectory, its snapshot and NIP-11 implementation, public config, or their tests.

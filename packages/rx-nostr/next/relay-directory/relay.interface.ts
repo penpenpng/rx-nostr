@@ -1,23 +1,30 @@
 import type * as Nostr from "nostr-typedef";
-import type { BehaviorSubject } from "rxjs";
-import type { ConnectionState } from "../connection-state.ts";
+import type { RelayUrl } from "../libs/index.ts";
 
-// TODO: internal なやつだけ IRelay として約束すれば良くて、
-// それ以外の public なやつは単に Relay の中に実装を置けばいい
-export interface IRelay {
-  retry(): void;
-  readonly url: string;
-  readonly lastRetriedAt?: number;
-  readonly consecutiveRetries: number;
-  readonly lastConnectedAt?: number;
-  readonly connections: number; // TODO
-  readonly nip11?: Nostr.Nip11.RelayInfo;
+/** Immutable metadata and aggregate health for one normalized relay URL. */
+export interface RelayDirectoryEntry {
+  readonly url: RelayUrl;
+  readonly nip11?: Readonly<Nostr.Nip11.RelayInfo>;
   readonly nip11FetchedAt?: number;
+  readonly nip11FailedAt?: number;
+  readonly lastConnectedAt?: number;
+  readonly lastFailureAt?: number;
+  readonly consecutiveFailures: number;
+  readonly liveConnections: number;
+  readonly maxSubscriptions?: number;
 }
 
-export interface IRelayInternal extends IRelay {
-  /** @internal */
-  _fetchNip11(): Promise<Nostr.Nip11.RelayInfo>;
-  /** @internal */
-  _setConnectionState$(stream: BehaviorSubject<ConnectionState>): void;
+export interface RelayDirectorySnapshotEntry {
+  readonly url: RelayUrl;
+  readonly nip11?: Readonly<Nostr.Nip11.RelayInfo>;
+  readonly nip11FetchedAt?: number;
+  readonly nip11FailedAt?: number;
+  readonly lastConnectedAt?: number;
+  readonly lastFailureAt?: number;
+  readonly consecutiveFailures: number;
+}
+
+export interface RelayDirectorySnapshotV1 {
+  readonly version: 1;
+  readonly relays: readonly RelayDirectorySnapshotEntry[];
 }

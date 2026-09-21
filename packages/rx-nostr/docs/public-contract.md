@@ -58,6 +58,15 @@ Resolution uses nullish checks, so `false`, `0`, and `Infinity` are preserved. S
 
 The optional WebSocket constructor is described by rx-nostr-owned structural types. No unipls type is part of configuration or any other public declaration.
 
+## Relay directory
+
+`GlobalRelayDirectory` is the default process-wide metadata/health store. An application or test can inject a distinct `RelayDirectory` through `RxNostrConfig.relayDirectory`; the directory does not own connections and cannot retry or close them.
+
+- A normalized relay URL identifies one record. `get()` and iteration return immutable snapshots; `observe()` emits a new immutable snapshot when that record changes.
+- NIP-11 reads are cached and concurrent requests for one relay are deduplicated. `{ refresh: true }` bypasses a completed cache, while `setNip11()` installs application-provided metadata. Successful and failed fetch times are tracked separately, and a valid non-negative integer `limitation.max_subscriptions` is exposed as `maxSubscriptions`.
+- Connection health contains the latest successful/failed timestamps, consecutive failures, and the currently observed connection count across reporters. A successful connection resets consecutive failures. Public entries expose no socket, retry operation, or mutable reporter.
+- `exportSnapshot()` returns version 1 JSON. `importSnapshot()` validates the complete input before merging it with newer/live local data. NIP-11 metadata and health timestamps/counters are persistent; live connection counts and handles are not. Invalid JSON, schema, and unsupported versions are typed errors.
+
 ## Packet naming
 
 - `from` is the canonical relay-origin property for inbound EVENT/OK and connection-state packets.

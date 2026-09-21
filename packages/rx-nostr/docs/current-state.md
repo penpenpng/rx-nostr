@@ -2,7 +2,7 @@
 
 ## 要約
 
-v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジック、公開 model/config、unipls transport adapter、per-instance pool と connection lease まで完成しています。一方、`RxNostr` facade、publish、relay directory、connection state 集約はスケッチ段階です。Task 03 完了時点では 70 unit tests と 4 public contract tests が通り、controlled transport で通信断、再接続、hot/query lease の競合を検証しています。
+v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジック、公開 model/config、unipls transport adapter、per-instance pool と connection lease、共有 RelayDirectory まで完成しています。一方、`RxNostr` facade、publish、connection state 集約はスケッチ段階です。Task 04 完了時点では 77 unit tests と 12 public contract tests が通り、controlled transport で通信断、再接続、hot/query lease の競合を、directory 単体テストで metadata/health 集約を検証しています。
 
 ## モジュール別状況
 
@@ -17,7 +17,7 @@ v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジッ�
 | relay communication                   | transport 移行済み | unipls adapter 上で REQ/EVENT の最小 wire 動作と unsubscribe 時の CLOSE 順序を実装済み。完全な query/publish semantics は Tasks 06/08。 |
 | publish                               | 未実装             | `summarize()` が存在せず、timeout packet の型も不一致。                                                                                 |
 | authenticator                         | 部品のみ           | AUTH event を署名する部品はあるが、challenge 監視、再送、timeout が通信層へ接続されていない。                                           |
-| relay directory                       | スケッチ           | serialize/deserialize/retry/state 集計が未実装。`_getOrCreate()` は既存値を確認せず毎回上書きする。                                     |
+| relay directory                       | 実装済み           | global/injected directory、immutable entry、NIP-11 dedupe/cache、health reporter、versioned merge snapshot を実装済み。transport lifecycle との配線は Task 05。 |
 | connection state/retry                | adapter 接続済み   | retry/cancel/exhaust を unipls reconnector に変換し、既定 backoff を実装済み。公開 state への完全な集約は Task 05。                     |
 | `RxNostr` 公開 API                    | model 固定         | v3 placeholder は削除済み。`createRxNostr`/`IRxNostr` は v4 model を公開するが、publish と state monitoring の実装は未完成。            |
 | WebSocket 抽象化                      | 移行済み           | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                        |
@@ -27,10 +27,10 @@ v4 は、relay 集合の動的制御、forward/backward REQ の上位ロジッ�
 
 2026-09-21 に次を実行しました。
 
-- `npm run test:unit -w packages/rx-nostr`: 14 files / 70 tests が成功
-- `npm run test:contract -w packages/rx-nostr`: 1 file / 4 tests が成功
+- `npm run test:unit -w packages/rx-nostr`: 15 files / 77 tests が成功
+- `npm run test:contract -w packages/rx-nostr`: 2 files / 12 tests が成功
 - `npm run lint -w packages/rx-nostr`: 成功
-- `npm run typecheck -w packages/rx-nostr`: 6 件の後続 task 所有 error を報告して exit 2
+- `npm run typecheck -w packages/rx-nostr`: 4 件の後続 task 所有 error を報告して exit 2
 - `npm run build -w packages/rx-nostr`: typecheck gate で exit 2
 
 build/typecheck は未実装を成功扱いにしない品質ゲートになりました。全体成功は後続 task の diagnostics 解消後です。
@@ -38,7 +38,7 @@ build/typecheck は未実装を成功扱いにしない品質ゲートになり�
 主な診断は次のとおりです。
 
 - publish implementation と facade の `Publication` 不一致
-- connection state monitor と relay directory の placeholder
+- connection state monitor の placeholder
 
 ## v3 から保持すべき問題領域
 

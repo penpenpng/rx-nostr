@@ -6,6 +6,10 @@ import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import { RxNostrInvalidUsageError } from "../libs/error.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
+import {
+  GlobalRelayDirectory,
+  type RelayDirectory,
+} from "../relay-directory/index.ts";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type {
   RxNostrConfig,
@@ -41,6 +45,7 @@ export class FilledRxNostrConfig {
   readonly signer: EventSigner;
   readonly authenticator: AuthenticatorInput | undefined;
   readonly retry: ConnectionRetryer;
+  readonly relayDirectory: RelayDirectory;
   readonly authTimeout: number;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
@@ -55,6 +60,7 @@ export class FilledRxNostrConfig {
     this.signer = config.signer ?? new Nip07Signer();
     this.authenticator = config.authenticator;
     this.retry = config.retry ?? new ExponentialBackoffRetryer();
+    this.relayDirectory = config.relayDirectory ?? GlobalRelayDirectory;
     this.authTimeout = config.authTimeout ?? RX_NOSTR_DEFAULTS.authTimeout;
     this.skipFetchNip11 =
       config.skipFetchNip11 ?? RX_NOSTR_DEFAULTS.skipFetchNip11;

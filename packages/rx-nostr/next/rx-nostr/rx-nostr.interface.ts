@@ -7,6 +7,7 @@ import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
+import type { RelayDirectory } from "../relay-directory/index.ts";
 import type { RxReq } from "../rx-req/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 
@@ -42,6 +43,8 @@ export interface RxNostrConfig {
    * Auto reconnection controller.
    */
   retry?: ConnectionRetryer;
+  /** Shared relay metadata and health directory. */
+  relayDirectory?: RelayDirectory;
   authTimeout?: number;
   /**
    * If true, skip automatic fetching NIP-11 relay information.

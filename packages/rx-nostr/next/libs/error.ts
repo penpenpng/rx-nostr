@@ -71,6 +71,45 @@ export class RxNostrEnvironmentError extends RxNostrError {
   }
 }
 
+export type RxNostrNip11ErrorCode =
+  | "invalid-url"
+  | "network"
+  | "status"
+  | "parse"
+  | "invalid-response";
+
+/** A NIP-11 request failed before producing a valid relay information object. */
+export class RxNostrNip11Error extends RxNostrError {
+  override readonly name = "RxNostrNip11Error";
+
+  constructor(
+    public readonly code: RxNostrNip11ErrorCode,
+    message: string,
+    public readonly status?: number,
+    options?: ErrorOptions,
+  ) {
+    super(`RxNostrNip11Error: ${message}`, options);
+  }
+}
+
+export type RelayDirectorySnapshotErrorCode =
+  | "invalid-json"
+  | "unsupported-version"
+  | "invalid-schema";
+
+/** A RelayDirectory snapshot was rejected without applying any records. */
+export class RelayDirectorySnapshotError extends RxNostrError {
+  override readonly name = "RelayDirectorySnapshotError";
+
+  constructor(
+    public readonly code: RelayDirectorySnapshotErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(`RelayDirectorySnapshotError: ${message}`, options);
+  }
+}
+
 /**
  * This is thrown only by a bug inside rx-nostr.
  *
