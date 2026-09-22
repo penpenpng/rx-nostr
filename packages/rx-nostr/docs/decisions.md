@@ -65,9 +65,9 @@
   - EVENT 送出努力の cancel
   - all policy: 全 relay の最終 OK が `true` なら resolve、AUTH 再送予定ではない `OK false` が一つでもあれば reject する Promise
   - any policy: いずれかの最終 OK が `true` なら resolve、全 relay が AUTH 再送予定ではない `OK false` なら reject する Promise
-  - 実際に署名・送信した EVENT の immutable snapshot の取得
+  - 実際に署名・送信した EVENT の detached mutable copy の取得
 - Rationale: raw OK の reactive な観測、命令的 cancellation、代表的な all/any 完了待ちを一つの publication lifecycle から利用できるようにする。any が resolve しても、残る relay への送出努力は明示的に cancel されるまで継続できる設計とする。
-- API completion: publication は `publish()` 呼び出し時に開始し、`subscribe(...)`、`cancel()`、`waitFor("all" | "any")`、`event: Promise<Readonly<Event>>` を提供する。timeout/drop/retry exhaustion/cancel/no-relay は final OK を得られないため typed rejection とする。
+- API completion: publication は `publish()` 呼び出し時に開始し、`subscribe(...)`、`cancel()`、`waitFor("all" | "any")`、`event: Promise<Event>` を提供する。送信用 snapshot は内部で不変に保ち、公開する EVENT は独立した変更可能な copy とする。timeout/drop/retry exhaustion/cancel/no-relay は final OK を得られないため typed rejection とする。
 
 ## D7: NIP-42 authentication の既定動作
 

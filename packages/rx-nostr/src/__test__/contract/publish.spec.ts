@@ -1,13 +1,16 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RxNostr,
   NoopRetryer,
   NoopSigner,
   NoopVerifier,
   RxNostrCallbackError,
+  RxNostrPublicationError,
   type EventSigner,
   type OkPacket,
+  type Publication,
+  type PublicationFailure,
 } from "rx-nostr";
 import { ControlledWebSocket, ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
@@ -37,6 +40,40 @@ async function expectEventSent(connection: ControlledWebSocket): Promise<void> {
 }
 
 describe("Publication public contract", () => {
+  test("exposes the signed event as a mutable event", () => {
+    expectTypeOf<Publication["event"]>().toEqualTypeOf<Promise<Nostr.Event>>();
+  });
+
+  test("exposes mutable detached publication failures", () => {
+    expectTypeOf<RxNostrPublicationError["failures"]>().toEqualTypeOf<PublicationFailure[]>();
+    const source: PublicationFailure[] = [
+      {
+        relay: relay1,
+        kind: "rejected",
+        ok: {
+          from: relay1,
+          type: "OK",
+          message: ["OK", "event", false, "blocked"],
+          eventId: "event",
+          ok: false,
+          notice: "blocked",
+        },
+      },
+    ];
+    const error = new RxNostrPublicationError("not-all-accepted", source);
+
+    source[0]!.kind = "cancelled";
+    source[0]!.ok!.ok = true;
+    source.push({ relay: relay2, kind: "timeout" });
+    expect(error.failures).toMatchObject([{ relay: relay1, kind: "rejected", ok: { ok: false } }]);
+
+    error.failures[0]!.kind = "failed";
+    error.failures[0]!.ok!.message[3] = "consumer change";
+    error.failures.push({ relay: relay2, kind: "timeout" });
+    expect(error.failures).toHaveLength(2);
+    expect(source[0]!.ok!.message[3]).toBe("blocked");
+  });
+
   test("publishes to multiple relays, settles all/any, and replays raw OK packets", async () => {
     const server = new ControlledWebSocketServer();
     const signed = event();
@@ -86,9 +123,13 @@ describe("Publication public contract", () => {
     signed.tags[0]![1] = "after";
     expect(snapshot.content).toBe("before");
     expect(snapshot.tags).toEqual([["t", "before"]]);
-    expect(Object.isFrozen(snapshot)).toBe(true);
-    expect(Object.isFrozen(snapshot.tags)).toBe(true);
-    expect(Object.isFrozen(snapshot.tags[0])).toBe(true);
+    expect(Object.isFrozen(snapshot)).toBe(false);
+    expect(Object.isFrozen(snapshot.tags)).toBe(false);
+    expect(Object.isFrozen(snapshot.tags[0])).toBe(false);
+    snapshot.content = "consumer change";
+    snapshot.tags[0]![1] = "consumer change";
+    expect(signed.content).toBe("after");
+    expect(signed.tags[0]![1]).toBe("after");
     rxNostr.dispose();
   });
 

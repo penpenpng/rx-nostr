@@ -58,7 +58,7 @@
 | `send()` が OK Observable を返す         | replace           | publication object の `subscribe()` が raw `OkPacket` を通知する     | 01, 08 |
 | `cast()` / `completeOn` で完了条件を選ぶ | replace           | `waitFor("all")` / `waitFor("any")` が Promise を返す                | 01, 08 |
 | publish effort の取消                    | keep              | publication の `cancel()` を明示 API にする                          | 01, 08 |
-| 実際に送信した signed EVENT の取得       | replace           | `event: Promise<Readonly<Event>>` を提供する                         | 01, 08 |
+| 実際に送信した signed EVENT の取得       | replace           | `event: Promise<Event>` から detached mutable copy を取得する        | 01, 08 |
 | publish 中の relay 集合更新              | replace           | publication 開始時に宛先を snapshot し、その後は変えない             | 08     |
 | OK timeout                               | keep              | timeout は publication の typed rejection。別 relay の努力は継続する | 08     |
 | reconnect 後の未確認 EVENT 再送          | keep              | delivery-unknown を明示した recovery policy で再送する               | 05, 08 |

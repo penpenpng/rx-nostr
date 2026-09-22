@@ -45,14 +45,14 @@ interface SettlementWaiter {
 }
 
 export class PublicationOperation implements Publication, Disposable {
-  readonly event: Promise<Readonly<Nostr.Event>>;
+  readonly event: Promise<Nostr.Event>;
   readonly closed: Promise<void>;
 
   readonly #okPackets = new ReplaySubject<OkPacket>();
   readonly #session: QuerySession;
   readonly #deliveries = new Map<RelayUrl, RelayDelivery>();
   readonly #waiters = new Set<SettlementWaiter>();
-  readonly #resolveEvent: (event: Readonly<Nostr.Event>) => void;
+  readonly #resolveEvent: (event: Nostr.Event) => void;
   readonly #rejectEvent: (error: unknown) => void;
   readonly #resolveClosed: () => void;
   #operationError?: unknown;
@@ -67,7 +67,7 @@ export class PublicationOperation implements Publication, Disposable {
     destinations: readonly RelayUrl[],
     private readonly config: FilledRxNostrPublishOptions,
   ) {
-    let resolveEvent!: (event: Readonly<Nostr.Event>) => void;
+    let resolveEvent!: (event: Nostr.Event) => void;
     let rejectEvent!: (error: unknown) => void;
     this.event = new Promise((resolve, reject) => {
       resolveEvent = resolve;
@@ -168,7 +168,7 @@ export class PublicationOperation implements Publication, Disposable {
       this.#signingFailed(cause);
       return;
     }
-    this.#resolveEvent(snapshot);
+    this.#resolveEvent(cloneEvent(snapshot));
     if (this.#cancelled || this.#cleaned) return;
 
     for (const delivery of this.#deliveries.values()) {
@@ -320,6 +320,13 @@ function snapshotEvent(value: unknown): Readonly<Nostr.Event> {
   const tags = event.tags.map((tag) => Object.freeze([...tag])) as Nostr.Tag.Any[];
   Object.freeze(tags);
   return Object.freeze({ ...event, tags });
+}
+
+function cloneEvent(event: Readonly<Nostr.Event>): Nostr.Event {
+  return {
+    ...event,
+    tags: event.tags.map((tag) => [...tag]) as Nostr.Tag.Any[],
+  };
 }
 
 function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailure {

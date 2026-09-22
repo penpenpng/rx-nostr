@@ -17,7 +17,7 @@ v4 の core implementation と Task 11 の静的品質ゲートまで完成し�
 | relay communication                   | query 実装済み | unipls adapter 上で resend、relay-local terminal、physical query queue、NIP-11 limit、filter snapshot、dispose cleanup を実装済み。        |
 | publish                               | 実装済み       | hot Publication、raw OK replay、all/any、cancel、snapshot、AUTH/reconnect resend、relay-local failure isolation を検証済み。               |
 | authenticator                         | 実装済み       | opt-in の relay coordinator が challenge 世代、dedupe、AUTH OK/timeout、REQ/EVENT一回再送、unsubscribe/dispose cleanup を管理する。        |
-| relay directory                       | 実装済み       | global/injected directory、immutable entry、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。   |
+| relay directory                       | 実装済み       | global/injected directory、mutable entries、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。   |
 | connection state/retry                | 実装済み       | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。 |
 | `RxNostr` 公開 API                    | 実装済み       | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local pool を検証済み。              |
 | WebSocket 抽象化                      | 移行済み       | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                           |

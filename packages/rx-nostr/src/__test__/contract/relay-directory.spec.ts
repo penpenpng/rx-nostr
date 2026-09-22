@@ -49,7 +49,7 @@ describe("RelayDirectory public contract", () => {
     skipped.dispose();
   });
 
-  test("normalizes aliases and exposes immutable read snapshots", () => {
+  test("normalizes aliases and exposes mutable detached read snapshots", () => {
     const directory: IRelayDirectory = new RelayDirectory({ clock: () => 10 });
     const first = directory.getOrCreate("wss://RELAY.example.com/");
     const second = directory.getOrCreate("wss://relay.example.com");
@@ -57,7 +57,10 @@ describe("RelayDirectory public contract", () => {
     expect(first.url).toBe("wss://relay.example.com");
     expect(second.url).toBe(first.url);
     expect([...directory]).toHaveLength(1);
-    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first)).toBe(false);
+    first.consecutiveFailures = 10;
+    expect(second.consecutiveFailures).toBe(0);
+    expect(directory.get(first.url)?.consecutiveFailures).toBe(0);
     expect(first).not.toHaveProperty("retry");
     expect(first).not.toHaveProperty("socket");
     expectTypeOf<RelayDirectoryEntry>().not.toHaveProperty("retry");
@@ -100,7 +103,8 @@ describe("RelayDirectory public contract", () => {
     ).resolves.toMatchObject({ name: "refreshed" });
     expect(fetcher).toHaveBeenCalledTimes(2);
 
-    directory.setNip11("wss://relay.example.com", { name: "manual" });
+    const installed = directory.setNip11("wss://relay.example.com", { name: "manual" });
+    installed.name = "consumer change";
     expect(directory.get("wss://relay.example.com")?.nip11).toEqual({
       name: "manual",
     });

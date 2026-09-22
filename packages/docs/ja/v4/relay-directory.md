@@ -38,7 +38,7 @@ console.log(entry?.liveConnections);
 | `consecutiveFailures` | 最新の成功以降の連続失敗数 |
 | `liveConnections` | Directory を共有する instance の接続数 |
 
-entry は immutable snapshot です。変更を購読するには `observe()` を使います。
+entry は Directory の内部状態から切り離された変更可能な snapshot です。entry を変更しても Directory には反映されません。Directory の変更を購読するには `observe()` を使います。各 observer には独立した snapshot が渡されます。
 
 ```ts
 const subscription = directory

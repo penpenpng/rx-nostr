@@ -1,5 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import type { Observable } from "rxjs";
+import { map, type Observable } from "rxjs";
 import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
 import { RelayDirectorySnapshotError } from "../libs/error.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
@@ -13,7 +13,7 @@ import type {
   RelayDirectorySnapshotEntry,
   RelayDirectorySnapshotV1,
 } from "./relay.interface.ts";
-import { cloneRelayInfo, RelayRecord } from "./relay.ts";
+import { cloneRelayInfo, copyRelayInfo, RelayRecord } from "./relay.ts";
 
 export interface RelayDirectoryReporter {
   connectionOpened(url: string): () => void;
@@ -40,11 +40,12 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   get(url: string): RelayDirectoryEntry | undefined {
-    return this.#relays.get(url)?.snapshot();
+    const entry = this.#relays.get(url)?.snapshot();
+    return entry && copyEntry(entry);
   }
 
   getOrCreate(url: string): RelayDirectoryEntry {
-    return this.#getOrCreate(url).snapshot();
+    return copyEntry(this.#getOrCreate(url).snapshot());
   }
 
   forget(url: string): boolean {
@@ -56,7 +57,7 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   *values(): IterableIterator<RelayDirectoryEntry> {
-    for (const relay of this.#relays.values()) yield relay.snapshot();
+    for (const relay of this.#relays.values()) yield copyEntry(relay.snapshot());
   }
 
   [Symbol.iterator](): IterableIterator<RelayDirectoryEntry> {
@@ -64,29 +65,26 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   observe(url: string): Observable<RelayDirectoryEntry> {
-    return this.#getOrCreate(url).observe();
+    return this.#getOrCreate(url).observe().pipe(map(copyEntry));
   }
 
-  fetchNip11(
-    url: string,
-    options: FetchNip11Options = {},
-  ): Promise<Readonly<Nostr.Nip11.RelayInfo>> {
-    return this.#getOrCreate(url).fetchNip11(options.refresh ?? false);
+  fetchNip11(url: string, options: FetchNip11Options = {}): Promise<Nostr.Nip11.RelayInfo> {
+    return this.#getOrCreate(url)
+      .fetchNip11(options.refresh ?? false)
+      .then(copyRelayInfo);
   }
 
-  setNip11(url: string, info: Nostr.Nip11.RelayInfo): Readonly<Nostr.Nip11.RelayInfo> {
-    return this.#getOrCreate(url).setNip11(info);
+  setNip11(url: string, info: Nostr.Nip11.RelayInfo): Nostr.Nip11.RelayInfo {
+    return copyRelayInfo(this.#getOrCreate(url).setNip11(info));
   }
 
   exportSnapshot(): string {
-    const snapshot: RelayDirectorySnapshotV1 = Object.freeze({
+    const snapshot: RelayDirectorySnapshotV1 = {
       version: 1,
-      relays: Object.freeze(
-        [...this.#relays.values()]
-          .map((relay) => relay.persisted())
-          .sort((left, right) => left.url.localeCompare(right.url)),
-      ),
-    });
+      relays: [...this.#relays.values()]
+        .map((relay) => relay.persisted())
+        .sort((left, right) => left.url.localeCompare(right.url)),
+    };
     return JSON.stringify(snapshot);
   }
 
@@ -105,6 +103,13 @@ export class RelayDirectory implements IRelayDirectory {
       { trusted: true },
     );
   }
+}
+
+function copyEntry(entry: RelayDirectoryEntry): RelayDirectoryEntry {
+  return {
+    ...entry,
+    ...(entry.nip11 === undefined ? {} : { nip11: copyRelayInfo(entry.nip11) }),
+  };
 }
 
 /** @internal Used by RelayCommunication integration without widening public API. */

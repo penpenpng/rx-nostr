@@ -17,7 +17,11 @@ describe("RxNostr connection state", () => {
       WebSocket: server.WebSocket,
     });
     const packets: ConnectionStatePacket[] = [];
-    rxNostr.monitorConnectionState().subscribe((packet) => packets.push(packet));
+    const states = rxNostr.monitorConnectionState();
+    states.subscribe((packet) => {
+      if (packet.state.state === "connecting") packet.state.attempt = 100;
+    });
+    states.subscribe((packet) => packets.push(packet));
 
     expect(server.connections).toHaveLength(0);
     rxNostr.setHotRelays([firstRelay, secondRelay]);

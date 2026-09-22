@@ -13,7 +13,7 @@ signing、複数 relay 送信、OK/AUTH/timeout を、一つの publication oper
 - OK true/false と auth-required を raw `OkPacket` subscription へ流し、timeout、drop、retry exhaustion も publication lifecycle へ反映する。
 - AUTH 後の再送と duplicate OK を event id/attempt で調停する。
 - all/any policy の Promise を同じ relay state table から settle し、any が resolve しても残りを暗黙に cancel しない。
-- 実際に署名・送信する EVENT の immutable snapshot を返す。
+- 実際に署名・送信する EVENT の detached mutable copy を返す。
 - signer error は publication 全体の失敗、relay-local failure は他 relay の送出努力を中断しない（D5b）。
 - OK subscription の unsubscribe はその observer だけを外し、送出努力は継続する。
 - publication の `cancel()` または RxNostr dispose で pending send/listener/retry/lease を解放する。
@@ -48,7 +48,7 @@ signing、複数 relay 送信、OK/AUTH/timeout を、一つの publication oper
 2026-09-21 に完了。
 
 - `publish()` 呼び出し時に宛先を normalized snapshot 化し、接続 prewarm と一回だけの署名を開始する hot `PublicationOperation` を実装した。observer の有無は operation lifecycle に影響しない。
-- signer の戻り値を検証して tag を含む immutable clone を `event` Promise へ返す。no relay は signer を呼ばず `no-relays`、throw/reject/invalid event は cause を保持する `RxNostrCallbackError("signer")` になる。
+- signer の戻り値を検証して tag を含む immutable clone を内部送信用に保持し、`event` Promise へは detached mutable copy を返す。no relay は signer を呼ばず `no-relays`、throw/reject/invalid event は cause を保持する `RxNostrCallbackError("signer")` になる。
 - relay ごとの同一 state table から raw `OkPacket` replay stream、`waitFor("all")`、`waitFor("any")` を駆動する。all は最初の final failure で reject、any は最初の acceptance で resolve し、any 成功後も他 relay の努力を継続する。
 - AUTH-related `OK false` は即時に observer へ流すが final failure にせず、AUTH/再送後の final OK または auth failure まで settlement を保留する。
 - timeout、drop/retry exhaustion、rejected、auth callback failure、cancel を relay failure snapshot に分類する。一 relay の terminal failure は他 relay の subscription/lease を終了しない。

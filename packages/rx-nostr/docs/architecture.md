@@ -117,7 +117,7 @@ relay URL 自体に紐づく共有 metadata を持ち、socket を所有しま�
 - 連続失敗回数
 - 現在観測される connection 数（複数 RxNostr instance の合計）
 
-connection の再試行を直接命令する API は、directory と pool の責務を再結合するため置きません。connection lifecycle の書き込みは internal reporter に限定し、public entry は immutable snapshot として公開します（D2）。
+connection の再試行を直接命令する API は、directory と pool の責務を再結合するため置きません。connection lifecycle の書き込みは internal reporter に限定し、public entry は内部状態から切り離した mutable snapshot として公開します（D2）。
 
 ## protocol flow
 
@@ -137,7 +137,7 @@ RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の
 ### publish
 
 1. `publish()` は一つの publication operation object を返し、開始時の宛先 relay を snapshot する。
-2. signer を一度実行し、実際に送信する EVENT の immutable snapshot を保持する。
+2. signer を一度実行し、実際に送信する EVENT の immutable snapshot を内部に保持し、利用者には detached mutable copy を返す。
 3. 宛先 relay ごとに lease と publish operation を作る。
 4. unipls で EVENT を送信し、同じ event id の OK を待つ。
 5. AUTH-required response の場合は AUTH coordinator の結果を待って EVENT を再送する。

@@ -134,7 +134,7 @@ export class RxNostr implements IRxNostr {
           mergeMap((relay) =>
             relay
               .monitorConnectionState()
-              .pipe(map((state) => Object.freeze({ from: relay.url, state }))),
+              .pipe(map((state) => ({ from: relay.url, state: copyConnectionState(state) }))),
           ),
         );
     });
@@ -153,6 +153,15 @@ export class RxNostr implements IRxNostr {
   #assertActive(): void {
     if (this.#disposed) throw new RxNostrAlreadyDisposedError();
   }
+}
+
+function copyConnectionState(
+  state: ConnectionStatePacket["state"],
+): ConnectionStatePacket["state"] {
+  if (state.state === "waiting-for-retry" || state.state === "failed") {
+    return { ...state, reason: { ...state.reason } };
+  }
+  return { ...state };
 }
 
 function callbackSafeVerifier(verifier: EventVerifier): EventVerifier {

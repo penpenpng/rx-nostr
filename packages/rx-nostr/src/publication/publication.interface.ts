@@ -5,17 +5,17 @@ import type { OkPacket } from "../packets/index.ts";
 
 export type PublicationSettlePolicy = "all" | "any";
 
-export type PublicationFailure = Readonly<{
+export type PublicationFailure = {
   relay: RelayUrl;
   kind: "rejected" | "timeout" | "dropped" | "retry-exhausted" | "cancelled" | "auth" | "failed";
   ok?: OkPacket;
   cause?: unknown;
-}>;
+};
 
 /** A publish operation that starts when `RxNostr.publish()` is called. */
 export interface Publication {
-  /** The immutable event snapshot that the operation attempted to send. */
-  readonly event: Promise<Readonly<Nostr.Event>>;
+  /** A detached copy of the signed event that the operation attempted to send. */
+  readonly event: Promise<Nostr.Event>;
 
   /** Observe unaggregated OK packets without controlling the operation. */
   subscribe(observer?: Partial<Observer<OkPacket>>): Subscription;

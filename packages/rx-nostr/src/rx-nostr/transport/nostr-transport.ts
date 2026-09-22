@@ -244,9 +244,9 @@ function createUniplsReconnector(
         relay,
         phase: context.origin === "initial" ? "initial" : "recovery",
         attempt: context.attempt,
-        reason,
+        reason: { ...reason },
         signal: context.signal,
-        health: getConnectionHealth?.() ?? retryHealth(context),
+        health: { ...(getConnectionHealth?.() ?? retryHealth(context)) },
       });
 
       if (context.signal.aborted) return;

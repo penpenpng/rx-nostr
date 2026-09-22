@@ -1,30 +1,30 @@
 import type * as Nostr from "nostr-typedef";
 import type { RelayUrl } from "../libs/index.ts";
 
-/** Immutable metadata and aggregate health for one normalized relay URL. */
+/** Detached metadata and aggregate health for one normalized relay URL. */
 export interface RelayDirectoryEntry {
-  readonly url: RelayUrl;
-  readonly nip11?: Readonly<Nostr.Nip11.RelayInfo>;
-  readonly nip11FetchedAt?: number;
-  readonly nip11FailedAt?: number;
-  readonly lastConnectedAt?: number;
-  readonly lastFailureAt?: number;
-  readonly consecutiveFailures: number;
-  readonly liveConnections: number;
-  readonly maxSubscriptions?: number;
+  url: RelayUrl;
+  nip11?: Nostr.Nip11.RelayInfo;
+  nip11FetchedAt?: number;
+  nip11FailedAt?: number;
+  lastConnectedAt?: number;
+  lastFailureAt?: number;
+  consecutiveFailures: number;
+  liveConnections: number;
+  maxSubscriptions?: number;
 }
 
 export interface RelayDirectorySnapshotEntry {
-  readonly url: RelayUrl;
-  readonly nip11?: Readonly<Nostr.Nip11.RelayInfo>;
-  readonly nip11FetchedAt?: number;
-  readonly nip11FailedAt?: number;
-  readonly lastConnectedAt?: number;
-  readonly lastFailureAt?: number;
-  readonly consecutiveFailures: number;
+  url: RelayUrl;
+  nip11?: Nostr.Nip11.RelayInfo;
+  nip11FetchedAt?: number;
+  nip11FailedAt?: number;
+  lastConnectedAt?: number;
+  lastFailureAt?: number;
+  consecutiveFailures: number;
 }
 
 export interface RelayDirectorySnapshotV1 {
-  readonly version: 1;
-  readonly relays: readonly RelayDirectorySnapshotEntry[];
+  version: 1;
+  relays: RelayDirectorySnapshotEntry[];
 }

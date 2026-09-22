@@ -1,6 +1,6 @@
 import type { Observable } from "rxjs";
 import { describe, expectTypeOf, test } from "vitest";
-import type { ConnectionState, ConnectionStatePacket, IRxNostr } from "rx-nostr";
+import type { ConnectionFailure, ConnectionState, ConnectionStatePacket, IRxNostr } from "rx-nostr";
 
 describe("connection state public contract", () => {
   test("uses rx-nostr-owned replayable state snapshots", () => {
@@ -8,17 +8,18 @@ describe("connection state public contract", () => {
       Observable<ConnectionStatePacket>
     >();
     expectTypeOf<ConnectionState>().toMatchTypeOf<
-      | { readonly state: "dormant" }
-      | { readonly state: "connecting"; readonly attempt: number }
-      | { readonly state: "connected" }
+      | { state: "dormant" }
+      | { state: "connecting"; attempt: number }
+      | { state: "connected" }
       | {
-          readonly state: "waiting-for-retry";
-          readonly attempt: number;
-          readonly delay: number;
+          state: "waiting-for-retry";
+          attempt: number;
+          delay: number;
+          reason: ConnectionFailure;
         }
-      | { readonly state: "retrying"; readonly attempt: number }
-      | { readonly state: "failed"; readonly attempt: number }
-      | { readonly state: "disposed" }
+      | { state: "retrying"; attempt: number }
+      | { state: "failed"; attempt: number; reason: ConnectionFailure }
+      | { state: "disposed" }
     >();
     expectTypeOf<ConnectionStatePacket>().toHaveProperty("from");
     expectTypeOf<ConnectionStatePacket>().toHaveProperty("state");

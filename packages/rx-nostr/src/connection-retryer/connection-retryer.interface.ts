@@ -8,17 +8,17 @@ export interface ConnectionRetryer {
 }
 
 export interface ConnectionRetryContext {
-  readonly relay: RelayUrl;
-  readonly phase: "initial" | "recovery";
+  relay: RelayUrl;
+  phase: "initial" | "recovery";
   /** One-based number of the retry that is being considered. */
-  readonly attempt: number;
-  readonly reason: ConnectionFailure;
-  readonly signal: AbortSignal;
-  readonly health: Readonly<{
+  attempt: number;
+  reason: ConnectionFailure;
+  signal: AbortSignal;
+  health: {
     consecutiveFailures: number;
     lastConnectedAt?: number;
     lastFailureAt?: number;
-  }>;
+  };
 }
 
 export type ConnectionRetryDecision =

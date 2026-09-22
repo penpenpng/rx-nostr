@@ -21,12 +21,25 @@ export type RxNostrPublicationErrorCode =
 
 /** A publication's requested all/any success condition cannot be met. */
 export class RxNostrPublicationError extends RxNostrError {
+  public readonly failures: import("../publication/index.ts").PublicationFailure[];
+
   constructor(
     public readonly code: RxNostrPublicationErrorCode,
-    public readonly failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
+    failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
   ) {
     super(`RxNostrPublicationError: publication failed (${code}).`);
     this.name = "RxNostrPublicationError";
+    this.failures = failures.map(({ ok, ...failure }) => ({
+      ...failure,
+      ...(ok === undefined
+        ? {}
+        : {
+            ok: {
+              ...ok,
+              message: [...ok.message] as typeof ok.message,
+            },
+          }),
+    }));
   }
 }
 

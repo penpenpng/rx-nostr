@@ -40,7 +40,7 @@ unipls の lifecycle/reconnector を唯一の transport state source とし、rx
 
 ## 実装結果
 
-- unipls lifecycle snapshot を唯一の transport state source とし、rx-nostr の immutable `ConnectionState` へ写像した。初回接続と retry attempt を分け、policy が確定した正確な delay を `waiting-for-retry` に保持する。
+- unipls lifecycle snapshot を唯一の transport state source とし、rx-nostr の `ConnectionState` へ写像した。内部 snapshot は不変に保ち、公開時には detached mutable copy を返す。初回接続と retry attempt を分け、policy が確定した正確な delay を `waiting-for-retry` に保持する。
 - `monitorConnectionState()` は pool に存在する relay と subscription 後に作られた relay を統合する。監視だけでは pool entry/connection を作らず、relay ごとの最新 state は replay される。
 - 同一 state の重複 emission を抑え、idle/user close は `dormant`、retry terminal は typed failure を持つ `failed`、instance cleanup は `disposed` として区別した。
 - retryer は引き続き rx-nostr 独自 I/F とし、unipls reconnector への adapter 内で wait/cancel/exhaust と AbortSignal を扱う。pending timer は close/dispose で中断される。

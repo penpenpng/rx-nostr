@@ -68,7 +68,7 @@ try {
 
 ## 署名済み EVENT を取得する
 
-`event` は、すべての宛先で実際に使用する immutable な EVENT snapshot へ resolve します。EVENT 自体と tags は凍結され、signer が返した object から切り離されています。
+`event` は、すべての宛先で実際に使用する EVENT の変更可能な copy へ resolve します。この copy は signer が返した object と内部の送信用 snapshot の両方から切り離されているため、EVENT や tags を変更しても送信内容には影響しません。
 
 ```ts
 const event = await publication.event;

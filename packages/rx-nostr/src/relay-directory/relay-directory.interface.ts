@@ -18,8 +18,8 @@ export interface IRelayDirectory extends Iterable<RelayDirectoryEntry> {
   forget(url: string): boolean;
   values(): IterableIterator<RelayDirectoryEntry>;
   observe(url: string): Observable<RelayDirectoryEntry>;
-  fetchNip11(url: string, options?: FetchNip11Options): Promise<Readonly<Nostr.Nip11.RelayInfo>>;
-  setNip11(url: string, info: Nostr.Nip11.RelayInfo): Readonly<Nostr.Nip11.RelayInfo>;
+  fetchNip11(url: string, options?: FetchNip11Options): Promise<Nostr.Nip11.RelayInfo>;
+  setNip11(url: string, info: Nostr.Nip11.RelayInfo): Nostr.Nip11.RelayInfo;
   exportSnapshot(): string;
   importSnapshot(data: string): void;
 }

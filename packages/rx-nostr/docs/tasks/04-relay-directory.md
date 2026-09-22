@@ -43,7 +43,7 @@ relay node 自体に紐づく metadata/health を instance 横断で集約し、
 ## 実装結果
 
 - `RelayDirectory` と process-wide の `GlobalRelayDirectory` を公開し、`RxNostrConfig.relayDirectory` から instance/test 単位で差し替え可能にした。
-- public entry は immutable snapshot とし、connection lifecycle の書き込み口は internal reporter に分離した。directory から socket、retry、connection handle は操作できない。
+- public entry は内部状態から切り離した mutable snapshot とし、connection lifecycle の書き込み口は internal reporter に分離した。directory から socket、retry、connection handle は操作できない。
 - URL alias の正規化、列挙、観測、forget を実装した。active connection または NIP-11 request がある entry は forget しない。
 - NIP-11 の cache、in-flight deduplication、明示 refresh、manual set、成功/失敗時刻、`maxSubscriptions` の導出を実装した。
 - `fetchRelayInfo` は network、HTTP status、JSON parse、invalid response を `RxNostrNip11Error` で区別する。

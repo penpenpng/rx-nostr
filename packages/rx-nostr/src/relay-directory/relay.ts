@@ -151,6 +151,12 @@ export class RelayRecord {
 export function cloneRelayInfo(
   info: Nostr.Nip11.RelayInfo | Readonly<Nostr.Nip11.RelayInfo>,
 ): Readonly<Nostr.Nip11.RelayInfo> {
+  return deepFreeze(copyRelayInfo(info)) as Readonly<Nostr.Nip11.RelayInfo>;
+}
+
+export function copyRelayInfo(
+  info: Nostr.Nip11.RelayInfo | Readonly<Nostr.Nip11.RelayInfo>,
+): Nostr.Nip11.RelayInfo {
   let clone: unknown;
   try {
     clone = JSON.parse(JSON.stringify(info));
@@ -162,7 +168,7 @@ export function cloneRelayInfo(
   if (typeof clone !== "object" || clone === null || Array.isArray(clone)) {
     throw new TypeError("NIP-11 metadata must be a JSON object.");
   }
-  return deepFreeze(clone) as Readonly<Nostr.Nip11.RelayInfo>;
+  return clone as Nostr.Nip11.RelayInfo;
 }
 
 function deepFreeze(value: unknown): unknown {

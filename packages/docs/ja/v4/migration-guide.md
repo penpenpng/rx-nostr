@@ -142,7 +142,7 @@ hot relay は宛先ではありません。v3 の default relay と同様に使�
 
 ## Connection state と retry
 
-`createConnectionStateObservable()` は `monitorConnectionState()` へ変わりました。state 名と構造も v4 独自の immutable union です。
+`createConnectionStateObservable()` は `monitorConnectionState()` へ変わりました。state 名と構造も v4 独自の union です。通知される state は内部状態から切り離された変更可能な copy です。
 
 ```ts
 rxNostr.monitorConnectionState().subscribe(({ from, state }) => {

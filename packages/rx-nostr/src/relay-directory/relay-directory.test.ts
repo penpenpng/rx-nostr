@@ -53,13 +53,15 @@ describe("RelayDirectory health reporter", () => {
     expect(directory.get("wss://relay.example.com")).toBeUndefined();
   });
 
-  test("observes immutable snapshots", () => {
+  test("gives each observer mutable detached snapshots", () => {
     let now = 10;
     const directory = new RelayDirectory({ clock: () => now });
     const values: number[] = [];
-    const sub = directory
-      .observe("wss://relay.example.com")
-      .subscribe((entry) => values.push(entry.consecutiveFailures));
+    const observed = directory.observe("wss://relay.example.com");
+    const mutatingSub = observed.subscribe((entry) => {
+      entry.consecutiveFailures = 100;
+    });
+    const sub = observed.subscribe((entry) => values.push(entry.consecutiveFailures));
     const reporter = getRelayDirectoryReporter(directory);
 
     reporter.connectionFailed("wss://relay.example.com");
@@ -67,6 +69,7 @@ describe("RelayDirectory health reporter", () => {
     reporter.connectionOpened("wss://relay.example.com");
 
     expect(values).toEqual([0, 1, 0]);
+    mutatingSub.unsubscribe();
     sub.unsubscribe();
   });
 });

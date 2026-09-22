@@ -12,7 +12,7 @@ const subscription = rxNostr.monitorConnectionState().subscribe((packet) => {
 });
 ```
 
-`packet.state` は immutable な discriminated union です。
+`packet.state` は rx-nostr 独自の discriminated union です。各 observer は変更可能な独立 copy を受け取るため、値を変更しても接続状態やほかの observer には影響しません。
 
 | `state` | 意味 |
 | --- | --- |

@@ -24,12 +24,12 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 - The returned `Publication` is one hot operation. `subscribe()` observes the unaggregated `OkPacket` stream; unsubscribing only stops that observer and never cancels delivery.
 - OK packets already received by the operation are replayed to a later subscriber before live packets. AUTH-related `OK false` packets remain observable even when a resend is pending.
 - `cancel()` is idempotent and stops every remaining relay effort.
-- `event` resolves to the immutable signed EVENT actually used by the operation. It rejects if signing cannot produce an EVENT or if there are no destinations.
+- `event` resolves to a detached mutable copy of the signed EVENT actually used by the operation. Mutating it does not affect delivery. It rejects if signing cannot produce an EVENT or if there are no destinations.
 - `waitFor("all")` and `waitFor("any")` resolve to `undefined`. `all` resolves only after every destination has final `OK true` and rejects as soon as a non-AUTH-pending final failure makes that impossible. `any` resolves on the first final `OK true` and rejects after every destination has finally failed. Resolving `any` does not cancel other efforts.
 - no relay, cancellation, timeout, drop, retry exhaustion, and final `OK false` reject through `RxNostrPublicationError`; signer callback failure rejects through `RxNostrCallbackError`.
 - The OK stream completes after every relay is terminal and replays prior packets to late subscribers. Signer failure errors that stream; relay-local delivery failures remain settlement failures and do not error or cancel another relay's stream.
 - `PublicationFailure` identifies `rejected`, `timeout`, `dropped`, `retry-exhausted`, `cancelled`, `auth`, or other `failed` relay effort and may carry the final OK and classified cause.
-- The event snapshot is a detached frozen clone, including its tags. Cancel before signing completes prevents transmission but does not discard a valid snapshot produced by the already-running signer.
+- The operation keeps its own frozen event snapshot, including its tags, and exposes a separate mutable clone. Cancel before signing completes prevents transmission but does not discard a valid event produced by the already-running signer.
 
 ## Relay input
 
@@ -74,7 +74,7 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 `GlobalRelayDirectory` is the default process-wide metadata/health store. An application or test can inject a distinct `RelayDirectory` through `RxNostrConfig.relayDirectory`; the directory does not own connections and cannot retry or close them.
 
-- A normalized relay URL identifies one record. `get()` and iteration return immutable snapshots; `observe()` emits a new immutable snapshot when that record changes.
+- A normalized relay URL identifies one record. `get()` and iteration return detached mutable snapshots; `observe()` gives each observer its own detached mutable snapshot when that record changes. Mutating these values never changes the directory.
 - NIP-11 reads are cached and concurrent requests for one relay are deduplicated. `{ refresh: true }` bypasses a completed cache, while `setNip11()` installs application-provided metadata. Successful and failed fetch times are tracked separately, and a valid non-negative integer `limitation.max_subscriptions` is exposed as `maxSubscriptions`.
 - Creating a relay pool entry starts the cached NIP-11 fetch unless `skipFetchNip11` is true. Fetch failure does not fail the operation. Skipping fetch does not disable metadata already present in the configured directory, including `maxSubscriptions`.
 - Connection health contains the latest successful/failed timestamps, consecutive failures, and the currently observed connection count across reporters. A successful connection resets consecutive failures. Public entries expose no socket, retry operation, or mutable reporter.
@@ -89,7 +89,7 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 ## Connection state
 
-`ConnectionState` is an immutable rx-nostr discriminated union: `dormant`, `connecting`, `connected`, `waiting-for-retry`, `retrying`, `failed`, or `disposed`. Retry states carry one-based attempts; wait state carries its delay; failure states contain only an rx-nostr `ConnectionFailure` snapshot. Transport implementation objects are not exposed.
+`ConnectionState` is an rx-nostr discriminated union: `dormant`, `connecting`, `connected`, `waiting-for-retry`, `retrying`, `failed`, or `disposed`. Public packets contain detached mutable state copies. Retry states carry one-based attempts; wait state carries its delay; failure states contain only an rx-nostr `ConnectionFailure` snapshot. Transport implementation objects are not exposed.
 
 `monitorConnectionState()` observes every relay entry that already exists in the instance pool and entries created later. Subscribing does not itself create a relay entry or open a connection. Each relay stream replays its latest state to a new observer; identical consecutive snapshots are suppressed, while relay ordering remains independent.
 
