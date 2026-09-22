@@ -107,6 +107,35 @@ describe("REQ public contract", () => {
     rxNostr.dispose();
   });
 
+  test("keeps a fixed forward descriptor active after EOSE", async () => {
+    const server = new ControlledWebSocketServer();
+    const rxNostr = new RxNostr({
+      verifier: new NoopVerifier(),
+      retry: new NoopRetryer(),
+      skipFetchNip11: true,
+      WebSocket: server.WebSocket,
+    });
+    const packets: EventPacket[] = [];
+    const complete = vi.fn();
+    const subscription = rxNostr
+      .req(relay, { strategy: "forward", filters: { kinds: [1] } }, { linger: 0 })
+      .subscribe({ next: (packet) => packets.push(packet), complete });
+
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(JSON.stringify(["EVENT", subId, event({ id: "live" })]));
+
+    await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["live"]));
+    expect(complete).not.toHaveBeenCalled();
+
+    subscription.unsubscribe();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
+    rxNostr.dispose();
+  });
+
   test("completes an empty destination without creating a connection", async () => {
     const server = new ControlledWebSocketServer();
     const rxNostr = new RxNostr({
@@ -116,7 +145,7 @@ describe("REQ public contract", () => {
     });
     const complete = vi.fn();
     const error = vi.fn();
-    rxNostr.req([], [{}]).subscribe({ complete, error });
+    rxNostr.req([], { strategy: "oneshot", filters: [{}] }).subscribe({ complete, error });
 
     await vi.waitFor(() => expect(complete.mock.calls.length + error.mock.calls.length).toBe(1));
     expect(complete).toHaveBeenCalledOnce();
@@ -141,7 +170,7 @@ describe("REQ public contract", () => {
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     rxNostr
-      .req(relay, [{ kinds: [1] }], { linger: 0 })
+      .req(relay, { strategy: "oneshot", filters: { kinds: [1] } }, { linger: 0 })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     server.sockets.latest.open();
     await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
@@ -174,7 +203,7 @@ describe("REQ public contract", () => {
       WebSocket: server.WebSocket,
     });
     let received: unknown;
-    rxNostr.req(relay, [{}], { linger: 0 }).subscribe({
+    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }, { linger: 0 }).subscribe({
       error: (error) => (received = error),
     });
     server.sockets.latest.open();
@@ -204,11 +233,15 @@ describe("REQ public contract", () => {
     });
     const packets: EventPacket[] = [];
     rxNostr
-      .req(relay, [{ kinds: [1] }], {
-        linger: 0,
-        skipExpirationCheck: true,
-        skipValidateFilterMatching: true,
-      })
+      .req(
+        relay,
+        { strategy: "oneshot", filters: [{ kinds: [1] }] },
+        {
+          linger: 0,
+          skipExpirationCheck: true,
+          skipValidateFilterMatching: true,
+        },
+      )
       .subscribe((packet) => packets.push(packet));
     server.sockets.latest.open();
     await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
@@ -241,13 +274,16 @@ describe("REQ public contract", () => {
     callbackRxNostr
       .req(
         relay,
-        [
-          {
-            since: () => {
-              throw cause;
+        {
+          strategy: "oneshot",
+          filters: [
+            {
+              since: () => {
+                throw cause;
+              },
             },
-          },
-        ],
+          ],
+        },
         { linger: 0 },
       )
       .subscribe({ error: (error) => (received = error) });
@@ -276,7 +312,7 @@ describe("REQ public contract", () => {
     });
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr.req([one, two], [{}], { linger: 0 }).subscribe({
+    rxNostr.req([one, two], { strategy: "oneshot", filters: [{}] }, { linger: 0 }).subscribe({
       next: (packet) => packets.push(packet),
       complete,
     });

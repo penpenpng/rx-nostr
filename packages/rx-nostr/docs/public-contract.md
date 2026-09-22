@@ -6,9 +6,9 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ### REQ
 
-- The public call shape is `req(relays, request, options?)`: destinations first, then an `RxReq` or filters, then operation-specific options.
+- The public call shape is `req(relays, request, options?)`: destinations first, then an `RxReq` or a `{ strategy, filters }` descriptor, then operation-specific options.
 - `req()` returns a cold Observable. Each subscription creates an independent logical query and connection demand; merely calling `req()` does not open a connection.
-- Passing filters directly creates a one-shot backward request. `RxForwardReq` replaces its previous segment, while `RxBackwardReq` keeps emitted segments active until their individual terminal conditions and completes after `over()` and all segments finish.
+- A `strategy: "oneshot"` descriptor creates one backward segment and completes at its terminal condition. A `strategy: "forward"` descriptor creates one forward segment that remains active after EOSE until unsubscribe. Both descriptors accept one or multiple filters. `RxForwardReq` replaces its previous segment, while `RxBackwardReq` keeps emitted segments active until their individual terminal conditions and completes after `over()` and all segments finish.
 - A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future physical split.
 - Physical `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.
 - The public result pipeline is filter matching, signature verification, then NIP-40 expiration filtering. A disabled stage is skipped in that same position.

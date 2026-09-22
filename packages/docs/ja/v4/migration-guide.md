@@ -78,10 +78,13 @@ const request = new RxForwardReq();
 const events$ = rxNostr.req(relays, request);
 ```
 
-簡単な backward query では `RxBackwardReq` を作らず、filter を直接渡せます。
+簡単な backward query では `RxBackwardReq` を作らず、oneshot descriptor を渡せます。
 
 ```ts
-rxNostr.req(relays, [{ kinds: [1], limit: 20 }]);
+rxNostr.req(relays, {
+  strategy: "oneshot",
+  filters: [{ kinds: [1], limit: 20 }],
+});
 ```
 
 forward は新しい ReqPacket が直前の REQ を置き換え、backward は各 REQ を並行して EOSE まで維持する契約を保ちます。

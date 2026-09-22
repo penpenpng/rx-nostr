@@ -13,7 +13,10 @@ const rxNostr = new RxNostr({
 });
 
 rxNostr
-  .req(["wss://relay.example.com"], [{ kinds: [1], limit: 20 }])
+  .req(["wss://relay.example.com"], {
+    strategy: "oneshot",
+    filters: [{ kinds: [1], limit: 20 }],
+  })
   .subscribe(({ from, event }) => {
     console.log(from, event);
   });
@@ -39,7 +42,7 @@ rxNostr
 import type { IRxNostr } from "rx-nostr";
 
 function startTimeline(client: IRxNostr) {
-  return client.req(relays, [{ kinds: [1] }]);
+  return client.req(relays, { strategy: "forward", filters: { kinds: [1] } });
 }
 ```
 
@@ -52,8 +55,11 @@ v4 では REQ と publish を独立した operation として扱います。oper
 宛先には、ひとつの URL、URL の iterable、または動的な `RxRelays` を渡せます。
 
 ```ts
-rxNostr.req("wss://relay.example.com", [{}]);
-rxNostr.req(["wss://one.example.com", "wss://two.example.com"], [{}]);
+rxNostr.req("wss://relay.example.com", { strategy: "oneshot", filters: [{}] });
+rxNostr.req(["wss://one.example.com", "wss://two.example.com"], {
+  strategy: "oneshot",
+  filters: [{}],
+});
 ```
 
 URL は境界で正規化、重複排除されます。query と hot relay に渡した `RxRelays` はその後の変更にも追従します。一方、publish の宛先は呼び出し時に固定されます。
@@ -82,7 +88,7 @@ query と接続状態は RxJS の `Observable` です。標準の RxJS operator 
 import { filterByKinds, timeline } from "rx-nostr";
 
 rxNostr
-  .req(["wss://relay.example.com"], [{}])
+  .req(["wss://relay.example.com"], { strategy: "oneshot", filters: [{}] })
   .pipe(filterByKinds([1, 6]), timeline(100))
   .subscribe((events) => {
     console.log(events);

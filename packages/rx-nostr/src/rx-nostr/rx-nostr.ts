@@ -1,13 +1,12 @@
 import * as Nostr from "nostr-typedef";
 import { defer, identity, map, mergeMap, Observable, Subject, takeUntil } from "rxjs";
 import type { EventVerifier } from "../event-verifier/index.ts";
-import type { LazyFilter } from "../lazy-filter/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
-import { RxOneshotReq, RxReq } from "../rx-req/index.ts";
+import { RxReq, RxStaticReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
 import { publish, RelayWarmer, reqBackward, reqForward } from "./modules/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
@@ -24,6 +23,7 @@ import type {
   RxNostrConfig,
   RxNostrPublishConfig,
   RxNostrReqConfig,
+  RxNostrReqInput,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
 
@@ -60,7 +60,7 @@ export class RxNostr implements IRxNostr {
 
   req(
     relays: RelayInput,
-    request: RxReq | LazyFilter | Iterable<LazyFilter>,
+    request: RxNostrReqInput,
     options: RxNostrReqConfig = {},
   ): Observable<EventPacket> {
     const config = new FilledRxNostrReqOptions(options, this.#config);
@@ -68,10 +68,9 @@ export class RxNostr implements IRxNostr {
     const rxReq: RxReq = (() => {
       if (request instanceof RxReq) {
         return request;
-      } else if (Symbol.iterator in request) {
-        return new RxOneshotReq([...request]);
       } else {
-        return new RxOneshotReq(request);
+        const filters = Symbol.iterator in request.filters ? [...request.filters] : request.filters;
+        return new RxStaticReq(request.strategy === "forward" ? "forward" : "backward", filters);
       }
     })();
 

@@ -22,7 +22,7 @@ const rxNostr = new RxNostr({
 
 ## EVENT を取得する
 
-フィルターを `req()` へ直接渡すと、一度だけ過去イベントを取得する backward query になります。EOSE、CLOSED、timeout などによって全リレーの処理が終わると Observable が complete します。
+`strategy: "oneshot"` を指定すると、一度だけ過去イベントを取得する backward query になります。EOSE、CLOSED、timeout などによって全リレーの処理が終わると Observable が complete します。
 
 ```ts
 const events = rxNostr.req(
@@ -30,7 +30,10 @@ const events = rxNostr.req(
     "wss://relay-one.example.com",
     "wss://relay-two.example.com",
   ],
-  [{ kinds: [1], limit: 20 }],
+  {
+    strategy: "oneshot",
+    filters: [{ kinds: [1], limit: 20 }],
+  },
 );
 
 const subscription = events.subscribe({

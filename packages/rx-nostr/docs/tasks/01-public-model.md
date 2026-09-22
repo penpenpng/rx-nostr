@@ -20,7 +20,7 @@
 - Observable が cold か hot か、operation を開始する時点
 - per-operation option と root default の優先順位
 - empty/invalid relay input の挙動
-- one-shot filter が backward strategy になること
+- `strategy: "oneshot"` descriptor が backward strategy になること
 - verifier/filter/expiration pipeline の順序と失敗時の挙動
 - query result が利用者指定 `traceTag` を保持し、physical/logical internal ID を公開しないこと
 - publication を開始する時点、all/any Promise の resolve value と error、cancel/timeout/drop の扱い

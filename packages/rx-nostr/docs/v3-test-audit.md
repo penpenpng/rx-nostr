@@ -49,7 +49,7 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 | EOSE sends an additional CLOSE                         | replace        | v4 treats EOSE as remote terminal and explicitly avoids redundant CLOSE        |
 | Backward EOSE does not end later/older active segments | keep           | `src/rx-nostr/modules/req-backward.test.ts`: concurrent segments remain active |
 | Backward `over()` completes after all segments         | keep           | `req-backward.test.ts` and `query.spec.ts`                                     |
-| One-shot completes on EOSE                             | keep           | `query.spec.ts`: direct filters create a one-shot backward request             |
+| One-shot completes on EOSE                             | keep           | `query.spec.ts`: an explicit oneshot descriptor creates a backward request     |
 | Multiple relays can reach EOSE at different times      | keep           | `req-backward.test.ts`: dynamic/multi-relay segment completion                 |
 | Dynamic relays affect live forward/backward work       | keep           | `req-forward.test.ts`, `req-backward.test.ts`, and `query.spec.ts`             |
 | `max_subscriptions` queues overflowed REQs             | keep           | `query.spec.ts` and `relay-communication.test.ts`: FIFO physical queue         |

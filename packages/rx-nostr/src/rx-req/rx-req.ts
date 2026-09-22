@@ -1,4 +1,4 @@
-import { type Observable, of, type OperatorFunction, Subject } from "rxjs";
+import { concat, NEVER, type Observable, of, type OperatorFunction, Subject } from "rxjs";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { createPipeMethod, type IPipeable, once, RxDisposableStack } from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
@@ -67,20 +67,30 @@ export class RxBackwardReq extends RxPipeableReq {
   }
 }
 
-export class RxOneshotReq extends RxReq {
-  readonly strategy = "backward";
+export class RxStaticReq extends RxReq {
   protected stream: Observable<ReqPacket>;
 
-  constructor(filters: LazyFilter | LazyFilter[], options?: Pick<ReqOptions, "traceTag">) {
+  constructor(
+    readonly strategy: RxReqStrategy,
+    filters: LazyFilter | LazyFilter[],
+    options?: Pick<ReqOptions, "traceTag">,
+  ) {
     super();
 
-    this.stream = of({
+    const packet$ = of({
       filters: normalizeFilters(filters),
       ...(options ?? {}),
     });
+    this.stream = strategy === "forward" ? concat(packet$, NEVER) : packet$;
   }
 
   asObservable(): Observable<ReqPacket> {
     return this.stream;
+  }
+}
+
+export class RxOneshotReq extends RxStaticReq {
+  constructor(filters: LazyFilter | LazyFilter[], options?: Pick<ReqOptions, "traceTag">) {
+    super("backward", filters, options);
   }
 }

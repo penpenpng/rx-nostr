@@ -24,7 +24,9 @@ dispose は冪等です。複数回呼んでも構いません。dispose 後に 
 query の購読が不要になったら unsubscribe してください。active REQ には必要に応じて Nostr CLOSE が送られます。
 
 ```ts
-const subscription = rxNostr.req(relays, filters).subscribe(onEvent);
+const subscription = rxNostr
+  .req(relays, { strategy: "forward", filters })
+  .subscribe(onEvent);
 
 subscription.unsubscribe();
 ```

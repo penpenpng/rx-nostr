@@ -1,1 +1,8 @@
-export { RxBackwardReq, RxForwardReq, RxOneshotReq, RxReq, type RxReqStrategy } from "./rx-req.ts";
+export {
+  RxBackwardReq,
+  RxForwardReq,
+  RxOneshotReq,
+  RxReq,
+  type RxReqStrategy,
+  RxStaticReq,
+} from "./rx-req.ts";

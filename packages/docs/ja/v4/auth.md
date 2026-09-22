@@ -45,7 +45,7 @@ factory には正規化済みの URL が渡されます。
 REQ と publish の config で root の設定を上書きできます。`false` を指定すると、その operation では AUTH を明示的に無効化します。
 
 ```ts
-rxNostr.req(relays, [{}], {
+rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, {
   authenticator: false,
 });
 

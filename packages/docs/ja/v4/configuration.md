@@ -70,10 +70,10 @@ REQ の `timeout` は backward segment が EOSE を待つ時間です。publish 
 
 ## REQ arguments and options
 
-`req(relays, request, options?)` の順です。宛先と request（`RxReq` または filters）は必須で、operation 固有の設定だけを第3引数へ渡します。
+`req(relays, request, options?)` の順です。宛先と request（`RxReq` または `{ strategy, filters }` descriptor）は必須で、operation 固有の設定だけを第3引数へ渡します。
 
 ```ts
-rxNostr.req(relays, filters, {
+rxNostr.req(relays, { strategy: "oneshot", filters }, {
   verifier,
   authenticator,
   defer: true,
@@ -129,7 +129,7 @@ const rxNostr = new RxNostr({
 });
 
 // この query だけ linger を 0 にします。
-rxNostr.req(relays, [{}], { linger: 0 });
+rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, { linger: 0 });
 ```
 
 ## Callback error

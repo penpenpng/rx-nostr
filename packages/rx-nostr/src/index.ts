@@ -107,6 +107,7 @@ export {
   type RxNostrPublishConfig,
   type RxNostrPublishOptions,
   type RxNostrReqConfig,
+  type RxNostrReqInput,
   type RxNostrReqOptions,
   type RxNostrStaticDefaultOptions,
 } from "./rx-nostr/index.ts";

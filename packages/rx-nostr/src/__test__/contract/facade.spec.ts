@@ -43,7 +43,7 @@ describe("RxNostr facade lifecycle", () => {
         WebSocket: server.WebSocket,
       });
       const complete = vi.fn();
-      rxNostr.req(relay, [{}]).subscribe({ complete });
+      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });
 
       server.sockets.latest.open();
       await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
@@ -84,7 +84,7 @@ describe("RxNostr facade lifecycle", () => {
     const reqComplete = vi.fn();
     rxNostr.req(relay, request).subscribe({ complete: reqComplete });
     request.emit([{}]);
-    const delayedReq = rxNostr.req(relay, [{}]);
+    const delayedReq = rxNostr.req(relay, { strategy: "oneshot", filters: [{}] });
     const delayedMonitor = rxNostr.monitorConnectionState();
 
     const publication = rxNostr.publish(relay, signedEvent, {
@@ -115,7 +115,7 @@ describe("RxNostr facade lifecycle", () => {
     delayedReq.subscribe({ error: delayedReqError });
     expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const newReqError = vi.fn();
-    rxNostr.req(relay, [{}]).subscribe({ error: newReqError });
+    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ error: newReqError });
     expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const monitorError = vi.fn();
     delayedMonitor.subscribe({ error: monitorError });

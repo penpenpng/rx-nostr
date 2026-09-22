@@ -12,10 +12,9 @@ import type { RxReq } from "../rx-req/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 
 export interface IRxNostr {
-  req(relays: RelayInput, rxReq: RxReq, options?: RxNostrReqConfig): Observable<EventPacket>;
   req(
     relays: RelayInput,
-    filters: LazyFilter | Iterable<LazyFilter>,
+    request: RxNostrReqInput,
     options?: RxNostrReqConfig,
   ): Observable<EventPacket>;
   publish(
@@ -29,6 +28,17 @@ export interface IRxNostr {
   [Symbol.dispose](): void;
   dispose(): void;
 }
+
+export type RxNostrReqInput =
+  | RxReq
+  | Readonly<{
+      strategy: "forward";
+      filters: LazyFilter | Iterable<LazyFilter>;
+    }>
+  | Readonly<{
+      strategy: "oneshot";
+      filters: LazyFilter | Iterable<LazyFilter>;
+    }>;
 
 export interface RxNostrConfig {
   /**

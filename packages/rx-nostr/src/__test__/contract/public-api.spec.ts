@@ -4,7 +4,6 @@ import type {
   Authenticator,
   EventPacket,
   IRxNostr,
-  LazyFilter,
   OkPacket,
   Publication,
   RelayInput,
@@ -13,6 +12,7 @@ import type {
   RxNostrConfig,
   RxNostrPublishConfig,
   RxNostrReqConfig,
+  RxNostrReqInput,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
 
@@ -33,9 +33,7 @@ describe("public entry point", () => {
     expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
     expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
     expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
-    expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<
-      LazyFilter | Iterable<LazyFilter>
-    >();
+    expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
     expectTypeOf<Parameters<IRxNostr["req"]>[2]>().toEqualTypeOf<RxNostrReqConfig | undefined>();
     expectTypeOf<Parameters<IRxNostr["publish"]>[0]>().toEqualTypeOf<RelayInput>();
     expectTypeOf<Parameters<IRxNostr["publish"]>[2]>().toEqualTypeOf<

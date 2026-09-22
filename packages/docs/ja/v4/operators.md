@@ -6,7 +6,7 @@ rx-nostr は `EventPacket`、`ReqPacket`、一般的な RxJS stream のための
 
 ```ts
 rxNostr
-  .req(relays, [{}])
+  .req(relays, { strategy: "oneshot", filters: [{}] })
   .pipe(
     filterByKinds([1, 6]),
     uniq(),

@@ -4,15 +4,18 @@
 
 ## One-shot query
 
-フィルターまたはフィルターの配列を直接渡すと、backward strategy の one-shot query になります。
+`strategy: "oneshot"` の descriptor は backward strategy の one-shot query を作ります。`filters` にはひとつの filter または filter の iterable を指定できます。
 
 ```ts
 const result$ = rxNostr.req(
   ["wss://relay.example.com"],
-  [
-    { kinds: [0], authors: [pubkey] },
-    { kinds: [1], authors: [pubkey], limit: 20 },
-  ],
+  {
+    strategy: "oneshot",
+    filters: [
+      { kinds: [0], authors: [pubkey] },
+      { kinds: [1], authors: [pubkey], limit: 20 },
+    ],
+  },
 );
 
 result$.subscribe(console.log);
@@ -22,7 +25,18 @@ result$.subscribe(console.log);
 
 ## Forward query
 
-これから到着するイベントを継続的に購読するには `RxForwardReq` を使います。`emit()` するたびに直前の REQ が新しい REQ に置き換わり、古い REQ には CLOSE が送られます。
+固定した filter でこれから到着するイベントを継続的に購読するには、`strategy: "forward"` の descriptor を使います。EOSE を受信しても完了せず、unsubscribe まで同じ REQ を維持します。
+
+```ts
+const subscription = rxNostr
+  .req(["wss://relay.example.com"], {
+    strategy: "forward",
+    filters: { kinds: [1] },
+  })
+  .subscribe(({ event }) => console.log(event));
+```
+
+実行中に filter を差し替える場合は `RxForwardReq` を使います。`emit()` するたびに直前の REQ が新しい REQ に置き換わり、古い REQ には CLOSE が送られます。
 
 ```ts
 import { RxForwardReq } from "rx-nostr";
@@ -106,7 +120,7 @@ EVENT は次の順序で処理されます。
 各検査は次の option で変更できます。
 
 ```ts
-rxNostr.req(relays, [{}], {
+rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, {
   verifier: customVerifier,
   skipValidateFilterMatching: true,
   skipExpirationCheck: true,
