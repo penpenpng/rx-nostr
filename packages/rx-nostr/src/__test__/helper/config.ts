@@ -3,6 +3,7 @@ import { type RxNostrConfig, type RxNostrReqOptions } from "../../rx-nostr/index
 import {
   FilledRxNostrConfig,
   FilledRxNostrReqOptions,
+  RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "../../rx-nostr/rx-nostr.config.ts";
 
@@ -21,5 +22,6 @@ export const getTestConfig = (config?: Omit<RxNostrConfig, "verifier">) =>
       },
       ...config,
     },
+    RX_NOSTR_DEFAULT_CONFIG,
     RX_NOSTR_DEFAULT_OPTIONS,
   );

@@ -8,9 +8,14 @@ import {
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
   FilledRxNostrReqOptions,
+  RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "./rx-nostr.config.ts";
-import type { RxNostrConfig, RxNostrStaticDefaultOptions } from "./rx-nostr.interface.ts";
+import type {
+  RxNostrConfig,
+  RxNostrStaticDefaultConfig,
+  RxNostrStaticDefaultOptions,
+} from "./rx-nostr.interface.ts";
 
 const createRoot = (config: Partial<RxNostrConfig> = {}) =>
   new FilledRxNostrConfig(
@@ -18,6 +23,7 @@ const createRoot = (config: Partial<RxNostrConfig> = {}) =>
       verifier: new NoopVerifier(),
       ...config,
     },
+    RX_NOSTR_DEFAULT_CONFIG,
     RX_NOSTR_DEFAULT_OPTIONS,
   );
 
@@ -79,7 +85,6 @@ describe("rx-nostr config", () => {
       publish: {
         ...RX_NOSTR_DEFAULT_OPTIONS.publish,
         linger: 3_000,
-        signer: new NoopSigner(),
         timeout: 5_000,
         weak: true,
       },
@@ -93,6 +98,7 @@ describe("rx-nostr config", () => {
           publish: { weak: false },
         },
       },
+      RX_NOSTR_DEFAULT_CONFIG,
       staticOptions,
     );
 
@@ -109,7 +115,11 @@ describe("rx-nostr config", () => {
       req: { ...RX_NOSTR_DEFAULT_OPTIONS.req, linger: 1_000 },
       publish: { ...RX_NOSTR_DEFAULT_OPTIONS.publish },
     };
-    const root = new FilledRxNostrConfig({ verifier: new NoopVerifier() }, staticOptions);
+    const root = new FilledRxNostrConfig(
+      { verifier: new NoopVerifier() },
+      RX_NOSTR_DEFAULT_CONFIG,
+      staticOptions,
+    );
 
     staticOptions.req.linger = 2_000;
 
@@ -129,15 +139,55 @@ describe("rx-nostr config", () => {
     expect(createRoot({ relayDirectory }).relayDirectory).toBe(relayDirectory);
   });
 
-  test("AUTH is opt-in and can be disabled per operation", () => {
+  test("applies and snapshots static constructor defaults", () => {
+    const verifier = new NoopVerifier();
+    const instanceVerifier = new NoopVerifier();
+    const signer = new NoopSigner();
+    const relayDirectory = new RelayDirectory();
+    const staticConfig: RxNostrStaticDefaultConfig = {
+      ...RX_NOSTR_DEFAULT_CONFIG,
+      verifier,
+      signer,
+      relayDirectory,
+      skipFetchNip11: true,
+    };
+    const root = new FilledRxNostrConfig({}, staticConfig, RX_NOSTR_DEFAULT_OPTIONS);
+    const overridden = new FilledRxNostrConfig(
+      { verifier: instanceVerifier, skipFetchNip11: false },
+      staticConfig,
+      RX_NOSTR_DEFAULT_OPTIONS,
+    );
+
+    staticConfig.verifier = undefined;
+    staticConfig.skipFetchNip11 = false;
+
+    expect(root.verifier).toBe(verifier);
+    expect(root.signer).toBe(signer);
+    expect(root.relayDirectory).toBe(relayDirectory);
+    expect(root.skipFetchNip11).toBe(true);
+    expect(overridden.verifier).toBe(instanceVerifier);
+    expect(overridden.skipFetchNip11).toBe(false);
+  });
+
+  test("AUTH defaults can be disabled per instance or operation", () => {
     const authenticator = {
       challenge: async () => {
         throw new Error("not called");
       },
     };
-    const root = createRoot({ authenticator });
+    const root = new FilledRxNostrConfig(
+      { verifier: new NoopVerifier() },
+      { ...RX_NOSTR_DEFAULT_CONFIG, authenticator },
+      RX_NOSTR_DEFAULT_OPTIONS,
+    );
+    const disabledRoot = new FilledRxNostrConfig(
+      { verifier: new NoopVerifier(), authenticator: false },
+      { ...RX_NOSTR_DEFAULT_CONFIG, authenticator },
+      RX_NOSTR_DEFAULT_OPTIONS,
+    );
 
     expect(new FilledRxNostrReqOptions({}, root).authenticator).toBe(authenticator);
+    expect(disabledRoot.authenticator).toBeUndefined();
     expect(
       new FilledRxNostrPublishOptions({ authenticator: false }, root).authenticator,
     ).toBeUndefined();
@@ -145,7 +195,12 @@ describe("rx-nostr config", () => {
 
   test("rejects a missing verifier at the config boundary", () => {
     expect(
-      () => new FilledRxNostrConfig({} as RxNostrConfig, RX_NOSTR_DEFAULT_OPTIONS),
+      () =>
+        new FilledRxNostrConfig(
+          {} as RxNostrConfig,
+          RX_NOSTR_DEFAULT_CONFIG,
+          RX_NOSTR_DEFAULT_OPTIONS,
+        ),
     ).toThrowError(RxNostrInvalidUsageError);
   });
 });

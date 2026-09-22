@@ -47,7 +47,7 @@
 - `EventPacket` は `from`、`event`、任意の `traceTag` のみにし、`subId`、`vreqId`、それらを含む tuple を public query result から除外した。
 - `Publication`、all/any policy、failure snapshot、typed publication/callback errors を公開 model として追加した。
 - connection state を rx-nostr 独自 discriminated union に置き換え、公開時には detached mutable copy を返すようにした。
-- config defaults と merge を一箇所へ集約し、D14 の `defer: true` / `linger: 10_000ms`、AUTH opt-in、operation override を反映した。built-in 値を保持する process-wide の `RxNostr.defaultOptions` と instance ごとの `RxNostrConfig.defaultOptions` を、operation > instance > static の優先順位で解決する。
+- config defaults と merge を一箇所へ集約し、D14 の `defer: true` / `linger: 10_000ms`、AUTH opt-in、operation override を反映した。constructor-level の `RxNostr.defaultConfig` と operation-level の `RxNostr.defaultOptions` を別 namespace に置き、instance override を static default より優先して解決する。
 - v3 compatibility placeholder を削除し、concrete `RxNostr` class、未完成 RelayDirectory、physical packet types を root entry point から隠した。
 - `RelayUrl` の `ws://` hostname 型欠陥、`RxOneshotReq` の stale `traceId`、`batch()` の `RelayInput` 型欠陥を修正した。
 

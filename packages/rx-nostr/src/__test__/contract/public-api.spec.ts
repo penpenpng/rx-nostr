@@ -13,6 +13,7 @@ import type {
   RxNostrPublishConfig,
   RxNostrReqConfig,
   RxNostrReqInput,
+  RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
 
@@ -31,6 +32,7 @@ describe("public entry point", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
     expectTypeOf<Authenticator>().toHaveProperty("authTimeout");
     expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
+    expectTypeOf(publicApi.RxNostr.defaultConfig).toEqualTypeOf<RxNostrStaticDefaultConfig>();
     expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
     expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
     expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
@@ -72,6 +74,16 @@ describe("public entry point", () => {
     } finally {
       publicApi.RxNostr.defaultOptions = previous;
     }
+  });
+
+  test("exposes constructor defaults in their own static namespace", () => {
+    const defaults = publicApi.RxNostr.defaultConfig;
+
+    expect(defaults.verifier).toBeUndefined();
+    expect(defaults.signer).toBeInstanceOf(publicApi.Nip07Signer);
+    expect(defaults.retry).toBeInstanceOf(publicApi.ExponentialBackoffRetryer);
+    expect(defaults.relayDirectory).toBe(publicApi.GlobalRelayDirectory);
+    expect(defaults.skipFetchNip11).toBe(false);
   });
 
   test("keeps IRxNostr independent from the concrete class", () => {

@@ -44,12 +44,13 @@ export interface RxNostrConfig {
   /**
    * Default verifier, which is used to verify event's signature.
    */
-  verifier: EventVerifier;
+  verifier?: EventVerifier;
   /**
    * Default signer, which is used to convert event parameters into signed event.
    */
   signer?: EventSigner;
-  authenticator?: AuthenticatorInput;
+  /** Override the process-wide authenticator, or disable AUTH for this instance. */
+  authenticator?: AuthenticatorInput | false;
   /** Defaults applied to REQ and publish operations owned by this instance. */
   defaultOptions?: RxNostrDefaultOptions;
   /**
@@ -75,7 +76,18 @@ export interface RxNostrDefaultOptions {
 
 export interface RxNostrStaticDefaultOptions {
   req: Required<RxNostrReqOptions>;
-  publish: Required<Omit<RxNostrPublishOptions, "signer">> & Pick<RxNostrPublishOptions, "signer">;
+  publish: Required<Omit<RxNostrPublishOptions, "signer">>;
+}
+
+/** Process-wide defaults for constructor-level configuration. */
+export interface RxNostrStaticDefaultConfig {
+  verifier: EventVerifier | undefined;
+  signer: EventSigner;
+  authenticator: AuthenticatorInput | undefined;
+  retry: ConnectionRetryer;
+  relayDirectory: RelayDirectory;
+  skipFetchNip11: boolean;
+  WebSocket: WebSocketConstructor | undefined;
 }
 
 export interface RxNostrReqOptions {

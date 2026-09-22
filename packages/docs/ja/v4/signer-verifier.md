@@ -70,7 +70,7 @@ interface EventVerifier {
 }
 ```
 
-instance config の `verifier` は必須です。query ごとに上書きすることもできます。
+`verifier` は instance config または `RxNostr.defaultConfig.verifier` で必ず指定します。query ごとに上書きすることもできます。
 
 ### `SimpleVerifier`
 

@@ -12,10 +12,12 @@ import { publish, RelayWarmer, reqBackward, reqForward } from "./modules/index.t
 import { RelayCommunication } from "./relay-communication.ts";
 import { RelayPool } from "./relay-pool.ts";
 import {
+  cloneStaticDefaultConfig,
   cloneStaticDefaultOptions,
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
   FilledRxNostrReqOptions,
+  RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "./rx-nostr.config.ts";
 import type {
@@ -24,10 +26,15 @@ import type {
   RxNostrPublishConfig,
   RxNostrReqConfig,
   RxNostrReqInput,
+  RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
+  /** Process-wide constructor defaults snapshotted by each new instance. */
+  static defaultConfig: RxNostrStaticDefaultConfig =
+    cloneStaticDefaultConfig(RX_NOSTR_DEFAULT_CONFIG);
+
   /** Process-wide operation defaults snapshotted by each new instance. */
   static defaultOptions: RxNostrStaticDefaultOptions =
     cloneStaticDefaultOptions(RX_NOSTR_DEFAULT_OPTIONS);
@@ -40,8 +47,8 @@ export class RxNostr implements IRxNostr {
   readonly #publications = new Set<ReturnType<typeof publish>>();
   #disposed = false;
 
-  constructor(config: RxNostrConfig) {
-    this.#config = new FilledRxNostrConfig(config, RxNostr.defaultOptions);
+  constructor(config: RxNostrConfig = {}) {
+    this.#config = new FilledRxNostrConfig(config, RxNostr.defaultConfig, RxNostr.defaultOptions);
     this.#relays = new RelayPool((url) => {
       if (!this.#config.skipFetchNip11) {
         void this.#config.relayDirectory.fetchNip11(url).catch(() => {});

@@ -4,7 +4,7 @@
 
 ## クライアントを作る
 
-`RxNostr` には verifier が必要で、constructor で指定します。query で受け取ったイベントは、公開 Observable に流れる前に verifier で検証されます。
+`RxNostr` には verifier が必要です。ここでは constructor で指定します。複数 instance で共有する場合は `RxNostr.defaultConfig.verifier` に設定することもできます。query で受け取ったイベントは、公開 Observable に流れる前に verifier で検証されます。
 
 ```ts
 import { RxNostr } from "rx-nostr";

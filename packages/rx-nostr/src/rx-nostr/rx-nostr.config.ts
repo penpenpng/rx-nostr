@@ -10,6 +10,7 @@ import type {
   RxNostrDefaultOptions,
   RxNostrPublishOptions,
   RxNostrReqOptions,
+  RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
 
@@ -29,8 +30,14 @@ export const RX_NOSTR_DEFAULT_OPTIONS: RxNostrStaticDefaultOptions = Object.free
   }),
 });
 
-export const RX_NOSTR_DEFAULTS = Object.freeze({
+export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze({
+  verifier: undefined,
+  signer: new Nip07Signer(),
+  authenticator: undefined,
+  retry: new ExponentialBackoffRetryer(),
+  relayDirectory: GlobalRelayDirectory,
   skipFetchNip11: false,
+  WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
 });
 
 export class FilledRxNostrConfig {
@@ -44,21 +51,35 @@ export class FilledRxNostrConfig {
   readonly defaultOptions: Readonly<RxNostrDefaultOptions>;
   readonly staticDefaultOptions: Readonly<RxNostrStaticDefaultOptions>;
 
-  constructor(config: RxNostrConfig, staticDefaultOptions: RxNostrStaticDefaultOptions) {
-    if (!config.verifier) {
+  constructor(
+    config: RxNostrConfig,
+    staticDefaultConfig: RxNostrStaticDefaultConfig,
+    staticDefaultOptions: RxNostrStaticDefaultOptions,
+  ) {
+    const verifier = config.verifier ?? staticDefaultConfig.verifier;
+    if (!verifier) {
       throw new RxNostrInvalidUsageError("A verifier is required.");
     }
 
-    this.verifier = config.verifier;
+    this.verifier = verifier;
     this.staticDefaultOptions = freezeStaticDefaultOptions(staticDefaultOptions);
-    this.signer = config.signer ?? this.staticDefaultOptions.publish.signer ?? new Nip07Signer();
-    this.authenticator = config.authenticator;
-    this.retry = config.retry ?? new ExponentialBackoffRetryer();
-    this.relayDirectory = config.relayDirectory ?? GlobalRelayDirectory;
-    this.skipFetchNip11 = config.skipFetchNip11 ?? RX_NOSTR_DEFAULTS.skipFetchNip11;
-    this.WebSocket = config.WebSocket ?? (globalThis.WebSocket as WebSocketConstructor | undefined);
+    this.signer = config.signer ?? staticDefaultConfig.signer;
+    this.authenticator =
+      config.authenticator === false
+        ? undefined
+        : (config.authenticator ?? staticDefaultConfig.authenticator);
+    this.retry = config.retry ?? staticDefaultConfig.retry;
+    this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
+    this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
+    this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
     this.defaultOptions = freezeDefaultOptions(config.defaultOptions);
   }
+}
+
+export function cloneStaticDefaultConfig(
+  config: RxNostrStaticDefaultConfig,
+): RxNostrStaticDefaultConfig {
+  return { ...config };
 }
 
 export class FilledRxNostrReqOptions {

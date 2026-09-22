@@ -44,7 +44,9 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 `RxNostr` is a public class constructed directly with `new RxNostr(config)`. The `createRxNostr` factory is not exported. `IRxNostr` remains the structural public operation interface for consumers that accept a client without depending on the concrete class. Concrete implementation state is exposed neither through `IRxNostr` nor through subclass-accessible protected members.
 
-`RxNostr.defaultOptions` holds the process-wide operation defaults, including the initial built-in values. Each instance takes a detached snapshot when constructed, so later static assignment or nested option mutation does not alter an existing instance. Root configuration such as the required verifier remains instance-local.
+Process-wide defaults are separated by scope. `RxNostr.defaultConfig` holds constructor-level defaults, while `RxNostr.defaultOptions` holds operation defaults. Each instance snapshots both namespaces when constructed, so later static assignment does not alter an existing instance.
+
+`RxNostr.defaultConfig` initially contains a `Nip07Signer`, an `ExponentialBackoffRetryer`, `GlobalRelayDirectory`, enabled NIP-11 fetching, and the runtime's `globalThis.WebSocket`. The verifier and authenticator are initially undefined. Applications may install either one process-wide; an instance config overrides it. `authenticator: false` disables a static authenticator for that instance. Because no verifier can be chosen safely by the library, constructing an instance while both verifier locations are undefined throws `RxNostrInvalidUsageError`.
 
 The initial `RxNostr.defaultOptions` values are:
 
@@ -64,9 +66,11 @@ Precedence is the most specific defined value first:
 3. `RxNostrConfig.defaultOptions.req/publish`;
 4. `RxNostr.defaultOptions.req/publish`, which initially holds the built-in defaults.
 
-Resolution uses nullish checks, so `false`, `0`, and `Infinity` are preserved. Stateful defaults such as the NIP-07 signer and retry policy are created once per RxNostr config, not once per property access.
+Constructor configuration resolves as `RxNostrConfig` over `RxNostr.defaultConfig`. Operation-level verifier, signer, and authenticator overrides remain more specific than either constructor-level source.
 
-`verifier` is required in each instance config. Omitting it is `RxNostrInvalidUsageError`. A signer is optional and defaults to the per-instance `Nip07Signer`; an unavailable NIP-07 provider becomes a signer callback failure when publishing. A supplied authenticator is never inferred merely from the signer.
+Resolution uses nullish checks, so `false`, `0`, and `Infinity` are preserved. Objects installed in `RxNostr.defaultConfig` are intentionally shared by subsequently constructed instances; instance config can provide isolated objects where needed.
+
+The verifier may be supplied globally or per instance. A signer defaults to the static `Nip07Signer`; an unavailable NIP-07 provider becomes a signer callback failure when publishing. A supplied authenticator is never inferred merely from the signer.
 
 The optional WebSocket constructor is described by rx-nostr-owned structural types. No unipls type is part of configuration or any other public declaration.
 

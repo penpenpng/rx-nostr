@@ -27,7 +27,7 @@ rx-nostr 本体の `nip07Signer()`、`noopSigner()`、`noopVerifier` も、そ�
 
 ## Client の作成
 
-`createRxNostr()` factory は廃止され、公開された `RxNostr` class を直接構築します。`verifier` は引き続き必須です。Node.js 用 WebSocket option の名前は `websocketCtor` から `WebSocket` へ変わりました。
+`createRxNostr()` factory は廃止され、公開された `RxNostr` class を直接構築します。`verifier` は instance config または `RxNostr.defaultConfig` での指定が必須です。Node.js 用 WebSocket option の名前は `websocketCtor` から `WebSocket` へ変わりました。
 
 ```ts
 // v3

@@ -109,6 +109,7 @@ export {
   type RxNostrReqConfig,
   type RxNostrReqInput,
   type RxNostrReqOptions,
+  type RxNostrStaticDefaultConfig,
   type RxNostrStaticDefaultOptions,
 } from "./rx-nostr/index.ts";
 export { RxRelays } from "./rx-relays/index.ts";

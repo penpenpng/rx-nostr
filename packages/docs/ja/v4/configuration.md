@@ -20,9 +20,9 @@ const rxNostr = new RxNostr({
 
 | option | 必須 | 内容 |
 | --- | --- | --- |
-| `verifier` | yes | 受信 EVENT の既定 verifier |
+| `verifier` | no | 受信 EVENT の既定 verifier。static にもなければ構築時にエラー |
 | `signer` | no | publish の既定 signer。省略時は `Nip07Signer` |
-| `authenticator` | no | root の Authenticator または relay factory |
+| `authenticator` | no | root の Authenticator / relay factory。`false` で static default を無効化 |
 | `retry` | no | 接続 retry policy |
 | `relayDirectory` | no | metadata/health store |
 | `skipFetchNip11` | no | pool entry 作成時の自動 NIP-11 fetch を止める |
@@ -33,27 +33,59 @@ AUTH は `authenticator` を指定した場合だけ有効になります。`sig
 
 `defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `req()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
 
+## Process-wide constructor defaults
+
+constructor-level の process-wide defaults は `RxNostr.defaultConfig` にまとまっています。application の起動時に一度設定すれば、各 instance で同じ verifier や runtime adapter を繰り返す必要はありません。
+
+```ts
+RxNostr.defaultConfig.verifier = verifier;
+RxNostr.defaultConfig.WebSocket = WebSocket;
+RxNostr.defaultConfig.retry = retry;
+
+const primary = new RxNostr();
+const secondary = new RxNostr({
+  // この instance だけ static authenticator を無効化します。
+  authenticator: false,
+});
+```
+
+初期値は次のとおりです。
+
+| option | static default |
+| --- | --- |
+| `verifier` | なし |
+| `signer` | `Nip07Signer` |
+| `authenticator` | なし（AUTH は opt-in） |
+| `retry` | `ExponentialBackoffRetryer` |
+| `relayDirectory` | `GlobalRelayDirectory` |
+| `skipFetchNip11` | `false` |
+| `WebSocket` | `globalThis.WebSocket` |
+
+instance config は対応する static default より優先されます。verifier は安全な built-in を選べないため、instance config または `RxNostr.defaultConfig` のどちらかで必ず指定します。どちらにもなければ constructor が `RxNostrInvalidUsageError` を投げます。
+
+static に設定した object は、以後作る instance が共有します。instance ごとに状態を分離した verifier、retry policy、relay directory などが必要なら instance config に渡してください。
+
 ## Process-wide operation defaults
 
 `RxNostr.defaultOptions` 自体が built-in の operation defaults を保持しています。複数の `RxNostr` instance で異なる値を共通利用する application は、instance の作成前にその値を変更できます。
 
 ```ts
+RxNostr.defaultConfig.verifier = verifier;
 RxNostr.defaultOptions.req.linger = 5_000;
 RxNostr.defaultOptions.req.timeout = 20_000;
 RxNostr.defaultOptions.publish.linger = 5_000;
 RxNostr.defaultOptions.publish.timeout = 15_000;
 
-const primary = new RxNostr({ verifier });
+const primary = new RxNostr();
 const secondary = new RxNostr({
-  verifier,
   // この instance の REQ だけ static default を上書きします。
   defaultOptions: { req: { linger: 0 } },
 });
 ```
 
-static defaults は各 constructor 呼び出し時に instance 内へ snapshot されます。その後 `RxNostr.defaultOptions` を差し替えたり nested option を変更したりしても、作成済み instance の値は変わりません。
+static defaults は各 constructor 呼び出し時に instance 内へ snapshot されます。その後 `RxNostr.defaultConfig` や `RxNostr.defaultOptions` を差し替えたり field を変更したりしても、作成済み instance が選択済みの値は変わりません。
 
-process-wide な可変設定なので、library module 内ではなく application の起動処理で設定してください。object 全体を差し替える場合、型はすべての built-in scalar option を要求します。一部だけ変更する場合は上記のように nested field を変更するか、現在値を spread してください。`verifier` などの root config は含まれないため、各 constructor で指定します。
+process-wide な可変設定なので、library module 内ではなく application の起動処理で設定してください。object 全体を差し替える場合、型は namespace に必要な全 field を要求します。一部だけ変更する場合は上記のように field を変更するか、現在値を spread してください。
 
 ## Built-in defaults
 
@@ -111,6 +143,8 @@ publish は呼び出し時の relay snapshot を使います。
 2. `req()` / `publish()` の config
 3. `RxNostrConfig.defaultOptions.req/publish`
 4. `RxNostr.defaultOptions.req/publish`（built-in defaults の初期値を保持）
+
+constructor-level の値は `RxNostrConfig`、`RxNostr.defaultConfig` の順です。operation-level の verifier、signer、authenticator はいずれの constructor-level 設定よりも優先されます。
 
 nullish な値だけを fallback するため、`false`、`0`、`Infinity` はそのまま有効です。
 

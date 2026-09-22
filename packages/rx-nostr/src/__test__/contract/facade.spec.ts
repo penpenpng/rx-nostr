@@ -27,6 +27,35 @@ const signedEvent: Nostr.Event = {
 };
 
 describe("RxNostr facade lifecycle", () => {
+  test("applies static constructor defaults to subsequently constructed instances", async () => {
+    const previous = RxNostr.defaultConfig;
+    const server = new ControlledWebSocketServer();
+
+    try {
+      RxNostr.defaultConfig = {
+        ...previous,
+        verifier: new NoopVerifier(),
+        retry: new NoopRetryer(),
+        skipFetchNip11: true,
+        WebSocket: server.WebSocket,
+      };
+      const rxNostr = new RxNostr();
+      const request = new RxForwardReq();
+      const subscription = rxNostr.req(relay, request).subscribe();
+
+      request.emit([{}]);
+      server.sockets.latest.open();
+      await expectSent(server.sockets.latest, "REQ");
+
+      subscription.unsubscribe();
+      rxNostr.dispose();
+      await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+      server.sockets.latest.acknowledgeClose();
+    } finally {
+      RxNostr.defaultConfig = previous;
+    }
+  });
+
   test("applies static operation defaults to subsequently constructed instances", async () => {
     const previous = RxNostr.defaultOptions;
     const server = new ControlledWebSocketServer();
