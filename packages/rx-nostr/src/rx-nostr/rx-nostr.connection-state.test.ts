@@ -8,6 +8,8 @@ import { RxNostr } from "./rx-nostr.ts";
 describe("RxNostr connection state", () => {
   test("observes created relays without creating monitor-only pool entries", async () => {
     const server = new ControlledWebSocketServer();
+    const firstRelay = "wss://one.example.com";
+    const secondRelay = "wss://two.example.com";
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
@@ -18,7 +20,7 @@ describe("RxNostr connection state", () => {
     rxNostr.monitorConnectionState().subscribe((packet) => packets.push(packet));
 
     expect(server.connections).toHaveLength(0);
-    rxNostr.setHotRelays(["wss://one.example.com", "wss://two.example.com"]);
+    rxNostr.setHotRelays([firstRelay, secondRelay]);
     expect(server.connections).toHaveLength(2);
     expect(packets).toEqual([
       { from: "wss://one.example.com", state: { state: "dormant" } },
@@ -33,13 +35,15 @@ describe("RxNostr connection state", () => {
       },
     ]);
 
-    server.connections[0]?.open();
-    server.connections[1]?.open();
+    const first = server.latestConnectionFor(firstRelay);
+    const second = server.latestConnectionFor(secondRelay);
+    first.open();
+    second.open();
     await vi.waitFor(() =>
       expect(packets.filter((packet) => packet.state.state === "connected")).toHaveLength(2),
     );
 
-    server.connections[0]?.peerClose(1006, "one failed");
+    first.peerClose(1006, "one failed");
     await vi.waitFor(() =>
       expect(
         packets.find(
@@ -54,8 +58,8 @@ describe("RxNostr connection state", () => {
     ).toHaveLength(0);
 
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() => expect(server.connections[1]?.closeRequests).toHaveLength(1));
-    server.connections[1]?.acknowledgeClose();
+    await vi.waitFor(() => expect(second.closeRequests).toHaveLength(1));
+    second.acknowledgeClose();
     rxNostr.dispose();
   });
 });

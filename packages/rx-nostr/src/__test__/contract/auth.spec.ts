@@ -8,7 +8,7 @@ import {
   SimpleAuthenticator,
   type EventSigner,
 } from "rx-nostr";
-import { ContractWebSocketServer } from "./support/controlled-websocket.ts";
+import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -29,7 +29,7 @@ function authEvent(id: string, challenge: string): Nostr.Event<22242> {
 
 describe("NIP-42 AUTH public contract", () => {
   test("deduplicates a challenge across REQs and resends each REQ only once", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const challenge = vi.fn(async (_url: string, value: string) => authEvent("auth-event", value));
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -46,35 +46,38 @@ describe("NIP-42 AUTH public contract", () => {
     rxNostr.req([{}], { relays: relay, linger: 0 }).subscribe({
       complete: completed[1],
     });
-    server.current.open();
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
-    const requests = server.current.sent.map(
+    server.latestConnection.open();
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(2));
+    const requests = server.latestConnection.sent.map(
       (value) => JSON.parse(value as string) as ["REQ", string],
     );
 
-    server.current.message(JSON.stringify(["AUTH", "challenge-1"]));
+    server.latestConnection.message(JSON.stringify(["AUTH", "challenge-1"]));
     for (const request of requests) {
-      server.current.message(
+      server.latestConnection.message(
         JSON.stringify(["CLOSED", request[1], "auth-required: authenticate first"]),
       );
     }
 
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(3));
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(3));
     expect(challenge).toHaveBeenCalledOnce();
     expect(challenge).toHaveBeenCalledWith(relay, "challenge-1");
-    const auth = JSON.parse(server.current.sent[2] as string) as ["AUTH", Nostr.Event<22242>];
+    const auth = JSON.parse(server.latestConnection.sent[2] as string) as [
+      "AUTH",
+      Nostr.Event<22242>,
+    ];
     expect(auth).toEqual(["AUTH", authEvent("auth-event", "challenge-1")]);
 
-    server.current.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(5));
+    server.latestConnection.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(5));
     expect(
-      server.current.sent
+      server.latestConnection.sent
         .map((value) => JSON.parse(value as string))
         .filter(([type]) => type === "REQ"),
     ).toHaveLength(4);
 
     for (const request of requests) {
-      server.current.message(
+      server.latestConnection.message(
         JSON.stringify(["CLOSED", request[1], "auth-required: still rejected"]),
       );
     }
@@ -84,7 +87,7 @@ describe("NIP-42 AUTH public contract", () => {
     });
     expect(challenge).toHaveBeenCalledOnce();
     expect(
-      server.current.sent
+      server.latestConnection.sent
         .map((value) => JSON.parse(value as string))
         .filter(([type]) => type === "AUTH"),
     ).toHaveLength(1);
@@ -92,7 +95,7 @@ describe("NIP-42 AUTH public contract", () => {
   });
 
   test("does not invoke a signer or authenticator when AUTH is disabled", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const signEvent = vi.fn();
     const signer: EventSigner = {
       signEvent: async () => {
@@ -112,21 +115,21 @@ describe("NIP-42 AUTH public contract", () => {
     });
     const complete = vi.fn();
     rxNostr.req([{}], { relays: relay, authenticator: false, linger: 0 }).subscribe({ complete });
-    server.current.open();
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
-    server.current.message(JSON.stringify(["AUTH", "challenge"]));
-    server.current.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
+    server.latestConnection.open();
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    server.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));
+    server.latestConnection.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(challenge).not.toHaveBeenCalled();
     expect(signEvent).not.toHaveBeenCalled();
-    expect(server.current.sent).toHaveLength(1);
+    expect(server.latestConnection.sent).toHaveLength(1);
     rxNostr.dispose();
   });
 
   test("resolves an authenticator factory with the normalized relay", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const factory = vi.fn(() => undefined);
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -137,16 +140,16 @@ describe("NIP-42 AUTH public contract", () => {
     });
     const complete = vi.fn();
     rxNostr.req([{}], { relays: "wss://RELAY.example.com/", linger: 0 }).subscribe({ complete });
-    server.current.open();
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
-    server.current.message(JSON.stringify(["AUTH", "challenge"]));
-    server.current.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
+    server.latestConnection.open();
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    server.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));
+    server.latestConnection.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(factory).toHaveBeenCalledOnce();
     expect(factory).toHaveBeenCalledWith(relay);
-    expect(server.current.sent).toHaveLength(1);
+    expect(server.latestConnection.sent).toHaveLength(1);
     rxNostr.dispose();
   });
 
@@ -192,7 +195,7 @@ describe("NIP-42 AUTH public contract", () => {
   ] as const)(
     "treats an AUTH $outcome as relay-local completion",
     async ({ outcome, authTimeout }) => {
-      const server = new ContractWebSocketServer();
+      const server = new ControlledWebSocketServer();
       const rxNostr = createRxNostr({
         verifier: new NoopVerifier(),
         authenticator: {
@@ -209,25 +212,25 @@ describe("NIP-42 AUTH public contract", () => {
         complete,
         error,
       });
-      server.current.open();
-      await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-      const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
-      server.current.message(JSON.stringify(["AUTH", "challenge"]));
-      server.current.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
-      await vi.waitFor(() => expect(server.current.sent).toHaveLength(2));
+      server.latestConnection.open();
+      await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+      const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+      server.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));
+      server.latestConnection.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
+      await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(2));
       if (outcome === "rejected") {
-        server.current.message(JSON.stringify(["OK", "auth-failure", false, "denied"]));
+        server.latestConnection.message(JSON.stringify(["OK", "auth-failure", false, "denied"]));
       }
 
       await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
       expect(error).not.toHaveBeenCalled();
-      expect(server.current.sent).toHaveLength(2);
+      expect(server.latestConnection.sent).toHaveLength(2);
       rxNostr.dispose();
     },
   );
 
   test("does not send an AUTH event from a challenge invalidated by reconnect", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -243,9 +246,9 @@ describe("NIP-42 AUTH public contract", () => {
     });
     const complete = vi.fn();
     rxNostr.req([{}], { relays: relay, linger: 0 }).subscribe({ complete });
-    server.current.open();
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const firstConnection = server.current;
+    server.latestConnection.open();
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+    const firstConnection = server.latestConnection;
     const [, subId] = JSON.parse(firstConnection.sent[0] as string) as ["REQ", string];
     firstConnection.message(JSON.stringify(["AUTH", "old-challenge"]));
     firstConnection.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
@@ -257,12 +260,12 @@ describe("NIP-42 AUTH public contract", () => {
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(firstConnection.sent).toHaveLength(1);
-    expect(server.current.sent).toHaveLength(0);
+    expect(server.latestConnection.sent).toHaveLength(0);
     rxNostr.dispose();
   });
 
   test("wraps authenticator errors and rejects stale challenge work", async () => {
-    const callbackServer = new ContractWebSocketServer();
+    const callbackServer = new ControlledWebSocketServer();
     const cause = new Error("authenticator failed");
     const callbackRxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -275,16 +278,21 @@ describe("NIP-42 AUTH public contract", () => {
     callbackRxNostr.req([{}], { relays: relay, linger: 0 }).subscribe({
       error: (error) => (received = error),
     });
-    callbackServer.current.open();
-    await vi.waitFor(() => expect(callbackServer.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(callbackServer.current.sent[0] as string) as ["REQ", string];
-    callbackServer.current.message(JSON.stringify(["AUTH", "challenge"]));
-    callbackServer.current.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
+    callbackServer.latestConnection.open();
+    await vi.waitFor(() => expect(callbackServer.latestConnection.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(callbackServer.latestConnection.sent[0] as string) as [
+      "REQ",
+      string,
+    ];
+    callbackServer.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));
+    callbackServer.latestConnection.message(
+      JSON.stringify(["CLOSED", subId, "auth-required: login"]),
+    );
     await vi.waitFor(() => expect(received).toBeInstanceOf(RxNostrCallbackError));
     expect(received).toMatchObject({ callback: "authenticator", cause });
     callbackRxNostr.dispose();
 
-    const staleServer = new ContractWebSocketServer();
+    const staleServer = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
     const staleRxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -302,22 +310,27 @@ describe("NIP-42 AUTH public contract", () => {
     staleRxNostr.req([{}], { relays: relay, linger: 0 }).subscribe({
       complete,
     });
-    staleServer.current.open();
-    await vi.waitFor(() => expect(staleServer.current.sent).toHaveLength(1));
-    const [, staleSubId] = JSON.parse(staleServer.current.sent[0] as string) as ["REQ", string];
-    staleServer.current.message(JSON.stringify(["AUTH", "old"]));
-    staleServer.current.message(JSON.stringify(["CLOSED", staleSubId, "auth-required: login"]));
+    staleServer.latestConnection.open();
+    await vi.waitFor(() => expect(staleServer.latestConnection.sent).toHaveLength(1));
+    const [, staleSubId] = JSON.parse(staleServer.latestConnection.sent[0] as string) as [
+      "REQ",
+      string,
+    ];
+    staleServer.latestConnection.message(JSON.stringify(["AUTH", "old"]));
+    staleServer.latestConnection.message(
+      JSON.stringify(["CLOSED", staleSubId, "auth-required: login"]),
+    );
     await vi.waitFor(() => expect(resolveAuth).toBeTypeOf("function"));
-    staleServer.current.message(JSON.stringify(["AUTH", "new"]));
+    staleServer.latestConnection.message(JSON.stringify(["AUTH", "new"]));
     resolveAuth(authEvent("old-auth", "old"));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(staleServer.current.sent).toHaveLength(1);
+    expect(staleServer.latestConnection.sent).toHaveLength(1);
     staleRxNostr.dispose();
   });
 
   test("cancels the AUTH effort when its last operation unsubscribes", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -332,11 +345,11 @@ describe("NIP-42 AUTH public contract", () => {
       WebSocket: server.WebSocket,
     });
     const subscription = rxNostr.req([{}], { relays: relay, linger: 0 }).subscribe();
-    server.current.open();
-    await vi.waitFor(() => expect(server.current.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.current.sent[0] as string) as ["REQ", string];
-    server.current.message(JSON.stringify(["AUTH", "challenge"]));
-    server.current.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
+    server.latestConnection.open();
+    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    server.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));
+    server.latestConnection.message(JSON.stringify(["CLOSED", subId, "auth-required: login"]));
     await vi.waitFor(() => expect(resolveAuth).toBeTypeOf("function"));
 
     subscription.unsubscribe();
@@ -344,7 +357,7 @@ describe("NIP-42 AUTH public contract", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(server.current.sent).toHaveLength(1);
+    expect(server.latestConnection.sent).toHaveLength(1);
     rxNostr.dispose();
   });
 });

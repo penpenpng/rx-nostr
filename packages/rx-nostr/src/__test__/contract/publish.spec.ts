@@ -9,7 +9,7 @@ import {
   type EventSigner,
   type OkPacket,
 } from "rx-nostr";
-import { ContractWebSocket, ContractWebSocketServer } from "./support/controlled-websocket.ts";
+import { ControlledWebSocket, ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 const relay1 = "wss://relay1.example.com";
 const relay2 = "wss://relay2.example.com";
@@ -27,20 +27,18 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
   };
 }
 
-function socket(server: ContractWebSocketServer, url: string): ContractWebSocket {
-  const result = server.connections.find((connection) => connection.url === url);
-  if (!result) throw new Error(`No connection for ${url}`);
-  return result;
+function socket(server: ControlledWebSocketServer, url: string): ControlledWebSocket {
+  return server.latestConnectionFor(url);
 }
 
-async function expectEventSent(connection: ContractWebSocket): Promise<void> {
+async function expectEventSent(connection: ControlledWebSocket): Promise<void> {
   await vi.waitFor(() => expect(connection.sent).toHaveLength(1));
   expect(JSON.parse(connection.sent[0] as string)[0]).toBe("EVENT");
 }
 
 describe("Publication public contract", () => {
   test("publishes to multiple relays, settles all/any, and replays raw OK packets", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const signed = event();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -96,7 +94,7 @@ describe("Publication public contract", () => {
   });
 
   test("rejects all on one final rejection while any can still succeed", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
@@ -129,7 +127,7 @@ describe("Publication public contract", () => {
   });
 
   test("isolates a timeout from another relay's acceptance", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
@@ -160,7 +158,7 @@ describe("Publication public contract", () => {
   });
 
   test("rejects no-relay and signer failures with typed errors", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const signEvent = vi.fn();
     const unusedSigner: EventSigner = {
       async signEvent<K extends number>(): Promise<Nostr.Event<K>> {
@@ -224,7 +222,7 @@ describe("Publication public contract", () => {
   });
 
   test("cancel is idempotent and prevents sending after signing completes", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     let resolveSigning!: (event: Nostr.Event) => void;
     const signing = new Promise<Nostr.Event>((resolve) => {
       resolveSigning = resolve;
@@ -256,12 +254,12 @@ describe("Publication public contract", () => {
       id: "cancelled-event",
     });
     await Promise.resolve();
-    expect(server.current.sent).toHaveLength(0);
+    expect(server.latestConnection.sent).toHaveLength(0);
     rxNostr.dispose();
   });
 
   test("observer unsubscribe before signing does not cancel the publication", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     let resolveSigning!: (event: Nostr.Event) => void;
     const signing = new Promise<Nostr.Event>((resolve) => {
       resolveSigning = resolve;
@@ -298,7 +296,7 @@ describe("Publication public contract", () => {
   });
 
   test("keeps a hot relay connected while releasing a cold publish relay", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
@@ -331,7 +329,7 @@ describe("Publication public contract", () => {
   });
 
   test("continues another relay after one connection drops", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
@@ -368,7 +366,7 @@ describe("Publication public contract", () => {
   });
 
   test("keeps auth-required OK pending and settles after authenticated resend", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const authEvent = event({ id: "auth-event", kind: 22242 });
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
@@ -407,7 +405,7 @@ describe("Publication public contract", () => {
   });
 
   test("resends an unconfirmed EVENT after reconnect", async () => {
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       retry: { retry: () => ({ action: "retry", delay: 0 }) },
@@ -426,7 +424,7 @@ describe("Publication public contract", () => {
     await expectEventSent(first);
     first.peerClose(1006, "offline");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const second = server.current;
+    const second = server.latestConnection;
     second.open();
     await expectEventSent(second);
     second.message(JSON.stringify(["OK", "event", true, "saved"]));

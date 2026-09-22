@@ -9,13 +9,13 @@ import {
   type RelayDirectoryEntry,
   type RxNostrConfig,
 } from "rx-nostr";
-import { ContractWebSocketServer } from "./support/controlled-websocket.ts";
+import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 describe("RelayDirectory public contract", () => {
   test("RxNostr populates metadata on first use unless fetching is skipped", async () => {
     const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
     const directory = new RelayDirectory({ fetcher });
-    const server = new ContractWebSocketServer();
+    const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
@@ -29,11 +29,11 @@ describe("RelayDirectory public contract", () => {
       }),
     );
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() => expect(server.current.closeRequests).toHaveLength(1));
-    server.current.acknowledgeClose();
+    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
+    server.latestConnection.acknowledgeClose();
     rxNostr.dispose();
 
-    const skippedServer = new ContractWebSocketServer();
+    const skippedServer = new ControlledWebSocketServer();
     const skipped = createRxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
@@ -44,8 +44,8 @@ describe("RelayDirectory public contract", () => {
     await Promise.resolve();
     expect(fetcher).toHaveBeenCalledOnce();
     skipped.unsetHotRelays();
-    await vi.waitFor(() => expect(skippedServer.current.closeRequests).toHaveLength(1));
-    skippedServer.current.acknowledgeClose();
+    await vi.waitFor(() => expect(skippedServer.latestConnection.closeRequests).toHaveLength(1));
+    skippedServer.latestConnection.acknowledgeClose();
     skipped.dispose();
   });
 

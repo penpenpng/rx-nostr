@@ -15,14 +15,14 @@ async function openTransport(server: ControlledWebSocketServer, retryer?: Connec
     retryer,
   });
   const opened = transport.open();
-  server.current.open();
+  server.latestConnection.open();
   await opened;
   return transport;
 }
 
 async function closeTransport(transport: NostrTransport, server: ControlledWebSocketServer) {
   const closed = transport.close();
-  server.current.acknowledgeClose();
+  server.latestConnection.acknowledgeClose();
   await closed;
 }
 
@@ -38,9 +38,9 @@ describe("NostrTransport", () => {
     transport.state$.subscribe((state) => states.push(state));
 
     const opened = transport.open();
-    server.current.peerClose(1006, "offline");
+    server.latestConnection.peerClose(1006, "offline");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    server.current.open();
+    server.latestConnection.open();
     await opened;
 
     expect(states).toEqual([
@@ -76,7 +76,7 @@ describe("NostrTransport", () => {
     transport.state$.subscribe((state) => states.push(state));
 
     const opened = transport.open();
-    server.current.peerClose(1000, "try later", true);
+    server.latestConnection.peerClose(1000, "try later", true);
     await vi.waitFor(() =>
       expect(states).toContainEqual(
         expect.objectContaining({
@@ -89,7 +89,7 @@ describe("NostrTransport", () => {
     expect(server.connections).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(server.connections).toHaveLength(2);
-    server.current.open();
+    server.latestConnection.open();
     await opened;
     await closeTransport(transport, server);
 
@@ -102,7 +102,7 @@ describe("NostrTransport", () => {
     const terminalStates: import("../../connection-state.ts").ConnectionState[] = [];
     terminal.state$.subscribe((state) => terminalStates.push(state));
     const terminalOpen = terminal.open();
-    terminalServer.current.peerClose(1000, "maintenance", true);
+    terminalServer.latestConnection.peerClose(1000, "maintenance", true);
     await expect(terminalOpen).rejects.toMatchObject({
       name: "UniplsOpenError",
     });
@@ -131,7 +131,7 @@ describe("NostrTransport", () => {
     transport.state$.subscribe((state) => states.push(state.state));
 
     const opened = transport.open();
-    server.current.peerClose(1006, "offline");
+    server.latestConnection.peerClose(1006, "offline");
     void opened.catch(() => {});
     await vi.waitFor(() => expect(states).toContain("waiting-for-retry"));
     await transport.dispose();
@@ -149,11 +149,11 @@ describe("NostrTransport", () => {
     transport.messages$.subscribe((packet) => messages.push(packet.type));
     transport.state$.subscribe((state) => states.push(state.state));
 
-    server.current.message('["NOTICE","hello"]');
+    server.latestConnection.message('["NOTICE","hello"]');
     await transport.cast(["CLOSE", "sub"]);
 
     expect(messages).toEqual(["NOTICE"]);
-    expect(server.current.sent).toEqual(['["CLOSE","sub"]']);
+    expect(server.latestConnection.sent).toEqual(['["CLOSE","sub"]']);
 
     await closeTransport(transport, server);
     expect(states).toContain("dormant");
@@ -169,8 +169,8 @@ describe("NostrTransport", () => {
       transport.diagnostics$.subscribe((value) => diagnostics.push(value.type));
       transport.messages$.subscribe((value) => messages.push(value.type));
 
-      server.current.message(input);
-      server.current.message('["NOTICE","still alive"]');
+      server.latestConnection.message(input);
+      server.latestConnection.message('["NOTICE","still alive"]');
 
       await vi.waitFor(() => expect(diagnostics).toEqual(["message-deserialization-failed"]));
       expect(messages).toEqual(["NOTICE"]);
@@ -195,17 +195,17 @@ describe("NostrTransport", () => {
         complete: () => completions++,
       });
 
-    expect(server.current.sent).toEqual(['["REQ","sub",{}]']);
+    expect(server.latestConnection.sent).toEqual(['["REQ","sub",{}]']);
     await Promise.resolve();
-    server.current.message(JSON.stringify(["EVENT", "sub", event]));
-    server.current.message('["EOSE","sub"]');
+    server.latestConnection.message(JSON.stringify(["EVENT", "sub", event]));
+    server.latestConnection.message('["EOSE","sub"]');
     await vi.waitFor(() => expect(completions).toBe(1));
     expect(received).toEqual(["EVENT"]);
 
     subscription.unsubscribe();
     subscription.unsubscribe();
     expect(completions).toBe(1);
-    expect(server.current.sent).toHaveLength(1);
+    expect(server.latestConnection.sent).toHaveLength(1);
     await closeTransport(transport, server);
   });
 
@@ -223,7 +223,7 @@ describe("NostrTransport", () => {
     const dropServer = new ControlledWebSocketServer();
     const dropTransport = await openTransport(dropServer);
     const dropped = firstValueFrom(dropTransport.listen({ retry: "fail" }).pipe(toArray()));
-    dropServer.current.peerClose(1006, "network lost");
+    dropServer.latestConnection.peerClose(1006, "network lost");
     await expect(dropped).rejects.toMatchObject({
       name: "NostrTransportOperationError",
       reason: "dropped",
@@ -236,7 +236,7 @@ describe("NostrTransport", () => {
       retry: vi.fn(() => ({ action: "retry", delay: 0 }) as const),
     };
     const transport = await openTransport(server, retryer);
-    const oldSocket = server.current;
+    const oldSocket = server.latestConnection;
     const messages: string[] = [];
     const states: string[] = [];
     transport.messages$.subscribe((packet) => messages.push(packet.type));
@@ -244,7 +244,7 @@ describe("NostrTransport", () => {
 
     oldSocket.peerClose(1006, "network lost");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const newSocket = server.current;
+    const newSocket = server.latestConnection;
     newSocket.open();
     await vi.waitFor(() => expect(retryer.retry).toHaveBeenCalledOnce());
     expect(retryer.retry).toHaveBeenCalledWith(
@@ -275,9 +275,9 @@ describe("NostrTransport", () => {
     });
 
     const opened = transport.open();
-    server.current.peerClose(1006, "initial failure");
+    server.latestConnection.peerClose(1006, "initial failure");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    server.current.open();
+    server.latestConnection.open();
     await opened;
 
     expect(retryer.retry).toHaveBeenCalledWith(
@@ -302,7 +302,7 @@ describe("NostrTransport", () => {
       });
 
       const opened = transport.open();
-      server.current.peerClose(1006, "initial failure");
+      server.latestConnection.peerClose(1006, "initial failure");
 
       await expect(opened).rejects.toMatchObject({ name: "UniplsOpenError" });
       expect(server.connections).toHaveLength(1);
@@ -316,7 +316,7 @@ describe("NostrTransport", () => {
     transport.state$.subscribe((state) => states.push(state.state));
     const result = firstValueFrom(transport.listen({ retry: "fail" }).pipe(toArray()));
 
-    server.current.error(new Error("offline"));
+    server.latestConnection.error(new Error("offline"));
 
     await expect(result).rejects.toBeInstanceOf(NostrTransportOperationError);
     expect(states).toContain("failed");
@@ -332,11 +332,11 @@ describe("NostrTransport", () => {
     const first = transport.dispose();
     const second = transport.dispose();
     expect(second).toBe(first);
-    server.current.acknowledgeClose();
+    server.latestConnection.acknowledgeClose();
     await first;
 
     expect(complete).toHaveBeenCalledOnce();
-    server.current.message('["NOTICE","late"]');
+    server.latestConnection.message('["NOTICE","late"]');
     expect(next).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "../../types/index.ts";
+import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "rx-nostr";
 
 type Handler<T> = ((event: T) => unknown) | null;
 
@@ -66,9 +66,15 @@ export class ControlledWebSocketServer {
     } as unknown as WebSocketConstructor;
   }
 
-  get current(): ControlledWebSocket {
+  get latestConnection(): ControlledWebSocket {
     const socket = this.connections.at(-1);
     if (!socket) throw new Error("No controlled connection has been created.");
+    return socket;
+  }
+
+  latestConnectionFor(url: string): ControlledWebSocket {
+    const socket = this.connections.findLast((connection) => connection.url === url);
+    if (!socket) throw new Error(`No controlled connection has been created for ${url}.`);
     return socket;
   }
 }
