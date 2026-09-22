@@ -1,6 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import {
-  NoopRetryer,
+  NoopReconnector,
   NoopVerifier,
   RxNostr,
   RxNostrCallbackError,
@@ -31,7 +31,7 @@ function createRxNostr(
 ): RxNostr {
   return new RxNostr({
     verifier: new NoopVerifier(),
-    retry: new NoopRetryer(),
+    reconnector: new NoopReconnector(),
     defaultOptions: { req: { linger: 0 } },
     skipFetchNip11: true,
     WebSocket: server.WebSocket,
@@ -219,7 +219,7 @@ describe("NIP-42 AUTH public contract", () => {
             resolveAuth = resolve;
           }),
       },
-      retry: { retry: () => ({ action: "retry", delay: 0 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const complete = vi.fn();
     rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });

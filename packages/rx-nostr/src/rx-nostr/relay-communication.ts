@@ -1,7 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY, Observable, type Subscriber, type Subscription, filter, map } from "rxjs";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
-import type { ConnectionRetryer } from "../connection-retryer/index.ts";
+import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
+import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
 import { isFiltered, once, type RelayUrl } from "../libs/index.ts";
 import { RxNostrCallbackError } from "../libs/error.ts";
@@ -39,7 +40,8 @@ export interface IRelayCommunication {
 
 export interface RelayCommunicationOptions {
   readonly WebSocket?: WebSocketConstructor;
-  readonly retryer?: ConnectionRetryer;
+  readonly reconnector?: ConnectionReconnector;
+  readonly dropDetectors?: readonly ConnectionDropDetector[];
   readonly relayDirectory?: RelayDirectory;
 }
 
@@ -66,7 +68,8 @@ export class RelayCommunication implements IRelayCommunication {
     this.#transport = new NostrTransport({
       url,
       WebSocket: options.WebSocket,
-      retryer: options.retryer,
+      reconnector: options.reconnector,
+      dropDetectors: options.dropDetectors,
       onConnectionOpened: directoryReporter
         ? () => directoryReporter.connectionOpened(url)
         : undefined,

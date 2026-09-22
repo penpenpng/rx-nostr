@@ -1,18 +1,46 @@
 import { describe, expect, test, vi } from "vitest";
 import { ControlledWebSocketServer } from "../__test__/helper/index.ts";
-import { NoopRetryer } from "../connection-retryer/index.ts";
+import type { ConnectionDropDetectorContext } from "../connection-drop-detector/index.ts";
+import { NoopReconnector } from "../connection-reconnector/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import type { ConnectionStatePacket } from "../packets/index.ts";
 import { RxNostr } from "./rx-nostr.ts";
 
 describe("RxNostr connection state", () => {
+  test("passes configured drop detectors to each relay connection", async () => {
+    const server = new ControlledWebSocketServer();
+    const relay = "wss://detected.example.com";
+    const contexts: ConnectionDropDetectorContext[] = [];
+    const rxNostr = new RxNostr({
+      verifier: new NoopVerifier(),
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+      dropDetectors: [{ setup: (context) => void contexts.push(context) }],
+      skipFetchNip11: true,
+      WebSocket: server.WebSocket,
+    });
+    const states: string[] = [];
+    rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state.state));
+
+    rxNostr.setHotRelays(relay);
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(contexts).toHaveLength(1));
+    contexts[0]!.drop();
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(contexts).toHaveLength(2));
+
+    expect(states.filter((state) => state === "connected")).toHaveLength(2);
+    rxNostr.dispose();
+    server.sockets.latest.acknowledgeClose();
+  });
+
   test("observes created relays without creating monitor-only pool entries", async () => {
     const server = new ControlledWebSocketServer();
     const firstRelay = "wss://one.example.com";
     const secondRelay = "wss://two.example.com";
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });

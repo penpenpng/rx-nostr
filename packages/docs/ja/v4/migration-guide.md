@@ -150,7 +150,7 @@ rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
 });
 ```
 
-手動 `reconnect()` は削除されました。再接続の回数、遅延、打ち切りは `ConnectionRetryer` で制御します。
+手動 `reconnect()` は削除されました。再接続の回数、遅延、打ち切りは `ConnectionReconnector` で制御します。
 
 ## AUTH は明示的に有効化する
 

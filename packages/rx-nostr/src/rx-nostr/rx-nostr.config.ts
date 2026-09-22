@@ -1,4 +1,8 @@
-import { ExponentialBackoffRetryer, type ConnectionRetryer } from "../connection-retryer/index.ts";
+import {
+  ExponentialBackoffReconnector,
+  type ConnectionReconnector,
+} from "../connection-reconnector/index.ts";
+import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
 import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
@@ -33,7 +37,8 @@ export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze
   verifier: new UnconfiguredVerifier(),
   signer: new Nip07Signer(),
   authenticator: undefined,
-  retry: new ExponentialBackoffRetryer(),
+  reconnector: new ExponentialBackoffReconnector(),
+  dropDetectors: [],
   relayDirectory: GlobalRelayDirectory,
   skipFetchNip11: false,
   WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
@@ -43,7 +48,8 @@ export class FilledRxNostrConfig {
   readonly verifier: EventVerifier;
   readonly signer: EventSigner;
   readonly authenticator: AuthenticatorInput | undefined;
-  readonly retry: ConnectionRetryer;
+  readonly reconnector: ConnectionReconnector;
+  readonly dropDetectors: readonly ConnectionDropDetector[];
   readonly relayDirectory: RelayDirectory;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
@@ -62,7 +68,10 @@ export class FilledRxNostrConfig {
       config.authenticator === false
         ? undefined
         : (config.authenticator ?? staticDefaultConfig.authenticator);
-    this.retry = config.retry ?? staticDefaultConfig.retry;
+    this.reconnector = config.reconnector ?? staticDefaultConfig.reconnector;
+    this.dropDetectors = Object.freeze([
+      ...(config.dropDetectors ?? staticDefaultConfig.dropDetectors),
+    ]);
     this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
@@ -73,7 +82,7 @@ export class FilledRxNostrConfig {
 export function cloneStaticDefaultConfig(
   config: RxNostrStaticDefaultConfig,
 ): RxNostrStaticDefaultConfig {
-  return { ...config };
+  return { ...config, dropDetectors: [...config.dropDetectors] };
 }
 
 export class FilledRxNostrReqOptions {

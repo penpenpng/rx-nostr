@@ -2,7 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
 import {
   RxNostr,
-  NoopRetryer,
+  NoopReconnector,
   NoopVerifier,
   RelayDirectory,
   RxBackwardReq,
@@ -34,7 +34,7 @@ function createRxNostr(
 ): RxNostr {
   return new RxNostr({
     verifier: new NoopVerifier(),
-    retry: new NoopRetryer(),
+    reconnector: new NoopReconnector(),
     defaultOptions: { req: { linger: 0, timeout: 1_000 } },
     skipFetchNip11: true,
     WebSocket: server.WebSocket,

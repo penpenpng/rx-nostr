@@ -33,11 +33,11 @@
 - Decision: Recommended を採用する。versioned JSON の明示的 export/import とし、自動保存は行わない。
 - Rationale: live resource を永続 state に混ぜず、保存先の選択を application に委ねる。
 
-## D4: connection-retryer と unipls reconnector の関係
+## D4: connection-reconnector と unipls reconnector の関係
 
 - Status: **decided at 2026-09-21**
 - User feedback: unipls を rx-nostr の public API に露出させないことを要求。
-- Revised question: retry engine の実行は unipls に委ねつつ、public config では rx-nostr 独自の `ConnectionRetryer`/context/decision だけを公開し、内部 adapter が unipls reconnector へ変換する方針でよいですか。
+- Revised question: retry engine の実行は unipls に委ねつつ、public config では rx-nostr 独自の `ConnectionReconnector`/context/decision だけを公開し、内部 adapter が unipls reconnector へ変換する方針でよいですか。
 - Revised recommendation: unipls の型を一切 public `.d.ts` に出さない。現在の `createRetry(): Observable<void>` は、initial/recovery、cancel/exhaust、AbortSignal、relay health を表現できる rx-nostr 独自 policy I/F へ置き換える。default backoff も rx-nostr の built-in として export する。
 - Rejected proposal: public config が `UniplsReconnector` を直接受け取る形。
 - Decision: Revised recommendation を採用する。public API には rx-nostr 独自の retry policy だけを公開し、unipls reconnector への変換は internal adapter に閉じ込める。

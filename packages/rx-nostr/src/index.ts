@@ -4,14 +4,20 @@ export {
   type AuthenticatorFactory,
   type AuthenticatorInput,
 } from "./authenticator/index.ts";
+export type {
+  ConnectionDropDetector,
+  ConnectionDropDetectorContext,
+  ConnectionDropDetectorDisposer,
+  ConnectionDropDetectorRequest,
+} from "./connection-drop-detector/index.ts";
 export {
-  ExponentialBackoffRetryer,
-  NoopRetryer,
-  type ConnectionRetryContext,
-  type ConnectionRetryDecision,
-  type ConnectionRetryer,
-  type ExponentialBackoffRetryerOptions,
-} from "./connection-retryer/index.ts";
+  ExponentialBackoffReconnector,
+  NoopReconnector,
+  type ConnectionReconnectorContext,
+  type ConnectionReconnectorDecision,
+  type ConnectionReconnector,
+  type ExponentialBackoffReconnectorOptions,
+} from "./connection-reconnector/index.ts";
 export type {
   ConnectionFailure,
   ConnectionState,

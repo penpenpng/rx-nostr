@@ -41,9 +41,10 @@ rx-nostr の production code から direct WebSocket 実装を排除し、Nostr 
 ## 実装結果
 
 - `NostrTransport` に unipls の生成、Nostr codec、lifecycle/diagnostic bridge、callback handle から RxJS への終端変換を集約した。
-- `ConnectionRetryer` の `retry | cancel | exhaust` を internal reconnector へ変換し、既定を最大 5 回の capped exponential backoff + jitter とした。
+- `ConnectionReconnector` の `retry | cancel | exhaust` を internal reconnector へ変換し、既定を最大 5 回の capped exponential backoff + jitter とした。
+- rx-nostr 独自の `ConnectionDropDetector` と Nostr tuple を扱う context を public contract とし、unipls detector/resource 型への変換を adapter 内に閉じ込めた。
 - `RelayCommunication` は transport を所有し、remote `CLOSE` を local unsubscribe より先に送る protocol 境界を担当する。REQ/publish の完全な状態機械は Tasks 06/08 のままとする。
-- rx-nostr 所有の controlled WebSocket fixture で open/message/user close、peer close、transport error、retry、old epoch isolation、timeout、unsubscribe、dispose を検証した。
+- rx-nostr 所有の controlled WebSocket fixture で open/message/user close、peer close、transport error、detector drop、reconnect、old epoch isolation、timeout、unsubscribe、dispose を検証した。
 - production tree から direct WebSocket 実装を削除した。unipls import は internal transport directory にだけ存在し、root public entry point からは到達しない。
 - unipls 公開 API だけで要件を満たせたため、`packages/unipls` は変更していない。
 - `package.json` には workspace runtime dependency を宣言した。既存 `package-lock.json` は利用者変更を保護するためこの task では更新せず、npm から pnpm への workspace/lockfile 移行を扱う Task 10 で明示的に置換する。

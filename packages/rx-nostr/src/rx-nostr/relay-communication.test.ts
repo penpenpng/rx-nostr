@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { ControlledWebSocketServer, expectSent, Faker } from "../__test__/helper/index.ts";
-import { NoopRetryer } from "../connection-retryer/index.ts";
+import { NoopReconnector } from "../connection-reconnector/index.ts";
 import { RelayDirectory } from "../relay-directory/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 
@@ -9,10 +9,10 @@ describe("RelayCommunication transport integration", () => {
     let now = 1;
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory({ clock: () => now });
-    const retry = vi.fn(() => ({ action: "retry", delay: 0 }) as const);
+    const reconnect = vi.fn(() => ({ action: "retry", delay: 0 }) as const);
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
-      retryer: { retry },
+      reconnector: { reconnect },
       relayDirectory: directory,
     });
     const release = relay.hold();
@@ -32,7 +32,7 @@ describe("RelayCommunication transport integration", () => {
       consecutiveFailures: 1,
       liveConnections: 0,
     });
-    expect(retry).toHaveBeenCalledWith(
+    expect(reconnect).toHaveBeenCalledWith(
       expect.objectContaining({
         health: {
           consecutiveFailures: 1,
@@ -77,7 +77,7 @@ describe("RelayCommunication transport integration", () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
-      retryer: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
     });
     const release = relay.hold();
     server.sockets.latest.open();
@@ -142,7 +142,7 @@ describe("RelayCommunication transport integration", () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
-      retryer: { retry: () => ({ action: "retry", delay: 0 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const release = relay.hold();
     server.sockets.latest.open();

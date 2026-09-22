@@ -2,6 +2,9 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import * as publicApi from "rx-nostr";
 import type {
   Authenticator,
+  ConnectionDropDetector,
+  ConnectionDropDetectorContext,
+  ConnectionReconnector,
   EventPacket,
   IRxNostr,
   OkPacket,
@@ -32,6 +35,13 @@ describe("public entry point", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
     expectTypeOf<Authenticator>().toHaveProperty("authTimeout");
     expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
+    expectTypeOf<RxNostrConfig["reconnector"]>().toEqualTypeOf<ConnectionReconnector | undefined>();
+    expectTypeOf<RxNostrConfig["dropDetectors"]>().toEqualTypeOf<
+      Iterable<ConnectionDropDetector> | undefined
+    >();
+    expectTypeOf<
+      Parameters<ConnectionDropDetector["setup"]>[0]
+    >().toEqualTypeOf<ConnectionDropDetectorContext>();
     expectTypeOf(publicApi.RxNostr.defaultConfig).toEqualTypeOf<RxNostrStaticDefaultConfig>();
     expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
     expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
@@ -83,7 +93,8 @@ describe("public entry point", () => {
       "You must configure a valid verifier",
     );
     expect(defaults.signer).toBeInstanceOf(publicApi.Nip07Signer);
-    expect(defaults.retry).toBeInstanceOf(publicApi.ExponentialBackoffRetryer);
+    expect(defaults.reconnector).toBeInstanceOf(publicApi.ExponentialBackoffReconnector);
+    expect(defaults.dropDetectors).toEqual([]);
     expect(defaults.relayDirectory).toBe(publicApi.GlobalRelayDirectory);
     expect(defaults.skipFetchNip11).toBe(false);
   });

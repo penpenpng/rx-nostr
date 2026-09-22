@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
+import { ExponentialBackoffReconnector } from "../connection-reconnector/index.ts";
 import { NoopSigner } from "../event-signer/index.ts";
 import { NoopVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import { GlobalRelayDirectory, RelayDirectory } from "../relay-directory/index.ts";
@@ -46,7 +46,7 @@ describe("rx-nostr config", () => {
       weak: false,
     });
     expect(root.authenticator).toBeUndefined();
-    expect(root.retry).toBeInstanceOf(ExponentialBackoffRetryer);
+    expect(root.reconnector).toBeInstanceOf(ExponentialBackoffReconnector);
     expect(root.relayDirectory).toBe(GlobalRelayDirectory);
   });
 
@@ -129,7 +129,7 @@ describe("rx-nostr config", () => {
     const root = createRoot();
 
     expect(root.signer).toBe(root.signer);
-    expect(root.retry).toBe(root.retry);
+    expect(root.reconnector).toBe(root.reconnector);
     expect(root.defaultOptions).toBe(root.defaultOptions);
   });
 
@@ -166,6 +166,32 @@ describe("rx-nostr config", () => {
     expect(root.skipFetchNip11).toBe(true);
     expect(overridden.verifier).toBe(instanceVerifier);
     expect(overridden.skipFetchNip11).toBe(false);
+  });
+
+  test("snapshots drop detector iterables for each instance", () => {
+    const first = { setup: () => {} };
+    const second = { setup: () => {} };
+    const dropDetectors = [first];
+    const root = createRoot({ dropDetectors });
+
+    dropDetectors.push(second);
+
+    expect(root.dropDetectors).toEqual([first]);
+    expect(Object.isFrozen(root.dropDetectors)).toBe(true);
+  });
+
+  test("snapshots static drop detectors for each instance", () => {
+    const first = { setup: () => {} };
+    const second = { setup: () => {} };
+    const staticConfig: RxNostrStaticDefaultConfig = {
+      ...RX_NOSTR_DEFAULT_CONFIG,
+      dropDetectors: [first],
+    };
+    const root = new FilledRxNostrConfig({}, staticConfig, RX_NOSTR_DEFAULT_OPTIONS);
+
+    staticConfig.dropDetectors.push(second);
+
+    expect(root.dropDetectors).toEqual([first]);
   });
 
   test("AUTH defaults can be disabled per instance or operation", () => {

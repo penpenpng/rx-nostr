@@ -1,6 +1,9 @@
-import type { ConnectionRetryContext, ConnectionRetryer } from "./connection-retryer.interface.ts";
+import type {
+  ConnectionReconnector,
+  ConnectionReconnectorContext,
+} from "./connection-reconnector.interface.ts";
 
-export interface ExponentialBackoffRetryerOptions {
+export interface ExponentialBackoffReconnectorOptions {
   /** Maximum number of retries after the failed connection attempt. */
   readonly maxRetries?: number;
   readonly initialDelay?: number;
@@ -12,14 +15,14 @@ export interface ExponentialBackoffRetryerOptions {
 }
 
 /** The default capped exponential reconnect policy used by rx-nostr. */
-export class ExponentialBackoffRetryer implements ConnectionRetryer {
+export class ExponentialBackoffReconnector implements ConnectionReconnector {
   readonly #maxRetries: number;
   readonly #initialDelay: number;
   readonly #maxDelay: number;
   readonly #jitter: number;
   readonly #random: () => number;
 
-  constructor(options: ExponentialBackoffRetryerOptions = {}) {
+  constructor(options: ExponentialBackoffReconnectorOptions = {}) {
     this.#maxRetries = options.maxRetries ?? 5;
     this.#initialDelay = options.initialDelay ?? 1_000;
     this.#maxDelay = options.maxDelay ?? 30_000;
@@ -34,7 +37,7 @@ export class ExponentialBackoffRetryer implements ConnectionRetryer {
     }
   }
 
-  retry(context: ConnectionRetryContext) {
+  reconnect(context: ConnectionReconnectorContext) {
     if (context.attempt > this.#maxRetries) {
       return { action: "exhaust" } as const;
     }

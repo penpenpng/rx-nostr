@@ -7,13 +7,21 @@ import {
   type StreamFinalization,
   type SubscriptionHandle,
   type UniplsDiagnostic,
+  type UniplsDropDetector,
   type UniplsDrop,
   type UniplsDropRetryStrategy,
   type UniplsLifecycleSnapshot,
   type UniplsRetryStrategy,
   type WebSocketConstructor as UniplsWebSocketConstructor,
 } from "unipls";
-import type { ConnectionRetryContext, ConnectionRetryer } from "../../connection-retryer/index.ts";
+import type {
+  ConnectionDropDetector,
+  ConnectionDropDetectorContext,
+} from "../../connection-drop-detector/index.ts";
+import type {
+  ConnectionReconnectorContext,
+  ConnectionReconnector,
+} from "../../connection-reconnector/index.ts";
 import type { ConnectionFailure, ConnectionState } from "../../connection-state.ts";
 import type { RelayUrl } from "../../libs/relay-urls.ts";
 import type { MessagePacket } from "../../packets/index.ts";
@@ -52,10 +60,11 @@ export interface NostrTransportOptions {
   readonly url: RelayUrl;
   readonly WebSocket?: WebSocketConstructor;
   readonly timeout?: number;
-  readonly retryer?: ConnectionRetryer;
+  readonly reconnector?: ConnectionReconnector;
+  readonly dropDetectors?: readonly ConnectionDropDetector[];
   readonly onConnectionOpened?: () => () => void;
   readonly onConnectionFailed?: () => void;
-  readonly getConnectionHealth?: () => ConnectionRetryContext["health"];
+  readonly getConnectionHealth?: () => ConnectionReconnectorContext["health"];
 }
 
 export interface NostrTransportListenOptions {
@@ -97,14 +106,17 @@ export class NostrTransport {
       deserializer: (data) => decodeRelayMessage(data, options.url),
       WebSocket: options.WebSocket as UniplsWebSocketConstructor | undefined,
       timeout: options.timeout,
-      reconnector: options.retryer
+      reconnector: options.reconnector
         ? createUniplsReconnector(
             options.url,
-            options.retryer,
+            options.reconnector,
             (state) => this.#emitState(state),
             options.getConnectionHealth,
           )
         : undefined,
+      dropDetectors: options.dropDetectors?.map((detector) =>
+        createUniplsDropDetector(options.url, detector),
+      ),
     });
 
     this.#removeListeners.push(
@@ -224,9 +236,9 @@ function createStreamObservable(
 
 function createUniplsReconnector(
   relay: RelayUrl,
-  retryer: ConnectionRetryer,
+  reconnector: ConnectionReconnector,
   emitState: (state: ConnectionState) => void,
-  getConnectionHealth?: () => ConnectionRetryContext["health"],
+  getConnectionHealth?: () => ConnectionReconnectorContext["health"],
 ) {
   return {
     async setup(
@@ -240,7 +252,7 @@ function createUniplsReconnector(
       const reason = context.drop
         ? failureFromDrop(context.drop)
         : failureFromCause("connection-failed", context.cause);
-      const decision = await retryer.retry({
+      const decision = await reconnector.reconnect({
         relay,
         phase: context.origin === "initial" ? "initial" : "recovery",
         attempt: context.attempt,
@@ -279,6 +291,41 @@ function createUniplsReconnector(
           actions.exhaust(decision.cause);
           return;
       }
+    },
+  };
+}
+
+function createUniplsDropDetector(
+  relay: RelayUrl,
+  detector: ConnectionDropDetector,
+): UniplsDropDetector<Nostr.ToRelayMessage.Any, MessagePacket> {
+  return {
+    ...(detector.name === undefined ? {} : { name: detector.name }),
+    setup(context) {
+      const wrapped: ConnectionDropDetectorContext = {
+        relay,
+        detector: Object.freeze({ ...context.detector }),
+        signal: context.signal,
+        defer: (disposer, options) => context.defer(disposer, options),
+        drop: () => context.drop(),
+        request: ({ query, selector, timeout, signal }) =>
+          context
+            .request({
+              query,
+              selector: (packet) => packet.type !== "unknown" && selector(packet.message),
+              ...(timeout === undefined ? {} : { timeout }),
+              ...(signal === undefined ? {} : { signal }),
+            })
+            .then((packet) => {
+              if (packet.type === "unknown") {
+                throw new TypeError("A drop detector received an unsupported relay message.");
+              }
+              return packet.message;
+            }),
+        guard: (callback) => context.guard(callback),
+        run: (task) => context.run(task),
+      };
+      return detector.setup(Object.freeze(wrapped));
     },
   };
 }
@@ -388,7 +435,7 @@ function sameFailure(left: ConnectionFailure, right: ConnectionFailure): boolean
   return left.kind === right.kind && left.message === right.message && left.code === right.code;
 }
 
-function retryHealth(context: ReconnectionContext): ConnectionRetryContext["health"] {
+function retryHealth(context: ReconnectionContext): ConnectionReconnectorContext["health"] {
   let consecutiveFailures = 0;
   let lastConnectedAt: number | undefined;
   let lastFailureAt: number | undefined;

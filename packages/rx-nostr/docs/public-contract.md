@@ -46,7 +46,7 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 Process-wide defaults are separated by scope. `RxNostr.defaultConfig` holds constructor-level defaults, while `RxNostr.defaultOptions` holds operation defaults. Each instance snapshots both namespaces when constructed, so later static assignment does not alter an existing instance.
 
-`RxNostr.defaultConfig` initially contains a fail-closed verifier, `Nip07Signer`, `ExponentialBackoffRetryer`, `GlobalRelayDirectory`, enabled NIP-11 fetching, and the runtime's `globalThis.WebSocket`. The authenticator is initially undefined. Applications may install a real verifier or authenticator process-wide; an instance config overrides it. `authenticator: false` disables a static authenticator for that instance. The fallback verifier deliberately throws when asked to verify an EVENT, allowing verifier-free construction for publish-only clients without silently accepting unverified events.
+`RxNostr.defaultConfig` initially contains a fail-closed verifier, `Nip07Signer`, `ExponentialBackoffReconnector`, an empty drop-detector list, `GlobalRelayDirectory`, enabled NIP-11 fetching, and the runtime's `globalThis.WebSocket`. The authenticator is initially undefined. Applications may install a real verifier or authenticator process-wide; an instance config overrides it. `authenticator: false` disables a static authenticator for that instance. The fallback verifier deliberately throws when asked to verify an EVENT, allowing verifier-free construction for publish-only clients without silently accepting unverified events.
 
 The initial `RxNostr.defaultOptions` values are:
 
@@ -102,7 +102,9 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 - `failed` is an unexpected terminal outcome and contains a transport-independent failure snapshot. Peer close code/reason may be copied, but mutable transport errors and unipls identifiers are not exposed.
 - Releasing the final lease produces `dormant` and never starts automatic retry. Disposing emits `disposed` to existing observers and prevents a pending retry from creating another socket.
 
-The `ConnectionRetryer` receives the aggregate health snapshot from the configured RelayDirectory after the triggering failure has been recorded. The directory remains observational: the retryer decision is executed only by the owning RxNostr instance/unipls session.
+The `ConnectionReconnector` receives the aggregate health snapshot from the configured RelayDirectory after the triggering failure has been recorded. The directory remains observational: the reconnector decision is executed only by the owning RxNostr instance/unipls session.
+
+`RxNostrConfig.dropDetectors` and `RxNostr.defaultConfig.dropDetectors` accept rx-nostr-owned `ConnectionDropDetector` values. The configured iterable is snapshotted when an instance is constructed. A detector is set up for every ready physical connection and receives the normalized relay, its stable registration identity, a connection-scoped abort signal, cleanup/task supervision helpers, `drop()`, and a Nostr-tuple `request()` operation. Returned and deferred disposers run when that physical connection ends. Reporting a drop enters the same reconnector-controlled recovery cycle as a transport-detected drop. No unipls detector, packet, or resource-scope type is public.
 
 ## NIP-42 authentication
 

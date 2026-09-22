@@ -39,34 +39,34 @@ rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
 
 同じ relay を使う別の `RxNostr` インスタンスは別の connection を持ちます。共有 `RelayDirectory` の health には両方の結果が集約されます。
 
-## 既定の retry policy
+## 既定の reconnector
 
-既定の `ExponentialBackoffRetryer` は exponential backoff と jitter を使い、失敗した最初の接続のあと最大5回 retry します。
+既定の `ExponentialBackoffReconnector` は exponential backoff と jitter を使い、失敗した最初の接続のあと最大5回 retry します。
 
 ```ts
-import { ExponentialBackoffRetryer } from "rx-nostr";
+import { ExponentialBackoffReconnector } from "rx-nostr";
 
-const retry = new ExponentialBackoffRetryer({
+const reconnector = new ExponentialBackoffReconnector({
   maxRetries: 8,
   initialDelay: 500,
   maxDelay: 60_000,
   jitter: 0.2,
 });
 
-const rxNostr = new RxNostr({ verifier, retry });
+const rxNostr = new RxNostr({ verifier, reconnector });
 ```
 
 最終的な connection demand が解放された場合は `dormant` になり、retry は開始されません。
 
-## Custom retry policy
+## Custom reconnector
 
-`ConnectionRetryer` は retry ごとに `retry`、`cancel`、`exhaust` のいずれかを返します。Promise を返すこともできます。
+`ConnectionReconnector` は retry ごとに `retry`、`cancel`、`exhaust` のいずれかを返します。Promise を返すこともできます。
 
 ```ts
-import type { ConnectionRetryer } from "rx-nostr";
+import type { ConnectionReconnector } from "rx-nostr";
 
-const retry: ConnectionRetryer = {
-  retry(context) {
+const reconnector: ConnectionReconnector = {
+  reconnect(context) {
     if (context.signal.aborted) return { action: "cancel" };
     if (context.attempt > 3) return { action: "exhaust" };
 
@@ -74,14 +74,51 @@ const retry: ConnectionRetryer = {
     return { action: "retry", delay: context.attempt * 1_000 };
   },
 };
+
+const rxNostr = new RxNostr({ verifier, reconnector });
 ```
 
 `context.health` は configured `RelayDirectory` の `consecutiveFailures`、`lastConnectedAt`、`lastFailureAt` snapshot です。
 
-自動 retry を行わない場合は `NoopRetryer` を指定します。
+自動 retry を行わない場合は `NoopReconnector` を指定します。
+
+## Drop detector
+
+`dropDetectors` には、接続が ready になったあと独自の条件で異常を検出する detector を指定できます。公開される context は rx-nostr 独自型であり、送受信値には Nostr message tuple を使います。
+
+```ts
+import type { ConnectionDropDetector } from "rx-nostr";
+
+const heartbeat: ConnectionDropDetector = {
+  name: "heartbeat",
+  setup(context) {
+    context.run(async (signal) => {
+      while (!signal.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 30_000));
+        if (signal.aborted) return;
+
+        try {
+          await context.request({
+            query: ["COUNT", "heartbeat", { limit: 1 }],
+            selector: (message) => message[0] === "COUNT" && message[1] === "heartbeat",
+            timeout: 5_000,
+            signal,
+          });
+        } catch {
+          context.drop();
+        }
+      }
+    });
+  },
+};
+
+const rxNostr = new RxNostr({ verifier, dropDetectors: [heartbeat] });
+```
+
+`setup()` は物理 connection ごとに呼ばれます。返した disposer と `context.defer()` へ登録した disposer は、その connection の終了時に実行されます。`signal` も同時に abort され、`drop()` が最初に接続異常を報告した場合は configured reconnector による復旧へ進みます。
 
 ## 再接続中の operation
 
 接続が復旧した場合、継続中の REQ は再発行されます。lazy filter は再送直前に再評価されます。最終結果を確認できていない publish EVENT も再送される可能性があります。
 
-v4 は手動 `reconnect()` API を持ちません。再試行の可否と時期は `ConnectionRetryer` で制御します。
+v4 は手動 `reconnect()` API を持ちません。再試行の可否と時期は `ConnectionReconnector` で制御します。

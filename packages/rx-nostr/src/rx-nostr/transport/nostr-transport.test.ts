@@ -1,18 +1,25 @@
 import { firstValueFrom, toArray } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ControlledWebSocketServer, Faker } from "../../__test__/helper/index.ts";
-import type { ConnectionRetryer } from "../../connection-retryer/index.ts";
+import { ControlledWebSocketServer, expectSent, Faker } from "../../__test__/helper/index.ts";
+import type { ConnectionDropDetectorContext } from "../../connection-drop-detector/index.ts";
+import type {
+  ConnectionReconnector,
+  ConnectionReconnectorContext,
+} from "../../connection-reconnector/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "./nostr-transport.ts";
 
 const relay = "wss://relay.example.com" as const;
 
 afterEach(() => vi.useRealTimers());
 
-async function openTransport(server: ControlledWebSocketServer, retryer?: ConnectionRetryer) {
+async function openTransport(
+  server: ControlledWebSocketServer,
+  reconnector?: ConnectionReconnector,
+) {
   const transport = new NostrTransport({
     url: relay,
     WebSocket: server.WebSocket,
-    retryer,
+    reconnector,
   });
   const opened = transport.open();
   server.sockets.latest.open();
@@ -32,7 +39,7 @@ describe("NostrTransport", () => {
     const transport = new NostrTransport({
       url: relay,
       WebSocket: server.WebSocket,
-      retryer: { retry: () => ({ action: "retry", delay: 0 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const states: import("../../connection-state.ts").ConnectionState[] = [];
     transport.state$.subscribe((state) => states.push(state));
@@ -70,7 +77,7 @@ describe("NostrTransport", () => {
     const transport = new NostrTransport({
       url: relay,
       WebSocket: server.WebSocket,
-      retryer: { retry: () => ({ action: "retry", delay: 100 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
     const states: import("../../connection-state.ts").ConnectionState[] = [];
     transport.state$.subscribe((state) => states.push(state));
@@ -97,7 +104,7 @@ describe("NostrTransport", () => {
     const terminal = new NostrTransport({
       url: "wss://terminal.example.com",
       WebSocket: terminalServer.WebSocket,
-      retryer: { retry: () => ({ action: "exhaust" }) },
+      reconnector: { reconnect: () => ({ action: "exhaust" }) },
     });
     const terminalStates: import("../../connection-state.ts").ConnectionState[] = [];
     terminal.state$.subscribe((state) => terminalStates.push(state));
@@ -125,7 +132,7 @@ describe("NostrTransport", () => {
     const transport = new NostrTransport({
       url: relay,
       WebSocket: server.WebSocket,
-      retryer: { retry: () => ({ action: "retry", delay: 100 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
     const states: string[] = [];
     transport.state$.subscribe((state) => states.push(state.state));
@@ -232,10 +239,10 @@ describe("NostrTransport", () => {
 
   test("reconnects and ignores delayed messages from an old transport epoch", async () => {
     const server = new ControlledWebSocketServer();
-    const retryer: ConnectionRetryer = {
-      retry: vi.fn(() => ({ action: "retry", delay: 0 }) as const),
+    const reconnector: ConnectionReconnector = {
+      reconnect: vi.fn(() => ({ action: "retry", delay: 0 }) as const),
     };
-    const transport = await openTransport(server, retryer);
+    const transport = await openTransport(server, reconnector);
     const oldSocket = server.sockets.latest;
     const messages: string[] = [];
     const states: string[] = [];
@@ -246,8 +253,8 @@ describe("NostrTransport", () => {
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     const newSocket = server.sockets.latest;
     newSocket.open();
-    await vi.waitFor(() => expect(retryer.retry).toHaveBeenCalledOnce());
-    expect(retryer.retry).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(reconnector.reconnect).toHaveBeenCalledOnce());
+    expect(reconnector.reconnect).toHaveBeenCalledWith(
       expect.objectContaining({
         phase: "recovery",
         attempt: 1,
@@ -263,15 +270,83 @@ describe("NostrTransport", () => {
     await closeTransport(transport, server);
   });
 
+  test("adapts Nostr drop detectors and resets the attempt for each recovery cycle", async () => {
+    const server = new ControlledWebSocketServer();
+    const contexts: ConnectionDropDetectorContext[] = [];
+    const deferredCleanup = vi.fn();
+    const returnedCleanup = vi.fn();
+    const reconnect = vi.fn((_context: ConnectionReconnectorContext) => {
+      return { action: "retry", delay: 0 } as const;
+    });
+    const transport = new NostrTransport({
+      url: relay,
+      WebSocket: server.WebSocket,
+      reconnector: { reconnect },
+      dropDetectors: [
+        {
+          name: "health-check",
+          setup(context) {
+            contexts.push(context);
+            context.defer(deferredCleanup, { name: "deferred-health-check-cleanup" });
+            return returnedCleanup;
+          },
+        },
+      ],
+    });
+
+    const opened = transport.open();
+    server.sockets.latest.open();
+    await opened;
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]).toMatchObject({
+      relay,
+      detector: { registrationIndex: 0, name: "health-check" },
+    });
+
+    const response = contexts[0]!.request({
+      query: ["REQ", "health", {}],
+      selector: (message) => message[0] === "EOSE" && message[1] === "health",
+    });
+    await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message(["EOSE", "health"]);
+    await expect(response).resolves.toEqual(["EOSE", "health"]);
+
+    contexts[0]!.drop();
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    expect(reconnect).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        relay,
+        phase: "recovery",
+        attempt: 1,
+        reason: { kind: "connection-dropped" },
+      }),
+    );
+    expect(contexts[0]!.signal.aborted).toBe(true);
+    expect(deferredCleanup).toHaveBeenCalledOnce();
+    expect(returnedCleanup).toHaveBeenCalledOnce();
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(contexts).toHaveLength(2));
+
+    server.sockets.latest.peerClose(1006, "again");
+    await vi.waitFor(() => expect(server.connections).toHaveLength(3));
+    expect(reconnect.mock.calls.map(([context]) => context.attempt)).toEqual([1, 1]);
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(contexts).toHaveLength(3));
+
+    await closeTransport(transport, server);
+    expect(deferredCleanup).toHaveBeenCalledTimes(3);
+    expect(returnedCleanup).toHaveBeenCalledTimes(3);
+  });
+
   test("applies the rx-nostr retry policy to an initial connection failure", async () => {
     const server = new ControlledWebSocketServer();
-    const retryer: ConnectionRetryer = {
-      retry: vi.fn(() => ({ action: "retry", delay: 0 }) as const),
+    const reconnector: ConnectionReconnector = {
+      reconnect: vi.fn(() => ({ action: "retry", delay: 0 }) as const),
     };
     const transport = new NostrTransport({
       url: relay,
       WebSocket: server.WebSocket,
-      retryer,
+      reconnector,
     });
 
     const opened = transport.open();
@@ -280,7 +355,7 @@ describe("NostrTransport", () => {
     server.sockets.latest.open();
     await opened;
 
-    expect(retryer.retry).toHaveBeenCalledWith(
+    expect(reconnector.reconnect).toHaveBeenCalledWith(
       expect.objectContaining({
         relay,
         phase: "initial",
@@ -298,7 +373,7 @@ describe("NostrTransport", () => {
       const transport = new NostrTransport({
         url: relay,
         WebSocket: server.WebSocket,
-        retryer: { retry: () => ({ action }) },
+        reconnector: { reconnect: () => ({ action }) },
       });
 
       const opened = transport.open();

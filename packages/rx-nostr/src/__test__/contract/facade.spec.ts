@@ -2,7 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
 import {
   RxNostr,
-  NoopRetryer,
+  NoopReconnector,
   NoopSigner,
   NoopVerifier,
   RelayDirectory,
@@ -35,7 +35,7 @@ describe("RxNostr facade lifecycle", () => {
       RxNostr.defaultConfig = {
         ...previous,
         verifier: new NoopVerifier(),
-        retry: new NoopRetryer(),
+        reconnector: new NoopReconnector(),
         skipFetchNip11: true,
         WebSocket: server.WebSocket,
       };
@@ -67,7 +67,7 @@ describe("RxNostr facade lifecycle", () => {
       };
       const rxNostr = new RxNostr({
         verifier: new NoopVerifier(),
-        retry: new NoopRetryer(),
+        reconnector: new NoopReconnector(),
         skipFetchNip11: true,
         WebSocket: server.WebSocket,
       });
@@ -92,7 +92,7 @@ describe("RxNostr facade lifecycle", () => {
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       signer: new NoopSigner(),
-      retry: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
       defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -160,14 +160,14 @@ describe("RxNostr facade lifecycle", () => {
     const first = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
-      retry: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
       skipFetchNip11: true,
       WebSocket: firstServer.WebSocket,
     });
     const second = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
-      retry: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
       skipFetchNip11: true,
       WebSocket: secondServer.WebSocket,
     });
@@ -206,7 +206,7 @@ describe("RxNostr facade lifecycle", () => {
           skipExpirationCheck: true,
         },
       },
-      retry: new NoopRetryer(),
+      reconnector: new NoopReconnector(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });

@@ -7,7 +7,8 @@ const rxNostr = new RxNostr({
   verifier,
   signer,
   authenticator,
-  retry,
+  reconnector,
+  dropDetectors,
   relayDirectory,
   skipFetchNip11: false,
   WebSocket,
@@ -23,7 +24,8 @@ const rxNostr = new RxNostr({
 | `verifier` | no | 受信 EVENT の既定 verifier。省略時は検証時にエラー |
 | `signer` | no | publish の既定 signer。省略時は `Nip07Signer` |
 | `authenticator` | no | root の Authenticator / relay factory。`false` で static default を無効化 |
-| `retry` | no | 接続 retry policy |
+| `reconnector` | no | 再接続 policy |
+| `dropDetectors` | no | 接続異常を検出する detector の iterable |
 | `relayDirectory` | no | metadata/health store |
 | `skipFetchNip11` | no | pool entry 作成時の自動 NIP-11 fetch を止める |
 | `WebSocket` | no | runtime に注入する WebSocket constructor |
@@ -40,7 +42,8 @@ constructor-level の process-wide defaults は `RxNostr.defaultConfig` にま�
 ```ts
 RxNostr.defaultConfig.verifier = verifier;
 RxNostr.defaultConfig.WebSocket = WebSocket;
-RxNostr.defaultConfig.retry = retry;
+RxNostr.defaultConfig.reconnector = reconnector;
+RxNostr.defaultConfig.dropDetectors = dropDetectors;
 
 const primary = new RxNostr();
 const secondary = new RxNostr({
@@ -56,14 +59,15 @@ const secondary = new RxNostr({
 | `verifier` | EVENT 検証時に例外を投げる fail-closed verifier |
 | `signer` | `Nip07Signer` |
 | `authenticator` | なし（AUTH は opt-in） |
-| `retry` | `ExponentialBackoffRetryer` |
+| `reconnector` | `ExponentialBackoffReconnector` |
+| `dropDetectors` | `[]` |
 | `relayDirectory` | `GlobalRelayDirectory` |
 | `skipFetchNip11` | `false` |
 | `WebSocket` | `globalThis.WebSocket` |
 
 instance config は対応する static default より優先されます。安全な verifier を本体だけでは選べないため、既定の verifier は EVENT の検証時に例外を投げます。これにより publish-only client は `new RxNostr()` で構築できますが、REQ を使う application は instance config または `RxNostr.defaultConfig.verifier` に実際の verifier を指定する必要があります。
 
-static に設定した object は、以後作る instance が共有します。instance ごとに状態を分離した verifier、retry policy、relay directory などが必要なら instance config に渡してください。
+static に設定した object は、以後作る instance が共有します。instance ごとに状態を分離した verifier、reconnector、relay directory などが必要なら instance config に渡してください。`dropDetectors` の iterable は constructor 呼び出し時に配列へ snapshot されます。
 
 ## Process-wide operation defaults
 

@@ -2,7 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RxNostr,
-  NoopRetryer,
+  NoopReconnector,
   NoopSigner,
   NoopVerifier,
   RxNostrCallbackError,
@@ -51,7 +51,7 @@ function createRxNostr(
   return new RxNostr({
     verifier: new NoopVerifier(),
     signer: new NoopSigner(),
-    retry: new NoopRetryer(),
+    reconnector: new NoopReconnector(),
     defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
     skipFetchNip11: true,
     WebSocket: server.WebSocket,
@@ -380,7 +380,7 @@ describe("Publication public contract", () => {
   test("resends an unconfirmed EVENT after reconnect", async () => {
     const server = new ControlledWebSocketServer();
     const rxNostr = createRxNostr(server, {
-      retry: { retry: () => ({ action: "retry", delay: 0 }) },
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const publication = rxNostr.publish(relay1, event());
     const all = publication.waitFor("all");

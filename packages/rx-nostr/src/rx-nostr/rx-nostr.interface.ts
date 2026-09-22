@@ -1,7 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
-import type { ConnectionRetryer } from "../connection-retryer/index.ts";
+import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
+import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
@@ -56,7 +57,9 @@ export interface RxNostrConfig {
   /**
    * Auto reconnection controller.
    */
-  retry?: ConnectionRetryer;
+  reconnector?: ConnectionReconnector;
+  /** Additional detectors that may report a ready connection as dropped. */
+  dropDetectors?: Iterable<ConnectionDropDetector>;
   /** Shared relay metadata and health directory. */
   relayDirectory?: RelayDirectory;
   /**
@@ -84,7 +87,8 @@ export interface RxNostrStaticDefaultConfig {
   verifier: EventVerifier;
   signer: EventSigner;
   authenticator: AuthenticatorInput | undefined;
-  retry: ConnectionRetryer;
+  reconnector: ConnectionReconnector;
+  dropDetectors: ConnectionDropDetector[];
   relayDirectory: RelayDirectory;
   skipFetchNip11: boolean;
   WebSocket: WebSocketConstructor | undefined;
