@@ -23,6 +23,7 @@ export type {
   ConnectionState,
   ConnectionStateSymbol,
 } from "./connection-state.ts";
+export type { RxNostrDiagnostic } from "./diagnostics/index.ts";
 export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
 export {
   NoopVerifier,
@@ -55,7 +56,6 @@ export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
 export type { FetchRelayInfoOptions } from "./libs/nostr/nip11.ts";
 export { normalizeRelayUrl, RelayMap, RelaySet, type RelayUrl } from "./libs/relay-urls.ts";
 export { RxDisposableStack } from "./libs/rxjs/rx-disposable-stack.ts";
-export { setLogLevel } from "./logger.ts";
 export {
   batch,
   chunk,

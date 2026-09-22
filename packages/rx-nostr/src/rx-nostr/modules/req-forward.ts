@@ -1,8 +1,8 @@
 import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
+import { emitDiagnostic } from "../../diagnostics/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
-import { Logger } from "../../logger.ts";
 import { mapStored } from "../../operators/general/map-stored.ts";
 import { setDiff } from "../../operators/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
@@ -24,16 +24,12 @@ export function reqForward({
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
-  Logger.debug("new forward REQ session");
   const session = new QuerySession(config);
   const sessionRelays = RxRelays.from(relayInput);
 
   const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      const prewarmed = session.prewarm(relay);
-      if (prewarmed) {
-        Logger.debug("session prewarm", relay.url);
-      }
+      session.prewarm(relay);
     });
   });
 
@@ -103,14 +99,9 @@ function req({
   skipValidateFilterMatching: boolean;
   authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
-  Logger.trace(traceTag, "new forward REQ segment");
-
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      const prewarmed = session.prewarm(relay);
-      if (prewarmed) {
-        Logger.trace(traceTag, `segment prewarm ${relay.url}`);
-      }
+      session.prewarm(relay);
     });
   });
 
@@ -124,20 +115,24 @@ function req({
     .asObservable()
     .pipe(setDiff())
     .subscribe(({ current, appended, outdated }) => {
-      Logger.trace(traceTag, "updated dest relays", {
-        current,
-        appended,
-        outdated,
-      });
-
       if (!sessionRelays.disposed) {
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
-          Logger.warn("REQ was issued, but no destination relays is set.");
+          const message = "A REQ was issued without any destination relays.";
+          emitDiagnostic({
+            severity: "warning",
+            occurredAt: Date.now(),
+            message,
+          });
           stream.complete();
           return;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
-          Logger.warn("The last relay was removed; no destination relays remain.");
+          const message = "The last relay was removed; no destination relays remain.";
+          emitDiagnostic({
+            severity: "warning",
+            occurredAt: Date.now(),
+            message,
+          });
         }
       }
 
@@ -145,7 +140,6 @@ function req({
       // to prevent WebSocket blinks when `linger` is 0.
       relays.forEach(appended, (relay) => {
         const segment = session.beginSegment(relay, linger);
-        Logger.trace(traceTag, `new segment on ${relay.url}`);
 
         let finalized = false;
         const queryRef: { sub?: Subscription } = {};
@@ -181,7 +175,6 @@ function req({
 
         // Forward: Session scope relays are still needed.
         query?.segment.endSegment();
-        Logger.trace(traceTag, `end segment on ${relay.url}`);
       });
     });
 
@@ -205,7 +198,6 @@ function req({
       segmentRelays.dispose();
 
       stream.complete();
-      Logger.trace(traceTag, "finalized segment");
     }),
   );
 }

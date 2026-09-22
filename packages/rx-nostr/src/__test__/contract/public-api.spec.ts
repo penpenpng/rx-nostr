@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
+import type { Observable } from "rxjs";
 import * as publicApi from "rx-nostr";
 import type {
   Authenticator,
@@ -11,6 +12,7 @@ import type {
   Publication,
   RelayInput,
   RelayUrl,
+  RxNostrDiagnostic,
   RxNostr,
   RxNostrConfig,
   RxNostrPublishConfig,
@@ -27,12 +29,17 @@ describe("public entry point", () => {
     expect(publicApi.RelayDirectory).toBeTypeOf("function");
     expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(publicApi.RelayDirectory);
     expect(publicApi).not.toHaveProperty("createRxNostr");
+    expect(publicApi).not.toHaveProperty("setLogLevel");
     expect(publicApi).not.toHaveProperty("NostrTransport");
     expect(publicApi).not.toHaveProperty("Unipls");
   });
 
   test("exposes the v4 operation model", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
+    expectTypeOf(publicApi.RxNostr.diagnostics).toEqualTypeOf<Observable<RxNostrDiagnostic>>();
+    expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("source");
+    expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("type");
+    expectTypeOf<RxNostrDiagnostic["message"]>().toEqualTypeOf<string>();
     expectTypeOf<Authenticator>().toHaveProperty("authTimeout");
     expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
     expectTypeOf<RxNostrConfig["reconnector"]>().toEqualTypeOf<ConnectionReconnector | undefined>();

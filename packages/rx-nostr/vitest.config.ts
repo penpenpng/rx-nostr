@@ -16,7 +16,6 @@ export default defineConfig({
         test: {
           include: ["src/__test__/contract/**/*.spec.{ts,mts}"],
           name: "contract",
-          setupFiles: ["./vitest.setup.ts"],
         },
       },
       {
@@ -24,7 +23,6 @@ export default defineConfig({
         test: {
           include: ["src/**/*.test.{ts,mts}"],
           name: "unit",
-          setupFiles: ["./vitest.setup.ts"],
         },
       },
     ],

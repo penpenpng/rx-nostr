@@ -43,3 +43,4 @@
 - Publication は facade 内の active registry で管理し、natural cleanup 後は除去する。これにより instance dispose 時は pool より先に全 publication を cancel する。
 - 同一 URL でも RxNostr instance ごとに別 pool/socket を所有し、注入した RelayDirectory の metadata/health entry だけを共有することを contract test で確認した。
 - ReqPacket relay/traceTag > operation config > root defaults の優先順位と、operation verifier/boolean override が root verifier/default を上書きすることを wire test で固定した。
+- `RxNostr.diagnostics` に全 instance の rx-nostr/unipls diagnostic を集約した。v3 `createAllErrorObservable()` が扱った不正 message、send 失敗、予期しない close、接続 attempt 失敗も relay 付きの rx-nostr 独自 snapshot として維持し、unipls identifier/type は公開しない。

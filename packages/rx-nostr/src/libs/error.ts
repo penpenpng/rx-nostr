@@ -44,17 +44,6 @@ export class RxNostrPublicationError extends RxNostrError {
 }
 
 /**
- * This is thrown when WebSocket connection is closed unexpectedly.
- * You may see them in a stream made by `rxNostr.createAllErrorObservable()`.
- */
-export class RxNostrWebSocketError extends RxNostrError {
-  constructor(public code?: number) {
-    super(`RxNostrWebSocketError: WebSocket was closed with code ${code} by relay.`);
-    this.name = "RxNostrWebSocketError";
-  }
-}
-
-/**
  * This is usually thrown when rx-nostr is used incorrectly (or possibly rx-nostr has a bug).
  * Please fix your program according to the message.
  *

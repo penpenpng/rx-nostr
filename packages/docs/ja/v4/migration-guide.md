@@ -152,6 +152,26 @@ rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
 
 手動 `reconnect()` は削除されました。再接続の回数、遅延、打ち切りは `ConnectionReconnector` で制御します。
 
+## `createAllErrorObservable()` を diagnostics へ移す
+
+v3 で `createAllErrorObservable()` が通知していた relay message の解析失敗、WebSocket send の失敗、予期しない WebSocket close は、v4 では全 instance 共通の `RxNostr.diagnostics` から取得します。
+
+```ts
+// v3
+rxNostr.createAllErrorObservable().subscribe(({ from, reason }) => {
+  console.debug(from, reason);
+});
+
+// v4
+RxNostr.diagnostics.subscribe((diagnostic) => {
+  console.debug(diagnostic.relay, diagnostic.message, diagnostic.cause);
+});
+```
+
+diagnostic はデバッグ／記録用です。application が処理すべき失敗は operation の戻り値または例外、connection の状態は `monitorConnectionState()` を使ってください。static stream にはすべての `RxNostr` instance の diagnostic が流れ、個別 instance の dispose では complete しません。
+
+`setLogLevel()` は削除されました。v4 は library から console へ直接出力しません。必要な diagnostic を購読し、出力先や filtering は application 側で選択してください。正常な REQ lifecycle の trace は diagnostic には含まれません。
+
 ## AUTH は明示的に有効化する
 
 v3 の `authenticator: "auto"` は削除されました。signer から `SimpleAuthenticator` を作ります。
@@ -214,7 +234,8 @@ rxNostr.dispose();
 - v3 API 名の compatibility alias
 - `createRxNostr()` factory（`new RxNostr()` に置換）
 - default/additional relay と read/write flag
-- transport の raw message/error/outgoing-message Observable
+- transport の raw message/outgoing-message Observable
+- instance ごとの error Observable（process-wide な `RxNostr.diagnostics` に置換）
 - query result の physical subscription identifier
 - signer から暗黙に AUTH を有効化する挙動
 - `reconnect()` と `polite` retry option

@@ -122,3 +122,23 @@ const rxNostr = new RxNostr({ verifier, dropDetectors: [heartbeat] });
 接続が復旧した場合、継続中の REQ は再発行されます。lazy filter は再送直前に再評価されます。最終結果を確認できていない publish EVENT も再送される可能性があります。
 
 v4 は手動 `reconnect()` API を持ちません。再試行の可否と時期は `ConnectionReconnector` で制御します。
+
+## Diagnostics
+
+`RxNostr.diagnostics` は、すべての `RxNostr` インスタンスから発生した diagnostic をまとめる process-wide の hot Observable です。
+
+```ts
+const subscription = RxNostr.diagnostics.subscribe((diagnostic) => {
+  console.debug(diagnostic.occurredAt, diagnostic.severity, diagnostic.relay);
+  console.debug(diagnostic.message);
+  if (diagnostic.cause !== undefined) console.debug(diagnostic.cause);
+});
+```
+
+diagnostic は、デバッグや記録に役立つものの、application が受け取って処理を分岐する必要がない補助情報です。operation の成否、callback 例外、connection の現在状態の代わりにはなりません。これらはそれぞれ `Publication`／REQ の error、`RxNostrCallbackError`、`monitorConnectionState()` で扱います。
+
+diagnostic は実装上の発生元を区別せず、下位実装の名前、型、session ID、connection ID、operation ID も露出しません。application が処理を分岐できる machine-readable な `type` も持たず、内容は `message` で説明します。
+
+v3 の `createAllErrorObservable()` が通知していた不正な relay message、WebSocket send の失敗、予期しない WebSocket close、初回接続／再接続 attempt の失敗も含まれます。このほか drop detector／reconnector／resource cleanup の失敗、NIP-11 自動取得失敗、宛先のない REQ なども通知します。
+
+この stream は過去の値を replay しないため、必要なら application の起動時に購読してください。個々の `RxNostr` を dispose しても process-wide stream は complete しません。各 observer は独立した変更可能な diagnostic copy を受け取ります。

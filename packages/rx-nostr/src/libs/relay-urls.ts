@@ -1,3 +1,4 @@
+import { emitDiagnostic } from "../diagnostics/index.ts";
 import { tryOrDefault } from "./try.ts";
 
 export type RelayUrl = `ws://${string}` | `wss://${string}`;
@@ -255,8 +256,8 @@ export class RelayMapOperator<T> {
     for (const relay of relays) {
       try {
         callback(this.get(relay));
-      } catch (err) {
-        console.error(err);
+      } catch (cause) {
+        emitRelayCollectionCallbackFailure(relay, "forEach", cause);
       }
     }
   }
@@ -271,8 +272,8 @@ export class RelayMapOperator<T> {
     for (const relay of relays) {
       try {
         results.push(project(this.get(relay)));
-      } catch (err) {
-        console.error(err);
+      } catch (cause) {
+        emitRelayCollectionCallbackFailure(relay, "map", cause);
       }
     }
 
@@ -301,6 +302,21 @@ export class RelayMapOperator<T> {
   get size(): number {
     return this.#map.size;
   }
+}
+
+function emitRelayCollectionCallbackFailure(
+  relay: RelayUrl,
+  operation: "forEach" | "map",
+  cause: unknown,
+): void {
+  emitDiagnostic({
+    severity: "error",
+    occurredAt: Date.now(),
+    relay,
+    message: `A callback used by a relay collection ${operation} operation failed.`,
+    cause,
+    details: { operation },
+  });
 }
 
 export function normalizeRelayUrl(url: string): RelayUrl | null {

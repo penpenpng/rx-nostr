@@ -10,12 +10,10 @@ import { RelayMapOperator } from "../../libs/index.ts";
 import { RxForwardReq } from "../../rx-req/index.ts";
 
 import { Expect } from "../../__test__/helper/expect.ts";
-import { setLogLevel } from "../../logger.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { reqForward } from "./req-forward.ts";
 
 test("single relay", async () => {
-  setLogLevel("debug");
   const rxReq = new RxForwardReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
@@ -145,7 +143,6 @@ test("single relay, weak=true", async () => {
 });
 
 test("dynamic relays", async () => {
-  setLogLevel("debug");
   const rxReq = new RxForwardReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();

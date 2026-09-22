@@ -1,5 +1,6 @@
 import * as Nostr from "nostr-typedef";
 import { defer, identity, map, mergeMap, Observable, Subject, takeUntil } from "rxjs";
+import { diagnostics, emitDiagnostic } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
@@ -31,6 +32,9 @@ import type {
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
+  /** Process-wide diagnostics emitted by every RxNostr instance. */
+  static readonly diagnostics = diagnostics;
+
   /** Process-wide constructor defaults snapshotted by each new instance. */
   static defaultConfig: RxNostrStaticDefaultConfig =
     cloneStaticDefaultConfig(RX_NOSTR_DEFAULT_CONFIG);
@@ -51,13 +55,22 @@ export class RxNostr implements IRxNostr {
     this.#config = new FilledRxNostrConfig(config, RxNostr.defaultConfig, RxNostr.defaultOptions);
     this.#relays = new RelayPool((url) => {
       if (!this.#config.skipFetchNip11) {
-        void this.#config.relayDirectory.fetchNip11(url).catch(() => {});
+        void this.#config.relayDirectory.fetchNip11(url).catch((cause) => {
+          emitDiagnostic({
+            severity: "warning",
+            occurredAt: Date.now(),
+            relay: url,
+            message: "Automatic NIP-11 relay information retrieval failed.",
+            cause,
+          });
+        });
       }
       return new RelayCommunication(url, {
         WebSocket: this.#config.WebSocket,
         reconnector: this.#config.reconnector,
         dropDetectors: this.#config.dropDetectors,
         relayDirectory: this.#config.relayDirectory,
+        onDiagnostic: emitDiagnostic,
       });
     });
     this.#stack.use(this.#relays);

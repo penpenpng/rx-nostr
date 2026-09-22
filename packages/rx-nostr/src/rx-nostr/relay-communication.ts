@@ -3,6 +3,7 @@ import { EMPTY, Observable, type Subscriber, type Subscription, filter, map } fr
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
+import type { RxNostrDiagnostic } from "../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../lazy-filter/index.ts";
 import { isFiltered, once, type RelayUrl } from "../libs/index.ts";
 import { RxNostrCallbackError } from "../libs/error.ts";
@@ -43,6 +44,7 @@ export interface RelayCommunicationOptions {
   readonly reconnector?: ConnectionReconnector;
   readonly dropDetectors?: readonly ConnectionDropDetector[];
   readonly relayDirectory?: RelayDirectory;
+  readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
 }
 
 // 将来、接続を多重化することがあればこのレイヤーで実装する
@@ -51,6 +53,7 @@ export class RelayCommunication implements IRelayCommunication {
   readonly #leases: ConnectionLeaseController;
   readonly #auth: AuthCoordinator;
   readonly #directorySubscription?: Subscription;
+  readonly #onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
   readonly #pendingQueries: QueryTask[] = [];
   readonly #activeQueries = new Set<QueryTask>();
   #maxSubscriptions?: number;
@@ -61,6 +64,7 @@ export class RelayCommunication implements IRelayCommunication {
     public readonly url: RelayUrl,
     options: RelayCommunicationOptions = {},
   ) {
+    this.#onDiagnostic = options.onDiagnostic;
     const relayDirectory = options.relayDirectory;
     const directoryReporter = relayDirectory
       ? getRelayDirectoryReporter(relayDirectory)
@@ -70,6 +74,7 @@ export class RelayCommunication implements IRelayCommunication {
       WebSocket: options.WebSocket,
       reconnector: options.reconnector,
       dropDetectors: options.dropDetectors,
+      onDiagnostic: options.onDiagnostic,
       onConnectionOpened: directoryReporter
         ? () => directoryReporter.connectionOpened(url)
         : undefined,
@@ -208,7 +213,15 @@ export class RelayCommunication implements IRelayCommunication {
           stopped = true;
           authAbort.abort();
           if (!remoteTerminated && queryEvaluated) {
-            void this.#transport.cast(["CLOSE", subId]).catch(() => {});
+            void this.#transport.cast(["CLOSE", subId]).catch((cause) => {
+              this.#onDiagnostic?.({
+                severity: "warning",
+                occurredAt: Date.now(),
+                relay: this.url,
+                message: "A best-effort CLOSE message could not be sent to the relay.",
+                cause,
+              });
+            });
           }
           subscription?.unsubscribe();
         };

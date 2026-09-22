@@ -106,6 +106,16 @@ The `ConnectionReconnector` receives the aggregate health snapshot from the conf
 
 `RxNostrConfig.dropDetectors` and `RxNostr.defaultConfig.dropDetectors` accept rx-nostr-owned `ConnectionDropDetector` values. The configured iterable is snapshotted when an instance is constructed. A detector is set up for every ready physical connection and receives the normalized relay, its stable registration identity, a connection-scoped abort signal, cleanup/task supervision helpers, `drop()`, and a Nostr-tuple `request()` operation. Returned and deferred disposers run when that physical connection ends. Reporting a drop enters the same reconnector-controlled recovery cycle as a transport-detected drop. No unipls detector, packet, or resource-scope type is public.
 
+## Diagnostics
+
+`RxNostr.diagnostics` is one process-wide hot `Observable<RxNostrDiagnostic>` combining diagnostics from every RxNostr instance. It does not replay, error, or complete when an instance is disposed. Every observer receives a detached mutable copy.
+
+A diagnostic is supplemental debugging information, not an operation outcome or an exception on which application behavior should depend. The public value intentionally neither exposes nor distinguishes its implementation origin, and contains no lower-level implementation name, type, or session/connection/operation identifier. It has no machine-readable diagnostic category; its required `message` explains what happened without defining a new application control-flow contract.
+
+The package does not write diagnostics directly to the console and has no logger or log-level API. Applications choose their own destination and filtering by subscribing to `RxNostr.diagnostics`. Routine successful lifecycle tracing is not a diagnostic.
+
+The stream includes the information formerly available through v3 `createAllErrorObservable()`: malformed relay messages, WebSocket send failures, unexpected ready-connection drops, and failed initial/recovery WebSocket attempts, all with a normalized relay when applicable. It also includes supervised unipls failures and rx-nostr supplemental failures such as automatic NIP-11 fetch or best-effort CLOSE-send failure. Actionable callback exceptions remain `RxNostrCallbackError`; publication outcomes remain `PublicationFailure`; current connection status remains `ConnectionState`.
+
 ## NIP-42 authentication
 
 AUTH is opt-in. A root or operation authenticator may be an `Authenticator` or a relay factory; `authenticator: false` disables AUTH for that operation even if another operation authenticates the same connection. The ordinary signer is never used implicitly for AUTH.

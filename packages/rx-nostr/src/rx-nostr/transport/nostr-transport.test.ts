@@ -173,13 +173,17 @@ describe("NostrTransport", () => {
       const transport = await openTransport(server);
       const diagnostics: string[] = [];
       const messages: string[] = [];
-      transport.diagnostics$.subscribe((value) => diagnostics.push(value.type));
+      transport.diagnostics$.subscribe((value) => diagnostics.push(value.message));
       transport.messages$.subscribe((value) => messages.push(value.type));
 
       server.sockets.latest.rawMessage(input);
       server.sockets.latest.message(["NOTICE", "still alive"]);
 
-      await vi.waitFor(() => expect(diagnostics).toEqual(["message-deserialization-failed"]));
+      await vi.waitFor(() =>
+        expect(diagnostics).toEqual([
+          "A message received from the relay could not be decoded and was ignored.",
+        ]),
+      );
       expect(messages).toEqual(["NOTICE"]);
       await closeTransport(transport, server);
     },
