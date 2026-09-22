@@ -45,14 +45,14 @@ describe("RxNostr facade lifecycle", () => {
       const complete = vi.fn();
       rxNostr.req(relay, [{}]).subscribe({ complete });
 
-      server.latestConnection.open();
-      await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-      const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
-      server.latestConnection.message(JSON.stringify(["EOSE", subId]));
+      server.sockets.latest.open();
+      await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+      const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+      server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
 
       await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-      await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-      server.latestConnection.acknowledgeClose();
+      await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+      server.sockets.latest.acknowledgeClose();
       rxNostr.dispose();
     } finally {
       RxNostr.defaultOptions = previous;
@@ -74,7 +74,7 @@ describe("RxNostr facade lifecycle", () => {
       complete: stateComplete,
     });
     rxNostr.setHotRelays(relay);
-    const connection = server.latestConnection;
+    const connection = server.sockets.latest;
     connection.open();
     await vi.waitFor(() =>
       expect(states.some((packet) => packet.state.state === "connected")).toBe(true),
@@ -152,20 +152,20 @@ describe("RxNostr facade lifecycle", () => {
     second.setHotRelays(relay);
     expect(firstServer.connections).toHaveLength(1);
     expect(secondServer.connections).toHaveLength(1);
-    expect(firstServer.latestConnection).not.toBe(secondServer.latestConnection);
-    firstServer.latestConnection.open();
-    secondServer.latestConnection.open();
+    expect(firstServer.sockets.latest).not.toBe(secondServer.sockets.latest);
+    firstServer.sockets.latest.open();
+    secondServer.sockets.latest.open();
     await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(2));
 
     first.dispose();
-    await vi.waitFor(() => expect(firstServer.latestConnection.closeRequests).toHaveLength(1));
-    firstServer.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(firstServer.sockets.latest.closeRequests).toHaveLength(1));
+    firstServer.sockets.latest.acknowledgeClose();
     await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(1));
-    expect(secondServer.latestConnection.closeRequests).toHaveLength(0);
+    expect(secondServer.sockets.latest.closeRequests).toHaveLength(0);
 
     second.dispose();
-    await vi.waitFor(() => expect(secondServer.latestConnection.closeRequests).toHaveLength(1));
-    secondServer.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(secondServer.sockets.latest.closeRequests).toHaveLength(1));
+    secondServer.sockets.latest.acknowledgeClose();
     await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(0));
   });
 
@@ -201,15 +201,15 @@ describe("RxNostr facade lifecycle", () => {
     });
     request.over();
     expect(server.connections).toHaveLength(1);
-    expect(server.latestConnection.url).toBe("wss://packet.example.com");
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    expect(server.sockets.latest.url).toBe("wss://packet.example.com");
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
     const now = Math.floor(Date.now() / 1_000);
-    server.latestConnection.message(
+    server.sockets.latest.message(
       JSON.stringify(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]),
     );
-    server.latestConnection.message(
+    server.sockets.latest.message(
       JSON.stringify([
         "EVENT",
         subId,
@@ -220,10 +220,10 @@ describe("RxNostr facade lifecycle", () => {
         },
       ]),
     );
-    server.latestConnection.message(
+    server.sockets.latest.message(
       JSON.stringify(["EVENT", subId, { ...signedEvent, id: "accepted" }]),
     );
-    server.latestConnection.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
 
     await vi.waitFor(() => expect(packets).toHaveLength(1));
     expect(packets[0]).toMatchObject({
@@ -232,8 +232,8 @@ describe("RxNostr facade lifecycle", () => {
     });
     expect(rootVerify).not.toHaveBeenCalled();
     expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual(["expired", "accepted"]);
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 });

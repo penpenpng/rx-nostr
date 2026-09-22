@@ -45,15 +45,15 @@ describe("REQ public contract", () => {
       .subscribe({ next: (packet) => packets.push(packet), complete });
     request.emit([{ kinds: [1] }], { traceTag: "timeline" });
     request.over();
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const req = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string, object];
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const req = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string, object];
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1] });
 
     const result = event({ id: "result" });
-    server.latestConnection.message(JSON.stringify(["EVENT", req[1], result]));
-    server.latestConnection.message(JSON.stringify(["EOSE", req[1]]));
+    server.sockets.latest.message(JSON.stringify(["EVENT", req[1], result]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", req[1]]));
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets).toEqual([
       {
@@ -66,10 +66,10 @@ describe("REQ public contract", () => {
     expect(packets[0]).not.toHaveProperty("subId");
     expect(packets[0]).not.toHaveProperty("vreqId");
     expect(packets[0]).not.toHaveProperty("message");
-    expect(server.latestConnection.sent).toHaveLength(1);
+    expect(server.sockets.latest.sent).toHaveLength(1);
 
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 
@@ -85,24 +85,25 @@ describe("REQ public contract", () => {
     const subscription = rxNostr.req(relay, request, { linger: 0 }).subscribe();
     request.emit([{ kinds: [1] }]);
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const first = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const first = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
 
     request.emit([{ kinds: [2] }]);
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(3));
-    const messages = server.latestConnection.sent.map((value) => JSON.parse(value as string));
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(3));
+    const messages = server.sockets.latest.sent.map((value) => JSON.parse(value as string));
     const second = messages.find((message) => message[0] === "REQ" && message[1] !== first[1]);
     expect(messages).toContainEqual(["CLOSE", first[1]]);
     expect(second?.[2]).toEqual({ kinds: [2] });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(4));
-    expect(server.latestConnection.sent.map((value) => JSON.parse(value as string))).toContainEqual(
-      ["CLOSE", second?.[1]],
-    );
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(4));
+    expect(server.sockets.latest.sent.map((value) => JSON.parse(value as string))).toContainEqual([
+      "CLOSE",
+      second?.[1],
+    ]);
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 
@@ -142,9 +143,9 @@ describe("REQ public contract", () => {
     rxNostr
       .req(relay, [{ kinds: [1] }], { linger: 0 })
       .subscribe({ next: (packet) => packets.push(packet), complete });
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
     const expiredAt = Math.floor(Date.now() / 1000) - 1;
     for (const value of [
       event({ id: "mismatch", kind: 2 }),
@@ -152,15 +153,15 @@ describe("REQ public contract", () => {
       event({ id: "expired", tags: [["expiration", `${expiredAt}`]] }),
       event({ id: "valid" }),
     ]) {
-      server.latestConnection.message(JSON.stringify(["EVENT", subId, value]));
+      server.sockets.latest.message(JSON.stringify(["EVENT", subId, value]));
     }
-    server.latestConnection.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(verified).toEqual(["invalid-signature", "expired", "valid"]);
     expect(packets.map((packet) => packet.event.id)).toEqual(["valid"]);
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 
@@ -176,10 +177,10 @@ describe("REQ public contract", () => {
     rxNostr.req(relay, [{}], { linger: 0 }).subscribe({
       error: (error) => (received = error),
     });
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
-    server.latestConnection.message(JSON.stringify(["EVENT", subId, event()]));
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    server.sockets.latest.message(JSON.stringify(["EVENT", subId, event()]));
 
     await vi.waitFor(() => expect(received).toBeDefined());
     expect(received).toMatchObject({
@@ -187,10 +188,10 @@ describe("REQ public contract", () => {
       callback: "verifier",
       cause,
     });
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(2));
-    expect(JSON.parse(server.latestConnection.sent[1] as string)).toEqual(["CLOSE", subId]);
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
+    expect(JSON.parse(server.sockets.latest.sent[1] as string)).toEqual(["CLOSE", subId]);
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 
@@ -209,10 +210,10 @@ describe("REQ public contract", () => {
         skipValidateFilterMatching: true,
       })
       .subscribe((packet) => packets.push(packet));
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
-    server.latestConnection.message(
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    server.sockets.latest.message(
       JSON.stringify([
         "EVENT",
         subId,
@@ -223,10 +224,10 @@ describe("REQ public contract", () => {
         }),
       ]),
     );
-    server.latestConnection.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
     await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["skipped"]));
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
 
     const callbackServer = new ControlledWebSocketServer();
@@ -250,16 +251,16 @@ describe("REQ public contract", () => {
         { linger: 0 },
       )
       .subscribe({ error: (error) => (received = error) });
-    callbackServer.latestConnection.open();
+    callbackServer.sockets.latest.open();
     await vi.waitFor(() => expect(received).toBeDefined());
     expect(received).toMatchObject({
       name: "RxNostrCallbackError",
       callback: "filter",
       cause,
     });
-    expect(callbackServer.latestConnection.sent).toEqual([]);
-    await vi.waitFor(() => expect(callbackServer.latestConnection.closeRequests).toHaveLength(1));
-    callbackServer.latestConnection.acknowledgeClose();
+    expect(callbackServer.sockets.latest.sent).toEqual([]);
+    await vi.waitFor(() => expect(callbackServer.sockets.latest.closeRequests).toHaveLength(1));
+    callbackServer.sockets.latest.acknowledgeClose();
     callbackRxNostr.dispose();
   });
 
@@ -280,8 +281,8 @@ describe("REQ public contract", () => {
       complete,
     });
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const first = server.latestConnectionFor(one);
-    const second = server.latestConnectionFor(two);
+    const first = server.sockets.latestFor(one);
+    const second = server.sockets.latestFor(two);
     first.open();
     second.open();
     await vi.waitFor(() =>
@@ -317,27 +318,27 @@ describe("REQ public contract", () => {
     request.emit([{ kinds: [1] }]);
     request.emit([{ kinds: [2] }]);
     request.over();
-    server.latestConnection.open();
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
-    const first = JSON.parse(server.latestConnection.sent[0] as string) as [
+    server.sockets.latest.open();
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    const first = JSON.parse(server.sockets.latest.sent[0] as string) as [
       "REQ",
       string,
       { kinds: number[] },
     ];
     expect(first[2]).toEqual({ kinds: [1] });
-    server.latestConnection.message(JSON.stringify(["EOSE", first[1]]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", first[1]]));
 
-    await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(2));
-    const second = JSON.parse(server.latestConnection.sent[1] as string) as [
+    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
+    const second = JSON.parse(server.sockets.latest.sent[1] as string) as [
       "REQ",
       string,
       { kinds: number[] },
     ];
     expect(second[2]).toEqual({ kinds: [2] });
-    server.latestConnection.message(JSON.stringify(["EOSE", second[1]]));
+    server.sockets.latest.message(JSON.stringify(["EOSE", second[1]]));
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
   });
 
@@ -361,13 +362,13 @@ describe("REQ public contract", () => {
     request.emit([{ kinds: [1] }]);
     request.over();
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
-    const first = server.latestConnectionFor(one);
+    const first = server.sockets.latestFor(one);
     first.open();
     await vi.waitFor(() => expect(first.sent).toHaveLength(1));
 
     destinations.append(two);
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const second = server.latestConnectionFor(two);
+    const second = server.sockets.latestFor(two);
     second.open();
     await vi.waitFor(() => expect(second.sent).toHaveLength(1));
     const [, firstSubId] = JSON.parse(first.sent[0] as string) as ["REQ", string];

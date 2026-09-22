@@ -131,13 +131,13 @@ describe("RelayWarmer", () => {
       .get("wss://relay.example.com")
       .monitorConnectionState()
       .subscribe((state) => states.push(state.state));
-    server.latestConnection.open();
+    server.sockets.latest.open();
     await vi.waitFor(() => expect(states).toContain("connected"));
-    expect(server.latestConnection.sent).toEqual([]);
+    expect(server.sockets.latest.sent).toEqual([]);
 
     warmer.unsetHotRelays();
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     warmer.dispose();
     pool.dispose();
   });

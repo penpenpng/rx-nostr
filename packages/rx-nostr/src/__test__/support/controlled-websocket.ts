@@ -53,10 +53,26 @@ export class ControlledWebSocket implements WebSocketLike {
 
 export class ControlledWebSocketServer {
   readonly connections: ControlledWebSocket[] = [];
+  readonly sockets: Readonly<{
+    readonly latest: ControlledWebSocket;
+    latestFor(url: string): ControlledWebSocket;
+  }>;
   readonly WebSocket: WebSocketConstructor;
 
   constructor() {
     const connections = this.connections;
+    this.sockets = Object.freeze({
+      get latest(): ControlledWebSocket {
+        const socket = connections.at(-1);
+        if (!socket) throw new Error("No controlled connection has been created.");
+        return socket;
+      },
+      latestFor(url: string): ControlledWebSocket {
+        const socket = connections.findLast((connection) => connection.url === url);
+        if (!socket) throw new Error(`No controlled connection has been created for ${url}.`);
+        return socket;
+      },
+    });
     this.WebSocket = class {
       constructor(url: string) {
         const socket = new ControlledWebSocket(url);
@@ -64,17 +80,5 @@ export class ControlledWebSocketServer {
         return socket;
       }
     } as unknown as WebSocketConstructor;
-  }
-
-  get latestConnection(): ControlledWebSocket {
-    const socket = this.connections.at(-1);
-    if (!socket) throw new Error("No controlled connection has been created.");
-    return socket;
-  }
-
-  latestConnectionFor(url: string): ControlledWebSocket {
-    const socket = this.connections.findLast((connection) => connection.url === url);
-    if (!socket) throw new Error(`No controlled connection has been created for ${url}.`);
-    return socket;
   }
 }

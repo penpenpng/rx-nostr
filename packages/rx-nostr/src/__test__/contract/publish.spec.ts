@@ -28,7 +28,7 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 }
 
 function socket(server: ControlledWebSocketServer, url: string): ControlledWebSocket {
-  return server.latestConnectionFor(url);
+  return server.sockets.latestFor(url);
 }
 
 async function expectEventSent(connection: ControlledWebSocket): Promise<void> {
@@ -236,7 +236,7 @@ describe("Publication public contract", () => {
       id: "cancelled-event",
     });
     await Promise.resolve();
-    expect(server.latestConnection.sent).toHaveLength(0);
+    expect(server.sockets.latest.sent).toHaveLength(0);
     rxNostr.dispose();
   });
 
@@ -399,7 +399,7 @@ describe("Publication public contract", () => {
     await expectEventSent(first);
     first.peerClose(1006, "offline");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const second = server.latestConnection;
+    const second = server.sockets.latest;
     second.open();
     await expectEventSent(second);
     second.message(JSON.stringify(["OK", "event", true, "saved"]));

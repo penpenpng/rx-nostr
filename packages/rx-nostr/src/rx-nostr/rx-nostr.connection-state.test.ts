@@ -35,8 +35,8 @@ describe("RxNostr connection state", () => {
       },
     ]);
 
-    const first = server.latestConnectionFor(firstRelay);
-    const second = server.latestConnectionFor(secondRelay);
+    const first = server.sockets.latestFor(firstRelay);
+    const second = server.sockets.latestFor(secondRelay);
     first.open();
     second.open();
     await vi.waitFor(() =>

@@ -29,8 +29,8 @@ describe("RelayDirectory public contract", () => {
       }),
     );
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
-    server.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
 
     const skippedServer = new ControlledWebSocketServer();
@@ -44,8 +44,8 @@ describe("RelayDirectory public contract", () => {
     await Promise.resolve();
     expect(fetcher).toHaveBeenCalledOnce();
     skipped.unsetHotRelays();
-    await vi.waitFor(() => expect(skippedServer.latestConnection.closeRequests).toHaveLength(1));
-    skippedServer.latestConnection.acknowledgeClose();
+    await vi.waitFor(() => expect(skippedServer.sockets.latest.closeRequests).toHaveLength(1));
+    skippedServer.sockets.latest.acknowledgeClose();
     skipped.dispose();
   });
 
