@@ -76,10 +76,12 @@ describe("public entry point", () => {
     }
   });
 
-  test("exposes constructor defaults in their own static namespace", () => {
+  test("exposes constructor defaults in their own static namespace", async () => {
     const defaults = publicApi.RxNostr.defaultConfig;
 
-    expect(defaults.verifier).toBeUndefined();
+    await expect(defaults.verifier.verifyEvent({} as never)).rejects.toThrow(
+      "You must configure a valid verifier",
+    );
     expect(defaults.signer).toBeInstanceOf(publicApi.Nip07Signer);
     expect(defaults.retry).toBeInstanceOf(publicApi.ExponentialBackoffRetryer);
     expect(defaults.relayDirectory).toBe(publicApi.GlobalRelayDirectory);

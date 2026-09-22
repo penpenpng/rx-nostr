@@ -1,7 +1,6 @@
 import { ExponentialBackoffRetryer, type ConnectionRetryer } from "../connection-retryer/index.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
-import type { EventVerifier } from "../event-verifier/index.ts";
-import { RxNostrInvalidUsageError } from "../libs/error.ts";
+import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
 import { GlobalRelayDirectory, type RelayDirectory } from "../relay-directory/index.ts";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
@@ -31,7 +30,7 @@ export const RX_NOSTR_DEFAULT_OPTIONS: RxNostrStaticDefaultOptions = Object.free
 });
 
 export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze({
-  verifier: undefined,
+  verifier: new UnconfiguredVerifier(),
   signer: new Nip07Signer(),
   authenticator: undefined,
   retry: new ExponentialBackoffRetryer(),
@@ -56,12 +55,7 @@ export class FilledRxNostrConfig {
     staticDefaultConfig: RxNostrStaticDefaultConfig,
     staticDefaultOptions: RxNostrStaticDefaultOptions,
   ) {
-    const verifier = config.verifier ?? staticDefaultConfig.verifier;
-    if (!verifier) {
-      throw new RxNostrInvalidUsageError("A verifier is required.");
-    }
-
-    this.verifier = verifier;
+    this.verifier = config.verifier ?? staticDefaultConfig.verifier;
     this.staticDefaultOptions = freezeStaticDefaultOptions(staticDefaultOptions);
     this.signer = config.signer ?? staticDefaultConfig.signer;
     this.authenticator =

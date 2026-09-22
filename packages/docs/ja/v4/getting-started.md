@@ -4,7 +4,7 @@
 
 ## クライアントを作る
 
-`RxNostr` には verifier が必要です。ここでは constructor で指定します。複数 instance で共有する場合は `RxNostr.defaultConfig.verifier` に設定することもできます。query で受け取ったイベントは、公開 Observable に流れる前に verifier で検証されます。
+query を行う `RxNostr` には実際の verifier が必要です。ここでは constructor で指定します。複数 instance で共有する場合は `RxNostr.defaultConfig.verifier` に設定することもできます。省略時の verifier は EVENT の検証時にエラーとなるため、未検証の EVENT が暗黙に通ることはありません。
 
 ```ts
 import { RxNostr } from "rx-nostr";

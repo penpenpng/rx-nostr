@@ -20,7 +20,7 @@ const rxNostr = new RxNostr({
 
 | option | 必須 | 内容 |
 | --- | --- | --- |
-| `verifier` | no | 受信 EVENT の既定 verifier。static にもなければ構築時にエラー |
+| `verifier` | no | 受信 EVENT の既定 verifier。省略時は検証時にエラー |
 | `signer` | no | publish の既定 signer。省略時は `Nip07Signer` |
 | `authenticator` | no | root の Authenticator / relay factory。`false` で static default を無効化 |
 | `retry` | no | 接続 retry policy |
@@ -53,7 +53,7 @@ const secondary = new RxNostr({
 
 | option | static default |
 | --- | --- |
-| `verifier` | なし |
+| `verifier` | EVENT 検証時に例外を投げる fail-closed verifier |
 | `signer` | `Nip07Signer` |
 | `authenticator` | なし（AUTH は opt-in） |
 | `retry` | `ExponentialBackoffRetryer` |
@@ -61,7 +61,7 @@ const secondary = new RxNostr({
 | `skipFetchNip11` | `false` |
 | `WebSocket` | `globalThis.WebSocket` |
 
-instance config は対応する static default より優先されます。verifier は安全な built-in を選べないため、instance config または `RxNostr.defaultConfig` のどちらかで必ず指定します。どちらにもなければ constructor が `RxNostrInvalidUsageError` を投げます。
+instance config は対応する static default より優先されます。安全な verifier を本体だけでは選べないため、既定の verifier は EVENT の検証時に例外を投げます。これにより publish-only client は `new RxNostr()` で構築できますが、REQ を使う application は instance config または `RxNostr.defaultConfig.verifier` に実際の verifier を指定する必要があります。
 
 static に設定した object は、以後作る instance が共有します。instance ごとに状態を分離した verifier、retry policy、relay directory などが必要なら instance config に渡してください。
 

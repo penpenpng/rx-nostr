@@ -1,8 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
 import { NoopSigner } from "../event-signer/index.ts";
-import { NoopVerifier } from "../event-verifier/index.ts";
-import { RxNostrInvalidUsageError } from "../libs/error.ts";
+import { NoopVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import { GlobalRelayDirectory, RelayDirectory } from "../relay-directory/index.ts";
 import {
   FilledRxNostrConfig,
@@ -158,7 +157,7 @@ describe("rx-nostr config", () => {
       RX_NOSTR_DEFAULT_OPTIONS,
     );
 
-    staticConfig.verifier = undefined;
+    staticConfig.verifier = new UnconfiguredVerifier();
     staticConfig.skipFetchNip11 = false;
 
     expect(root.verifier).toBe(verifier);
@@ -193,14 +192,16 @@ describe("rx-nostr config", () => {
     ).toBeUndefined();
   });
 
-  test("rejects a missing verifier at the config boundary", () => {
-    expect(
-      () =>
-        new FilledRxNostrConfig(
-          {} as RxNostrConfig,
-          RX_NOSTR_DEFAULT_CONFIG,
-          RX_NOSTR_DEFAULT_OPTIONS,
-        ),
-    ).toThrowError(RxNostrInvalidUsageError);
+  test("uses a failing verifier by default without blocking publish-only construction", async () => {
+    const root = new FilledRxNostrConfig(
+      {} as RxNostrConfig,
+      RX_NOSTR_DEFAULT_CONFIG,
+      RX_NOSTR_DEFAULT_OPTIONS,
+    );
+
+    expect(root.verifier).toBeInstanceOf(UnconfiguredVerifier);
+    await expect(root.verifier.verifyEvent({} as never)).rejects.toThrow(
+      "You must configure a valid verifier",
+    );
   });
 });

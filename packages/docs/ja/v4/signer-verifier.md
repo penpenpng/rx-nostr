@@ -70,7 +70,11 @@ interface EventVerifier {
 }
 ```
 
-`verifier` は instance config または `RxNostr.defaultConfig.verifier` で必ず指定します。query ごとに上書きすることもできます。
+実際の `verifier` は instance config、`RxNostr.defaultConfig.verifier`、または query ごとに指定できます。
+
+### 省略時の verifier
+
+省略時には fail-closed の内部実装が使われます。EVENT の検証を要求されると例外を投げるため、publish-only client は verifier なしで構築できますが、未検証の EVENT を暗黙に受け入れることはありません。
 
 ### `SimpleVerifier`
 

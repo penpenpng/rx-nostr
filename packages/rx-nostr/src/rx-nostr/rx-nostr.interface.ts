@@ -81,7 +81,7 @@ export interface RxNostrStaticDefaultOptions {
 
 /** Process-wide defaults for constructor-level configuration. */
 export interface RxNostrStaticDefaultConfig {
-  verifier: EventVerifier | undefined;
+  verifier: EventVerifier;
   signer: EventSigner;
   authenticator: AuthenticatorInput | undefined;
   retry: ConnectionRetryer;

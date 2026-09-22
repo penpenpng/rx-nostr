@@ -46,7 +46,7 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 Process-wide defaults are separated by scope. `RxNostr.defaultConfig` holds constructor-level defaults, while `RxNostr.defaultOptions` holds operation defaults. Each instance snapshots both namespaces when constructed, so later static assignment does not alter an existing instance.
 
-`RxNostr.defaultConfig` initially contains a `Nip07Signer`, an `ExponentialBackoffRetryer`, `GlobalRelayDirectory`, enabled NIP-11 fetching, and the runtime's `globalThis.WebSocket`. The verifier and authenticator are initially undefined. Applications may install either one process-wide; an instance config overrides it. `authenticator: false` disables a static authenticator for that instance. Because no verifier can be chosen safely by the library, constructing an instance while both verifier locations are undefined throws `RxNostrInvalidUsageError`.
+`RxNostr.defaultConfig` initially contains a fail-closed verifier, `Nip07Signer`, `ExponentialBackoffRetryer`, `GlobalRelayDirectory`, enabled NIP-11 fetching, and the runtime's `globalThis.WebSocket`. The authenticator is initially undefined. Applications may install a real verifier or authenticator process-wide; an instance config overrides it. `authenticator: false` disables a static authenticator for that instance. The fallback verifier deliberately throws when asked to verify an EVENT, allowing verifier-free construction for publish-only clients without silently accepting unverified events.
 
 The initial `RxNostr.defaultOptions` values are:
 

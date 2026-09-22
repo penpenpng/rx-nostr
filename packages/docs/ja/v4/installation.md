@@ -33,7 +33,7 @@ const rxNostr = new RxNostr({
 });
 ```
 
-`verifier` は instance config または `RxNostr.defaultConfig.verifier` のどちらかで必ず指定します。意図的に署名検証を省略する場合も、`new NoopVerifier()` を明示してください。
+REQ を使う場合、`verifier` は instance config または `RxNostr.defaultConfig.verifier` に指定します。省略時の verifier は EVENT の検証時にエラーとなります。意図的に署名検証を省略する場合も、`new NoopVerifier()` を明示してください。
 
 ## Node.js
 
