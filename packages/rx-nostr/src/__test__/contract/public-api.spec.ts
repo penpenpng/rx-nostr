@@ -1,24 +1,50 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import * as publicApi from "rx-nostr";
-import type { EventPacket, IRxNostr, OkPacket, Publication, RelayInput, RelayUrl } from "rx-nostr";
+import type {
+  EventPacket,
+  IRxNostr,
+  OkPacket,
+  Publication,
+  RelayInput,
+  RelayUrl,
+  RxNostr,
+} from "rx-nostr";
 
 describe("public entry point", () => {
   test("can be imported by contract tests", () => {
     expect(publicApi).toBeTypeOf("object");
-    expect(publicApi.createRxNostr).toBeTypeOf("function");
+    expect(publicApi.RxNostr).toBeTypeOf("function");
     expect(publicApi.RelayDirectory).toBeTypeOf("function");
     expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(publicApi.RelayDirectory);
-    expect(publicApi).not.toHaveProperty("RxNostr");
+    expect(publicApi).not.toHaveProperty("createRxNostr");
     expect(publicApi).not.toHaveProperty("NostrTransport");
     expect(publicApi).not.toHaveProperty("Unipls");
   });
 
   test("exposes the v4 operation model", () => {
+    expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
     expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<Publication>();
     expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
     expectTypeOf<string>().toMatchTypeOf<RelayInput>();
     expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
     expectTypeOf<"ws://relay.example">().toMatchTypeOf<RelayUrl>();
+  });
+
+  test("keeps IRxNostr independent from the concrete class", () => {
+    const dispose = () => {};
+    const structuralClient = {
+      req: undefined as unknown as IRxNostr["req"],
+      publish: undefined as unknown as IRxNostr["publish"],
+      setHotRelays: undefined as unknown as IRxNostr["setHotRelays"],
+      unsetHotRelays: undefined as unknown as IRxNostr["unsetHotRelays"],
+      monitorConnectionState: undefined as unknown as IRxNostr["monitorConnectionState"],
+      dispose,
+      [Symbol.dispose]: dispose,
+    } satisfies IRxNostr;
+    const acceptClient = (client: IRxNostr) => client;
+
+    expect(acceptClient(structuralClient)).toBe(structuralClient);
+    expect(structuralClient).not.toBeInstanceOf(publicApi.RxNostr);
   });
 
   test("keeps physical query identifiers out of results", () => {

@@ -1,13 +1,13 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, test, vi } from "vitest";
 import {
-  createRxNostr,
   NoopRetryer,
   NoopVerifier,
+  RxNostr,
   RxNostrCallbackError,
   SimpleAuthenticator,
   type EventSigner,
 } from "rx-nostr";
+import { describe, expect, test, vi } from "vitest";
 import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 const relay = "wss://relay.example.com";
@@ -31,7 +31,7 @@ describe("NIP-42 AUTH public contract", () => {
   test("deduplicates a challenge across REQs and resends each REQ only once", async () => {
     const server = new ControlledWebSocketServer();
     const challenge = vi.fn(async (_url: string, value: string) => authEvent("auth-event", value));
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       authenticator: { challenge },
@@ -105,7 +105,7 @@ describe("NIP-42 AUTH public contract", () => {
       getPublicKey: async () => "unused",
     };
     const challenge = vi.fn(async () => authEvent("unused", "unused"));
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       signer,
       authenticator: { challenge },
@@ -131,7 +131,7 @@ describe("NIP-42 AUTH public contract", () => {
   test("resolves an authenticator factory with the normalized relay", async () => {
     const server = new ControlledWebSocketServer();
     const factory = vi.fn(() => undefined);
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: factory,
       retry: new NoopRetryer(),
@@ -196,7 +196,7 @@ describe("NIP-42 AUTH public contract", () => {
     "treats an AUTH $outcome as relay-local completion",
     async ({ outcome, authTimeout }) => {
       const server = new ControlledWebSocketServer();
-      const rxNostr = createRxNostr({
+      const rxNostr = new RxNostr({
         verifier: new NoopVerifier(),
         authenticator: {
           challenge: async (_url, value) => authEvent("auth-failure", value),
@@ -232,7 +232,7 @@ describe("NIP-42 AUTH public contract", () => {
   test("does not send an AUTH event from a challenge invalidated by reconnect", async () => {
     const server = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: {
         challenge: () =>
@@ -267,7 +267,7 @@ describe("NIP-42 AUTH public contract", () => {
   test("wraps authenticator errors and rejects stale challenge work", async () => {
     const callbackServer = new ControlledWebSocketServer();
     const cause = new Error("authenticator failed");
-    const callbackRxNostr = createRxNostr({
+    const callbackRxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: { challenge: async () => Promise.reject(cause) },
       retry: new NoopRetryer(),
@@ -294,7 +294,7 @@ describe("NIP-42 AUTH public contract", () => {
 
     const staleServer = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
-    const staleRxNostr = createRxNostr({
+    const staleRxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: {
         challenge: () =>
@@ -332,7 +332,7 @@ describe("NIP-42 AUTH public contract", () => {
   test("cancels the AUTH effort when its last operation unsubscribes", async () => {
     const server = new ControlledWebSocketServer();
     let resolveAuth!: (event: Nostr.Event<22242>) => void;
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: {
         challenge: () =>

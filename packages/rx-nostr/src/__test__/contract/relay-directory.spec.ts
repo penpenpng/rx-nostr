@@ -3,7 +3,7 @@ import {
   RelayDirectory,
   RelayDirectorySnapshotError,
   NoopVerifier,
-  createRxNostr,
+  RxNostr,
   fetchRelayInfo,
   type IRelayDirectory,
   type RelayDirectoryEntry,
@@ -16,7 +16,7 @@ describe("RelayDirectory public contract", () => {
     const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
     const directory = new RelayDirectory({ fetcher });
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
       WebSocket: server.WebSocket,
@@ -34,7 +34,7 @@ describe("RelayDirectory public contract", () => {
     rxNostr.dispose();
 
     const skippedServer = new ControlledWebSocketServer();
-    const skipped = createRxNostr({
+    const skipped = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
       skipFetchNip11: true,

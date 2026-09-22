@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
 import {
-  createRxNostr,
+  RxNostr,
   NoopRetryer,
   NoopSigner,
   NoopVerifier,
@@ -40,7 +40,7 @@ describe("Publication public contract", () => {
   test("publishes to multiple relays, settles all/any, and replays raw OK packets", async () => {
     const server = new ControlledWebSocketServer();
     const signed = event();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -95,7 +95,7 @@ describe("Publication public contract", () => {
 
   test("rejects all on one final rejection while any can still succeed", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -128,7 +128,7 @@ describe("Publication public contract", () => {
 
   test("isolates a timeout from another relay's acceptance", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -167,7 +167,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -231,7 +231,7 @@ describe("Publication public contract", () => {
       signEvent: <K extends number>() => signing as Promise<Nostr.Event<K>>,
       getPublicKey: async () => "pubkey",
     };
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -268,7 +268,7 @@ describe("Publication public contract", () => {
       signEvent: <K extends number>() => signing as Promise<Nostr.Event<K>>,
       getPublicKey: async () => "pubkey",
     };
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -297,7 +297,7 @@ describe("Publication public contract", () => {
 
   test("keeps a hot relay connected while releasing a cold publish relay", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -330,7 +330,7 @@ describe("Publication public contract", () => {
 
   test("continues another relay after one connection drops", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -368,7 +368,7 @@ describe("Publication public contract", () => {
   test("keeps auth-required OK pending and settles after authenticated resend", async () => {
     const server = new ControlledWebSocketServer();
     const authEvent = event({ id: "auth-event", kind: 22242 });
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       authenticator: { challenge: async () => ({ ...authEvent, kind: 22242 }) },
       authTimeout: 1_000,
@@ -406,7 +406,7 @@ describe("Publication public contract", () => {
 
   test("resends an unconfirmed EVENT after reconnect", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: { retry: () => ({ action: "retry", delay: 0 }) },
       skipFetchNip11: true,

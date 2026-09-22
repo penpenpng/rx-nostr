@@ -4,15 +4,15 @@
 
 ## クライアントを作る
 
-`createRxNostr()` には verifier が必須です。query で受け取ったイベントは、公開 Observable に流れる前に verifier で検証されます。
+`RxNostr` constructor には verifier が必須です。query で受け取ったイベントは、公開 Observable に流れる前に verifier で検証されます。
 
 ```ts
-import { createRxNostr } from "rx-nostr";
+import { RxNostr } from "rx-nostr";
 import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
 
 const signer = new SeckeySigner("nsec1...");
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
   signer,
 });
@@ -94,7 +94,7 @@ rxNostr.dispose();
 Explicit Resource Management を利用できる環境では `using` も使えます。
 
 ```ts
-using rxNostr = createRxNostr({
+using rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
 });
 ```

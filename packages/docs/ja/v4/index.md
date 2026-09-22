@@ -5,10 +5,10 @@ rx-nostr は、Nostr リレーとの通信を RxJS の Observable として扱�
 v4 では「どのリレーへ何を問い合わせるか」と「接続をいつ維持するか」を分離しました。問い合わせと発行では宛先をその都度明示し、接続の先行確立が必要な場合だけ hot relay を設定します。
 
 ```ts
-import { createRxNostr } from "rx-nostr";
+import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
 });
 
@@ -25,7 +25,7 @@ rxNostr
 
 ### `RxNostr`
 
-`createRxNostr()` が返すクライアントです。ひとつのインスタンスは、正規化されたリレー URL ごとに高々ひとつの WebSocket 接続を所有します。別の `RxNostr` インスタンスとは接続を共有しません。
+公開 constructor から直接作成するクライアントです。ひとつのインスタンスは、正規化されたリレー URL ごとに高々ひとつの WebSocket 接続を所有します。別の `RxNostr` インスタンスとは接続を共有しません。
 
 公開される主な操作は次のとおりです。
 
@@ -34,6 +34,16 @@ rxNostr
 - `setHotRelays()` / `unsetHotRelays()` — 接続だけを維持する
 - `monitorConnectionState()` — リレーごとの接続状態を監視する
 - `dispose()` — すべての操作と接続を終了する
+
+ライブラリや application 内の関数がクライアントを受け取る場合は、class ではなく構造的な `IRxNostr` interface を引数型にできます。これにより `RxNostr` の内部実装や private field に依存せず、同じ公開操作を実装した別の object も渡せます。
+
+```ts
+import type { IRxNostr } from "rx-nostr";
+
+function startTimeline(client: IRxNostr) {
+  return client.req([{ kinds: [1] }], { relays });
+}
+```
 
 ### Operation
 

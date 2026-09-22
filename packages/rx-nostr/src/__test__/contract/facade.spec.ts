@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
 import {
-  createRxNostr,
+  RxNostr,
   NoopRetryer,
   NoopSigner,
   NoopVerifier,
@@ -29,7 +29,7 @@ const signedEvent: Nostr.Event = {
 describe("RxNostr facade lifecycle", () => {
   test("disposes active operations before transport and rejects later work", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -105,14 +105,14 @@ describe("RxNostr facade lifecycle", () => {
     const directory = new RelayDirectory();
     const firstServer = new ControlledWebSocketServer();
     const secondServer = new ControlledWebSocketServer();
-    const first = createRxNostr({
+    const first = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
       retry: new NoopRetryer(),
       skipFetchNip11: true,
       WebSocket: firstServer.WebSocket,
     });
-    const second = createRxNostr({
+    const second = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
       retry: new NoopRetryer(),
@@ -145,7 +145,7 @@ describe("RxNostr facade lifecycle", () => {
     const server = new ControlledWebSocketServer();
     const rootVerify = vi.fn(async (_event: Nostr.Event) => false);
     const operationVerify = vi.fn(async (_event: Nostr.Event) => true);
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: { verifyEvent: rootVerify },
       defaultOptions: {
         req: {

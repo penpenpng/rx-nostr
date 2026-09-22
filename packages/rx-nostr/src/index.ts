@@ -100,7 +100,7 @@ export {
   type RelayDirectorySnapshotV1,
 } from "./relay-directory/index.ts";
 export {
-  createRxNostr,
+  RxNostr,
   type IRxNostr,
   type RxNostrConfig,
   type RxNostrDefaultOptions,

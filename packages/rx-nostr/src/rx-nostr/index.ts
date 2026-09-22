@@ -7,4 +7,4 @@ export type {
   RxNostrReqConfig,
   RxNostrReqOptions,
 } from "./rx-nostr.interface.ts";
-export { createRxNostr } from "./rx-nostr.ts";
+export { RxNostr } from "./rx-nostr.ts";

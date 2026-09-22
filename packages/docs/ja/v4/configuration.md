@@ -1,9 +1,9 @@
 # Configuration
 
-## `createRxNostr()`
+## `RxNostr` constructor
 
 ```ts
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   signer,
   authenticator,
@@ -85,13 +85,13 @@ rxNostr.publish(params, {
 
 1. `RxReq.emit()` の packet option (`relays`, `linger`, `traceTag`)
 2. `req()` / `publish()` の config
-3. `createRxNostr().defaultOptions.req/publish`
+3. `RxNostrConfig.defaultOptions.req/publish`
 4. root signer/verifier と built-in defaults
 
 nullish な値だけを fallback するため、`false`、`0`、`Infinity` はそのまま有効です。
 
 ```ts
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   defaultOptions: {
     req: {

@@ -53,7 +53,7 @@ const retry = new ExponentialBackoffRetryer({
   jitter: 0.2,
 });
 
-const rxNostr = createRxNostr({ verifier, retry });
+const rxNostr = new RxNostr({ verifier, retry });
 ```
 
 最終的な connection demand が解放された場合は `dormant` になり、retry は開始されません。

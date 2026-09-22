@@ -68,7 +68,7 @@ Explicit Resource Management を使える環境では scope 終了時に自動�
 
 ```ts
 {
-  using rxNostr = createRxNostr({ verifier });
+  using rxNostr = new RxNostr({ verifier });
   using relays = new RxRelays(["wss://relay.example.com"]);
 
   // ...

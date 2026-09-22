@@ -27,7 +27,7 @@ rx-nostr 本体の `nip07Signer()`、`noopSigner()`、`noopVerifier` も、そ�
 
 ## Client の作成
 
-`verifier` は引き続き必須です。Node.js 用 WebSocket option の名前は `websocketCtor` から `WebSocket` へ変わりました。
+`createRxNostr()` factory は廃止され、公開された `RxNostr` class を直接構築します。`verifier` は引き続き必須です。Node.js 用 WebSocket option の名前は `websocketCtor` から `WebSocket` へ変わりました。
 
 ```ts
 // v3
@@ -37,7 +37,7 @@ const rxNostr = createRxNostr({
 });
 
 // v4
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
   WebSocket,
 });
@@ -164,7 +164,7 @@ const rxNostr = createRxNostr({
 });
 
 // v4
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   signer,
   verifier,
   authenticator: new SimpleAuthenticator(signer),
@@ -191,7 +191,7 @@ application 固有の store を使う場合:
 
 ```ts
 const directory = new RelayDirectory();
-const rxNostr = createRxNostr({ verifier, relayDirectory: directory });
+const rxNostr = new RxNostr({ verifier, relayDirectory: directory });
 ```
 
 v4 は Directory を自動永続化しません。`exportSnapshot()` / `importSnapshot()` と application の storage を組み合わせてください。
@@ -211,6 +211,7 @@ rxNostr.dispose();
 ## 削除された公開能力
 
 - v3 API 名の compatibility alias
+- `createRxNostr()` factory（`new RxNostr()` に置換）
 - default/additional relay と read/write flag
 - transport の raw message/error/outgoing-message Observable
 - query result の physical subscription identifier

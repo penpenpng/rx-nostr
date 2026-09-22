@@ -13,10 +13,10 @@ interface EventSigner {
 }
 ```
 
-root signer は `createRxNostr()` で指定し、publication ごとに上書きできます。
+root signer は `RxNostr` constructor で指定し、publication ごとに上書きできます。
 
 ```ts
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   signer,
 });
@@ -72,7 +72,7 @@ interface EventVerifier {
 }
 ```
 
-`createRxNostr()` の `verifier` は必須です。query ごとに上書きすることもできます。
+`RxNostr` constructor の `verifier` は必須です。query ごとに上書きすることもできます。
 
 ### `SimpleVerifier`
 
@@ -91,7 +91,7 @@ const verifier = new SimpleVerifier();
 ```ts
 import { NoopVerifier } from "rx-nostr";
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new NoopVerifier(),
 });
 ```
@@ -115,7 +115,7 @@ host.start();
 Application 側:
 
 ```ts
-import { VerificationClient, createRxNostr } from "rx-nostr";
+import { VerificationClient, RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 
 const client = new VerificationClient({
@@ -128,7 +128,7 @@ const client = new VerificationClient({
 
 client.start();
 
-const rxNostr = createRxNostr({ verifier: client });
+const rxNostr = new RxNostr({ verifier: client });
 
 // 終了時
 rxNostr.dispose();

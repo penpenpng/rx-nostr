@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
 import {
-  createRxNostr,
+  RxNostr,
   NoopRetryer,
   NoopVerifier,
   RelayDirectory,
@@ -30,7 +30,7 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 describe("REQ public contract", () => {
   test("sends a backward REQ, exposes traceTag only, and ends on EOSE", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -74,7 +74,7 @@ describe("REQ public contract", () => {
 
   test("replaces a forward REQ and sends CLOSE for each local end", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -107,7 +107,7 @@ describe("REQ public contract", () => {
 
   test("completes an empty destination without creating a connection", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -126,7 +126,7 @@ describe("REQ public contract", () => {
   test("applies filter matching, verification, and expiration in order", async () => {
     const server = new ControlledWebSocketServer();
     const verified: string[] = [];
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: {
         async verifyEvent(value) {
           verified.push(value.id);
@@ -166,7 +166,7 @@ describe("REQ public contract", () => {
   test("wraps verifier exceptions as callback errors", async () => {
     const server = new ControlledWebSocketServer();
     const cause = new Error("verifier failed");
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: { verifyEvent: async () => Promise.reject(cause) },
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -195,7 +195,7 @@ describe("REQ public contract", () => {
 
   test("honors filter/expiration skips and wraps lazy filter exceptions", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
@@ -230,7 +230,7 @@ describe("REQ public contract", () => {
     rxNostr.dispose();
 
     const callbackServer = new ControlledWebSocketServer();
-    const callbackRxNostr = createRxNostr({
+    const callbackRxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: callbackServer.WebSocket,
@@ -266,7 +266,7 @@ describe("REQ public contract", () => {
     const server = new ControlledWebSocketServer();
     const one = "wss://one.example.com";
     const two = "wss://two.example.com";
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
       skipFetchNip11: true,
@@ -304,7 +304,7 @@ describe("REQ public contract", () => {
     directory.setNip11(relay, {
       limitation: { max_subscriptions: 1 },
     });
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       relayDirectory: directory,
       skipFetchNip11: true,
@@ -345,7 +345,7 @@ describe("REQ public contract", () => {
     const one = "wss://one.example.com";
     const two = "wss://two.example.com";
     const destinations = new RxRelays([one]);
-    const rxNostr = createRxNostr({
+    const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,

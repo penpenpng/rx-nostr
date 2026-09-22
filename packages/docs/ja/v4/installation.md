@@ -25,10 +25,10 @@ yarn add rx-nostr @rx-nostr/crypto nostr-typedef
 ブラウザでは、通常は `globalThis.WebSocket` がそのまま使われます。署名を NIP-07 provider に任せる場合、既定の `Nip07Signer` を利用できるため signer の指定は不要です。
 
 ```ts
-import { createRxNostr } from "rx-nostr";
+import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
 });
 ```
@@ -45,11 +45,11 @@ pnpm add -D @types/ws
 ```
 
 ```ts
-import { createRxNostr } from "rx-nostr";
+import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 import WebSocket from "ws";
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
   WebSocket,
 });
@@ -62,5 +62,5 @@ const rxNostr = createRxNostr({
 rx-nostr v4 は ESM package として配布されます。JavaScript と TypeScript のいずれからも package root を importしてください。
 
 ```ts
-import { createRxNostr } from "rx-nostr";
+import { RxNostr } from "rx-nostr";
 ```

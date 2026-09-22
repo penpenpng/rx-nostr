@@ -7,12 +7,12 @@ AUTH は opt-in です。通常の signer を指定しただけでは有効に�
 通常の signer で kind 22242 の EVENT を署名する場合は `SimpleAuthenticator` を使います。
 
 ```ts
-import { SimpleAuthenticator, createRxNostr } from "rx-nostr";
+import { SimpleAuthenticator, RxNostr } from "rx-nostr";
 import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
 
 const signer = new SeckeySigner("nsec1...");
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),
   signer,
   authenticator: new SimpleAuthenticator(signer),
@@ -28,7 +28,7 @@ factory を渡すと、relay ごとに authenticator を選べます。`undefine
 ```ts
 const authenticator = new SimpleAuthenticator(signer);
 
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   authenticator(relay) {
     return relay === "wss://private.example.com"
@@ -74,7 +74,7 @@ AUTH に関連する `OK false` も `Publication.subscribe()` では観測でき
 AUTH の OK 待機時間は root の `authTimeout` で指定します。既定は 30 秒です。
 
 ```ts
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   authenticator,
   authTimeout: 10_000,

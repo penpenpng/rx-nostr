@@ -25,38 +25,38 @@ import type {
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
-  protected stack = new RxDisposableStack();
-  protected relays: RelayPool<RelayCommunication>;
-  protected config: FilledRxNostrConfig;
-  protected warmer: RelayWarmer;
+  readonly #stack = new RxDisposableStack();
+  readonly #relays: RelayPool<RelayCommunication>;
+  readonly #config: FilledRxNostrConfig;
+  readonly #warmer: RelayWarmer;
   readonly #dispose$ = new Subject<void>();
   readonly #publications = new Set<ReturnType<typeof publish>>();
   #disposed = false;
 
   constructor(config: RxNostrConfig) {
-    this.config = new FilledRxNostrConfig(config);
-    this.relays = new RelayPool((url) => {
-      if (!this.config.skipFetchNip11) {
-        void this.config.relayDirectory.fetchNip11(url).catch(() => {});
+    this.#config = new FilledRxNostrConfig(config);
+    this.#relays = new RelayPool((url) => {
+      if (!this.#config.skipFetchNip11) {
+        void this.#config.relayDirectory.fetchNip11(url).catch(() => {});
       }
       return new RelayCommunication(url, {
-        WebSocket: this.config.WebSocket,
-        retryer: this.config.retry,
-        relayDirectory: this.config.relayDirectory,
-        authTimeout: this.config.authTimeout,
+        WebSocket: this.#config.WebSocket,
+        retryer: this.#config.retry,
+        relayDirectory: this.#config.relayDirectory,
+        authTimeout: this.#config.authTimeout,
       });
     });
-    this.stack.use(this.relays);
+    this.#stack.use(this.#relays);
 
-    this.warmer = new RelayWarmer(this.relays);
-    this.stack.use(this.warmer);
+    this.#warmer = new RelayWarmer(this.#relays);
+    this.#stack.use(this.#warmer);
   }
 
   req(
     arg: RxReq | LazyFilter | Iterable<LazyFilter>,
     { relays, ...options }: RxNostrReqConfig,
   ): Observable<EventPacket> {
-    const config = new FilledRxNostrReqOptions(options, this.config);
+    const config = new FilledRxNostrReqOptions(options, this.#config);
 
     const rxReq: RxReq = (() => {
       if (arg instanceof RxReq) {
@@ -82,7 +82,7 @@ export class RxNostr implements IRxNostr {
         rxReq,
         config,
         relayInput: relays,
-        relays: this.relays,
+        relays: this.#relays,
       }).pipe(
         verify(callbackSafeVerifier(config.verifier)),
         config.skipExpirationCheck ? identity : dropExpiredEvents(),
@@ -95,13 +95,13 @@ export class RxNostr implements IRxNostr {
     { relays, ...options }: RxNostrPublishConfig,
   ): Publication {
     this.#assertActive();
-    const config = new FilledRxNostrPublishOptions(options, this.config);
+    const config = new FilledRxNostrPublishOptions(options, this.#config);
 
     const publication = publish({
       params,
       config,
       relayInput: relays,
-      relays: this.relays,
+      relays: this.#relays,
     });
     this.#publications.add(publication);
     void publication.closed.then(() => this.#publications.delete(publication));
@@ -110,18 +110,18 @@ export class RxNostr implements IRxNostr {
 
   setHotRelays(relays: RelayInput): void {
     this.#assertActive();
-    this.warmer.setHotRelays(relays);
+    this.#warmer.setHotRelays(relays);
   }
 
   unsetHotRelays(): void {
     this.#assertActive();
-    this.warmer.unsetHotRelays();
+    this.#warmer.unsetHotRelays();
   }
 
   monitorConnectionState(): Observable<ConnectionStatePacket> {
     return defer(() => {
       this.#assertActive();
-      return this.relays
+      return this.#relays
         .observeEntries()
         .pipe(
           mergeMap((relay) =>
@@ -139,17 +139,13 @@ export class RxNostr implements IRxNostr {
     this.#dispose$.complete();
     for (const publication of this.#publications) publication.cancel();
     this.#publications.clear();
-    this.stack.dispose();
+    this.#stack.dispose();
   });
   dispose = this[Symbol.dispose];
 
   #assertActive(): void {
     if (this.#disposed) throw new RxNostrAlreadyDisposedError();
   }
-}
-
-export function createRxNostr(config: RxNostrConfig): IRxNostr {
-  return new RxNostr(config);
 }
 
 function callbackSafeVerifier(verifier: EventVerifier): EventVerifier {

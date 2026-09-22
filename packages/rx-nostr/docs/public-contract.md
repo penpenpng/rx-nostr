@@ -40,6 +40,8 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ## Configuration and precedence
 
+`RxNostr` is a public class constructed directly with `new RxNostr(config)`. The `createRxNostr` factory is not exported. `IRxNostr` remains the structural public operation interface for consumers that accept a client without depending on the concrete class. Concrete implementation state is exposed neither through `IRxNostr` nor through subclass-accessible protected members.
+
 Built-in operation defaults are defined once in `RX_NOSTR_DEFAULTS`:
 
 | Option           |         REQ |     publish |

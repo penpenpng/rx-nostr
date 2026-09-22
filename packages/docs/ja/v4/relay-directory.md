@@ -5,10 +5,10 @@
 既定では `GlobalRelayDirectory` が使われます。アプリケーションまたはテストで分離したい場合は専用の instance を注入します。
 
 ```ts
-import { RelayDirectory, createRxNostr } from "rx-nostr";
+import { RelayDirectory, RxNostr } from "rx-nostr";
 
 const directory = new RelayDirectory();
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   relayDirectory: directory,
 });
@@ -72,7 +72,7 @@ directory.setNip11("wss://relay.example.com", {
 自動取得だけを止めるには `skipFetchNip11: true` を指定します。この option は Directory に既に存在する metadata の利用までは無効にしません。
 
 ```ts
-const rxNostr = createRxNostr({
+const rxNostr = new RxNostr({
   verifier,
   relayDirectory: directory,
   skipFetchNip11: true,
