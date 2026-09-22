@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import * as publicApi from "rx-nostr";
 import type {
+  Authenticator,
   EventPacket,
   IRxNostr,
   LazyFilter,
@@ -9,6 +10,7 @@ import type {
   RelayInput,
   RelayUrl,
   RxNostr,
+  RxNostrConfig,
   RxNostrPublishConfig,
   RxNostrReqConfig,
   RxNostrStaticDefaultOptions,
@@ -27,6 +29,8 @@ describe("public entry point", () => {
 
   test("exposes the v4 operation model", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
+    expectTypeOf<Authenticator>().toHaveProperty("authTimeout");
+    expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
     expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
     expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
     expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<

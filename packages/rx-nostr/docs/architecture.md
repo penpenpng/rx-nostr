@@ -161,7 +161,7 @@ terminal 後は各 segment の linger を維持し、finite linger cleanup 後�
 
 - RelayCommunication ごとの coordinator が transport message stream から最新 AUTH challenge を保持する。challenge は connection generation に紐づき、drop/reconnect で無効化する。
 - operation は `auth-required:` CLOSED/OK を受けたときだけ coordinator へ参加する。同じ challenge の参加者は署名、AUTH送信、OK待機を共有するが、`authenticator: false` の operation は参加しない。
-- coordinator は kind 22242 event を `['AUTH', event]` として送り、その event id の OK を root `authTimeout` まで待つ。成功した generation は後続 operation が共有できる。
+- coordinator は kind 22242 event を `['AUTH', event]` として送り、その event id の OK を attempt を開始した Authenticator の `authTimeout` まで待つ。成功した generation は後続 operation が共有できる。
 - AUTH成功後の元 operation 再送は各 physical REQ/EVENT が一度だけ管理する。coordinator 自身は query/publish state を所有しない。
 - 各参加者は AbortSignal を持ち、最後の waiter が外れれば共有 attempt を中止する。新 challenge、reconnect、dispose も旧 attempt を abort/stale にし、古い結果で operation を再開しない。
 

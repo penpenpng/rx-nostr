@@ -1,5 +1,6 @@
 import type { Subscription } from "rxjs";
 import { filter, firstValueFrom, take } from "rxjs";
+import { DEFAULT_AUTH_TIMEOUT } from "../authenticator/authenticator.defaults.ts";
 import type { Authenticator, AuthenticatorInput } from "../authenticator/index.ts";
 import { RxNostrCallbackError } from "../libs/error.ts";
 import type { RelayUrl } from "../libs/index.ts";
@@ -36,7 +37,6 @@ export class AuthCoordinator {
   constructor(
     private readonly relay: RelayUrl,
     private readonly transport: NostrTransport,
-    private readonly timeout: number,
   ) {
     this.#subscriptions.push(
       transport.messages$.subscribe((packet) => {
@@ -111,6 +111,7 @@ export class AuthCoordinator {
     challenge: Readonly<{ value: string; version: number }>,
     signal: AbortSignal,
   ): Promise<void> {
+    const timeout = authenticator.authTimeout ?? DEFAULT_AUTH_TIMEOUT;
     let event;
     try {
       event = await authenticator.challenge(this.relay, challenge.value);
@@ -126,9 +127,9 @@ export class AuthCoordinator {
           .subscribe({
             query: ["AUTH", event],
             selector: (packet) => packet.type === "OK" && packet.eventId === event.id,
-            ...(Number.isFinite(this.timeout)
+            ...(Number.isFinite(timeout)
               ? {
-                  timeout: this.timeout === 0 ? Number.MIN_VALUE : this.timeout,
+                  timeout: timeout === 0 ? Number.MIN_VALUE : timeout,
                 }
               : {}),
             signal,

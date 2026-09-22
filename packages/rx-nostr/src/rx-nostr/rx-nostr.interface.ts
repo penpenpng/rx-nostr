@@ -48,7 +48,6 @@ export interface RxNostrConfig {
   retry?: ConnectionRetryer;
   /** Shared relay metadata and health directory. */
   relayDirectory?: RelayDirectory;
-  authTimeout?: number;
   /**
    * If true, skip automatic fetching NIP-11 relay information.
    */

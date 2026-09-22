@@ -345,8 +345,10 @@ describe("Publication public contract", () => {
     const authEvent = event({ id: "auth-event", kind: 22242 });
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
-      authenticator: { challenge: async () => ({ ...authEvent, kind: 22242 }) },
-      authTimeout: 1_000,
+      authenticator: {
+        authTimeout: 1_000,
+        challenge: async () => ({ ...authEvent, kind: 22242 }),
+      },
       retry: new NoopRetryer(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,

@@ -34,8 +34,7 @@ describe("NIP-42 AUTH public contract", () => {
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       retry: new NoopRetryer(),
-      authenticator: { challenge },
-      authTimeout: 1_000,
+      authenticator: { challenge, authTimeout: 1_000 },
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
@@ -171,9 +170,12 @@ describe("NIP-42 AUTH public contract", () => {
       getPublicKey: async () => "signer-pubkey",
     };
     const authenticator = new SimpleAuthenticator(signer);
+    const immediateAuthenticator = new SimpleAuthenticator(signer, { authTimeout: 0 });
 
     const result = await authenticator.challenge(relay, "challenge-value");
 
+    expect(authenticator.authTimeout).toBe(30_000);
+    expect(immediateAuthenticator.authTimeout).toBe(0);
     expect(signEvent).toHaveBeenCalledWith({
       kind: 22242,
       content: "",
@@ -199,9 +201,9 @@ describe("NIP-42 AUTH public contract", () => {
       const rxNostr = new RxNostr({
         verifier: new NoopVerifier(),
         authenticator: {
+          authTimeout,
           challenge: async (_url, value) => authEvent("auth-failure", value),
         },
-        authTimeout,
         retry: new NoopRetryer(),
         skipFetchNip11: true,
         WebSocket: server.WebSocket,

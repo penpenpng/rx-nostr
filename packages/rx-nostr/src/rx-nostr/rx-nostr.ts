@@ -50,7 +50,6 @@ export class RxNostr implements IRxNostr {
         WebSocket: this.#config.WebSocket,
         retryer: this.#config.retry,
         relayDirectory: this.#config.relayDirectory,
-        authTimeout: this.#config.authTimeout,
       });
     });
     this.#stack.use(this.#relays);

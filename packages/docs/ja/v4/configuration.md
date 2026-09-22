@@ -9,7 +9,6 @@ const rxNostr = new RxNostr({
   authenticator,
   retry,
   relayDirectory,
-  authTimeout: 30_000,
   skipFetchNip11: false,
   WebSocket,
   defaultOptions: {
@@ -26,7 +25,6 @@ const rxNostr = new RxNostr({
 | `authenticator` | no | root の Authenticator または relay factory |
 | `retry` | no | 接続 retry policy |
 | `relayDirectory` | no | metadata/health store |
-| `authTimeout` | no | AUTH EVENT の OK 待機時間 |
 | `skipFetchNip11` | no | pool entry 作成時の自動 NIP-11 fetch を止める |
 | `WebSocket` | no | runtime に注入する WebSocket constructor |
 | `defaultOptions` | no | REQ / publish operation の既定値 |
@@ -66,7 +64,7 @@ process-wide な可変設定なので、library module 内ではなく applicati
 | `weak` | `false` | `false` |
 | `timeout` | `30_000` ms | `30_000` ms |
 
-`authTimeout` は 30,000 ms、NIP-11 自動取得は有効です。
+Authenticator の `authTimeout` は省略時 30,000 ms、NIP-11 自動取得は有効です。
 
 REQ の `timeout` は backward segment が EOSE を待つ時間です。publish の `timeout` は relay ごとの OK を待つ時間です。
 

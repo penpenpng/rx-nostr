@@ -30,7 +30,6 @@ export const RX_NOSTR_DEFAULT_OPTIONS: RxNostrStaticDefaultOptions = Object.free
 });
 
 export const RX_NOSTR_DEFAULTS = Object.freeze({
-  authTimeout: 30_000,
   skipFetchNip11: false,
 });
 
@@ -40,7 +39,6 @@ export class FilledRxNostrConfig {
   readonly authenticator: AuthenticatorInput | undefined;
   readonly retry: ConnectionRetryer;
   readonly relayDirectory: RelayDirectory;
-  readonly authTimeout: number;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
   readonly defaultOptions: Readonly<RxNostrDefaultOptions>;
@@ -57,7 +55,6 @@ export class FilledRxNostrConfig {
     this.authenticator = config.authenticator;
     this.retry = config.retry ?? new ExponentialBackoffRetryer();
     this.relayDirectory = config.relayDirectory ?? GlobalRelayDirectory;
-    this.authTimeout = config.authTimeout ?? RX_NOSTR_DEFAULTS.authTimeout;
     this.skipFetchNip11 = config.skipFetchNip11 ?? RX_NOSTR_DEFAULTS.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? (globalThis.WebSocket as WebSocketConstructor | undefined);
     this.defaultOptions = freezeDefaultOptions(config.defaultOptions);

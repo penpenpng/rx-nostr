@@ -378,7 +378,6 @@ describe("RelayCommunication transport integration", () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
-      authTimeout: 1_000,
     });
     const release = relay.hold();
     server.latestConnection.open();
@@ -397,7 +396,9 @@ describe("RelayCommunication transport integration", () => {
     const packets: object[] = [];
     const complete = vi.fn();
     relay
-      .event(event, { authenticator: { challenge: async () => authEvent } })
+      .event(event, {
+        authenticator: { authTimeout: 1_000, challenge: async () => authEvent },
+      })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
     server.latestConnection.message(JSON.stringify(["AUTH", "challenge"]));

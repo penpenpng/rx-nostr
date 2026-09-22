@@ -69,13 +69,16 @@ AUTH に関連する `OK false` も `Publication.subscribe()` では観測でき
 
 ## Timeout と stale challenge
 
-AUTH の OK 待機時間は root の `authTimeout` で指定します。既定は 30 秒です。
+AUTH の OK 待機時間は Authenticator の `authTimeout` で指定します。省略時は 30 秒です。Authenticator factory を使えば、relay ごとに異なる値を設定できます。
 
 ```ts
+const authenticator = new SimpleAuthenticator(signer, {
+  authTimeout: 10_000,
+});
+
 const rxNostr = new RxNostr({
   verifier,
   authenticator,
-  authTimeout: 10_000,
 });
 ```
 
@@ -85,6 +88,7 @@ Custom authenticator は次の interface を実装します。
 
 ```ts
 interface Authenticator {
+  readonly authTimeout?: number;
   challenge(
     relay: RelayUrl,
     challenge: string,

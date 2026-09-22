@@ -41,7 +41,6 @@ export interface RelayCommunicationOptions {
   readonly WebSocket?: WebSocketConstructor;
   readonly retryer?: ConnectionRetryer;
   readonly relayDirectory?: RelayDirectory;
-  readonly authTimeout?: number;
 }
 
 // 将来、接続を多重化することがあればこのレイヤーで実装する
@@ -92,7 +91,7 @@ export class RelayCommunication implements IRelayCommunication {
       onLastRelease: () => void this.#transport.close().catch(() => {}),
       onDispose: () => void this.#transport.dispose().catch(() => {}),
     });
-    this.#auth = new AuthCoordinator(url, this.#transport, options.authTimeout ?? 30_000);
+    this.#auth = new AuthCoordinator(url, this.#transport);
     if (relayDirectory) {
       this.#directorySubscription = relayDirectory.observe(url).subscribe({
         next: (entry) => {

@@ -55,7 +55,7 @@ The initial `RxNostr.defaultOptions` values are:
 | `weak`           |     `false` |     `false` |
 | response timeout | `30_000` ms | `30_000` ms |
 
-`authTimeout` is 30 seconds and NIP-11 fetching is enabled by default. AUTH itself has no implicit default: it is enabled only when an authenticator or per-relay authenticator factory is supplied. A REQ/publication may override the instance authenticator or use `false` to disable AUTH for that operation.
+An authenticator's `authTimeout` defaults to 30 seconds, and NIP-11 fetching is enabled by default. AUTH itself has no implicit default: it is enabled only when an authenticator or per-relay authenticator factory is supplied. A REQ/publication may override the instance authenticator or use `false` to disable AUTH for that operation.
 
 Precedence is the most specific defined value first:
 
@@ -105,6 +105,7 @@ The `ConnectionRetryer` receives the aggregate health snapshot from the configur
 AUTH is opt-in. A root or operation authenticator may be an `Authenticator` or a relay factory; `authenticator: false` disables AUTH for that operation even if another operation authenticates the same connection. The ordinary signer is never used implicitly for AUTH.
 
 - `Authenticator.challenge()` returns a kind 22242 event. `SimpleAuthenticator` asks its signer to sign empty content with the normalized `relay` and received `challenge` tags.
+- `Authenticator.authTimeout` controls how long the shared attempt waits for the AUTH EVENT's OK. The authenticator that starts an attempt supplies its timeout; omitting it uses 30 seconds.
 - The latest challenge is connection-generation scoped. Concurrent operations using the same challenge share one AUTH event and OK result. A new challenge or reconnect invalidates older pending work and an old OK cannot resume a new connection.
 - An `auth-required:` CLOSED retries the affected REQ once after successful AUTH. An `auth-required:` `OK false` remains observable with `reason: "auth"`, then retries the affected EVENT once. A second auth-required result is final and cannot form a loop.
 - Disabled/missing authentication, AUTH `OK false`, AUTH timeout, stale work, and transport failure terminate only that relay effort. Factory or authenticator exceptions are `RxNostrCallbackError` with callback kind `authenticator`.
