@@ -33,6 +33,30 @@ const rxNostr = new RxNostr({
 
 AUTH は `authenticator` を指定した場合だけ有効になります。`signer` から暗黙には作られません。
 
+`defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `req()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
+
+## Process-wide operation defaults
+
+`RxNostr.defaultOptions` 自体が built-in の operation defaults を保持しています。複数の `RxNostr` instance で異なる値を共通利用する application は、instance の作成前にその値を変更できます。
+
+```ts
+RxNostr.defaultOptions.req.linger = 5_000;
+RxNostr.defaultOptions.req.timeout = 20_000;
+RxNostr.defaultOptions.publish.linger = 5_000;
+RxNostr.defaultOptions.publish.timeout = 15_000;
+
+const primary = new RxNostr({ verifier });
+const secondary = new RxNostr({
+  verifier,
+  // この instance の REQ だけ static default を上書きします。
+  defaultOptions: { req: { linger: 0 } },
+});
+```
+
+static defaults は各 constructor 呼び出し時に instance 内へ snapshot されます。その後 `RxNostr.defaultOptions` を差し替えたり nested option を変更したりしても、作成済み instance の値は変わりません。
+
+process-wide な可変設定なので、library module 内ではなく application の起動処理で設定してください。object 全体を差し替える場合、型はすべての built-in scalar option を要求します。一部だけ変更する場合は上記のように nested field を変更するか、現在値を spread してください。`verifier` などの root config は含まれないため、各 constructor で指定します。
+
 ## Built-in defaults
 
 | option | REQ | publish |
@@ -86,7 +110,7 @@ rxNostr.publish(params, {
 1. `RxReq.emit()` の packet option (`relays`, `linger`, `traceTag`)
 2. `req()` / `publish()` の config
 3. `RxNostrConfig.defaultOptions.req/publish`
-4. root signer/verifier と built-in defaults
+4. `RxNostr.defaultOptions.req/publish`（built-in defaults の初期値を保持）
 
 nullish な値だけを fallback するため、`false`、`0`、`Infinity` はそのまま有効です。
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ExponentialBackoffRetryer } from "../connection-retryer/index.ts";
+import { NoopSigner } from "../event-signer/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import { RxNostrInvalidUsageError } from "../libs/error.ts";
 import { GlobalRelayDirectory, RelayDirectory } from "../relay-directory/index.ts";
@@ -7,14 +8,18 @@ import {
   FilledRxNostrConfig,
   FilledRxNostrPublishOptions,
   FilledRxNostrReqOptions,
+  RX_NOSTR_DEFAULT_OPTIONS,
 } from "./rx-nostr.config.ts";
-import type { RxNostrConfig } from "./rx-nostr.interface.ts";
+import type { RxNostrConfig, RxNostrStaticDefaultOptions } from "./rx-nostr.interface.ts";
 
 const createRoot = (config: Partial<RxNostrConfig> = {}) =>
-  new FilledRxNostrConfig({
-    verifier: new NoopVerifier(),
-    ...config,
-  });
+  new FilledRxNostrConfig(
+    {
+      verifier: new NoopVerifier(),
+      ...config,
+    },
+    RX_NOSTR_DEFAULT_OPTIONS,
+  );
 
 describe("rx-nostr config", () => {
   test("applies the v4 operation defaults", () => {
@@ -61,6 +66,56 @@ describe("rx-nostr config", () => {
     expect(publish.weak).toBe(false);
   });
 
+  test("applies operation, instance, and static precedence", () => {
+    const instanceSigner = new NoopSigner();
+    const staticOptions: RxNostrStaticDefaultOptions = {
+      req: {
+        ...RX_NOSTR_DEFAULT_OPTIONS.req,
+        defer: false,
+        linger: 1_000,
+        timeout: 4_000,
+        weak: true,
+      },
+      publish: {
+        ...RX_NOSTR_DEFAULT_OPTIONS.publish,
+        linger: 3_000,
+        signer: new NoopSigner(),
+        timeout: 5_000,
+        weak: true,
+      },
+    };
+    const root = new FilledRxNostrConfig(
+      {
+        verifier: new NoopVerifier(),
+        signer: instanceSigner,
+        defaultOptions: {
+          req: { linger: 2_000 },
+          publish: { weak: false },
+        },
+      },
+      staticOptions,
+    );
+
+    const req = new FilledRxNostrReqOptions({ linger: 0 }, root);
+    const publish = new FilledRxNostrPublishOptions({ timeout: Infinity }, root);
+
+    expect(req).toMatchObject({ defer: false, linger: 0, timeout: 4_000, weak: true });
+    expect(publish).toMatchObject({ linger: 3_000, timeout: Infinity, weak: false });
+    expect(publish.signer).toBe(instanceSigner);
+  });
+
+  test("snapshots static operation defaults for each root config", () => {
+    const staticOptions: RxNostrStaticDefaultOptions = {
+      req: { ...RX_NOSTR_DEFAULT_OPTIONS.req, linger: 1_000 },
+      publish: { ...RX_NOSTR_DEFAULT_OPTIONS.publish },
+    };
+    const root = new FilledRxNostrConfig({ verifier: new NoopVerifier() }, staticOptions);
+
+    staticOptions.req.linger = 2_000;
+
+    expect(new FilledRxNostrReqOptions({}, root).linger).toBe(1_000);
+  });
+
   test("creates stateful defaults only once per root config", () => {
     const root = createRoot();
 
@@ -89,8 +144,8 @@ describe("rx-nostr config", () => {
   });
 
   test("rejects a missing verifier at the config boundary", () => {
-    expect(() => new FilledRxNostrConfig({} as RxNostrConfig)).toThrowError(
-      RxNostrInvalidUsageError,
-    );
+    expect(
+      () => new FilledRxNostrConfig({} as RxNostrConfig, RX_NOSTR_DEFAULT_OPTIONS),
+    ).toThrowError(RxNostrInvalidUsageError);
   });
 });

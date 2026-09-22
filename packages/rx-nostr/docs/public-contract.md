@@ -42,7 +42,9 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 `RxNostr` is a public class constructed directly with `new RxNostr(config)`. The `createRxNostr` factory is not exported. `IRxNostr` remains the structural public operation interface for consumers that accept a client without depending on the concrete class. Concrete implementation state is exposed neither through `IRxNostr` nor through subclass-accessible protected members.
 
-Built-in operation defaults are defined once in `RX_NOSTR_DEFAULTS`:
+`RxNostr.defaultOptions` holds the process-wide operation defaults, including the initial built-in values. Each instance takes a detached snapshot when constructed, so later static assignment or nested option mutation does not alter an existing instance. Root configuration such as the required verifier remains instance-local.
+
+The initial `RxNostr.defaultOptions` values are:
 
 | Option           |         REQ |     publish |
 | ---------------- | ----------: | ----------: |
@@ -58,11 +60,11 @@ Precedence is the most specific defined value first:
 1. a `ReqPacket` override (`relays`, `linger`, `traceTag`) where applicable;
 2. the `req()` or `publish()` call config;
 3. `RxNostrConfig.defaultOptions.req/publish`;
-4. the root signer/verifier and built-in defaults.
+4. `RxNostr.defaultOptions.req/publish`, which initially holds the built-in defaults.
 
 Resolution uses nullish checks, so `false`, `0`, and `Infinity` are preserved. Stateful defaults such as the NIP-07 signer and retry policy are created once per RxNostr config, not once per property access.
 
-`verifier` is required. Omitting it at runtime is `RxNostrInvalidUsageError`. A signer is optional and defaults to the per-instance `Nip07Signer`; an unavailable NIP-07 provider becomes a signer callback failure when publishing. A supplied authenticator is never inferred merely from the signer.
+`verifier` is required in each instance config. Omitting it is `RxNostrInvalidUsageError`. A signer is optional and defaults to the per-instance `Nip07Signer`; an unavailable NIP-07 provider becomes a signer callback failure when publishing. A supplied authenticator is never inferred merely from the signer.
 
 The optional WebSocket constructor is described by rx-nostr-owned structural types. No unipls type is part of configuration or any other public declaration.
 

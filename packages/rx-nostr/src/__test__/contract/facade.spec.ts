@@ -27,6 +27,38 @@ const signedEvent: Nostr.Event = {
 };
 
 describe("RxNostr facade lifecycle", () => {
+  test("applies static operation defaults to subsequently constructed instances", async () => {
+    const previous = RxNostr.defaultOptions;
+    const server = new ControlledWebSocketServer();
+
+    try {
+      RxNostr.defaultOptions = {
+        req: { ...previous.req, linger: 0 },
+        publish: { ...previous.publish },
+      };
+      const rxNostr = new RxNostr({
+        verifier: new NoopVerifier(),
+        retry: new NoopRetryer(),
+        skipFetchNip11: true,
+        WebSocket: server.WebSocket,
+      });
+      const complete = vi.fn();
+      rxNostr.req([{}], { relays: relay }).subscribe({ complete });
+
+      server.latestConnection.open();
+      await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
+      const [, subId] = JSON.parse(server.latestConnection.sent[0] as string) as ["REQ", string];
+      server.latestConnection.message(JSON.stringify(["EOSE", subId]));
+
+      await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(server.latestConnection.closeRequests).toHaveLength(1));
+      server.latestConnection.acknowledgeClose();
+      rxNostr.dispose();
+    } finally {
+      RxNostr.defaultOptions = previous;
+    }
+  });
+
   test("disposes active operations before transport and rejects later work", async () => {
     const server = new ControlledWebSocketServer();
     const rxNostr = new RxNostr({

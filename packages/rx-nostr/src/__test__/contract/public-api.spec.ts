@@ -8,6 +8,7 @@ import type {
   RelayInput,
   RelayUrl,
   RxNostr,
+  RxNostrStaticDefaultOptions,
 } from "rx-nostr";
 
 describe("public entry point", () => {
@@ -23,11 +24,40 @@ describe("public entry point", () => {
 
   test("exposes the v4 operation model", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
+    expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
     expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<Publication>();
     expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
     expectTypeOf<string>().toMatchTypeOf<RelayInput>();
     expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
     expectTypeOf<"ws://relay.example">().toMatchTypeOf<RelayUrl>();
+  });
+
+  test("exposes built-in values through static operation defaults", () => {
+    const previous = publicApi.RxNostr.defaultOptions;
+
+    try {
+      expect(previous).toMatchObject({
+        req: {
+          defer: true,
+          linger: 10_000,
+          skipExpirationCheck: false,
+          skipValidateFilterMatching: false,
+          timeout: 30_000,
+          weak: false,
+        },
+        publish: { linger: 10_000, timeout: 30_000, weak: false },
+      });
+      publicApi.RxNostr.defaultOptions = {
+        req: { ...previous.req, linger: 123 },
+        publish: { ...previous.publish },
+      };
+
+      const client = new publicApi.RxNostr({ verifier: new publicApi.NoopVerifier() });
+      expect(client).toBeInstanceOf(publicApi.RxNostr);
+      client.dispose();
+    } finally {
+      publicApi.RxNostr.defaultOptions = previous;
+    }
   });
 
   test("keeps IRxNostr independent from the concrete class", () => {

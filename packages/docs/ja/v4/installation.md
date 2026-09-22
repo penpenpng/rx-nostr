@@ -33,7 +33,7 @@ const rxNostr = new RxNostr({
 });
 ```
 
-`verifier` は必須です。意図的に署名検証を省略する場合も、`new NoopVerifier()` を明示してください。
+instance config の `verifier` は必須です。意図的に署名検証を省略する場合も、`new NoopVerifier()` を明示してください。
 
 ## Node.js
 

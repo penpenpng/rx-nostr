@@ -6,5 +6,6 @@ export type {
   RxNostrPublishOptions,
   RxNostrReqConfig,
   RxNostrReqOptions,
+  RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
 export { RxNostr } from "./rx-nostr.ts";

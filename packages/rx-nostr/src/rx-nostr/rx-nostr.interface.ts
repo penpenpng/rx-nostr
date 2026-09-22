@@ -35,6 +35,7 @@ export interface RxNostrConfig {
    */
   signer?: EventSigner;
   authenticator?: AuthenticatorInput;
+  /** Defaults applied to REQ and publish operations owned by this instance. */
   defaultOptions?: RxNostrDefaultOptions;
   /**
    * Auto reconnection controller.
@@ -56,6 +57,11 @@ export interface RxNostrConfig {
 export interface RxNostrDefaultOptions {
   req?: RxNostrReqOptions;
   publish?: RxNostrPublishOptions;
+}
+
+export interface RxNostrStaticDefaultOptions {
+  req: Required<RxNostrReqOptions>;
+  publish: Required<Omit<RxNostrPublishOptions, "signer">> & Pick<RxNostrPublishOptions, "signer">;
 }
 
 export interface RxNostrReqOptions {

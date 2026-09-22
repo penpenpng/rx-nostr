@@ -13,7 +13,7 @@ interface EventSigner {
 }
 ```
 
-root signer は `RxNostr` constructor で指定し、publication ごとに上書きできます。
+root signer は instance config で指定し、publication ごとに上書きできます。
 
 ```ts
 const rxNostr = new RxNostr({
@@ -72,7 +72,7 @@ interface EventVerifier {
 }
 ```
 
-`RxNostr` constructor の `verifier` は必須です。query ごとに上書きすることもできます。
+instance config の `verifier` は必須です。query ごとに上書きすることもできます。
 
 ### `SimpleVerifier`
 

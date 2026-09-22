@@ -108,6 +108,7 @@ export {
   type RxNostrPublishOptions,
   type RxNostrReqConfig,
   type RxNostrReqOptions,
+  type RxNostrStaticDefaultOptions,
 } from "./rx-nostr/index.ts";
 export { RxRelays } from "./rx-relays/index.ts";
 export { RxBackwardReq, RxForwardReq, RxReq, type RxReqStrategy } from "./rx-req/index.ts";

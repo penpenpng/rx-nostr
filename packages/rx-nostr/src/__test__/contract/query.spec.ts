@@ -35,12 +35,13 @@ describe("REQ public contract", () => {
       retry: new NoopRetryer(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
+      defaultOptions: { req: { linger: 0 } },
     });
     const request = new RxBackwardReq();
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     rxNostr
-      .req(request, { relays: relay, linger: 0, timeout: 1_000 })
+      .req(request, { relays: relay, timeout: 1_000 })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     request.emit([{ kinds: [1] }], { traceTag: "timeline" });
     request.over();
