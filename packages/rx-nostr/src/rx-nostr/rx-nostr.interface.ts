@@ -12,12 +12,17 @@ import type { RxReq } from "../rx-req/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 
 export interface IRxNostr {
-  req(rxReq: RxReq, config: RxNostrReqConfig): Observable<EventPacket>;
+  req(relays: RelayInput, rxReq: RxReq, options?: RxNostrReqConfig): Observable<EventPacket>;
   req(
+    relays: RelayInput,
     filters: LazyFilter | Iterable<LazyFilter>,
-    config: RxNostrReqConfig,
+    options?: RxNostrReqConfig,
   ): Observable<EventPacket>;
-  publish(params: Nostr.EventParameters, config: RxNostrPublishConfig): Publication;
+  publish(
+    relays: RelayInput,
+    params: Nostr.EventParameters,
+    options?: RxNostrPublishConfig,
+  ): Publication;
   setHotRelays(relays: RelayInput): void;
   unsetHotRelays(): void;
   monitorConnectionState(): Observable<ConnectionStatePacket>;
@@ -86,7 +91,6 @@ export interface RxNostrReqOptions {
 }
 
 export interface RxNostrReqConfig extends RxNostrReqOptions {
-  relays: RelayInput;
   verifier?: EventVerifier;
   /** Override the instance authenticator, or disable AUTH for this operation. */
   authenticator?: AuthenticatorInput | false;
@@ -105,7 +109,6 @@ export interface RxNostrPublishOptions {
 }
 
 export interface RxNostrPublishConfig extends RxNostrPublishOptions {
-  relays: RelayInput;
   /** Override the instance authenticator, or disable AUTH for this operation. */
   authenticator?: AuthenticatorInput | false;
 }

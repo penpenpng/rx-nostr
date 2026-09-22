@@ -6,6 +6,7 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ### REQ
 
+- The public call shape is `req(relays, request, options?)`: destinations first, then an `RxReq` or filters, then operation-specific options.
 - `req()` returns a cold Observable. Each subscription creates an independent logical query and connection demand; merely calling `req()` does not open a connection.
 - Passing filters directly creates a one-shot backward request. `RxForwardReq` replaces its previous segment, while `RxBackwardReq` keeps emitted segments active until their individual terminal conditions and completes after `over()` and all segments finish.
 - A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future physical split.
@@ -18,6 +19,7 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ### Publication
 
+- The public call shape is `publish(relays, payload, options?)`: destinations first, then EVENT parameters, then operation-specific options.
 - `publish()` snapshots normalized destinations and starts signing immediately when called. Later `RxRelays` changes do not affect that publication.
 - The returned `Publication` is one hot operation. `subscribe()` observes the unaggregated `OkPacket` stream; unsubscribing only stops that observer and never cancels delivery.
 - OK packets already received by the operation are replayed to a later subscriber before live packets. AUTH-related `OK false` packets remain observable even when a resend is pending.

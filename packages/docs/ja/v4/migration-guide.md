@@ -53,9 +53,7 @@ rxNostr.setDefaultRelays(["wss://relay.example.com"]);
 rxNostr.use(request);
 
 // v4
-rxNostr.req(request, {
-  relays: ["wss://relay.example.com"],
-});
+rxNostr.req(["wss://relay.example.com"], request);
 ```
 
 一時的な relay と default relay の区別もありません。ReqPacket ごとの宛先変更は `emit()` の option で行います。
@@ -77,13 +75,13 @@ const events$ = rxNostr.use(request);
 
 // v4
 const request = new RxForwardReq();
-const events$ = rxNostr.req(request, { relays });
+const events$ = rxNostr.req(relays, request);
 ```
 
 簡単な backward query では `RxBackwardReq` を作らず、filter を直接渡せます。
 
 ```ts
-rxNostr.req([{ kinds: [1], limit: 20 }], { relays });
+rxNostr.req(relays, [{ kinds: [1], limit: 20 }]);
 ```
 
 forward は新しい ReqPacket が直前の REQ を置き換え、backward は各 REQ を並行して EOSE まで維持する契約を保ちます。
@@ -112,7 +110,7 @@ v3 の `send()` が返す Observable は、v4 では `Publication` に置き換�
 rxNostr.send(params).subscribe(onOk);
 
 // v4
-const publication = rxNostr.publish(params, { relays });
+const publication = rxNostr.publish(relays, params);
 publication.subscribe(onOk);
 await publication.waitFor("all");
 ```

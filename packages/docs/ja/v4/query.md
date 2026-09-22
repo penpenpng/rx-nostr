@@ -8,11 +8,11 @@
 
 ```ts
 const result$ = rxNostr.req(
+  ["wss://relay.example.com"],
   [
     { kinds: [0], authors: [pubkey] },
     { kinds: [1], authors: [pubkey], limit: 20 },
   ],
-  { relays: ["wss://relay.example.com"] },
 );
 
 result$.subscribe(console.log);
@@ -29,7 +29,7 @@ import { RxForwardReq } from "rx-nostr";
 
 const request = new RxForwardReq();
 const subscription = rxNostr
-  .req(request, { relays: ["wss://relay.example.com"] })
+  .req(["wss://relay.example.com"], request)
   .subscribe(({ event }) => console.log(event));
 
 request.emit([{ kinds: [1], since: Math.floor(Date.now() / 1000) }]);
@@ -51,7 +51,7 @@ import { RxBackwardReq } from "rx-nostr";
 const request = new RxBackwardReq();
 
 rxNostr
-  .req(request, { relays: ["wss://relay.example.com"] })
+  .req(["wss://relay.example.com"], request)
   .subscribe({
     next: console.log,
     complete: () => console.log("all pages completed"),
@@ -106,8 +106,7 @@ EVENT は次の順序で処理されます。
 各検査は次の option で変更できます。
 
 ```ts
-rxNostr.req([{}], {
-  relays,
+rxNostr.req(relays, [{}], {
   verifier: customVerifier,
   skipValidateFilterMatching: true,
   skipExpirationCheck: true,

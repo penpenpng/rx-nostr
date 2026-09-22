@@ -38,7 +38,7 @@ console.log([...relays]); // ["wss://relay.example.com"]
 const relays = new RxRelays(["wss://one.example.com"]);
 const request = new RxForwardReq();
 
-const subscription = rxNostr.req(request, { relays }).subscribe(console.log);
+const subscription = rxNostr.req(relays, request).subscribe(console.log);
 request.emit([{}]);
 
 relays.append("wss://two.example.com");

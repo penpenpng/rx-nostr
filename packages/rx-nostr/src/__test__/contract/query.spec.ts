@@ -41,7 +41,7 @@ describe("REQ public contract", () => {
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     rxNostr
-      .req(request, { relays: relay, timeout: 1_000 })
+      .req(relay, request, { timeout: 1_000 })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     request.emit([{ kinds: [1] }], { traceTag: "timeline" });
     request.over();
@@ -82,7 +82,7 @@ describe("REQ public contract", () => {
       WebSocket: server.WebSocket,
     });
     const request = new RxForwardReq();
-    const subscription = rxNostr.req(request, { relays: relay, linger: 0 }).subscribe();
+    const subscription = rxNostr.req(relay, request, { linger: 0 }).subscribe();
     request.emit([{ kinds: [1] }]);
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
     server.latestConnection.open();
@@ -115,7 +115,7 @@ describe("REQ public contract", () => {
     });
     const complete = vi.fn();
     const error = vi.fn();
-    rxNostr.req([{}], { relays: [] }).subscribe({ complete, error });
+    rxNostr.req([], [{}]).subscribe({ complete, error });
 
     await vi.waitFor(() => expect(complete.mock.calls.length + error.mock.calls.length).toBe(1));
     expect(complete).toHaveBeenCalledOnce();
@@ -140,7 +140,7 @@ describe("REQ public contract", () => {
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     rxNostr
-      .req([{ kinds: [1] }], { relays: relay, linger: 0 })
+      .req(relay, [{ kinds: [1] }], { linger: 0 })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     server.latestConnection.open();
     await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
@@ -173,7 +173,7 @@ describe("REQ public contract", () => {
       WebSocket: server.WebSocket,
     });
     let received: unknown;
-    rxNostr.req([{}], { relays: relay, linger: 0 }).subscribe({
+    rxNostr.req(relay, [{}], { linger: 0 }).subscribe({
       error: (error) => (received = error),
     });
     server.latestConnection.open();
@@ -203,8 +203,7 @@ describe("REQ public contract", () => {
     });
     const packets: EventPacket[] = [];
     rxNostr
-      .req([{ kinds: [1] }], {
-        relays: relay,
+      .req(relay, [{ kinds: [1] }], {
         linger: 0,
         skipExpirationCheck: true,
         skipValidateFilterMatching: true,
@@ -240,6 +239,7 @@ describe("REQ public contract", () => {
     let received: unknown;
     callbackRxNostr
       .req(
+        relay,
         [
           {
             since: () => {
@@ -247,7 +247,7 @@ describe("REQ public contract", () => {
             },
           },
         ],
-        { relays: relay, linger: 0 },
+        { linger: 0 },
       )
       .subscribe({ error: (error) => (received = error) });
     callbackServer.latestConnection.open();
@@ -275,7 +275,7 @@ describe("REQ public contract", () => {
     });
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr.req([{}], { relays: [one, two], linger: 0 }).subscribe({
+    rxNostr.req([one, two], [{}], { linger: 0 }).subscribe({
       next: (packet) => packets.push(packet),
       complete,
     });
@@ -313,7 +313,7 @@ describe("REQ public contract", () => {
     });
     const request = new RxBackwardReq();
     const complete = vi.fn();
-    rxNostr.req(request, { relays: relay, linger: 0 }).subscribe({ complete });
+    rxNostr.req(relay, request, { linger: 0 }).subscribe({ complete });
     request.emit([{ kinds: [1] }]);
     request.emit([{ kinds: [2] }]);
     request.over();
@@ -354,7 +354,7 @@ describe("REQ public contract", () => {
     const request = new RxBackwardReq();
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr.req(request, { relays: destinations, linger: 0 }).subscribe({
+    rxNostr.req(destinations, request, { linger: 0 }).subscribe({
       next: (packet) => packets.push(packet),
       complete,
     });

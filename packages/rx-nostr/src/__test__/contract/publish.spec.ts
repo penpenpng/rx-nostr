@@ -46,8 +46,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(signed, {
-      relays: [relay1, relay2],
+    const publication = rxNostr.publish([relay1, relay2], signed, {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -101,8 +100,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: [relay1, relay2],
+    const publication = rxNostr.publish([relay1, relay2], event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -134,8 +132,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: [relay1, relay2],
+    const publication = rxNostr.publish([relay1, relay2], event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 100,
@@ -172,10 +169,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const empty = rxNostr.publish(event(), {
-      relays: [],
-      signer: unusedSigner,
-    });
+    const empty = rxNostr.publish([], event(), { signer: unusedSigner });
     await expect(empty.event).rejects.toMatchObject({ code: "no-relays" });
     await expect(empty.waitFor("all")).rejects.toMatchObject({
       code: "no-relays",
@@ -190,11 +184,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const failed = rxNostr.publish(event(), {
-      relays: relay1,
-      signer: rejectingSigner,
-      linger: 0,
-    });
+    const failed = rxNostr.publish(relay1, event(), { signer: rejectingSigner, linger: 0 });
     const observerError = vi.fn();
     failed.subscribe({ error: observerError });
     await expect(failed.event).rejects.toMatchObject({
@@ -212,11 +202,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const invalid = rxNostr.publish(event(), {
-      relays: relay2,
-      signer: invalidSigner,
-      linger: 0,
-    });
+    const invalid = rxNostr.publish(relay2, event(), { signer: invalidSigner, linger: 0 });
     await expect(invalid.event).rejects.toMatchObject({ callback: "signer" });
     rxNostr.dispose();
   });
@@ -236,11 +222,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: relay1,
-      signer,
-      linger: 0,
-    });
+    const publication = rxNostr.publish(relay1, event(), { signer, linger: 0 });
     const complete = vi.fn();
     publication.subscribe({ complete });
     const all = publication.waitFor("all");
@@ -274,12 +256,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: relay1,
-      signer,
-      linger: 0,
-      timeout: 1_000,
-    });
+    const publication = rxNostr.publish(relay1, event(), { signer, linger: 0, timeout: 1_000 });
     const observed = vi.fn();
     publication.subscribe(observed).unsubscribe();
     const all = publication.waitFor("all");
@@ -306,8 +283,7 @@ describe("Publication public contract", () => {
     rxNostr.setHotRelays([relay1]);
     const hot = socket(server, relay1);
     hot.open();
-    const publication = rxNostr.publish(event(), {
-      relays: [relay1, relay2],
+    const publication = rxNostr.publish([relay1, relay2], event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -336,8 +312,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: [relay1, relay2],
+    const publication = rxNostr.publish([relay1, relay2], event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -376,8 +351,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: relay1,
+    const publication = rxNostr.publish(relay1, event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -412,8 +386,7 @@ describe("Publication public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(event(), {
-      relays: relay1,
+    const publication = rxNostr.publish(relay1, event(), {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,

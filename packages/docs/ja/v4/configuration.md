@@ -70,11 +70,12 @@ process-wide な可変設定なので、library module 内ではなく applicati
 
 REQ の `timeout` は backward segment が EOSE を待つ時間です。publish の `timeout` は relay ごとの OK を待つ時間です。
 
-## REQ config
+## REQ arguments and options
+
+`req(relays, request, options?)` の順です。宛先と request（`RxReq` または filters）は必須で、operation 固有の設定だけを第3引数へ渡します。
 
 ```ts
-rxNostr.req(filters, {
-  relays,
+rxNostr.req(relays, filters, {
   verifier,
   authenticator,
   defer: true,
@@ -86,13 +87,14 @@ rxNostr.req(filters, {
 });
 ```
 
-`relays` は必須です。`authenticator: false` で root の AUTH を operation 単位に無効化できます。
+`authenticator: false` で root の AUTH を operation 単位に無効化できます。
 
-## Publish config
+## Publish arguments and options
+
+`publish(relays, payload, options?)` の順です。宛先と EVENT parameters は必須で、operation 固有の設定だけを第3引数へ渡します。
 
 ```ts
-rxNostr.publish(params, {
-  relays,
+rxNostr.publish(relays, params, {
   signer,
   authenticator,
   linger: 10_000,
@@ -101,7 +103,7 @@ rxNostr.publish(params, {
 });
 ```
 
-`relays` は必須です。publish は呼び出し時の relay snapshot を使います。
+publish は呼び出し時の relay snapshot を使います。
 
 ## 優先順位
 
@@ -129,7 +131,7 @@ const rxNostr = new RxNostr({
 });
 
 // この query だけ linger を 0 にします。
-rxNostr.req([{}], { relays, linger: 0 });
+rxNostr.req(relays, [{}], { linger: 0 });
 ```
 
 ## Callback error

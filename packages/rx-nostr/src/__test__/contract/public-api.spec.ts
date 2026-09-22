@@ -3,11 +3,14 @@ import * as publicApi from "rx-nostr";
 import type {
   EventPacket,
   IRxNostr,
+  LazyFilter,
   OkPacket,
   Publication,
   RelayInput,
   RelayUrl,
   RxNostr,
+  RxNostrPublishConfig,
+  RxNostrReqConfig,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
 
@@ -25,6 +28,15 @@ describe("public entry point", () => {
   test("exposes the v4 operation model", () => {
     expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
     expectTypeOf(publicApi.RxNostr.defaultOptions).toEqualTypeOf<RxNostrStaticDefaultOptions>();
+    expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
+    expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<
+      LazyFilter | Iterable<LazyFilter>
+    >();
+    expectTypeOf<Parameters<IRxNostr["req"]>[2]>().toEqualTypeOf<RxNostrReqConfig | undefined>();
+    expectTypeOf<Parameters<IRxNostr["publish"]>[0]>().toEqualTypeOf<RelayInput>();
+    expectTypeOf<Parameters<IRxNostr["publish"]>[2]>().toEqualTypeOf<
+      RxNostrPublishConfig | undefined
+    >();
     expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<Publication>();
     expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
     expectTypeOf<string>().toMatchTypeOf<RelayInput>();

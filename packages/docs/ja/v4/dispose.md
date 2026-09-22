@@ -24,7 +24,7 @@ dispose は冪等です。複数回呼んでも構いません。dispose 後に 
 query の購読が不要になったら unsubscribe してください。active REQ には必要に応じて Nostr CLOSE が送られます。
 
 ```ts
-const subscription = rxNostr.req(filters, { relays }).subscribe(onEvent);
+const subscription = rxNostr.req(relays, filters).subscribe(onEvent);
 
 subscription.unsubscribe();
 ```
@@ -34,7 +34,7 @@ unsubscribe は、その query の観測と通信を終了します。
 一方、`Publication.subscribe()` の Subscription は OK の観測だけを所有します。unsubscribe しても publication 自体は継続します。
 
 ```ts
-const publication = rxNostr.publish(params, { relays });
+const publication = rxNostr.publish(relays, params);
 const observer = publication.subscribe(onOk);
 
 observer.unsubscribe();     // 観測だけを終了

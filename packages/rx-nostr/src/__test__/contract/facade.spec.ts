@@ -43,7 +43,7 @@ describe("RxNostr facade lifecycle", () => {
         WebSocket: server.WebSocket,
       });
       const complete = vi.fn();
-      rxNostr.req([{}], { relays: relay }).subscribe({ complete });
+      rxNostr.req(relay, [{}]).subscribe({ complete });
 
       server.latestConnection.open();
       await vi.waitFor(() => expect(server.latestConnection.sent).toHaveLength(1));
@@ -82,13 +82,12 @@ describe("RxNostr facade lifecycle", () => {
 
     const request = new RxForwardReq();
     const reqComplete = vi.fn();
-    rxNostr.req(request, { relays: relay }).subscribe({ complete: reqComplete });
+    rxNostr.req(relay, request).subscribe({ complete: reqComplete });
     request.emit([{}]);
-    const delayedReq = rxNostr.req([{}], { relays: relay });
+    const delayedReq = rxNostr.req(relay, [{}]);
     const delayedMonitor = rxNostr.monitorConnectionState();
 
-    const publication = rxNostr.publish(signedEvent, {
-      relays: relay,
+    const publication = rxNostr.publish(relay, signedEvent, {
       signer: new NoopSigner(),
       linger: 0,
       timeout: 1_000,
@@ -108,18 +107,15 @@ describe("RxNostr facade lifecycle", () => {
     await cancelled;
     expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
     expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
-    expect(() =>
-      rxNostr.publish(signedEvent, {
-        relays: relay,
-        signer: new NoopSigner(),
-      }),
-    ).toThrow(RxNostrAlreadyDisposedError);
+    expect(() => rxNostr.publish(relay, signedEvent, { signer: new NoopSigner() })).toThrow(
+      RxNostrAlreadyDisposedError,
+    );
 
     const delayedReqError = vi.fn();
     delayedReq.subscribe({ error: delayedReqError });
     expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const newReqError = vi.fn();
-    rxNostr.req([{}], { relays: relay }).subscribe({ error: newReqError });
+    rxNostr.req(relay, [{}]).subscribe({ error: newReqError });
     expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
     const monitorError = vi.fn();
     delayedMonitor.subscribe({ error: monitorError });
@@ -192,8 +188,7 @@ describe("RxNostr facade lifecycle", () => {
     const request = new RxBackwardReq();
     const packets: EventPacket[] = [];
     rxNostr
-      .req(request, {
-        relays: relay,
+      .req(relay, request, {
         verifier: { verifyEvent: operationVerify },
         skipValidateFilterMatching: false,
         skipExpirationCheck: false,

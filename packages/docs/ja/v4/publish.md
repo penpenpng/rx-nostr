@@ -4,12 +4,12 @@
 
 ```ts
 const publication = rxNostr.publish(
+  ["wss://relay.example.com"],
   {
     kind: 1,
     content: "Hello, Nostr!",
     tags: [],
   },
-  { relays: ["wss://relay.example.com"] },
 );
 ```
 
@@ -91,8 +91,7 @@ observer.unsubscribe();
 ## Option
 
 ```ts
-const publication = rxNostr.publish(params, {
-  relays,
+const publication = rxNostr.publish(relays, params, {
   signer,
   authenticator,
   timeout: 30_000,

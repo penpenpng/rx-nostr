@@ -6,7 +6,7 @@ rx-nostr は `EventPacket`、`ReqPacket`、一般的な RxJS stream のための
 
 ```ts
 rxNostr
-  .req([{}], { relays })
+  .req(relays, [{}])
   .pipe(
     filterByKinds([1, 6]),
     uniq(),
@@ -61,7 +61,7 @@ import { RxForwardReq, batch } from "rx-nostr";
 const source = new RxForwardReq();
 const batched = source.pipe(bufferTime(50), batch());
 
-rxNostr.req(batched, { relays }).subscribe(console.log);
+rxNostr.req(relays, batched).subscribe(console.log);
 ```
 
 | operator | 内容 |

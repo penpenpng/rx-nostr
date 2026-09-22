@@ -53,7 +53,7 @@ const rxNostr = new RxNostr({
 const rxReq = new RxForwardReq();
 
 // Define a listener.
-rxNostr.req(rxReq, { relays: ["wss://nostr.example.com"] }).subscribe(({ event }) => {
+rxNostr.req(["wss://nostr.example.com"], rxReq).subscribe(({ event }) => {
   console.log(event);
 });
 

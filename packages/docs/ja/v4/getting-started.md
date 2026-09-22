@@ -25,12 +25,13 @@ const rxNostr = new RxNostr({
 フィルターを `req()` へ直接渡すと、一度だけ過去イベントを取得する backward query になります。EOSE、CLOSED、timeout などによって全リレーの処理が終わると Observable が complete します。
 
 ```ts
-const events = rxNostr.req([{ kinds: [1], limit: 20 }], {
-  relays: [
+const events = rxNostr.req(
+  [
     "wss://relay-one.example.com",
     "wss://relay-two.example.com",
   ],
-});
+  [{ kinds: [1], limit: 20 }],
+);
 
 const subscription = events.subscribe({
   next(packet) {
@@ -59,16 +60,14 @@ interface EventPacket {
 
 ```ts
 const publication = rxNostr.publish(
+  [
+    "wss://relay-one.example.com",
+    "wss://relay-two.example.com",
+  ],
   {
     kind: 1,
     content: "Hello, Nostr!",
     tags: [],
-  },
-  {
-    relays: [
-      "wss://relay-one.example.com",
-      "wss://relay-two.example.com",
-    ],
   },
 );
 

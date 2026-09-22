@@ -21,8 +21,7 @@ const rxNostr = new RxNostr({
   signer,
 });
 
-rxNostr.publish(params, {
-  relays,
+rxNostr.publish(relays, params, {
   signer: anotherSigner,
 });
 ```
@@ -58,8 +57,7 @@ const signer = new SeckeySigner("nsec1...");
 ```ts
 import { NoopSigner } from "rx-nostr";
 
-rxNostr.publish(signedEvent, {
-  relays,
+rxNostr.publish(relays, signedEvent, {
   signer: new NoopSigner(),
 });
 ```

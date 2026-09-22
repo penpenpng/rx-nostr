@@ -60,18 +60,19 @@ export class RxNostr implements IRxNostr {
   }
 
   req(
-    arg: RxReq | LazyFilter | Iterable<LazyFilter>,
-    { relays, ...options }: RxNostrReqConfig,
+    relays: RelayInput,
+    request: RxReq | LazyFilter | Iterable<LazyFilter>,
+    options: RxNostrReqConfig = {},
   ): Observable<EventPacket> {
     const config = new FilledRxNostrReqOptions(options, this.#config);
 
     const rxReq: RxReq = (() => {
-      if (arg instanceof RxReq) {
-        return arg;
-      } else if (Symbol.iterator in arg) {
-        return new RxOneshotReq([...arg]);
+      if (request instanceof RxReq) {
+        return request;
+      } else if (Symbol.iterator in request) {
+        return new RxOneshotReq([...request]);
       } else {
-        return new RxOneshotReq(arg);
+        return new RxOneshotReq(request);
       }
     })();
 
@@ -98,8 +99,9 @@ export class RxNostr implements IRxNostr {
   }
 
   publish(
+    relays: RelayInput,
     params: Nostr.EventParameters,
-    { relays, ...options }: RxNostrPublishConfig,
+    options: RxNostrPublishConfig = {},
   ): Publication {
     this.#assertActive();
     const config = new FilledRxNostrPublishOptions(options, this.#config);
