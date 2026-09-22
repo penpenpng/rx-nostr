@@ -12,7 +12,7 @@ import {
   type ConnectionStatePacket,
   type EventPacket,
 } from "rx-nostr";
-import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
+import { ControlledWebSocketServer, expectSent } from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -46,9 +46,8 @@ describe("RxNostr facade lifecycle", () => {
       rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });
 
       server.sockets.latest.open();
-      await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-      const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-      server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      server.sockets.latest.message(["EOSE", subId]);
 
       await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
       await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
@@ -63,7 +62,9 @@ describe("RxNostr facade lifecycle", () => {
     const server = new ControlledWebSocketServer();
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
+      signer: new NoopSigner(),
       retry: new NoopRetryer(),
+      defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
@@ -87,11 +88,7 @@ describe("RxNostr facade lifecycle", () => {
     const delayedReq = rxNostr.req(relay, { strategy: "oneshot", filters: [{}] });
     const delayedMonitor = rxNostr.monitorConnectionState();
 
-    const publication = rxNostr.publish(relay, signedEvent, {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const publication = rxNostr.publish(relay, signedEvent);
     const publicationComplete = vi.fn();
     publication.subscribe({ complete: publicationComplete });
     const cancelled = expect(publication.waitFor("all")).rejects.toMatchObject({
@@ -107,9 +104,7 @@ describe("RxNostr facade lifecycle", () => {
     await cancelled;
     expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
     expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
-    expect(() => rxNostr.publish(relay, signedEvent, { signer: new NoopSigner() })).toThrow(
-      RxNostrAlreadyDisposedError,
-    );
+    expect(() => rxNostr.publish(relay, signedEvent)).toThrow(RxNostrAlreadyDisposedError);
 
     const delayedReqError = vi.fn();
     delayedReq.subscribe({ error: delayedReqError });
@@ -177,6 +172,7 @@ describe("RxNostr facade lifecycle", () => {
       verifier: { verifyEvent: rootVerify },
       defaultOptions: {
         req: {
+          linger: 0,
           skipValidateFilterMatching: true,
           skipExpirationCheck: true,
         },
@@ -192,7 +188,6 @@ describe("RxNostr facade lifecycle", () => {
         verifier: { verifyEvent: operationVerify },
         skipValidateFilterMatching: false,
         skipExpirationCheck: false,
-        linger: 0,
       })
       .subscribe((packet) => packets.push(packet));
     request.emit([{ kinds: [1] }], {
@@ -203,27 +198,20 @@ describe("RxNostr facade lifecycle", () => {
     expect(server.connections).toHaveLength(1);
     expect(server.sockets.latest.url).toBe("wss://packet.example.com");
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
     const now = Math.floor(Date.now() / 1_000);
-    server.sockets.latest.message(
-      JSON.stringify(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]),
-    );
-    server.sockets.latest.message(
-      JSON.stringify([
-        "EVENT",
-        subId,
-        {
-          ...signedEvent,
-          id: "expired",
-          tags: [["expiration", `${now - 1}`]],
-        },
-      ]),
-    );
-    server.sockets.latest.message(
-      JSON.stringify(["EVENT", subId, { ...signedEvent, id: "accepted" }]),
-    );
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
+    server.sockets.latest.message([
+      "EVENT",
+      subId,
+      {
+        ...signedEvent,
+        id: "expired",
+        tags: [["expiration", `${now - 1}`]],
+      },
+    ]);
+    server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "accepted" }]);
+    server.sockets.latest.message(["EOSE", subId]);
 
     await vi.waitFor(() => expect(packets).toHaveLength(1));
     expect(packets[0]).toMatchObject({

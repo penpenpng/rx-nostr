@@ -1,9 +1,10 @@
+import type * as Nostr from "nostr-typedef";
 import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "rx-nostr";
 
 type Handler<T> = ((event: T) => unknown) | null;
 
 export class ControlledWebSocket implements WebSocketLike {
-  readonly sent: WebSocketData[] = [];
+  readonly sent: Nostr.ToRelayMessage.Any[] = [];
   readonly closeRequests: Readonly<{ code?: number; reason?: string }>[] = [];
   readyState = 0;
   onopen: Handler<{ type: string }> = null;
@@ -19,7 +20,26 @@ export class ControlledWebSocket implements WebSocketLike {
 
   send(data: WebSocketData): void {
     if (this.readyState !== 1) throw new Error("The controlled socket is not open.");
-    this.sent.push(data);
+    if (typeof data !== "string") {
+      throw new TypeError("Expected a Nostr JSON text message from the client.");
+    }
+    const message: unknown = JSON.parse(data);
+    if (!Array.isArray(message)) {
+      throw new TypeError("Expected a Nostr message tuple from the client.");
+    }
+    this.sent.push(message as Nostr.ToRelayMessage.Any);
+  }
+
+  sentOfType<T extends Nostr.ToRelayMessage.Type>(type: T): Nostr.ToRelayMessage.Message<T>[] {
+    return this.sent.filter(
+      (message): message is Nostr.ToRelayMessage.Message<T> => message[0] === type,
+    );
+  }
+
+  latestSent<T extends Nostr.ToRelayMessage.Type>(type: T): Nostr.ToRelayMessage.Message<T> {
+    const message = this.sentOfType(type).at(-1);
+    if (!message) throw new Error(`No ${type} message has been sent.`);
+    return message;
   }
 
   close(code?: number, reason?: string): void {
@@ -32,7 +52,12 @@ export class ControlledWebSocket implements WebSocketLike {
     this.onopen?.({ type: "open" });
   }
 
-  message(data: WebSocketData): void {
+  message(data: Nostr.ToClientMessage.Any): void {
+    this.rawMessage(JSON.stringify(data));
+  }
+
+  /** Deliver malformed or non-text data in transport/codec failure tests. */
+  rawMessage(data: WebSocketData): void {
     this.onmessage?.({ data });
   }
 

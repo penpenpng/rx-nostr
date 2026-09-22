@@ -11,14 +11,20 @@ import {
   type OkPacket,
   type Publication,
   type PublicationFailure,
+  type RxNostrConfig,
 } from "rx-nostr";
-import { ControlledWebSocket, ControlledWebSocketServer } from "../support/controlled-websocket.ts";
+import {
+  ControlledWebSocket,
+  ControlledWebSocketServer,
+  expectSent,
+  Faker,
+} from "../helper/index.ts";
 
 const relay1 = "wss://relay1.example.com";
 const relay2 = "wss://relay2.example.com";
 
 function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
-  return {
+  return Faker.event({
     id: "event",
     pubkey: "pubkey",
     created_at: 1,
@@ -27,7 +33,7 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
     content: "before",
     sig: "signature",
     ...overrides,
-  };
+  });
 }
 
 function socket(server: ControlledWebSocketServer, url: string): ControlledWebSocket {
@@ -35,8 +41,22 @@ function socket(server: ControlledWebSocketServer, url: string): ControlledWebSo
 }
 
 async function expectEventSent(connection: ControlledWebSocket): Promise<void> {
-  await vi.waitFor(() => expect(connection.sent).toHaveLength(1));
-  expect(JSON.parse(connection.sent[0] as string)[0]).toBe("EVENT");
+  await expectSent(connection, "EVENT");
+}
+
+function createRxNostr(
+  server: ControlledWebSocketServer,
+  overrides: Partial<RxNostrConfig> = {},
+): RxNostr {
+  return new RxNostr({
+    verifier: new NoopVerifier(),
+    signer: new NoopSigner(),
+    retry: new NoopRetryer(),
+    defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
+    skipFetchNip11: true,
+    WebSocket: server.WebSocket,
+    ...overrides,
+  });
 }
 
 describe("Publication public contract", () => {
@@ -77,17 +97,8 @@ describe("Publication public contract", () => {
   test("publishes to multiple relays, settles all/any, and replays raw OK packets", async () => {
     const server = new ControlledWebSocketServer();
     const signed = event();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const publication = rxNostr.publish([relay1, relay2], signed, {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const rxNostr = createRxNostr(server);
+    const publication = rxNostr.publish([relay1, relay2], signed);
     const firstPackets: OkPacket[] = [];
     const firstObserver = publication.subscribe((packet) => firstPackets.push(packet));
     const all = publication.waitFor("all");
@@ -100,13 +111,13 @@ describe("Publication public contract", () => {
     first.open();
     second.open();
     await Promise.all([expectEventSent(first), expectEventSent(second)]);
-    first.message(JSON.stringify(["OK", "event", true, "saved first"]));
+    first.message(["OK", "event", true, "saved first"]);
 
     await expect(any).resolves.toBeUndefined();
     expect(allSettled).toBe(false);
     expect(firstPackets).toHaveLength(1);
     firstObserver.unsubscribe();
-    second.message(JSON.stringify(["OK", "event", true, "saved second"]));
+    second.message(["OK", "event", true, "saved second"]);
     await expect(all).resolves.toBeUndefined();
 
     const replayed: OkPacket[] = [];
@@ -135,17 +146,8 @@ describe("Publication public contract", () => {
 
   test("rejects all on one final rejection while any can still succeed", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const publication = rxNostr.publish([relay1, relay2], event(), {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const rxNostr = createRxNostr(server);
+    const publication = rxNostr.publish([relay1, relay2], event());
     const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
       code: "not-all-accepted",
       failures: [{ relay: relay1, kind: "rejected" }],
@@ -157,25 +159,18 @@ describe("Publication public contract", () => {
     second.open();
     await Promise.all([expectEventSent(first), expectEventSent(second)]);
 
-    first.message(JSON.stringify(["OK", "event", false, "blocked: denied"]));
+    first.message(["OK", "event", false, "blocked: denied"]);
     await allFailure;
     expect(second.closeRequests).toHaveLength(0);
-    second.message(JSON.stringify(["OK", "event", true, "saved"]));
+    second.message(["OK", "event", true, "saved"]);
     await expect(any).resolves.toBeUndefined();
     rxNostr.dispose();
   });
 
   test("isolates a timeout from another relay's acceptance", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const publication = rxNostr.publish([relay1, relay2], event(), {
-      signer: new NoopSigner(),
-      linger: 0,
       timeout: 100,
     });
     const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
@@ -188,7 +183,7 @@ describe("Publication public contract", () => {
     first.open();
     second.open();
     await Promise.all([expectEventSent(first), expectEventSent(second)]);
-    first.message(JSON.stringify(["OK", "event", true, "saved"]));
+    first.message(["OK", "event", true, "saved"]);
 
     await expect(any).resolves.toBeUndefined();
     await allFailure;
@@ -205,11 +200,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const empty = rxNostr.publish([], event(), { signer: unusedSigner });
     await expect(empty.event).rejects.toMatchObject({ code: "no-relays" });
     await expect(empty.waitFor("all")).rejects.toMatchObject({
@@ -225,7 +216,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const failed = rxNostr.publish(relay1, event(), { signer: rejectingSigner, linger: 0 });
+    const failed = rxNostr.publish(relay1, event(), { signer: rejectingSigner });
     const observerError = vi.fn();
     failed.subscribe({ error: observerError });
     await expect(failed.event).rejects.toMatchObject({
@@ -243,7 +234,7 @@ describe("Publication public contract", () => {
       },
       getPublicKey: async () => "unused",
     };
-    const invalid = rxNostr.publish(relay2, event(), { signer: invalidSigner, linger: 0 });
+    const invalid = rxNostr.publish(relay2, event(), { signer: invalidSigner });
     await expect(invalid.event).rejects.toMatchObject({ callback: "signer" });
     rxNostr.dispose();
   });
@@ -258,12 +249,8 @@ describe("Publication public contract", () => {
       signEvent: <K extends number>() => signing as Promise<Nostr.Event<K>>,
       getPublicKey: async () => "pubkey",
     };
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const publication = rxNostr.publish(relay1, event(), { signer, linger: 0 });
+    const rxNostr = createRxNostr(server);
+    const publication = rxNostr.publish(relay1, event(), { signer });
     const complete = vi.fn();
     publication.subscribe({ complete });
     const all = publication.waitFor("all");
@@ -291,13 +278,8 @@ describe("Publication public contract", () => {
       signEvent: <K extends number>() => signing as Promise<Nostr.Event<K>>,
       getPublicKey: async () => "pubkey",
     };
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const publication = rxNostr.publish(relay1, event(), { signer, linger: 0, timeout: 1_000 });
+    const rxNostr = createRxNostr(server);
+    const publication = rxNostr.publish(relay1, event(), { signer });
     const observed = vi.fn();
     publication.subscribe(observed).unsubscribe();
     const all = publication.waitFor("all");
@@ -306,7 +288,7 @@ describe("Publication public contract", () => {
     const connection = socket(server, relay1);
     connection.open();
     await expectEventSent(connection);
-    connection.message(JSON.stringify(["OK", "event", true, "saved"]));
+    connection.message(["OK", "event", true, "saved"]);
 
     await expect(all).resolves.toBeUndefined();
     expect(observed).not.toHaveBeenCalled();
@@ -315,25 +297,16 @@ describe("Publication public contract", () => {
 
   test("keeps a hot relay connected while releasing a cold publish relay", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     rxNostr.setHotRelays([relay1]);
     const hot = socket(server, relay1);
     hot.open();
-    const publication = rxNostr.publish([relay1, relay2], event(), {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const publication = rxNostr.publish([relay1, relay2], event());
     const cold = socket(server, relay2);
     cold.open();
     await Promise.all([expectEventSent(hot), expectEventSent(cold)]);
-    hot.message(JSON.stringify(["OK", "event", true, "saved"]));
-    cold.message(JSON.stringify(["OK", "event", true, "saved"]));
+    hot.message(["OK", "event", true, "saved"]);
+    cold.message(["OK", "event", true, "saved"]);
     await expect(publication.waitFor("all")).resolves.toBeUndefined();
 
     await vi.waitFor(() => expect(cold.closeRequests).toHaveLength(1));
@@ -347,17 +320,8 @@ describe("Publication public contract", () => {
 
   test("continues another relay after one connection drops", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const publication = rxNostr.publish([relay1, relay2], event(), {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const rxNostr = createRxNostr(server);
+    const publication = rxNostr.publish([relay1, relay2], event());
     const allFailure = expect(publication.waitFor("all")).rejects.toMatchObject({
       code: "not-all-accepted",
       failures: [
@@ -374,7 +338,7 @@ describe("Publication public contract", () => {
     second.open();
     await Promise.all([expectEventSent(first), expectEventSent(second)]);
     second.peerClose(1006, "offline");
-    first.message(JSON.stringify(["OK", "event", true, "saved"]));
+    first.message(["OK", "event", true, "saved"]);
 
     await expect(any).resolves.toBeUndefined();
     await allFailure;
@@ -383,22 +347,14 @@ describe("Publication public contract", () => {
 
   test("keeps auth-required OK pending and settles after authenticated resend", async () => {
     const server = new ControlledWebSocketServer();
-    const authEvent = event({ id: "auth-event", kind: 22242 });
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
+    const authEvent = Faker.authEvent({ id: "auth-event" });
+    const rxNostr = createRxNostr(server, {
       authenticator: {
         authTimeout: 1_000,
-        challenge: async () => ({ ...authEvent, kind: 22242 }),
+        challenge: async () => authEvent,
       },
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(relay1, event(), {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const publication = rxNostr.publish(relay1, event());
     const packets: OkPacket[] = [];
     publication.subscribe((packet) => packets.push(packet));
     const all = publication.waitFor("all");
@@ -407,15 +363,15 @@ describe("Publication public contract", () => {
     const connection = socket(server, relay1);
     connection.open();
     await expectEventSent(connection);
-    connection.message(JSON.stringify(["AUTH", "challenge"]));
-    connection.message(JSON.stringify(["OK", "event", false, "auth-required: login"]));
-    await vi.waitFor(() => expect(connection.sent).toHaveLength(2));
+    connection.message(["AUTH", "challenge"]);
+    connection.message(["OK", "event", false, "auth-required: login"]);
+    expect(await expectSent(connection, "AUTH")).toEqual(["AUTH", authEvent]);
     expect(settled).toBe(false);
     expect(packets).toHaveLength(1);
 
-    connection.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
-    await vi.waitFor(() => expect(connection.sent).toHaveLength(3));
-    connection.message(JSON.stringify(["OK", "event", true, "saved"]));
+    connection.message(["OK", "auth-event", true, "authenticated"]);
+    await expectSent(connection, "EVENT", 2);
+    connection.message(["OK", "event", true, "saved"]);
     await expect(all).resolves.toBeUndefined();
     expect(packets.map((packet) => packet.ok)).toEqual([false, true]);
     rxNostr.dispose();
@@ -423,17 +379,10 @@ describe("Publication public contract", () => {
 
   test("resends an unconfirmed EVENT after reconnect", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
+    const rxNostr = createRxNostr(server, {
       retry: { retry: () => ({ action: "retry", delay: 0 }) },
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
-    const publication = rxNostr.publish(relay1, event(), {
-      signer: new NoopSigner(),
-      linger: 0,
-      timeout: 1_000,
-    });
+    const publication = rxNostr.publish(relay1, event());
     const all = publication.waitFor("all");
     const first = socket(server, relay1);
     first.open();
@@ -443,7 +392,7 @@ describe("Publication public contract", () => {
     const second = server.sockets.latest;
     second.open();
     await expectEventSent(second);
-    second.message(JSON.stringify(["OK", "event", true, "saved"]));
+    second.message(["OK", "event", true, "saved"]);
 
     await expect(all).resolves.toBeUndefined();
     rxNostr.dispose();

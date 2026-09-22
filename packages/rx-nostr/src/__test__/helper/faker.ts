@@ -3,17 +3,35 @@ import type { RelayUrl } from "../../libs";
 import type { EventPacket } from "../../packets";
 
 export class Faker {
-  static event(event: Partial<Nostr.Event>): Nostr.Event {
+  static event<K extends number = number>(event: Partial<Nostr.Event<K>> = {}): Nostr.Event<K> {
     return {
       id: "",
       pubkey: "",
       created_at: 0,
-      kind: 0,
+      kind: 0 as K,
       tags: [],
       content: "",
       sig: "",
       ...event,
     };
+  }
+
+  static authEvent({
+    relay = "wss://faker.example.com",
+    challenge = "",
+    ...event
+  }: Partial<Nostr.Event<22242>> & {
+    relay?: string;
+    challenge?: string;
+  } = {}): Nostr.Event<22242> {
+    return Faker.event<22242>({
+      kind: 22242,
+      ...event,
+      tags: event.tags ?? [
+        ["relay", relay],
+        ["challenge", challenge],
+      ],
+    });
   }
 
   static eventPacket({

@@ -9,13 +9,14 @@ import {
   RxForwardReq,
   RxRelays,
   type EventPacket,
+  type RxNostrConfig,
 } from "rx-nostr";
-import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
+import { ControlledWebSocketServer, expectSent, Faker } from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
 
 function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
-  return {
+  return Faker.event({
     id: "event",
     pubkey: "pubkey",
     created_at: Math.floor(Date.now() / 1000),
@@ -24,36 +25,41 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
     content: "",
     sig: "sig",
     ...overrides,
-  };
+  });
+}
+
+function createRxNostr(
+  server: ControlledWebSocketServer,
+  overrides: Partial<RxNostrConfig> = {},
+): RxNostr {
+  return new RxNostr({
+    verifier: new NoopVerifier(),
+    retry: new NoopRetryer(),
+    defaultOptions: { req: { linger: 0, timeout: 1_000 } },
+    skipFetchNip11: true,
+    WebSocket: server.WebSocket,
+    ...overrides,
+  });
 }
 
 describe("REQ public contract", () => {
   test("sends a backward REQ, exposes traceTag only, and ends on EOSE", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-      defaultOptions: { req: { linger: 0 } },
-    });
+    const rxNostr = createRxNostr(server);
     const request = new RxBackwardReq();
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr
-      .req(relay, request, { timeout: 1_000 })
-      .subscribe({ next: (packet) => packets.push(packet), complete });
+    rxNostr.req(relay, request).subscribe({ next: (packet) => packets.push(packet), complete });
     request.emit([{ kinds: [1] }], { traceTag: "timeline" });
     request.over();
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const req = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string, object];
+    const req = await expectSent(server.sockets.latest, "REQ");
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1] });
 
     const result = event({ id: "result" });
-    server.sockets.latest.message(JSON.stringify(["EVENT", req[1], result]));
-    server.sockets.latest.message(JSON.stringify(["EOSE", req[1]]));
+    server.sockets.latest.message(["EVENT", req[1], result]);
+    server.sockets.latest.message(["EOSE", req[1]]);
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets).toEqual([
       {
@@ -75,33 +81,23 @@ describe("REQ public contract", () => {
 
   test("replaces a forward REQ and sends CLOSE for each local end", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const request = new RxForwardReq();
-    const subscription = rxNostr.req(relay, request, { linger: 0 }).subscribe();
+    const subscription = rxNostr.req(relay, request).subscribe();
     request.emit([{ kinds: [1] }]);
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const first = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    const first = await expectSent(server.sockets.latest, "REQ");
 
     request.emit([{ kinds: [2] }]);
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(3));
-    const messages = server.sockets.latest.sent.map((value) => JSON.parse(value as string));
-    const second = messages.find((message) => message[0] === "REQ" && message[1] !== first[1]);
-    expect(messages).toContainEqual(["CLOSE", first[1]]);
-    expect(second?.[2]).toEqual({ kinds: [2] });
+    const second = await expectSent(server.sockets.latest, "REQ", 2);
+    await expectSent(server.sockets.latest, "CLOSE");
+    expect(server.sockets.latest.sent).toContainEqual(["CLOSE", first[1]]);
+    expect(second[2]).toEqual({ kinds: [2] });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(4));
-    expect(server.sockets.latest.sent.map((value) => JSON.parse(value as string))).toContainEqual([
-      "CLOSE",
-      second?.[1],
-    ]);
+    await expectSent(server.sockets.latest, "CLOSE", 2);
+    expect(server.sockets.latest.sent).toContainEqual(["CLOSE", second[1]]);
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
     server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
@@ -109,23 +105,17 @@ describe("REQ public contract", () => {
 
   test("keeps a fixed forward descriptor active after EOSE", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     const subscription = rxNostr
-      .req(relay, { strategy: "forward", filters: { kinds: [1] } }, { linger: 0 })
+      .req(relay, { strategy: "forward", filters: { kinds: [1] } })
       .subscribe({ next: (packet) => packets.push(packet), complete });
 
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
-    server.sockets.latest.message(JSON.stringify(["EVENT", subId, event({ id: "live" })]));
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message(["EOSE", subId]);
+    server.sockets.latest.message(["EVENT", subId, event({ id: "live" })]);
 
     await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["live"]));
     expect(complete).not.toHaveBeenCalled();
@@ -138,11 +128,7 @@ describe("REQ public contract", () => {
 
   test("completes an empty destination without creating a connection", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const complete = vi.fn();
     const error = vi.fn();
     rxNostr.req([], { strategy: "oneshot", filters: [{}] }).subscribe({ complete, error });
@@ -157,24 +143,21 @@ describe("REQ public contract", () => {
   test("applies filter matching, verification, and expiration in order", async () => {
     const server = new ControlledWebSocketServer();
     const verified: string[] = [];
-    const rxNostr = new RxNostr({
+    const rxNostr = createRxNostr(server, {
       verifier: {
         async verifyEvent(value) {
           verified.push(value.id);
           return value.id !== "invalid-signature";
         },
       },
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
     const packets: EventPacket[] = [];
     const complete = vi.fn();
     rxNostr
-      .req(relay, { strategy: "oneshot", filters: { kinds: [1] } }, { linger: 0 })
+      .req(relay, { strategy: "oneshot", filters: { kinds: [1] } })
       .subscribe({ next: (packet) => packets.push(packet), complete });
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
     const expiredAt = Math.floor(Date.now() / 1000) - 1;
     for (const value of [
       event({ id: "mismatch", kind: 2 }),
@@ -182,9 +165,9 @@ describe("REQ public contract", () => {
       event({ id: "expired", tags: [["expiration", `${expiredAt}`]] }),
       event({ id: "valid" }),
     ]) {
-      server.sockets.latest.message(JSON.stringify(["EVENT", subId, value]));
+      server.sockets.latest.message(["EVENT", subId, value]);
     }
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(["EOSE", subId]);
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(verified).toEqual(["invalid-signature", "expired", "valid"]);
@@ -197,19 +180,16 @@ describe("REQ public contract", () => {
   test("wraps verifier exceptions as callback errors", async () => {
     const server = new ControlledWebSocketServer();
     const cause = new Error("verifier failed");
-    const rxNostr = new RxNostr({
+    const rxNostr = createRxNostr(server, {
       verifier: { verifyEvent: async () => Promise.reject(cause) },
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
     let received: unknown;
-    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }, { linger: 0 }).subscribe({
+    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
       error: (error) => (received = error),
     });
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-    server.sockets.latest.message(JSON.stringify(["EVENT", subId, event()]));
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message(["EVENT", subId, event()]);
 
     await vi.waitFor(() => expect(received).toBeDefined());
     expect(received).toMatchObject({
@@ -217,8 +197,7 @@ describe("REQ public contract", () => {
       callback: "verifier",
       cause,
     });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
-    expect(JSON.parse(server.sockets.latest.sent[1] as string)).toEqual(["CLOSE", subId]);
+    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", subId]);
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
     server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
@@ -226,66 +205,50 @@ describe("REQ public contract", () => {
 
   test("honors filter/expiration skips and wraps lazy filter exceptions", async () => {
     const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const packets: EventPacket[] = [];
     rxNostr
       .req(
         relay,
         { strategy: "oneshot", filters: [{ kinds: [1] }] },
         {
-          linger: 0,
           skipExpirationCheck: true,
           skipValidateFilterMatching: true,
         },
       )
       .subscribe((packet) => packets.push(packet));
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-    server.sockets.latest.message(
-      JSON.stringify([
-        "EVENT",
-        subId,
-        event({
-          id: "skipped",
-          kind: 2,
-          tags: [["expiration", "0"]],
-        }),
-      ]),
-    );
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message([
+      "EVENT",
+      subId,
+      event({
+        id: "skipped",
+        kind: 2,
+        tags: [["expiration", "0"]],
+      }),
+    ]);
+    server.sockets.latest.message(["EOSE", subId]);
     await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["skipped"]));
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
     server.sockets.latest.acknowledgeClose();
     rxNostr.dispose();
 
     const callbackServer = new ControlledWebSocketServer();
-    const callbackRxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: callbackServer.WebSocket,
-    });
+    const callbackRxNostr = createRxNostr(callbackServer);
     const cause = new Error("filter failed");
     let received: unknown;
     callbackRxNostr
-      .req(
-        relay,
-        {
-          strategy: "oneshot",
-          filters: [
-            {
-              since: () => {
-                throw cause;
-              },
+      .req(relay, {
+        strategy: "oneshot",
+        filters: [
+          {
+            since: () => {
+              throw cause;
             },
-          ],
-        },
-        { linger: 0 },
-      )
+          },
+        ],
+      })
       .subscribe({ error: (error) => (received = error) });
     callbackServer.sockets.latest.open();
     await vi.waitFor(() => expect(received).toBeDefined());
@@ -304,15 +267,10 @@ describe("REQ public contract", () => {
     const server = new ControlledWebSocketServer();
     const one = "wss://one.example.com";
     const two = "wss://two.example.com";
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      retry: new NoopRetryer(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr.req([one, two], { strategy: "oneshot", filters: [{}] }, { linger: 0 }).subscribe({
+    rxNostr.req([one, two], { strategy: "oneshot", filters: [{}] }).subscribe({
       next: (packet) => packets.push(packet),
       complete,
     });
@@ -321,13 +279,11 @@ describe("REQ public contract", () => {
     const second = server.sockets.latestFor(two);
     first.open();
     second.open();
-    await vi.waitFor(() =>
-      expect(server.connections.every((socket) => socket.sent.length === 1)).toBe(true),
-    );
+    const [, secondSubId] = await expectSent(second, "REQ");
+    await expectSent(first, "REQ");
     first.peerClose(1006, "offline");
-    const [, secondSubId] = JSON.parse(second.sent[0] as string) as ["REQ", string];
-    second.message(JSON.stringify(["EVENT", secondSubId, event({ id: "from-two" })]));
-    second.message(JSON.stringify(["EOSE", secondSubId]));
+    second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
+    second.message(["EOSE", secondSubId]);
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets.map((packet) => packet.event.id)).toEqual(["from-two"]);
@@ -342,36 +298,23 @@ describe("REQ public contract", () => {
     directory.setNip11(relay, {
       limitation: { max_subscriptions: 1 },
     });
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
+    const rxNostr = createRxNostr(server, {
       relayDirectory: directory,
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
     const request = new RxBackwardReq();
     const complete = vi.fn();
-    rxNostr.req(relay, request, { linger: 0 }).subscribe({ complete });
+    rxNostr.req(relay, request).subscribe({ complete });
     request.emit([{ kinds: [1] }]);
     request.emit([{ kinds: [2] }]);
     request.over();
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const first = JSON.parse(server.sockets.latest.sent[0] as string) as [
-      "REQ",
-      string,
-      { kinds: number[] },
-    ];
+    const first = await expectSent(server.sockets.latest, "REQ");
     expect(first[2]).toEqual({ kinds: [1] });
-    server.sockets.latest.message(JSON.stringify(["EOSE", first[1]]));
+    server.sockets.latest.message(["EOSE", first[1]]);
 
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
-    const second = JSON.parse(server.sockets.latest.sent[1] as string) as [
-      "REQ",
-      string,
-      { kinds: number[] },
-    ];
+    const second = await expectSent(server.sockets.latest, "REQ", 2);
     expect(second[2]).toEqual({ kinds: [2] });
-    server.sockets.latest.message(JSON.stringify(["EOSE", second[1]]));
+    server.sockets.latest.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
     server.sockets.latest.acknowledgeClose();
@@ -383,15 +326,11 @@ describe("REQ public contract", () => {
     const one = "wss://one.example.com";
     const two = "wss://two.example.com";
     const destinations = new RxRelays([one]);
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
+    const rxNostr = createRxNostr(server);
     const request = new RxBackwardReq();
     const packets: EventPacket[] = [];
     const complete = vi.fn();
-    rxNostr.req(destinations, request, { linger: 0 }).subscribe({
+    rxNostr.req(destinations, request).subscribe({
       next: (packet) => packets.push(packet),
       complete,
     });
@@ -400,18 +339,16 @@ describe("REQ public contract", () => {
     await vi.waitFor(() => expect(server.connections).toHaveLength(1));
     const first = server.sockets.latestFor(one);
     first.open();
-    await vi.waitFor(() => expect(first.sent).toHaveLength(1));
+    const [, firstSubId] = await expectSent(first, "REQ");
 
     destinations.append(two);
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     const second = server.sockets.latestFor(two);
     second.open();
-    await vi.waitFor(() => expect(second.sent).toHaveLength(1));
-    const [, firstSubId] = JSON.parse(first.sent[0] as string) as ["REQ", string];
-    const [, secondSubId] = JSON.parse(second.sent[0] as string) as ["REQ", string];
-    second.message(JSON.stringify(["EVENT", secondSubId, event({ id: "dynamic" })]));
-    first.message(JSON.stringify(["EOSE", firstSubId]));
-    second.message(JSON.stringify(["EOSE", secondSubId]));
+    const [, secondSubId] = await expectSent(second, "REQ");
+    second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
+    first.message(["EOSE", firstSubId]);
+    second.message(["EOSE", secondSubId]);
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);

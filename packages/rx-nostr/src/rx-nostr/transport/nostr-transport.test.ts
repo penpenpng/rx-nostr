@@ -149,11 +149,11 @@ describe("NostrTransport", () => {
     transport.messages$.subscribe((packet) => messages.push(packet.type));
     transport.state$.subscribe((state) => states.push(state.state));
 
-    server.sockets.latest.message('["NOTICE","hello"]');
+    server.sockets.latest.message(["NOTICE", "hello"]);
     await transport.cast(["CLOSE", "sub"]);
 
     expect(messages).toEqual(["NOTICE"]);
-    expect(server.sockets.latest.sent).toEqual(['["CLOSE","sub"]']);
+    expect(server.sockets.latest.sent).toEqual([["CLOSE", "sub"]]);
 
     await closeTransport(transport, server);
     expect(states).toContain("dormant");
@@ -169,8 +169,8 @@ describe("NostrTransport", () => {
       transport.diagnostics$.subscribe((value) => diagnostics.push(value.type));
       transport.messages$.subscribe((value) => messages.push(value.type));
 
-      server.sockets.latest.message(input);
-      server.sockets.latest.message('["NOTICE","still alive"]');
+      server.sockets.latest.rawMessage(input);
+      server.sockets.latest.message(["NOTICE", "still alive"]);
 
       await vi.waitFor(() => expect(diagnostics).toEqual(["message-deserialization-failed"]));
       expect(messages).toEqual(["NOTICE"]);
@@ -195,10 +195,10 @@ describe("NostrTransport", () => {
         complete: () => completions++,
       });
 
-    expect(server.sockets.latest.sent).toEqual(['["REQ","sub",{}]']);
+    expect(server.sockets.latest.sent).toEqual([["REQ", "sub", {}]]);
     await Promise.resolve();
-    server.sockets.latest.message(JSON.stringify(["EVENT", "sub", event]));
-    server.sockets.latest.message('["EOSE","sub"]');
+    server.sockets.latest.message(["EVENT", "sub", event]);
+    server.sockets.latest.message(["EOSE", "sub"]);
     await vi.waitFor(() => expect(completions).toBe(1));
     expect(received).toEqual(["EVENT"]);
 
@@ -256,8 +256,8 @@ describe("NostrTransport", () => {
     );
     await vi.waitFor(() => expect(states.filter((state) => state === "connected")).toHaveLength(2));
 
-    oldSocket.message('["NOTICE","stale"]');
-    newSocket.message('["NOTICE","current"]');
+    oldSocket.message(["NOTICE", "stale"]);
+    newSocket.message(["NOTICE", "current"]);
     expect(messages).toEqual(["NOTICE"]);
 
     await closeTransport(transport, server);
@@ -336,7 +336,7 @@ describe("NostrTransport", () => {
     await first;
 
     expect(complete).toHaveBeenCalledOnce();
-    server.sockets.latest.message('["NOTICE","late"]');
+    server.sockets.latest.message(["NOTICE", "late"]);
     expect(next).not.toHaveBeenCalled();
   });
 });

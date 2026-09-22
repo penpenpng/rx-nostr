@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { ControlledWebSocketServer, Faker } from "../__test__/helper/index.ts";
+import { ControlledWebSocketServer, expectSent, Faker } from "../__test__/helper/index.ts";
 import { NoopRetryer } from "../connection-retryer/index.ts";
 import { RelayDirectory } from "../relay-directory/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
@@ -88,17 +88,15 @@ describe("RelayCommunication transport integration", () => {
       next: (packet) => events.push(packet.event.id),
       complete,
     });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const req = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string, object];
+    const req = await expectSent(server.sockets.latest, "REQ");
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1], since: 10 });
 
-    server.sockets.latest.message(JSON.stringify(["EVENT", req[1], Faker.event({ id: "event" })]));
+    server.sockets.latest.message(["EVENT", req[1], Faker.event({ id: "event" })]);
     expect(events).toEqual(["event"]);
 
     subscription.unsubscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
-    expect(JSON.parse(server.sockets.latest.sent[1] as string)).toEqual(["CLOSE", req[1]]);
+    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", req[1]]);
     expect(complete).not.toHaveBeenCalled();
 
     release();
@@ -120,10 +118,9 @@ describe("RelayCommunication transport integration", () => {
       next: (packet) => packets.push(packet),
       complete,
     });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-    server.sockets.latest.message(JSON.stringify(["EVENT", subId, Faker.event({ id: "event" })]));
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "event" })]);
+    server.sockets.latest.message(["EOSE", subId]);
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets).toEqual([
@@ -151,8 +148,8 @@ describe("RelayCommunication transport integration", () => {
     server.sockets.latest.open();
     let since = 1;
     const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    expect(JSON.parse(server.sockets.latest.sent[0] as string)[2]).toMatchObject({
+    const first = await expectSent(server.sockets.latest, "REQ");
+    expect(first[2]).toMatchObject({
       since: 1,
     });
 
@@ -160,13 +157,13 @@ describe("RelayCommunication transport integration", () => {
     since = 2;
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     server.sockets.latest.open();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    expect(JSON.parse(server.sockets.latest.sent[0] as string)[2]).toMatchObject({
+    const resent = await expectSent(server.sockets.latest, "REQ");
+    expect(resent[2]).toMatchObject({
       since: 2,
     });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
+    await expectSent(server.sockets.latest, "CLOSE");
     release();
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
     server.sockets.latest.acknowledgeClose();
@@ -189,16 +186,11 @@ describe("RelayCommunication transport integration", () => {
         next: (packet) => events.push(packet.event.id),
         complete,
       });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const [, subId] = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
+    const [, subId] = await expectSent(server.sockets.latest, "REQ");
 
-    server.sockets.latest.message(
-      JSON.stringify(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]),
-    );
-    server.sockets.latest.message(
-      JSON.stringify(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]),
-    );
-    server.sockets.latest.message(JSON.stringify(["EOSE", subId]));
+    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]);
+    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]);
+    server.sockets.latest.message(["EOSE", subId]);
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(events).toEqual(["right"]);
     expect(server.sockets.latest.sent).toHaveLength(1);
@@ -224,8 +216,8 @@ describe("RelayCommunication transport integration", () => {
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(error).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
-    const [req, close] = server.sockets.latest.sent.map((value) => JSON.parse(value as string));
+    const req = server.sockets.latest.latestSent("REQ");
+    const close = await expectSent(server.sockets.latest, "CLOSE");
     expect(close).toEqual(["CLOSE", req[1]]);
 
     release();
@@ -255,19 +247,13 @@ describe("RelayCommunication transport integration", () => {
     });
     const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe();
     cancelled.unsubscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    const first = JSON.parse(server.sockets.latest.sent[0] as string) as ["REQ", string];
-    server.sockets.latest.message(JSON.stringify(["EOSE", first[1]]));
+    const first = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.message(["EOSE", first[1]]);
 
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
+    const second = await expectSent(server.sockets.latest, "REQ", 2);
     expect(firstComplete).toHaveBeenCalledOnce();
-    const second = JSON.parse(server.sockets.latest.sent[1] as string) as [
-      "REQ",
-      string,
-      { kinds: number[] },
-    ];
     expect(second[2]).toMatchObject({ kinds: [2] });
-    server.sockets.latest.message(JSON.stringify(["EOSE", second[1]]));
+    server.sockets.latest.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
     expect(server.sockets.latest.sent).toHaveLength(2);
 
@@ -295,17 +281,13 @@ describe("RelayCommunication transport integration", () => {
     });
     const queued = relay.vreq("backward", [{ kinds: [2] }]);
     queued.subscribe({ complete: queuedComplete });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
+    await expectSent(server.sockets.latest, "REQ");
 
     relay.dispose();
 
     expect(firstComplete).toHaveBeenCalledOnce();
     expect(queuedComplete).toHaveBeenCalledOnce();
-    expect(
-      server.sockets.latest.sent
-        .map((value) => JSON.parse(value as string))
-        .filter(([type]) => type === "REQ"),
-    ).toHaveLength(1);
+    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
     queued.subscribe({ complete: queuedComplete });
     expect(queuedComplete).toHaveBeenCalledTimes(2);
   });
@@ -353,9 +335,8 @@ describe("RelayCommunication transport integration", () => {
     const packets: object[] = [];
 
     relay.event(event).subscribe((packet) => packets.push(packet));
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    expect(JSON.parse(server.sockets.latest.sent[0] as string)).toEqual(["EVENT", event]);
-    server.sockets.latest.message('["OK","event",true,"saved"]');
+    expect(await expectSent(server.sockets.latest, "EVENT")).toEqual(["EVENT", event]);
+    server.sockets.latest.message(["OK", "event", true, "saved"]);
 
     expect(packets).toEqual([
       {
@@ -380,17 +361,11 @@ describe("RelayCommunication transport integration", () => {
     const release = relay.hold();
     server.sockets.latest.open();
     const event = Faker.event({ id: "event" });
-    const authEvent = {
-      ...Faker.event({
-        id: "auth-event",
-        kind: 22242,
-        tags: [
-          ["relay", relay.url],
-          ["challenge", "challenge"],
-        ],
-      }),
-      kind: 22242 as const,
-    };
+    const authEvent = Faker.authEvent({
+      id: "auth-event",
+      relay: relay.url,
+      challenge: "challenge",
+    });
     const packets: object[] = [];
     const complete = vi.fn();
     relay
@@ -398,16 +373,14 @@ describe("RelayCommunication transport integration", () => {
         authenticator: { authTimeout: 1_000, challenge: async () => authEvent },
       })
       .subscribe({ next: (packet) => packets.push(packet), complete });
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(1));
-    server.sockets.latest.message(JSON.stringify(["AUTH", "challenge"]));
-    server.sockets.latest.message(JSON.stringify(["OK", "event", false, "auth-required: login"]));
+    await expectSent(server.sockets.latest, "EVENT");
+    server.sockets.latest.message(["AUTH", "challenge"]);
+    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
 
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(2));
-    expect(JSON.parse(server.sockets.latest.sent[1] as string)).toEqual(["AUTH", authEvent]);
-    server.sockets.latest.message(JSON.stringify(["OK", "auth-event", true, "authenticated"]));
-    await vi.waitFor(() => expect(server.sockets.latest.sent).toHaveLength(3));
-    expect(JSON.parse(server.sockets.latest.sent[2] as string)).toEqual(["EVENT", event]);
-    server.sockets.latest.message(JSON.stringify(["OK", "event", true, "saved"]));
+    expect(await expectSent(server.sockets.latest, "AUTH")).toEqual(["AUTH", authEvent]);
+    server.sockets.latest.message(["OK", "auth-event", true, "authenticated"]);
+    expect(await expectSent(server.sockets.latest, "EVENT", 2)).toEqual(["EVENT", event]);
+    server.sockets.latest.message(["OK", "event", true, "saved"]);
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(packets).toEqual([
