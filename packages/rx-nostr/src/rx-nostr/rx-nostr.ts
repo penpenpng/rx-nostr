@@ -54,22 +54,12 @@ export class RxNostr implements IRxNostr {
   constructor(config: RxNostrConfig = {}) {
     this.#config = new FilledRxNostrConfig(config, RxNostr.defaultConfig, RxNostr.defaultOptions);
     this.#relays = new RelayPool((url) => {
-      if (!this.#config.skipFetchNip11) {
-        void this.#config.relayDirectory.fetchNip11(url).catch((cause) => {
-          emitDiagnostic({
-            severity: "warning",
-            occurredAt: Date.now(),
-            relay: url,
-            message: "Automatic NIP-11 relay information retrieval failed.",
-            cause,
-          });
-        });
-      }
       return new RelayCommunication(url, {
         WebSocket: this.#config.WebSocket,
         reconnector: this.#config.reconnector,
         dropDetectors: this.#config.dropDetectors,
         relayDirectory: this.#config.relayDirectory,
+        ...(this.#config.skipFetchNip11 ? {} : { nip11Timeout: this.#config.nip11Timeout }),
         onDiagnostic: emitDiagnostic,
       });
     });

@@ -9,9 +9,9 @@ describe("RelayDirectoryBridge", () => {
     const url = normalizeRelayUrl("wss://relay.example.com")!;
     const directory = new RelayDirectory({ clock: () => now });
     const onMaxSubscriptions = vi.fn();
-    const bridge = new RelayDirectoryBridge(url, directory, onMaxSubscriptions);
+    const bridge = new RelayDirectoryBridge(url, directory, onMaxSubscriptions, vi.fn());
 
-    expect(onMaxSubscriptions).toHaveBeenLastCalledWith(undefined);
+    expect(onMaxSubscriptions).not.toHaveBeenCalled();
     directory.setNip11(url, { limitation: { max_subscriptions: 2 } });
     expect(onMaxSubscriptions).toHaveBeenLastCalledWith(2);
 
@@ -41,10 +41,10 @@ describe("RelayDirectoryBridge", () => {
   test("provides no transport hooks when no directory is configured", () => {
     const url = normalizeRelayUrl("wss://relay.example.com")!;
     const onMaxSubscriptions = vi.fn();
-    const bridge = new RelayDirectoryBridge(url, undefined, onMaxSubscriptions);
+    const bridge = new RelayDirectoryBridge(url, undefined, onMaxSubscriptions, vi.fn());
 
     expect(bridge.transportHooks).toEqual({});
-    expect(onMaxSubscriptions).not.toHaveBeenCalled();
+    expect(onMaxSubscriptions).toHaveBeenCalledWith(undefined);
     bridge.dispose();
   });
 });

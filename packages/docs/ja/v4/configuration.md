@@ -10,6 +10,7 @@ const rxNostr = new RxNostr({
   reconnector,
   dropDetectors,
   relayDirectory,
+  nip11Timeout: 30_000,
   skipFetchNip11: false,
   WebSocket,
   defaultOptions: {
@@ -27,7 +28,8 @@ const rxNostr = new RxNostr({
 | `reconnector` | no | 再接続 policy |
 | `dropDetectors` | no | 接続異常を検出する detector の iterable |
 | `relayDirectory` | no | metadata/health store |
-| `skipFetchNip11` | no | pool entry 作成時の自動 NIP-11 fetch を止める |
+| `nip11Timeout` | no | 自動 NIP-11 fetch の待機時間。既定値は30,000 ms |
+| `skipFetchNip11` | no | 接続需要発生時の自動 NIP-11 fetch を止める |
 | `WebSocket` | no | runtime に注入する WebSocket constructor |
 | `defaultOptions` | no | REQ / publish operation の既定値 |
 
@@ -62,6 +64,7 @@ const secondary = new RxNostr({
 | `reconnector` | `ExponentialBackoffReconnector` |
 | `dropDetectors` | `[]` |
 | `relayDirectory` | `GlobalRelayDirectory` |
+| `nip11Timeout` | `30_000` ms |
 | `skipFetchNip11` | `false` |
 | `WebSocket` | `globalThis.WebSocket` |
 

@@ -11,6 +11,18 @@ function req(source: Observable<EventPacket>, run: () => void): ReqRunner {
 }
 
 describe("RelayReqScheduler", () => {
+  test("waits for NIP-11 capacity before starting REQs", () => {
+    const scheduler = new RelayReqScheduler();
+    const run = vi.fn();
+
+    scheduler.schedule(req(new Subject<EventPacket>(), run)).subscribe();
+    expect(run).not.toHaveBeenCalled();
+
+    scheduler.setMaxSubscriptions(undefined);
+    expect(run).toHaveBeenCalledOnce();
+    scheduler.dispose();
+  });
+
   test("starts REQs in FIFO order after the previous terminal is delivered", () => {
     const scheduler = new RelayReqScheduler();
     scheduler.setMaxSubscriptions(1);

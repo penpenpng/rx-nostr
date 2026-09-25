@@ -40,6 +40,7 @@ export interface RelayCommunicationOptions {
   readonly dropDetectors?: readonly ConnectionDropDetector[];
   readonly relayDirectory?: RelayDirectory;
   readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
+  readonly nip11Timeout?: number;
   /** @internal Seam for future REQ planning. */
   readonly vreqPlanner?: RelayVreqPlanner;
 }
@@ -58,9 +59,13 @@ export class RelayCommunication implements IRelayCommunication {
     public readonly url: RelayUrl,
     options: RelayCommunicationOptions = {},
   ) {
-    this.#directory = new RelayDirectoryBridge(url, options.relayDirectory, (maxSubscriptions) =>
-      this.#reqScheduler.setMaxSubscriptions(maxSubscriptions),
+    this.#directory = new RelayDirectoryBridge(
+      url,
+      options.relayDirectory,
+      (maxSubscriptions) => this.#reqScheduler.setMaxSubscriptions(maxSubscriptions),
+      () => this.#reqScheduler.waitForMaxSubscriptions(),
     );
+    if (options.nip11Timeout === undefined) this.#directory.useAvailableNip11();
     const transport = new NostrTransport({
       url,
       WebSocket: options.WebSocket,
@@ -74,7 +79,20 @@ export class RelayCommunication implements IRelayCommunication {
       vreqPlanner: options.vreqPlanner,
     });
     this.#leases = new ConnectionLeaseController({
-      onFirstLease: () => void this.#protocol.open().catch(() => {}),
+      onFirstLease: () => {
+        if (options.nip11Timeout !== undefined) {
+          void this.#directory.acquireNip11(options.nip11Timeout).catch((cause) => {
+            options.onDiagnostic?.({
+              severity: "warning",
+              occurredAt: Date.now(),
+              relay: url,
+              message: "Automatic NIP-11 relay information retrieval failed.",
+              cause,
+            });
+          });
+        }
+        void this.#protocol.open().catch(() => {});
+      },
       onLastRelease: () => void this.#protocol.close().catch(() => {}),
       onDispose: () => this.#protocol.dispose(),
     });

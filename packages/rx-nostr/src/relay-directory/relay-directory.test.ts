@@ -152,4 +152,16 @@ describe("RelayDirectory snapshots", () => {
       nip11FailedAt: 2,
     });
   });
+
+  test("times out NIP-11 fetches and records the failure", async () => {
+    const directory = new RelayDirectory({
+      clock: () => 3,
+      fetcher: () => new Promise(() => {}),
+    });
+
+    await expect(
+      directory.fetchNip11("wss://relay.example.com", { timeout: 0 }),
+    ).rejects.toMatchObject({ code: "timeout" });
+    expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
+  });
 });

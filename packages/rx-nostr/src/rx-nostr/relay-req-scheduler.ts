@@ -10,12 +10,18 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   readonly #pending = new Set<ReqTask>();
   readonly #active = new Set<ReqTask>();
   #maxSubscriptions?: number;
+  #capacityReady = false;
   #disposed = false;
   #drainSuppression = 0;
 
   setMaxSubscriptions(maxSubscriptions: number | undefined): void {
     this.#maxSubscriptions = maxSubscriptions;
+    this.#capacityReady = true;
     this.#drain();
+  }
+
+  waitForMaxSubscriptions(): void {
+    this.#capacityReady = false;
   }
 
   schedule(run: ReqRunner): Observable<EventPacket> {
@@ -40,7 +46,7 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   dispose = this[Symbol.dispose];
 
   #drain(): void {
-    if (this.#disposed || this.#drainSuppression > 0) return;
+    if (this.#disposed || this.#drainSuppression > 0 || !this.#capacityReady) return;
     const limit = this.#maxSubscriptions ?? Number.POSITIVE_INFINITY;
     if (limit === 0) {
       for (const task of this.#pending) task.subscriber.complete();

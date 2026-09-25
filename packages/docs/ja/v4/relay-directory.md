@@ -48,7 +48,9 @@ const subscription = directory
 
 ## NIP-11
 
-RxNostr は relay pool entry を初めて作るとき、既定で NIP-11 を非同期に取得します。取得失敗は operation を失敗させません。
+RxNostr は relay への接続需要が初めて発生したとき、NIP-11 cache を確認し、cache がなければ取得を開始します。REQ は取得が完了するまで NIP-11 queue で待機します。
+
+取得は `nip11Timeout`（既定値30,000 ms）まで待機します。取得に失敗した場合、その事実を Directory に記録したうえで、最新の cache または空の metadata を利用します。取得失敗自体は operation を失敗させません。
 
 手動取得、refresh、手動設定も可能です。
 

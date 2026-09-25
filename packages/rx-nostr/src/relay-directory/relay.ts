@@ -1,6 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { BehaviorSubject, type Observable } from "rxjs";
 import { once, type RelayUrl } from "../libs/index.ts";
+import { RxNostrNip11Error } from "../libs/error.ts";
 import type { RelayDirectoryEntry, RelayDirectorySnapshotEntry } from "./relay.interface.ts";
 
 export type Nip11Fetcher = (url: string) => Promise<Nostr.Nip11.RelayInfo>;
@@ -56,11 +57,17 @@ export class RelayRecord {
     return this.#updates.asObservable();
   }
 
-  fetchNip11(refresh: boolean): Promise<Readonly<Nostr.Nip11.RelayInfo>> {
+  fetchNip11(refresh: boolean, timeout?: number): Promise<Readonly<Nostr.Nip11.RelayInfo>> {
     if (!refresh && this.#nip11) return Promise.resolve(this.#nip11);
     if (this.#inflight) return this.#inflight;
 
-    const request = this.fetcher(this.url).then(
+    let fetched: Promise<Nostr.Nip11.RelayInfo>;
+    try {
+      fetched = this.fetcher(this.url);
+    } catch (error) {
+      fetched = Promise.reject(error);
+    }
+    const request = withTimeout(fetched, timeout, this.url).then(
       (info) => {
         this.#nip11 = cloneRelayInfo(info);
         this.#nip11FetchedAt = this.clock();
@@ -146,6 +153,42 @@ export class RelayRecord {
   #emit(): void {
     this.#updates.next(this.snapshot());
   }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeout: number | undefined,
+  url: RelayUrl,
+): Promise<T> {
+  if (timeout === undefined || timeout === Number.POSITIVE_INFINITY) return promise;
+  if (!Number.isFinite(timeout) || timeout < 0) {
+    return Promise.reject(
+      new RangeError("NIP-11 timeout must be a non-negative finite number or Infinity."),
+    );
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(
+          new RxNostrNip11Error(
+            "timeout",
+            `Timed out while fetching relay information from ${url}.`,
+          ),
+        ),
+      timeout,
+    );
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 export function cloneRelayInfo(

@@ -40,6 +40,7 @@ export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze
   reconnector: new ExponentialBackoffReconnector(),
   dropDetectors: [],
   relayDirectory: GlobalRelayDirectory,
+  nip11Timeout: 30_000,
   skipFetchNip11: false,
   WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
 });
@@ -51,6 +52,7 @@ export class FilledRxNostrConfig {
   readonly reconnector: ConnectionReconnector;
   readonly dropDetectors: readonly ConnectionDropDetector[];
   readonly relayDirectory: RelayDirectory;
+  readonly nip11Timeout: number;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
   readonly defaultOptions: Readonly<RxNostrDefaultOptions>;
@@ -73,6 +75,7 @@ export class FilledRxNostrConfig {
       ...(config.dropDetectors ?? staticDefaultConfig.dropDetectors),
     ]);
     this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
+    this.nip11Timeout = config.nip11Timeout ?? staticDefaultConfig.nip11Timeout;
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
     this.defaultOptions = freezeDefaultOptions(config.defaultOptions);

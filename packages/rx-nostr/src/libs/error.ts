@@ -70,6 +70,7 @@ export class RxNostrEnvironmentError extends RxNostrError {
 export type RxNostrNip11ErrorCode =
   | "invalid-url"
   | "network"
+  | "timeout"
   | "status"
   | "parse"
   | "invalid-response";

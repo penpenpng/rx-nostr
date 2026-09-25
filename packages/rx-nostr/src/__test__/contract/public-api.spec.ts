@@ -127,6 +127,7 @@ describe("public entry point", () => {
       expect(defaults.reconnector).toBeInstanceOf(publicApi.ExponentialBackoffReconnector);
       expect(defaults.dropDetectors).toEqual([]);
       expect(defaults.relayDirectory).toBe(publicApi.GlobalRelayDirectory);
+      expect(defaults.nip11Timeout).toBe(30_000);
       expect(defaults.skipFetchNip11).toBe(false);
     });
   });

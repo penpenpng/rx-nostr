@@ -70,7 +70,7 @@ export class RelayDirectory implements IRelayDirectory {
 
   fetchNip11(url: string, options: FetchNip11Options = {}): Promise<Nostr.Nip11.RelayInfo> {
     return this.#getOrCreate(url)
-      .fetchNip11(options.refresh ?? false)
+      .fetchNip11(options.refresh ?? false, options.timeout)
       .then(copyRelayInfo);
   }
 

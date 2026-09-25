@@ -163,6 +163,7 @@ describe("rx-nostr config", () => {
     expect(root.verifier).toBe(verifier);
     expect(root.signer).toBe(signer);
     expect(root.relayDirectory).toBe(relayDirectory);
+    expect(root.nip11Timeout).toBe(30_000);
     expect(root.skipFetchNip11).toBe(true);
     expect(overridden.verifier).toBe(instanceVerifier);
     expect(overridden.skipFetchNip11).toBe(false);

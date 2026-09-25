@@ -1,10 +1,74 @@
 import { describe, expect, test, vi } from "vitest";
-import { ControlledWebSocketServer, expectSent, Faker } from "../__test__/helper/index.ts";
+import {
+  ControlledWebSocketServer,
+  createDeferred,
+  expectSent,
+  Faker,
+} from "../__test__/helper/index.ts";
 import { NoopReconnector } from "../connection-reconnector/index.ts";
 import { RelayDirectory } from "../relay-directory/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 
 describe("RelayCommunication transport integration", () => {
+  test("starts NIP-11 retrieval on connection demand and holds REQs until it settles", async () => {
+    const server = new ControlledWebSocketServer();
+    const response = createDeferred<{ limitation: { max_subscriptions: number } }>();
+    const fetcher = vi.fn(() => response.promise);
+    const directory = new RelayDirectory({ fetcher });
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+      nip11Timeout: 1_000,
+    });
+
+    expect(fetcher).not.toHaveBeenCalled();
+    const release = relay.hold();
+    expect(fetcher).toHaveBeenCalledOnce();
+    server.sockets.latest.open();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe();
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe();
+    await Promise.resolve();
+    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(0);
+
+    response.resolve({ limitation: { max_subscriptions: 1 } });
+    const first = await expectSent(server.sockets.latest, "REQ");
+    expect(first[2]).toMatchObject({ kinds: [1] });
+    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
+    server.sockets.latest.message(["EOSE", first[1]]);
+    const second = await expectSent(server.sockets.latest, "REQ", 2);
+    expect(second[2]).toMatchObject({ kinds: [2] });
+    server.sockets.latest.message(["EOSE", second[1]]);
+
+    release();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
+  });
+
+  test("uses empty NIP-11 metadata after retrieval fails", async () => {
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory({ fetcher: () => Promise.reject(new Error("offline")) });
+    const diagnostic = vi.fn();
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+      nip11Timeout: 1_000,
+      onDiagnostic: diagnostic,
+    });
+    const release = relay.hold();
+    server.sockets.latest.open();
+    relay.vreq("backward", [{}]).subscribe();
+
+    const req = await expectSent(server.sockets.latest, "REQ");
+    expect(directory.get(relay.url)?.nip11FailedAt).toBeTypeOf("number");
+    expect(diagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Automatic NIP-11 relay information retrieval failed." }),
+    );
+    server.sockets.latest.message(["EOSE", req[1]]);
+    release();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
+  });
+
   test("reports the same lifecycle to RelayDirectory health", async () => {
     let now = 1;
     const server = new ControlledWebSocketServer();
