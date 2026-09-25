@@ -8,7 +8,7 @@ import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayInput } from "../../types/index.ts";
-import { QuerySession, type QuerySegment } from "../query-session.ts";
+import { ConnectionDemandScope, type QuerySegment } from "../connection-demand-scope.ts";
 import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 
@@ -23,19 +23,19 @@ export function reqBackward({
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
-  const session = new QuerySession(config);
+  const connectionDemand = new ConnectionDemandScope(config);
   const sessionRelays = RxRelays.from(relayInput);
 
   const warming = sessionRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      session.prewarm(relay);
+      connectionDemand.prewarm(relay);
     });
   });
 
   return rxReq.asObservable().pipe(
     map((packet) =>
       req({
-        session,
+        connectionDemand,
         relays,
         sessionRelays,
         segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
@@ -51,14 +51,14 @@ export function reqBackward({
     mergeAll(),
     finalize(() => {
       warming.unsubscribe();
-      session.dispose();
+      connectionDemand.dispose();
       sessionRelays.dispose();
     }),
   );
 }
 
 function req({
-  session,
+  connectionDemand,
   relays,
   sessionRelays,
   segmentRelays,
@@ -69,7 +69,7 @@ function req({
   eoseTimeout,
   authenticator,
 }: {
-  session: QuerySession;
+  connectionDemand: ConnectionDemandScope;
   relays: RelayCommunicationCollection;
   sessionRelays: RxRelays;
   segmentRelays: RxRelays;
@@ -82,7 +82,7 @@ function req({
 }): Observable<EventPacket> {
   const warming = segmentRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
-      session.prewarm(relay);
+      connectionDemand.prewarm(relay);
     });
   });
 
@@ -138,7 +138,7 @@ function req({
         }
         started.add(relay.url);
 
-        const segment = session.beginSegment(relay, linger);
+        const segment = connectionDemand.beginSegment(relay, linger);
 
         let finalized = false;
         const queryRef: { sub?: Subscription } = {};

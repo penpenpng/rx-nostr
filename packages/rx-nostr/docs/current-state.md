@@ -12,7 +12,7 @@ v4 の core implementation と Task 11 の静的品質ゲートまで完成し�
 | `rx-relays`                           | 概ね維持       | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                                       |
 | signer/verifier/lazy-filter/operators | 概ね維持       | v4 向けに分離済み。Task 01 で public export を監査し、明確な型欠陥だけを修正した。                                                         |
 | forward/backward REQ                  | 実装済み       | real adapter で REQ/CLOSE、forward replacement、backward terminal、動的 relay、weak/defer/linger、empty destination を検証済み。           |
-| query session / hot relays            | 実装済み       | query/publish/hot が同じ idempotent lease を使用し、prewarm、weak、linger、rapid reacquire、dispose を検証済み。                           |
+| connection demand scope / hot relays  | 実装済み       | query/publish/hot が同じ idempotent lease を使用し、prewarm、weak、linger、rapid reacquire、dispose を検証済み。                           |
 | relay pool                            | 実装済み       | instance ごと・normalized URL ごとに一 entry。初期 v4 は idle eviction せず instance dispose で一括解放する。                              |
 | relay communication                   | query 実装済み | unipls adapter 上で resend、relay-local terminal、physical query queue、NIP-11 limit、filter snapshot、dispose cleanup を実装済み。        |
 | publish                               | 実装済み       | hot Publication、raw OK replay、all/any、cancel、snapshot、AUTH/reconnect resend、relay-local failure isolation を検証済み。               |

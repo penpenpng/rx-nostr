@@ -10,7 +10,7 @@ import type {
 } from "../../publication/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RelayInput } from "../../types/index.ts";
-import { QuerySession, type QuerySegment } from "../query-session.ts";
+import { ConnectionDemandScope, type QuerySegment } from "../connection-demand-scope.ts";
 import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
 import { NostrTransportOperationError } from "../transport/index.ts";
@@ -49,7 +49,7 @@ export class PublicationOperation implements Publication, Disposable {
   readonly closed: Promise<void>;
 
   readonly #okPackets = new ReplaySubject<OkPacket>();
-  readonly #session: QuerySession;
+  readonly #connectionDemand: ConnectionDemandScope;
   readonly #deliveries = new Map<RelayUrl, RelayDelivery>();
   readonly #waiters = new Set<SettlementWaiter>();
   readonly #resolveEvent: (event: Nostr.Event) => void;
@@ -83,7 +83,7 @@ export class PublicationOperation implements Publication, Disposable {
     });
     this.#resolveClosed = resolveClosed;
 
-    this.#session = new QuerySession({ defer: false, weak: config.weak });
+    this.#connectionDemand = new ConnectionDemandScope({ defer: false, weak: config.weak });
     for (const relay of destinations) {
       this.#deliveries.set(relay, { relay, state: "pending" });
     }
@@ -95,7 +95,7 @@ export class PublicationOperation implements Publication, Disposable {
       return;
     }
 
-    this.relays.forEach(destinations, (relay) => this.#session.prewarm(relay));
+    this.relays.forEach(destinations, (relay) => this.#connectionDemand.prewarm(relay));
 
     let signed: Promise<Nostr.Event>;
     try {
@@ -174,7 +174,7 @@ export class PublicationOperation implements Publication, Disposable {
     for (const delivery of this.#deliveries.values()) {
       if (delivery.state !== "pending") continue;
       const relay = this.relays.get(delivery.relay);
-      delivery.segment = this.#session.beginSegment(relay, this.config.linger);
+      delivery.segment = this.#connectionDemand.beginSegment(relay, this.config.linger);
       delivery.subscription = relay
         .event(snapshot as Nostr.Event, {
           authenticator: this.config.authenticator,
@@ -307,7 +307,7 @@ export class PublicationOperation implements Publication, Disposable {
     for (const delivery of this.#deliveries.values()) {
       delivery.subscription?.unsubscribe();
     }
-    this.#session.dispose();
+    this.#connectionDemand.dispose();
     this.#resolveClosed();
   }
 }

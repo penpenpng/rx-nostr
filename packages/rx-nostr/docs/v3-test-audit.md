@@ -27,7 +27,7 @@ through hot relays and leases.
 | v3 scenario                                                            | Classification | v4 coverage                                                                                   |
 | ---------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
 | keep-lazy default relay remains connected after subscriptions          | replace        | `src/rx-nostr/modules/relay-warmer.test.ts`: hot and query leases are independent             |
-| keep-lazy temporary relay becomes dormant immediately or after timeout | replace        | `src/rx-nostr/query-session.test.ts`: `linger` retains and releases the lease                 |
+| keep-lazy temporary relay becomes dormant immediately or after timeout | replace        | `src/rx-nostr/connection-demand-scope.test.ts`: `linger` retains and releases the lease       |
 | aggressive default relay connects immediately                          | replace        | `relay-warmer.test.ts`: hot demand opens without sending protocol messages                    |
 | aggressive relay becomes temporary/non-default                         | replace        | `relay-warmer.test.ts`: dynamic hot-set removal releases only the hot lease                   |
 | adding/removing default relays updates a live forward REQ              | replace        | `src/rx-nostr/modules/req-forward.test.ts`: dynamic `RxRelays` starts/stops relay segments    |

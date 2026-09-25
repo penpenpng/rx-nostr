@@ -6,7 +6,7 @@ import type { LazyFilter } from "../../lazy-filter/index.ts";
 import type { RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
-import { QuerySession } from "../query-session.ts";
+import { ConnectionDemandScope } from "../connection-demand-scope.ts";
 import { RelayCommunication, type IRelayCommunication } from "../relay-communication.ts";
 import { RelayPool, type RelayCommunicationCollection } from "../relay-pool.ts";
 import { RelayWarmer } from "./relay-warmer.ts";
@@ -100,21 +100,21 @@ describe("RelayWarmer", () => {
     const collection = new LeaseRelayCollection();
     const warmer = new RelayWarmer(collection);
     const relay = collection.get("wss://relay.example.com");
-    const session = new QuerySession({ defer: true, weak: false });
+    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
 
     warmer.setHotRelays([relay.url]);
-    const segment = session.beginSegment(relay, 0);
+    const segment = connectionDemand.beginSegment(relay, 0);
     expect(relay.leases).toBe(2);
 
     segment.endSegment();
     expect(relay.leases).toBe(1);
-    const active = session.beginSegment(relay, 0);
+    const active = connectionDemand.beginSegment(relay, 0);
     warmer.unsetHotRelays();
     expect(relay.leases).toBe(1);
     active.endSegment();
     expect(relay.leases).toBe(0);
 
-    session.dispose();
+    connectionDemand.dispose();
     warmer.dispose();
   });
 

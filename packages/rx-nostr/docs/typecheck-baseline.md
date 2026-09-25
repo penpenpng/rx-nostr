@@ -81,7 +81,7 @@ No diagnostic comes from the Nostr codec, unipls adapter, reconnect policy, cont
 
 ## Progress after Task 03
 
-Task 03 replaced the provisional generic relay map with the per-instance `RelayPool` and connected query/hot lifetime to one lease contract without introducing new diagnostics. The check still reports the same 6 diagnostics owned by Tasks 04, 08, and 09. No diagnostic comes from pool, lease, warmer, query-session, or their tests.
+Task 03 replaced the provisional generic relay map with the per-instance `RelayPool` and connected query/hot lifetime to one lease contract without introducing new diagnostics. The check still reports the same 6 diagnostics owned by Tasks 04, 08, and 09. No diagnostic comes from pool, lease, warmer, connection-demand-scope, or their tests.
 
 ## Progress after Task 04
 

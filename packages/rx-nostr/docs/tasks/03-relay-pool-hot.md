@@ -11,7 +11,7 @@ Status: **complete (2026-09-21)**
 - normalized URL ごとに `RelayCommunication` を一つ作る per-instance pool を実装する。
 - `hold()` が idempotent disposer を返す lease contract を固定する。
 - 0 -> 1 lease で unipls session を開き、1 -> 0 で linger 後に閉じる。open/close race を test clock で検証する。
-- `QuerySession` の prewarm、segment、linger、weak を lease に接続する。
+- `ConnectionDemandScope` の prewarm、segment、linger、weak を lease に接続する。
 - `RelayWarmer` を `hold()` ベースに修正し、動的 `RxRelays` 差分ごとに hot lease を取得/解放する。
 - hot set の置換、同一 URL alias、empty set、dispose を検証する。
 - pool entry の eviction policy を決める。少なくとも active lease/query がある entry は削除しない。
@@ -45,6 +45,6 @@ Status: **complete (2026-09-21)**
 - per-instance `RelayPool` が URL を再正規化し、一つの normalized URL に一つの `RelayCommunication` を割り当てる。
 - 初期 v4 では pool entry を idle eviction しない。entry は RxNostr instance の dispose まで保持し、pool dispose で全 entry を一度だけ破棄する。
 - `ConnectionLeaseController` が idempotent lease disposer と 0→1 open / 1→0 close を管理する。最後の release による close は microtask まで保留し、同一 turn の再取得で stale close を無効化する。
-- query の `linger` は `QuerySession` が lease の release を遅延させる。session dispose は timer を取り消して即時 release し、pool/communication dispose 後の callback は transport を再操作しない。
+- query の `linger` は `ConnectionDemandScope` が lease の release を遅延させる。scope dispose は timer を取り消して即時 release し、pool/communication dispose 後の callback は transport を再操作しない。
 - `RelayWarmer` は hot relay ごとの lease disposer を直接所有し、dynamic `RxRelays` の追加・削除・集合置換に追従する。hot 専用 connection API は持たない。
 - hot/query の二重 lease、active query 中の hot removal、linger、weak、URL alias、empty set、rapid reacquire、dispose を unit test で検証した。

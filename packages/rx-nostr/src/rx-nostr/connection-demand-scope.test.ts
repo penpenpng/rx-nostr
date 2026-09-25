@@ -5,7 +5,7 @@ import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/index.ts";
 import type { EventPacket, OkPacket } from "../packets/index.ts";
 import type { IRelayCommunication } from "./relay-communication.ts";
-import { QuerySession } from "./query-session.ts";
+import { ConnectionDemandScope } from "./connection-demand-scope.ts";
 
 class LeaseRelay implements IRelayCommunication {
   leases = 0;
@@ -28,12 +28,12 @@ class LeaseRelay implements IRelayCommunication {
 
 afterEach(() => vi.useRealTimers());
 
-describe("QuerySession leases", () => {
+describe("ConnectionDemandScope leases", () => {
   test("holds a segment lease through linger", () => {
     vi.useFakeTimers();
     const relay = new LeaseRelay("wss://relay.example.com");
-    const session = new QuerySession({ defer: true, weak: false });
-    const segment = session.beginSegment(relay, 100);
+    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
+    const segment = connectionDemand.beginSegment(relay, 100);
 
     segment.endSegment();
     expect(relay.leases).toBe(1);
@@ -41,16 +41,16 @@ describe("QuerySession leases", () => {
     expect(relay.leases).toBe(1);
     vi.advanceTimersByTime(1);
     expect(relay.leases).toBe(0);
-    session.dispose();
+    connectionDemand.dispose();
   });
 
   test("dispose cancels linger callbacks and releases immediately", () => {
     vi.useFakeTimers();
     const relay = new LeaseRelay("wss://relay.example.com");
-    const session = new QuerySession({ defer: true, weak: false });
-    session.beginSegment(relay, 100).endSegment();
+    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
+    connectionDemand.beginSegment(relay, 100).endSegment();
 
-    session.dispose();
+    connectionDemand.dispose();
     expect(relay.leases).toBe(0);
     vi.runAllTimers();
     expect(relay.leases).toBe(0);
@@ -58,11 +58,11 @@ describe("QuerySession leases", () => {
 
   test("weak sessions never acquire a lease", () => {
     const relay = new LeaseRelay("wss://relay.example.com");
-    const session = new QuerySession({ defer: false, weak: true });
+    const connectionDemand = new ConnectionDemandScope({ defer: false, weak: true });
 
-    expect(session.prewarm(relay)).toBe(false);
-    session.beginSegment(relay, 0).endSegment();
+    expect(connectionDemand.prewarm(relay)).toBe(false);
+    connectionDemand.beginSegment(relay, 0).endSegment();
     expect(relay.leases).toBe(0);
-    session.dispose();
+    connectionDemand.dispose();
   });
 });

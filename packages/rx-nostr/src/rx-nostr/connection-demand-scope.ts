@@ -5,10 +5,17 @@ export interface QuerySegment {
   endSegment: () => void;
 }
 
-export class QuerySession {
+/**
+ * Owns connection demand for one operation without owning its protocol work.
+ *
+ * A query or publication uses this scope to hold per-relay leases while its
+ * segments run, optionally warming connections first and releasing them after
+ * their configured linger period.
+ */
+export class ConnectionDemandScope {
   private defer: boolean;
   private weak: boolean;
-  private relays = new RelayMap<QuerySessionPerRelay>();
+  private relays = new RelayMap<RelayDemand>();
 
   constructor(params: { defer: boolean; weak: boolean }) {
     this.defer = params.defer;
@@ -42,11 +49,12 @@ export class QuerySession {
   dispose = this[Symbol.dispose];
 
   private getSessionPerRelay(relay: IRelayCommunication) {
-    return this.relays.setDefault(relay.url, () => new QuerySessionPerRelay(relay));
+    return this.relays.setDefault(relay.url, () => new RelayDemand(relay));
   }
 }
 
-class QuerySessionPerRelay {
+/** Manages the leases this scope holds for one relay. */
+class RelayDemand {
   private deferrer = new Deferrer();
   private warmed = false;
   private dropPrewarming?: () => void;

@@ -80,7 +80,7 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 
 query、publish、hot relay はすべて同じ lease を取得します。最初の lease で unipls session を `open()` し、最後の lease が解放された後に linger policy に従って `close()` します。
 
-最後の lease の release は close を microtask まで保留します。同じ turn で lease が再取得された場合は close を取り消すため、動的 relay の remove/re-add や forward segment の交代で不要な socket blink を起こしません。より長い `linger` は query session が lease 自体を保持し続けることで表現します。
+最後の lease の release は close を microtask まで保留します。同じ turn で lease が再取得された場合は close を取り消すため、動的 relay の remove/re-add や forward segment の交代で不要な socket blink を起こしません。より長い `linger` は connection demand scope が lease 自体を保持し続けることで表現します。
 
 - hot relay: hot 集合に含まれる間、長寿命 lease を保持
 - normal query: segment 中 lease を保持
@@ -123,7 +123,7 @@ connection の再試行を直接命令する API は、directory と pool の責
 
 ### REQ
 
-1. `RxNostr.req()` の subscription ごとに query session を作る。
+1. `RxNostr.req()` の subscription ごとに connection demand scope を作る。
 2. RxRelays の差分から relay segment を開始/終了する。
 3. segment は relay lease と physical subId を取り、NIP-11 subscription limit に空きがなければ relay-local FIFO queue で待つ。
 4. queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
