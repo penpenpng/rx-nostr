@@ -2,142 +2,165 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RelayDirectory,
   RelayDirectorySnapshotError,
-  NoopVerifier,
-  RxNostr,
   fetchRelayInfo,
   type IRelayDirectory,
   type RelayDirectoryEntry,
   type RxNostrConfig,
 } from "rx-nostr";
-import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
+import {
+  createDeferred,
+  createRxNostrScenario,
+  expectCallbackCalled,
+  expectSocketCloseRequested,
+} from "../helper/index.ts";
+
+const relay = "wss://relay.example.com";
+
+async function expectRelayInfo(
+  directory: RelayDirectory,
+  url: string,
+  expected: unknown,
+): Promise<void> {
+  await vi.waitFor(() => expect(directory.get(url)?.nip11).toEqual(expected));
+}
 
 describe("RelayDirectory public contract", () => {
-  test("RxNostr populates metadata on first use unless fetching is skipped", async () => {
-    const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
-    const directory = new RelayDirectory({ fetcher });
-    const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      relayDirectory: directory,
-      WebSocket: server.WebSocket,
-    });
-    rxNostr.setHotRelays(["wss://relay.example.com"]);
-    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
-    await vi.waitFor(() =>
-      expect(directory.get("wss://relay.example.com")?.nip11).toEqual({
-        name: "relay",
-      }),
-    );
-    rxNostr.unsetHotRelays();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
+  describe("RxNostr integration", () => {
+    test("populates metadata on first use", async () => {
+      const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
+      const directory = new RelayDirectory({ fetcher });
+      const { server, rxNostr } = createRxNostrScenario({
+        relayDirectory: directory,
+        skipFetchNip11: false,
+      });
 
-    const skippedServer = new ControlledWebSocketServer();
-    const skipped = new RxNostr({
-      verifier: new NoopVerifier(),
-      relayDirectory: directory,
-      skipFetchNip11: true,
-      WebSocket: skippedServer.WebSocket,
-    });
-    skipped.setHotRelays(["wss://skipped.example.com"]);
-    await Promise.resolve();
-    expect(fetcher).toHaveBeenCalledOnce();
-    skipped.unsetHotRelays();
-    await vi.waitFor(() => expect(skippedServer.sockets.latest.closeRequests).toHaveLength(1));
-    skippedServer.sockets.latest.acknowledgeClose();
-    skipped.dispose();
-  });
+      rxNostr.setHotRelays([relay]);
 
-  test("normalizes aliases and exposes mutable detached read snapshots", () => {
-    const directory: IRelayDirectory = new RelayDirectory({ clock: () => 10 });
-    const first = directory.getOrCreate("wss://RELAY.example.com/");
-    const second = directory.getOrCreate("wss://relay.example.com");
+      await expectCallbackCalled(fetcher);
+      await expectRelayInfo(directory, relay, { name: "relay" });
 
-    expect(first.url).toBe("wss://relay.example.com");
-    expect(second.url).toBe(first.url);
-    expect([...directory]).toHaveLength(1);
-    expect(Object.isFrozen(first)).toBe(false);
-    first.consecutiveFailures = 10;
-    expect(second.consecutiveFailures).toBe(0);
-    expect(directory.get(first.url)?.consecutiveFailures).toBe(0);
-    expect(first).not.toHaveProperty("retry");
-    expect(first).not.toHaveProperty("socket");
-    expectTypeOf<RelayDirectoryEntry>().not.toHaveProperty("retry");
-    expectTypeOf<RxNostrConfig>().toHaveProperty("relayDirectory");
-  });
-
-  test("deduplicates NIP-11 requests, caches them, and supports refresh/manual set", async () => {
-    let resolve!: (value: { name: string; limitation: { max_subscriptions: number } }) => void;
-    const fetcher = vi.fn(
-      () =>
-        new Promise<{
-          name: string;
-          limitation: { max_subscriptions: number };
-        }>((done) => {
-          resolve = done;
-        }),
-    );
-    const directory = new RelayDirectory({ clock: () => 20, fetcher });
-
-    const first = directory.fetchNip11("wss://relay.example.com");
-    const second = directory.fetchNip11("wss://RELAY.example.com/");
-    expect(fetcher).toHaveBeenCalledOnce();
-    resolve({ name: "relay", limitation: { max_subscriptions: 3 } });
-    await expect(first).resolves.toMatchObject({ name: "relay" });
-    await expect(second).resolves.toMatchObject({ name: "relay" });
-    expect(directory.get("wss://relay.example.com")).toMatchObject({
-      nip11FetchedAt: 20,
-      maxSubscriptions: 3,
+      rxNostr.unsetHotRelays();
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
     });
 
-    await directory.fetchNip11("wss://relay.example.com");
-    expect(fetcher).toHaveBeenCalledOnce();
+    test("skips metadata fetching when configured", async () => {
+      const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
+      const directory = new RelayDirectory({ fetcher });
+      const { server, rxNostr } = createRxNostrScenario({
+        relayDirectory: directory,
+        skipFetchNip11: true,
+      });
 
-    fetcher.mockResolvedValue({
-      name: "refreshed",
-      limitation: { max_subscriptions: 4 },
-    });
-    await expect(
-      directory.fetchNip11("wss://relay.example.com", { refresh: true }),
-    ).resolves.toMatchObject({ name: "refreshed" });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+      rxNostr.setHotRelays([relay]);
+      await Promise.resolve();
 
-    const installed = directory.setNip11("wss://relay.example.com", { name: "manual" });
-    installed.name = "consumer change";
-    expect(directory.get("wss://relay.example.com")?.nip11).toEqual({
-      name: "manual",
+      expect(fetcher).not.toHaveBeenCalled();
+
+      rxNostr.unsetHotRelays();
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
     });
   });
 
-  test("rejects malformed snapshots atomically with typed errors", () => {
-    const directory = new RelayDirectory();
-    directory.setNip11("wss://existing.example.com", { name: "existing" });
-    const before = directory.exportSnapshot();
+  describe("entries and snapshots", () => {
+    test("normalizes aliases and exposes mutable detached read snapshots", () => {
+      const directory: IRelayDirectory = new RelayDirectory({ clock: () => 10 });
+      const first = directory.getOrCreate("wss://RELAY.example.com/");
+      const second = directory.getOrCreate("wss://relay.example.com");
 
-    expect(() => directory.importSnapshot("not-json")).toThrowError(
-      expect.objectContaining({ code: "invalid-json" }),
-    );
-    expect(() => directory.importSnapshot(JSON.stringify({ version: 2, relays: [] }))).toThrowError(
-      expect.objectContaining({ code: "unsupported-version" }),
-    );
-    expect(() =>
-      directory.importSnapshot(
-        JSON.stringify({
-          version: 1,
-          relays: [
-            {
-              url: "wss://valid.example.com",
-              consecutiveFailures: 0,
-            },
-            { url: "invalid", consecutiveFailures: 0 },
-          ],
-        }),
-      ),
-    ).toThrowError(expect.objectContaining({ code: "invalid-schema" }));
+      expect(first.url).toBe("wss://relay.example.com");
+      expect(second.url).toBe(first.url);
+      expect([...directory]).toHaveLength(1);
+      expect(Object.isFrozen(first)).toBe(false);
 
-    expect(directory.exportSnapshot()).toBe(before);
-    expectTypeOf<RelayDirectorySnapshotError>().toHaveProperty("code");
+      first.consecutiveFailures = 10;
+
+      expect(second.consecutiveFailures).toBe(0);
+      expect(directory.get(first.url)?.consecutiveFailures).toBe(0);
+      expect(first).not.toHaveProperty("retry");
+      expect(first).not.toHaveProperty("socket");
+      expectTypeOf<RelayDirectoryEntry>().not.toHaveProperty("retry");
+      expectTypeOf<RxNostrConfig>().toHaveProperty("relayDirectory");
+    });
+
+    test("rejects malformed snapshots atomically with typed errors", () => {
+      const directory = new RelayDirectory();
+      directory.setNip11("wss://existing.example.com", { name: "existing" });
+      const before = directory.exportSnapshot();
+
+      expect(() => directory.importSnapshot("not-json")).toThrowError(
+        expect.objectContaining({ code: "invalid-json" }),
+      );
+      expect(() =>
+        directory.importSnapshot(JSON.stringify({ version: 2, relays: [] })),
+      ).toThrowError(expect.objectContaining({ code: "unsupported-version" }));
+      expect(() =>
+        directory.importSnapshot(
+          JSON.stringify({
+            version: 1,
+            relays: [
+              {
+                url: "wss://valid.example.com",
+                consecutiveFailures: 0,
+              },
+              { url: "invalid", consecutiveFailures: 0 },
+            ],
+          }),
+        ),
+      ).toThrowError(expect.objectContaining({ code: "invalid-schema" }));
+
+      expect(directory.exportSnapshot()).toBe(before);
+      expectTypeOf<RelayDirectorySnapshotError>().toHaveProperty("code");
+    });
+  });
+
+  describe("NIP-11 cache", () => {
+    test("deduplicates concurrent requests and caches their result", async () => {
+      const response = createDeferred<{
+        name: string;
+        limitation: { max_subscriptions: number };
+      }>();
+      const fetcher = vi.fn(() => response.promise);
+      const directory = new RelayDirectory({ clock: () => 20, fetcher });
+
+      const first = directory.fetchNip11(relay);
+      const second = directory.fetchNip11("wss://RELAY.example.com/");
+
+      expect(fetcher).toHaveBeenCalledOnce();
+
+      response.resolve({ name: "relay", limitation: { max_subscriptions: 3 } });
+
+      await expect(first).resolves.toMatchObject({ name: "relay" });
+      await expect(second).resolves.toMatchObject({ name: "relay" });
+      expect(directory.get(relay)).toMatchObject({
+        nip11FetchedAt: 20,
+        maxSubscriptions: 3,
+      });
+
+      await directory.fetchNip11(relay);
+      expect(fetcher).toHaveBeenCalledOnce();
+    });
+
+    test("refreshes cached metadata and supports manual replacement", async () => {
+      const fetcher = vi
+        .fn()
+        .mockResolvedValueOnce({ name: "initial" })
+        .mockResolvedValueOnce({ name: "refreshed", limitation: { max_subscriptions: 4 } });
+      const directory = new RelayDirectory({ fetcher });
+      await directory.fetchNip11(relay);
+
+      await expect(directory.fetchNip11(relay, { refresh: true })).resolves.toMatchObject({
+        name: "refreshed",
+      });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+
+      const installed = directory.setNip11(relay, { name: "manual" });
+      installed.name = "consumer change";
+      expect(directory.get(relay)?.nip11).toEqual({ name: "manual" });
+    });
   });
 });
 

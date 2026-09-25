@@ -11,8 +11,15 @@ import {
   RxNostrAlreadyDisposedError,
   type ConnectionStatePacket,
   type EventPacket,
+  type RxNostrStaticDefaultConfig,
+  type RxNostrStaticDefaultOptions,
 } from "rx-nostr";
-import { ControlledWebSocketServer, expectSent } from "../helper/index.ts";
+import {
+  ControlledWebSocketServer,
+  expectObservableCompleted,
+  expectSent,
+  expectSocketCloseRequested,
+} from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -26,231 +33,293 @@ const signedEvent: Nostr.Event = {
   sig: "signature",
 };
 
+async function withDefaultConfig(
+  value: RxNostrStaticDefaultConfig,
+  run: () => Promise<void>,
+): Promise<void> {
+  const previous = RxNostr.defaultConfig;
+  try {
+    RxNostr.defaultConfig = value;
+    await run();
+  } finally {
+    RxNostr.defaultConfig = previous;
+  }
+}
+
+async function withDefaultOptions(
+  value: RxNostrStaticDefaultOptions,
+  run: () => Promise<void>,
+): Promise<void> {
+  const previous = RxNostr.defaultOptions;
+  try {
+    RxNostr.defaultOptions = value;
+    await run();
+  } finally {
+    RxNostr.defaultOptions = previous;
+  }
+}
+
+async function expectConnectionState(
+  states: ConnectionStatePacket[],
+  state: ConnectionStatePacket["state"]["state"],
+): Promise<void> {
+  await vi.waitFor(() => expect(states.some((packet) => packet.state.state === state)).toBe(true));
+}
+
+async function expectLiveConnections(directory: RelayDirectory, count: number): Promise<void> {
+  await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(count));
+}
+
+async function expectPacketCount(packets: EventPacket[], count: number): Promise<void> {
+  await vi.waitFor(() => expect(packets).toHaveLength(count));
+}
+
 describe("RxNostr facade lifecycle", () => {
-  test("applies static constructor defaults to subsequently constructed instances", async () => {
-    const previous = RxNostr.defaultConfig;
-    const server = new ControlledWebSocketServer();
+  describe("static defaults", () => {
+    test("applies static constructor defaults to subsequently constructed instances", async () => {
+      const previous = RxNostr.defaultConfig;
+      const server = new ControlledWebSocketServer();
 
-    try {
-      RxNostr.defaultConfig = {
-        ...previous,
-        verifier: new NoopVerifier(),
-        reconnector: new NoopReconnector(),
-        skipFetchNip11: true,
-        WebSocket: server.WebSocket,
-      };
-      const rxNostr = new RxNostr();
-      const request = new RxForwardReq();
-      const subscription = rxNostr.req(relay, request).subscribe();
+      await withDefaultConfig(
+        {
+          ...previous,
+          verifier: new NoopVerifier(),
+          reconnector: new NoopReconnector(),
+          skipFetchNip11: true,
+          WebSocket: server.WebSocket,
+        },
+        async () => {
+          const rxNostr = new RxNostr();
+          const request = new RxForwardReq();
+          const subscription = rxNostr.req(relay, request).subscribe();
 
-      request.emit([{}]);
-      server.sockets.latest.open();
-      await expectSent(server.sockets.latest, "REQ");
+          request.emit([{}]);
+          server.sockets.latest.open();
+          await expectSent(server.sockets.latest, "REQ");
 
-      subscription.unsubscribe();
-      rxNostr.dispose();
-      await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-      server.sockets.latest.acknowledgeClose();
-    } finally {
-      RxNostr.defaultConfig = previous;
-    }
+          subscription.unsubscribe();
+          rxNostr.dispose();
+          await expectSocketCloseRequested(server.sockets.latest);
+          server.sockets.latest.acknowledgeClose();
+        },
+      );
+    });
+
+    test("applies static operation defaults to subsequently constructed instances", async () => {
+      const previous = RxNostr.defaultOptions;
+      const server = new ControlledWebSocketServer();
+
+      await withDefaultOptions(
+        {
+          req: { ...previous.req, linger: 0 },
+          publish: { ...previous.publish },
+        },
+        async () => {
+          const rxNostr = new RxNostr({
+            verifier: new NoopVerifier(),
+            reconnector: new NoopReconnector(),
+            skipFetchNip11: true,
+            WebSocket: server.WebSocket,
+          });
+          const complete = vi.fn();
+
+          rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });
+
+          server.sockets.latest.open();
+          const [, subId] = await expectSent(server.sockets.latest, "REQ");
+          server.sockets.latest.message(["EOSE", subId]);
+
+          await expectObservableCompleted(complete);
+          await expectSocketCloseRequested(server.sockets.latest);
+
+          server.sockets.latest.acknowledgeClose();
+          rxNostr.dispose();
+        },
+      );
+    });
   });
 
-  test("applies static operation defaults to subsequently constructed instances", async () => {
-    const previous = RxNostr.defaultOptions;
-    const server = new ControlledWebSocketServer();
-
-    try {
-      RxNostr.defaultOptions = {
-        req: { ...previous.req, linger: 0 },
-        publish: { ...previous.publish },
-      };
+  describe("disposal", () => {
+    test("disposes active operations before transport and rejects later work", async () => {
+      const server = new ControlledWebSocketServer();
       const rxNostr = new RxNostr({
         verifier: new NoopVerifier(),
+        signer: new NoopSigner(),
+        reconnector: new NoopReconnector(),
+        defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
+        skipFetchNip11: true,
+        WebSocket: server.WebSocket,
+      });
+      const states: ConnectionStatePacket[] = [];
+      const stateComplete = vi.fn();
+      rxNostr.monitorConnectionState().subscribe({
+        next: (packet) => states.push(packet),
+        complete: stateComplete,
+      });
+
+      rxNostr.setHotRelays(relay);
+      const connection = server.sockets.latest;
+      connection.open();
+      await expectConnectionState(states, "connected");
+
+      const request = new RxForwardReq();
+      const reqComplete = vi.fn();
+      rxNostr.req(relay, request).subscribe({ complete: reqComplete });
+      request.emit([{}]);
+      const delayedReq = rxNostr.req(relay, { strategy: "oneshot", filters: [{}] });
+      const delayedMonitor = rxNostr.monitorConnectionState();
+
+      const publication = rxNostr.publish(relay, signedEvent);
+      const publicationComplete = vi.fn();
+      publication.subscribe({ complete: publicationComplete });
+      const cancelled = expect(publication.waitFor("all")).rejects.toMatchObject({
+        code: "cancelled",
+      });
+
+      rxNostr.dispose();
+      rxNostr.dispose();
+      rxNostr[Symbol.dispose]();
+
+      expect(reqComplete).toHaveBeenCalledOnce();
+      expect(publicationComplete).toHaveBeenCalledOnce();
+      await cancelled;
+      expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
+      expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
+      expect(() => rxNostr.publish(relay, signedEvent)).toThrow(RxNostrAlreadyDisposedError);
+
+      const delayedReqError = vi.fn();
+      delayedReq.subscribe({ error: delayedReqError });
+      expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
+      const newReqError = vi.fn();
+
+      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ error: newReqError });
+      expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
+
+      const monitorError = vi.fn();
+
+      delayedMonitor.subscribe({ error: monitorError });
+      expect(monitorError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
+
+      await expectSocketCloseRequested(connection);
+
+      connection.acknowledgeClose();
+      await expectConnectionState(states, "disposed");
+      await expectObservableCompleted(stateComplete);
+    });
+  });
+
+  describe("instance isolation", () => {
+    test("keeps pools per instance while sharing directory metadata", async () => {
+      const directory = new RelayDirectory();
+      const firstServer = new ControlledWebSocketServer();
+      const secondServer = new ControlledWebSocketServer();
+      const first = new RxNostr({
+        verifier: new NoopVerifier(),
+        relayDirectory: directory,
+        reconnector: new NoopReconnector(),
+        skipFetchNip11: true,
+        WebSocket: firstServer.WebSocket,
+      });
+      const second = new RxNostr({
+        verifier: new NoopVerifier(),
+        relayDirectory: directory,
+        reconnector: new NoopReconnector(),
+        skipFetchNip11: true,
+        WebSocket: secondServer.WebSocket,
+      });
+
+      first.setHotRelays(relay);
+      second.setHotRelays(relay);
+
+      expect(firstServer.connections).toHaveLength(1);
+      expect(secondServer.connections).toHaveLength(1);
+      expect(firstServer.sockets.latest).not.toBe(secondServer.sockets.latest);
+
+      firstServer.sockets.latest.open();
+      secondServer.sockets.latest.open();
+      await expectLiveConnections(directory, 2);
+
+      first.dispose();
+      await expectSocketCloseRequested(firstServer.sockets.latest);
+      firstServer.sockets.latest.acknowledgeClose();
+      await expectLiveConnections(directory, 1);
+      expect(secondServer.sockets.latest.closeRequests).toHaveLength(0);
+
+      second.dispose();
+      await expectSocketCloseRequested(secondServer.sockets.latest);
+      secondServer.sockets.latest.acknowledgeClose();
+      await expectLiveConnections(directory, 0);
+    });
+  });
+
+  describe("configuration precedence", () => {
+    test("applies packet, operation, root-default precedence", async () => {
+      const server = new ControlledWebSocketServer();
+      const rootVerify = vi.fn(async (_event: Nostr.Event) => false);
+      const operationVerify = vi.fn(async (_event: Nostr.Event) => true);
+      const rxNostr = new RxNostr({
+        verifier: { verifyEvent: rootVerify },
+        defaultOptions: {
+          req: {
+            linger: 0,
+            skipValidateFilterMatching: true,
+            skipExpirationCheck: true,
+          },
+        },
         reconnector: new NoopReconnector(),
         skipFetchNip11: true,
         WebSocket: server.WebSocket,
       });
-      const complete = vi.fn();
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });
+      const request = new RxBackwardReq();
+      const packets: EventPacket[] = [];
+
+      rxNostr
+        .req(relay, request, {
+          verifier: { verifyEvent: operationVerify },
+          skipValidateFilterMatching: false,
+          skipExpirationCheck: false,
+        })
+        .subscribe((packet) => packets.push(packet));
+
+      request.emit([{ kinds: [1] }], {
+        relays: "wss://packet.example.com",
+        traceTag: "packet",
+      });
+      request.over();
+
+      expect(server.connections).toHaveLength(1);
+      expect(server.sockets.latest.url).toBe("wss://packet.example.com");
 
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      const now = Math.floor(Date.now() / 1_000);
+      server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
+      server.sockets.latest.message([
+        "EVENT",
+        subId,
+        {
+          ...signedEvent,
+          id: "expired",
+          tags: [["expiration", `${now - 1}`]],
+        },
+      ]);
+      server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "accepted" }]);
       server.sockets.latest.message(["EOSE", subId]);
 
-      await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-      await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+      await expectPacketCount(packets, 1);
+      expect(packets[0]).toMatchObject({
+        traceTag: "packet",
+        event: { id: "accepted" },
+      });
+      expect(rootVerify).not.toHaveBeenCalled();
+      expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual([
+        "expired",
+        "accepted",
+      ]);
+
+      await expectSocketCloseRequested(server.sockets.latest);
       server.sockets.latest.acknowledgeClose();
       rxNostr.dispose();
-    } finally {
-      RxNostr.defaultOptions = previous;
-    }
-  });
-
-  test("disposes active operations before transport and rejects later work", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = new RxNostr({
-      verifier: new NoopVerifier(),
-      signer: new NoopSigner(),
-      reconnector: new NoopReconnector(),
-      defaultOptions: { publish: { linger: 0, timeout: 1_000 } },
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
     });
-    const states: ConnectionStatePacket[] = [];
-    const stateComplete = vi.fn();
-    rxNostr.monitorConnectionState().subscribe({
-      next: (packet) => states.push(packet),
-      complete: stateComplete,
-    });
-    rxNostr.setHotRelays(relay);
-    const connection = server.sockets.latest;
-    connection.open();
-    await vi.waitFor(() =>
-      expect(states.some((packet) => packet.state.state === "connected")).toBe(true),
-    );
-
-    const request = new RxForwardReq();
-    const reqComplete = vi.fn();
-    rxNostr.req(relay, request).subscribe({ complete: reqComplete });
-    request.emit([{}]);
-    const delayedReq = rxNostr.req(relay, { strategy: "oneshot", filters: [{}] });
-    const delayedMonitor = rxNostr.monitorConnectionState();
-
-    const publication = rxNostr.publish(relay, signedEvent);
-    const publicationComplete = vi.fn();
-    publication.subscribe({ complete: publicationComplete });
-    const cancelled = expect(publication.waitFor("all")).rejects.toMatchObject({
-      code: "cancelled",
-    });
-
-    rxNostr.dispose();
-    rxNostr.dispose();
-    rxNostr[Symbol.dispose]();
-
-    expect(reqComplete).toHaveBeenCalledOnce();
-    expect(publicationComplete).toHaveBeenCalledOnce();
-    await cancelled;
-    expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
-    expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
-    expect(() => rxNostr.publish(relay, signedEvent)).toThrow(RxNostrAlreadyDisposedError);
-
-    const delayedReqError = vi.fn();
-    delayedReq.subscribe({ error: delayedReqError });
-    expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
-    const newReqError = vi.fn();
-    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ error: newReqError });
-    expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
-    const monitorError = vi.fn();
-    delayedMonitor.subscribe({ error: monitorError });
-    expect(monitorError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
-
-    await vi.waitFor(() => expect(connection.closeRequests).toHaveLength(1));
-    connection.acknowledgeClose();
-    await vi.waitFor(() => {
-      expect(states.some((packet) => packet.state.state === "disposed")).toBe(true);
-      expect(stateComplete).toHaveBeenCalledOnce();
-    });
-  });
-
-  test("keeps pools per instance while sharing directory metadata", async () => {
-    const directory = new RelayDirectory();
-    const firstServer = new ControlledWebSocketServer();
-    const secondServer = new ControlledWebSocketServer();
-    const first = new RxNostr({
-      verifier: new NoopVerifier(),
-      relayDirectory: directory,
-      reconnector: new NoopReconnector(),
-      skipFetchNip11: true,
-      WebSocket: firstServer.WebSocket,
-    });
-    const second = new RxNostr({
-      verifier: new NoopVerifier(),
-      relayDirectory: directory,
-      reconnector: new NoopReconnector(),
-      skipFetchNip11: true,
-      WebSocket: secondServer.WebSocket,
-    });
-
-    first.setHotRelays(relay);
-    second.setHotRelays(relay);
-    expect(firstServer.connections).toHaveLength(1);
-    expect(secondServer.connections).toHaveLength(1);
-    expect(firstServer.sockets.latest).not.toBe(secondServer.sockets.latest);
-    firstServer.sockets.latest.open();
-    secondServer.sockets.latest.open();
-    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(2));
-
-    first.dispose();
-    await vi.waitFor(() => expect(firstServer.sockets.latest.closeRequests).toHaveLength(1));
-    firstServer.sockets.latest.acknowledgeClose();
-    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(1));
-    expect(secondServer.sockets.latest.closeRequests).toHaveLength(0);
-
-    second.dispose();
-    await vi.waitFor(() => expect(secondServer.sockets.latest.closeRequests).toHaveLength(1));
-    secondServer.sockets.latest.acknowledgeClose();
-    await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(0));
-  });
-
-  test("applies packet, operation, root-default precedence", async () => {
-    const server = new ControlledWebSocketServer();
-    const rootVerify = vi.fn(async (_event: Nostr.Event) => false);
-    const operationVerify = vi.fn(async (_event: Nostr.Event) => true);
-    const rxNostr = new RxNostr({
-      verifier: { verifyEvent: rootVerify },
-      defaultOptions: {
-        req: {
-          linger: 0,
-          skipValidateFilterMatching: true,
-          skipExpirationCheck: true,
-        },
-      },
-      reconnector: new NoopReconnector(),
-      skipFetchNip11: true,
-      WebSocket: server.WebSocket,
-    });
-    const request = new RxBackwardReq();
-    const packets: EventPacket[] = [];
-    rxNostr
-      .req(relay, request, {
-        verifier: { verifyEvent: operationVerify },
-        skipValidateFilterMatching: false,
-        skipExpirationCheck: false,
-      })
-      .subscribe((packet) => packets.push(packet));
-    request.emit([{ kinds: [1] }], {
-      relays: "wss://packet.example.com",
-      traceTag: "packet",
-    });
-    request.over();
-    expect(server.connections).toHaveLength(1);
-    expect(server.sockets.latest.url).toBe("wss://packet.example.com");
-    server.sockets.latest.open();
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    const now = Math.floor(Date.now() / 1_000);
-    server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
-    server.sockets.latest.message([
-      "EVENT",
-      subId,
-      {
-        ...signedEvent,
-        id: "expired",
-        tags: [["expiration", `${now - 1}`]],
-      },
-    ]);
-    server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "accepted" }]);
-    server.sockets.latest.message(["EOSE", subId]);
-
-    await vi.waitFor(() => expect(packets).toHaveLength(1));
-    expect(packets[0]).toMatchObject({
-      traceTag: "packet",
-      event: { id: "accepted" },
-    });
-    expect(rootVerify).not.toHaveBeenCalled();
-    expect(operationVerify.mock.calls.map(([value]) => value.id)).toEqual(["expired", "accepted"]);
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
   });
 });

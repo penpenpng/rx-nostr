@@ -7,6 +7,7 @@ describe("connection state public contract", () => {
     expectTypeOf<IRxNostr["monitorConnectionState"]>().returns.toEqualTypeOf<
       Observable<ConnectionStatePacket>
     >();
+
     expectTypeOf<ConnectionState>().toMatchTypeOf<
       | { state: "dormant" }
       | { state: "connecting"; attempt: number }
@@ -21,6 +22,7 @@ describe("connection state public contract", () => {
       | { state: "failed"; attempt: number; reason: ConnectionFailure }
       | { state: "disposed" }
     >();
+
     expectTypeOf<ConnectionStatePacket>().toHaveProperty("from");
     expectTypeOf<ConnectionStatePacket>().toHaveProperty("state");
   });

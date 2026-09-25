@@ -1,19 +1,22 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, test, vi } from "vitest";
+import { RelayDirectory, RxBackwardReq, RxForwardReq, RxRelays, type EventPacket } from "rx-nostr";
 import {
-  RxNostr,
-  NoopReconnector,
-  NoopVerifier,
-  RelayDirectory,
-  RxBackwardReq,
-  RxForwardReq,
-  RxRelays,
-  type EventPacket,
-  type RxNostrConfig,
-} from "rx-nostr";
-import { ControlledWebSocketServer, expectSent, Faker } from "../helper/index.ts";
+  createRxNostrScenario,
+  expectAllSocketsCloseRequested,
+  expectCallbackCalled,
+  expectConnectionCount,
+  expectObservableCompleted,
+  expectSent,
+  expectSocketCloseRequested,
+  Faker,
+} from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
+
+async function expectEventIds(packets: EventPacket[], ids: string[]): Promise<void> {
+  await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(ids));
+}
 
 function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
   return Faker.event({
@@ -28,335 +31,344 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
   });
 }
 
-function createRxNostr(
-  server: ControlledWebSocketServer,
-  overrides: Partial<RxNostrConfig> = {},
-): RxNostr {
-  return new RxNostr({
-    verifier: new NoopVerifier(),
-    reconnector: new NoopReconnector(),
-    defaultOptions: { req: { linger: 0, timeout: 1_000 } },
-    skipFetchNip11: true,
-    WebSocket: server.WebSocket,
-    ...overrides,
-  });
-}
-
 describe("REQ public contract", () => {
-  test("sends a backward REQ, exposes traceTag only, and ends on EOSE", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr(server);
-    const request = new RxBackwardReq();
-    const packets: EventPacket[] = [];
-    const complete = vi.fn();
-    rxNostr.req(relay, request).subscribe({ next: (packet) => packets.push(packet), complete });
-    request.emit([{ kinds: [1] }], { traceTag: "timeline" });
-    request.over();
-    server.sockets.latest.open();
-    const req = await expectSent(server.sockets.latest, "REQ");
-    expect(req[0]).toBe("REQ");
-    expect(req[2]).toEqual({ kinds: [1] });
+  describe("backward queries", () => {
+    test("sends a backward REQ, exposes traceTag only, and ends on EOSE", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxBackwardReq();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
 
-    const result = event({ id: "result" });
-    server.sockets.latest.message(["EVENT", req[1], result]);
-    server.sockets.latest.message(["EOSE", req[1]]);
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(packets).toEqual([
-      {
-        from: relay,
-        type: "EVENT",
-        event: result,
-        traceTag: "timeline",
-      },
-    ]);
-    expect(packets[0]).not.toHaveProperty("subId");
-    expect(packets[0]).not.toHaveProperty("vreqId");
-    expect(packets[0]).not.toHaveProperty("message");
-    expect(server.sockets.latest.sent).toHaveLength(1);
+      rxNostr.req(relay, request).subscribe({ next: (packet) => packets.push(packet), complete });
 
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
+      request.emit([{ kinds: [1] }], { traceTag: "timeline" });
+      request.over();
+      server.sockets.latest.open();
+      const req = await expectSent(server.sockets.latest, "REQ");
+      expect(req[0]).toBe("REQ");
+      expect(req[2]).toEqual({ kinds: [1] });
 
-  test("replaces a forward REQ and sends CLOSE for each local end", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr(server);
-    const request = new RxForwardReq();
-    const subscription = rxNostr.req(relay, request).subscribe();
-    request.emit([{ kinds: [1] }]);
-    await vi.waitFor(() => expect(server.connections).toHaveLength(1));
-    server.sockets.latest.open();
-    const first = await expectSent(server.sockets.latest, "REQ");
+      const result = event({ id: "result" });
+      server.sockets.latest.message(["EVENT", req[1], result]);
+      server.sockets.latest.message(["EOSE", req[1]]);
 
-    request.emit([{ kinds: [2] }]);
-    const second = await expectSent(server.sockets.latest, "REQ", 2);
-    await expectSent(server.sockets.latest, "CLOSE");
-    expect(server.sockets.latest.sent).toContainEqual(["CLOSE", first[1]]);
-    expect(second[2]).toEqual({ kinds: [2] });
-
-    subscription.unsubscribe();
-    await expectSent(server.sockets.latest, "CLOSE", 2);
-    expect(server.sockets.latest.sent).toContainEqual(["CLOSE", second[1]]);
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
-
-  test("keeps a fixed forward descriptor active after EOSE", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr(server);
-    const packets: EventPacket[] = [];
-    const complete = vi.fn();
-    const subscription = rxNostr
-      .req(relay, { strategy: "forward", filters: { kinds: [1] } })
-      .subscribe({ next: (packet) => packets.push(packet), complete });
-
-    server.sockets.latest.open();
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.message(["EOSE", subId]);
-    server.sockets.latest.message(["EVENT", subId, event({ id: "live" })]);
-
-    await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["live"]));
-    expect(complete).not.toHaveBeenCalled();
-
-    subscription.unsubscribe();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
-
-  test("completes an empty destination without creating a connection", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr(server);
-    const complete = vi.fn();
-    const error = vi.fn();
-    rxNostr.req([], { strategy: "oneshot", filters: [{}] }).subscribe({ complete, error });
-
-    await vi.waitFor(() => expect(complete.mock.calls.length + error.mock.calls.length).toBe(1));
-    expect(complete).toHaveBeenCalledOnce();
-    expect(error).not.toHaveBeenCalled();
-    expect(server.connections).toEqual([]);
-    rxNostr.dispose();
-  });
-
-  test("applies filter matching, verification, and expiration in order", async () => {
-    const server = new ControlledWebSocketServer();
-    const verified: string[] = [];
-    const rxNostr = createRxNostr(server, {
-      verifier: {
-        async verifyEvent(value) {
-          verified.push(value.id);
-          return value.id !== "invalid-signature";
-        },
-      },
-    });
-    const packets: EventPacket[] = [];
-    const complete = vi.fn();
-    rxNostr
-      .req(relay, { strategy: "oneshot", filters: { kinds: [1] } })
-      .subscribe({ next: (packet) => packets.push(packet), complete });
-    server.sockets.latest.open();
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    const expiredAt = Math.floor(Date.now() / 1000) - 1;
-    for (const value of [
-      event({ id: "mismatch", kind: 2 }),
-      event({ id: "invalid-signature" }),
-      event({ id: "expired", tags: [["expiration", `${expiredAt}`]] }),
-      event({ id: "valid" }),
-    ]) {
-      server.sockets.latest.message(["EVENT", subId, value]);
-    }
-    server.sockets.latest.message(["EOSE", subId]);
-
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(verified).toEqual(["invalid-signature", "expired", "valid"]);
-    expect(packets.map((packet) => packet.event.id)).toEqual(["valid"]);
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
-
-  test("wraps verifier exceptions as callback errors", async () => {
-    const server = new ControlledWebSocketServer();
-    const cause = new Error("verifier failed");
-    const rxNostr = createRxNostr(server, {
-      verifier: { verifyEvent: async () => Promise.reject(cause) },
-    });
-    let received: unknown;
-    rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
-      error: (error) => (received = error),
-    });
-    server.sockets.latest.open();
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.message(["EVENT", subId, event()]);
-
-    await vi.waitFor(() => expect(received).toBeDefined());
-    expect(received).toMatchObject({
-      name: "RxNostrCallbackError",
-      callback: "verifier",
-      cause,
-    });
-    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", subId]);
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
-
-  test("honors filter/expiration skips and wraps lazy filter exceptions", async () => {
-    const server = new ControlledWebSocketServer();
-    const rxNostr = createRxNostr(server);
-    const packets: EventPacket[] = [];
-    rxNostr
-      .req(
-        relay,
-        { strategy: "oneshot", filters: [{ kinds: [1] }] },
+      await expectObservableCompleted(complete);
+      expect(packets).toEqual([
         {
-          skipExpirationCheck: true,
-          skipValidateFilterMatching: true,
+          from: relay,
+          type: "EVENT",
+          event: result,
+          traceTag: "timeline",
         },
-      )
-      .subscribe((packet) => packets.push(packet));
-    server.sockets.latest.open();
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.message([
-      "EVENT",
-      subId,
-      event({
-        id: "skipped",
-        kind: 2,
-        tags: [["expiration", "0"]],
-      }),
-    ]);
-    server.sockets.latest.message(["EOSE", subId]);
-    await vi.waitFor(() => expect(packets.map((packet) => packet.event.id)).toEqual(["skipped"]));
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
+      ]);
+      expect(packets[0]).not.toHaveProperty("subId");
+      expect(packets[0]).not.toHaveProperty("vreqId");
+      expect(packets[0]).not.toHaveProperty("message");
+      expect(server.sockets.latest.sent).toHaveLength(1);
 
-    const callbackServer = new ControlledWebSocketServer();
-    const callbackRxNostr = createRxNostr(callbackServer);
-    const cause = new Error("filter failed");
-    let received: unknown;
-    callbackRxNostr
-      .req(relay, {
-        strategy: "oneshot",
-        filters: [
-          {
-            since: () => {
-              throw cause;
-            },
+      await expectSocketCloseRequested(server.sockets.latest);
+
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+  });
+
+  describe("forward queries", () => {
+    test("replaces a forward REQ and sends CLOSE for each local end", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxForwardReq();
+      const subscription = rxNostr.req(relay, request).subscribe();
+
+      request.emit([{ kinds: [1] }]);
+      await expectConnectionCount(server, 1);
+      server.sockets.latest.open();
+      const first = await expectSent(server.sockets.latest, "REQ");
+
+      request.emit([{ kinds: [2] }]);
+      const second = await expectSent(server.sockets.latest, "REQ", 2);
+      await expectSent(server.sockets.latest, "CLOSE");
+      expect(server.sockets.latest.sent).toContainEqual(["CLOSE", first[1]]);
+      expect(second[2]).toEqual({ kinds: [2] });
+
+      subscription.unsubscribe();
+      await expectSent(server.sockets.latest, "CLOSE", 2);
+      expect(server.sockets.latest.sent).toContainEqual(["CLOSE", second[1]]);
+      await expectSocketCloseRequested(server.sockets.latest);
+
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("keeps a fixed forward descriptor active after EOSE", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+      const subscription = rxNostr
+        .req(relay, { strategy: "forward", filters: { kinds: [1] } })
+        .subscribe({ next: (packet) => packets.push(packet), complete });
+
+      server.sockets.latest.open();
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      server.sockets.latest.message(["EOSE", subId]);
+      server.sockets.latest.message(["EVENT", subId, event({ id: "live" })]);
+
+      await expectEventIds(packets, ["live"]);
+      expect(complete).not.toHaveBeenCalled();
+
+      subscription.unsubscribe();
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+  });
+
+  describe("input and filtering", () => {
+    test("completes an empty destination without creating a connection", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const complete = vi.fn();
+      const error = vi.fn();
+
+      rxNostr.req([], { strategy: "oneshot", filters: [{}] }).subscribe({ complete, error });
+
+      await expectObservableCompleted(complete, error);
+      expect(server.connections).toEqual([]);
+
+      rxNostr.dispose();
+    });
+
+    test("applies filter matching, verification, and expiration in order", async () => {
+      const verified: string[] = [];
+      const { server, rxNostr } = createRxNostrScenario({
+        verifier: {
+          async verifyEvent(value) {
+            verified.push(value.id);
+            return value.id !== "invalid-signature";
           },
-        ],
-      })
-      .subscribe({ error: (error) => (received = error) });
-    callbackServer.sockets.latest.open();
-    await vi.waitFor(() => expect(received).toBeDefined());
-    expect(received).toMatchObject({
-      name: "RxNostrCallbackError",
-      callback: "filter",
-      cause,
+        },
+      });
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+
+      rxNostr
+        .req(relay, { strategy: "oneshot", filters: { kinds: [1] } })
+        .subscribe({ next: (packet) => packets.push(packet), complete });
+      server.sockets.latest.open();
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      const expiredAt = Math.floor(Date.now() / 1000) - 1;
+      for (const value of [
+        event({ id: "mismatch", kind: 2 }),
+        event({ id: "invalid-signature" }),
+        event({ id: "expired", tags: [["expiration", `${expiredAt}`]] }),
+        event({ id: "valid" }),
+      ]) {
+        server.sockets.latest.message(["EVENT", subId, value]);
+      }
+      server.sockets.latest.message(["EOSE", subId]);
+
+      await expectObservableCompleted(complete);
+      expect(verified).toEqual(["invalid-signature", "expired", "valid"]);
+      expect(packets.map((packet) => packet.event.id)).toEqual(["valid"]);
+
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
     });
-    expect(callbackServer.sockets.latest.sent).toEqual([]);
-    await vi.waitFor(() => expect(callbackServer.sockets.latest.closeRequests).toHaveLength(1));
-    callbackServer.sockets.latest.acknowledgeClose();
-    callbackRxNostr.dispose();
+
+    test("wraps verifier exceptions as callback errors", async () => {
+      const cause = new Error("verifier failed");
+      const { server, rxNostr } = createRxNostrScenario({
+        verifier: { verifyEvent: async () => Promise.reject(cause) },
+      });
+      const error = vi.fn();
+
+      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+        error,
+      });
+      server.sockets.latest.open();
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      server.sockets.latest.message(["EVENT", subId, event()]);
+
+      await expectCallbackCalled(error);
+      expect(error.mock.calls[0]![0]).toMatchObject({
+        name: "RxNostrCallbackError",
+        callback: "verifier",
+        cause,
+      });
+      expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", subId]);
+
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("honors filter and expiration skips", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const packets: EventPacket[] = [];
+
+      rxNostr
+        .req(
+          relay,
+          { strategy: "oneshot", filters: [{ kinds: [1] }] },
+          {
+            skipExpirationCheck: true,
+            skipValidateFilterMatching: true,
+          },
+        )
+        .subscribe((packet) => packets.push(packet));
+      server.sockets.latest.open();
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      server.sockets.latest.message([
+        "EVENT",
+        subId,
+        event({
+          id: "skipped",
+          kind: 2,
+          tags: [["expiration", "0"]],
+        }),
+      ]);
+      server.sockets.latest.message(["EOSE", subId]);
+
+      await expectEventIds(packets, ["skipped"]);
+      await expectSocketCloseRequested(server.sockets.latest);
+
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("wraps lazy filter exceptions as callback errors", async () => {
+      const { server: callbackServer, rxNostr: callbackRxNostr } = createRxNostrScenario();
+      const cause = new Error("filter failed");
+      const error = vi.fn();
+
+      callbackRxNostr
+        .req(relay, {
+          strategy: "oneshot",
+          filters: [
+            {
+              since: () => {
+                throw cause;
+              },
+            },
+          ],
+        })
+        .subscribe({ error });
+
+      callbackServer.sockets.latest.open();
+
+      await expectCallbackCalled(error);
+      expect(error.mock.calls[0]![0]).toMatchObject({
+        name: "RxNostrCallbackError",
+        callback: "filter",
+        cause,
+      });
+      expect(callbackServer.sockets.latest.sent).toEqual([]);
+
+      await expectSocketCloseRequested(callbackServer.sockets.latest);
+      callbackServer.sockets.latest.acknowledgeClose();
+      callbackRxNostr.dispose();
+    });
   });
 
-  test("isolates one relay's retry exhaustion from another relay", async () => {
-    const server = new ControlledWebSocketServer();
-    const one = "wss://one.example.com";
-    const two = "wss://two.example.com";
-    const rxNostr = createRxNostr(server);
-    const packets: EventPacket[] = [];
-    const complete = vi.fn();
-    rxNostr.req([one, two], { strategy: "oneshot", filters: [{}] }).subscribe({
-      next: (packet) => packets.push(packet),
-      complete,
+  describe("multiple relays", () => {
+    test("isolates one relay's retry exhaustion from another relay", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const { server, rxNostr } = createRxNostrScenario();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+
+      rxNostr.req([one, two], { strategy: "oneshot", filters: [{}] }).subscribe({
+        next: (packet) => packets.push(packet),
+        complete,
+      });
+
+      await expectConnectionCount(server, 2);
+      const first = server.sockets.latestFor(one);
+      const second = server.sockets.latestFor(two);
+      first.open();
+      second.open();
+      const [, secondSubId] = await expectSent(second, "REQ");
+      await expectSent(first, "REQ");
+      first.peerClose(1006, "offline");
+      second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
+      second.message(["EOSE", secondSubId]);
+
+      await expectObservableCompleted(complete);
+      expect(packets.map((packet) => packet.event.id)).toEqual(["from-two"]);
+
+      await expectSocketCloseRequested(second);
+      second.acknowledgeClose();
+      rxNostr.dispose();
     });
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const first = server.sockets.latestFor(one);
-    const second = server.sockets.latestFor(two);
-    first.open();
-    second.open();
-    const [, secondSubId] = await expectSent(second, "REQ");
-    await expectSent(first, "REQ");
-    first.peerClose(1006, "offline");
-    second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
-    second.message(["EOSE", secondSubId]);
 
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(packets.map((packet) => packet.event.id)).toEqual(["from-two"]);
-    await vi.waitFor(() => expect(second.closeRequests).toHaveLength(1));
-    second.acknowledgeClose();
-    rxNostr.dispose();
-  });
+    test("honors the RelayDirectory max_subscriptions queue", async () => {
+      const directory = new RelayDirectory();
+      directory.setNip11(relay, {
+        limitation: { max_subscriptions: 1 },
+      });
+      const { server, rxNostr } = createRxNostrScenario({
+        relayDirectory: directory,
+      });
+      const request = new RxBackwardReq();
+      const complete = vi.fn();
 
-  test("honors the RelayDirectory max_subscriptions queue", async () => {
-    const server = new ControlledWebSocketServer();
-    const directory = new RelayDirectory();
-    directory.setNip11(relay, {
-      limitation: { max_subscriptions: 1 },
+      rxNostr.req(relay, request).subscribe({ complete });
+
+      request.emit([{ kinds: [1] }]);
+      request.emit([{ kinds: [2] }]);
+      request.over();
+      server.sockets.latest.open();
+      const first = await expectSent(server.sockets.latest, "REQ");
+      expect(first[2]).toEqual({ kinds: [1] });
+      server.sockets.latest.message(["EOSE", first[1]]);
+
+      const second = await expectSent(server.sockets.latest, "REQ", 2);
+      expect(second[2]).toEqual({ kinds: [2] });
+      server.sockets.latest.message(["EOSE", second[1]]);
+
+      await expectObservableCompleted(complete);
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
     });
-    const rxNostr = createRxNostr(server, {
-      relayDirectory: directory,
+
+    test("sends an unfinished backward query to a dynamically added relay", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const destinations = new RxRelays([one]);
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxBackwardReq();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+
+      rxNostr.req(destinations, request).subscribe({
+        next: (packet) => packets.push(packet),
+        complete,
+      });
+      request.emit([{ kinds: [1] }]);
+      request.over();
+      await expectConnectionCount(server, 1);
+      const first = server.sockets.latestFor(one);
+      first.open();
+      const [, firstSubId] = await expectSent(first, "REQ");
+
+      destinations.append(two);
+      await expectConnectionCount(server, 2);
+      const second = server.sockets.latestFor(two);
+      second.open();
+      const [, secondSubId] = await expectSent(second, "REQ");
+      second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
+      first.message(["EOSE", firstSubId]);
+      second.message(["EOSE", secondSubId]);
+
+      await expectObservableCompleted(complete);
+      expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);
+
+      await expectAllSocketsCloseRequested(server);
+
+      for (const socket of server.connections) socket.acknowledgeClose();
+      destinations.dispose();
+      rxNostr.dispose();
     });
-    const request = new RxBackwardReq();
-    const complete = vi.fn();
-    rxNostr.req(relay, request).subscribe({ complete });
-    request.emit([{ kinds: [1] }]);
-    request.emit([{ kinds: [2] }]);
-    request.over();
-    server.sockets.latest.open();
-    const first = await expectSent(server.sockets.latest, "REQ");
-    expect(first[2]).toEqual({ kinds: [1] });
-    server.sockets.latest.message(["EOSE", first[1]]);
-
-    const second = await expectSent(server.sockets.latest, "REQ", 2);
-    expect(second[2]).toEqual({ kinds: [2] });
-    server.sockets.latest.message(["EOSE", second[1]]);
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
-    rxNostr.dispose();
-  });
-
-  test("sends an unfinished backward query to a dynamically added relay", async () => {
-    const server = new ControlledWebSocketServer();
-    const one = "wss://one.example.com";
-    const two = "wss://two.example.com";
-    const destinations = new RxRelays([one]);
-    const rxNostr = createRxNostr(server);
-    const request = new RxBackwardReq();
-    const packets: EventPacket[] = [];
-    const complete = vi.fn();
-    rxNostr.req(destinations, request).subscribe({
-      next: (packet) => packets.push(packet),
-      complete,
-    });
-    request.emit([{ kinds: [1] }]);
-    request.over();
-    await vi.waitFor(() => expect(server.connections).toHaveLength(1));
-    const first = server.sockets.latestFor(one);
-    first.open();
-    const [, firstSubId] = await expectSent(first, "REQ");
-
-    destinations.append(two);
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    const second = server.sockets.latestFor(two);
-    second.open();
-    const [, secondSubId] = await expectSent(second, "REQ");
-    second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
-    first.message(["EOSE", firstSubId]);
-    second.message(["EOSE", secondSubId]);
-
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);
-    await vi.waitFor(() =>
-      expect(server.connections.every((socket) => socket.closeRequests.length === 1)).toBe(true),
-    );
-    for (const socket of server.connections) socket.acknowledgeClose();
-    destinations.dispose();
-    rxNostr.dispose();
   });
 });
