@@ -11,7 +11,7 @@ Status: **complete (2026-09-21)**
 - normalized URL ごとに `RelayCommunication` を一つ作る per-instance pool を実装する。
 - `hold()` が idempotent disposer を返す lease contract を固定する。
 - 0 -> 1 lease で unipls session を開き、1 -> 0 で linger 後に閉じる。open/close race を test clock で検証する。
-- `ConnectionDemandScope` の prewarm、segment、linger、weak を lease に接続する。
+- `ConnectionDemandScope` の prewarm、relay demand window、linger、weak を lease に接続する。
 - `RelayWarmer` を `hold()` ベースに修正し、動的 `RxRelays` 差分ごとに hot lease を取得/解放する。
 - hot set の置換、同一 URL alias、empty set、dispose を検証する。
 - pool entry の eviction policy を決める。少なくとも active lease/query がある entry は削除しない。
@@ -23,7 +23,7 @@ Status: **complete (2026-09-21)**
 - query target だが hot でない: linger 後に close
 - weak query + disconnected: connection を作らず結果なし
 - weak query + hot/open: 既存 connection を利用
-- dynamic RxRelays: 追加は開始、削除は該当 segment だけ終了
+- dynamic RxRelays: 追加は relay demand window を開き、削除は該当 window だけ閉じる
 - rapid remove/re-add: 不要な socket blink と stale close を起こさない
 
 ## 受入条件

@@ -80,14 +80,14 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 
 query、publish、hot relay はすべて同じ lease を取得します。最初の lease で unipls session を `open()` し、最後の lease が解放された後に linger policy に従って `close()` します。
 
-最後の lease の release は close を microtask まで保留します。同じ turn で lease が再取得された場合は close を取り消すため、動的 relay の remove/re-add や forward segment の交代で不要な socket blink を起こしません。より長い `linger` は connection demand scope が lease 自体を保持し続けることで表現します。
+最後の lease の release は close を microtask まで保留します。同じ turn で lease が再取得された場合は close を取り消すため、動的 relay の remove/re-add や forward vreq の交代で不要な socket blink を起こしません。より長い `linger` は connection demand scope が lease 自体を保持し続けることで表現します。
 
 - hot relay: hot 集合に含まれる間、長寿命 lease を保持
-- normal query: segment 中 lease を保持
-- `defer: false`: 最初の segment より前に prewarm lease を取得
-- `defer: true`: segment 開始時まで lease を取得しない
-- `weak: true`: lease を取得せず、既に ready な connection だけを利用
-- `linger`: segment 終了から lease 解放までの猶予。hot lease には影響しない
+- normal vreq: 対応する relay demand window 中に lease を保持
+- `defer: false`: 最初の demand window より前に prewarm lease を取得
+- `defer: true`: demand window 開始時まで lease を取得しない
+- `weak: true`: demand window は lease を取得せず、既に ready な connection だけを利用
+- `linger`: demand window を閉じてから lease を解放するまでの猶予。hot lease には影響しない
 
 hot relay は宛先ではありません。hot だが query の `RxRelays` に含まれない relay へメッセージを送ってはいけません。
 
@@ -124,8 +124,8 @@ connection の再試行を直接命令する API は、directory と pool の責
 ### REQ
 
 1. `RxNostr.req()` の subscription ごとに connection demand scope を作る。
-2. RxRelays の差分から relay segment を開始/終了する。
-3. segment は relay lease と physical subId を取り、NIP-11 subscription limit に空きがなければ relay-local FIFO queue で待つ。
+2. RxRelays の差分から relay demand window を開閉する。
+3. demand window は vreq の実行中に relay lease を保持する。vreq は physical subId を取り、NIP-11 subscription limit に空きがなければ relay-local FIFO queue で待つ。
 4. queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
 5. selector は同じ subId の EVENT/EOSE/CLOSED だけを受ける。
 6. backward は EOSE/CLOSED/timeout で終端、forward は次の ReqPacket または unsubscribe まで継続する。
@@ -146,7 +146,7 @@ RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の
 
 Publication は relay ごとの `pending | accepted | failed` table を一つだけ持ち、raw OK replay と all/any settlement を同じ状態から導出します。AUTH-related `OK false` は table を terminal にせず、認証後の再送結果を待ちます。relay-local timeout/drop/rejection は failure snapshot に変換し、別 relay の subscription を操作しません。署名失敗だけが operation-wide error です。
 
-terminal 後は各 segment の linger を維持し、finite linger cleanup 後に RxNostr の temporary resource registry から外れます。明示 cancel と instance dispose は linger を待たず、subscription、AUTH waiter、timer、lease を即時解放します。
+terminal 後は各 relay demand window の linger を維持し、finite linger cleanup 後に RxNostr の temporary resource registry から外れます。明示 cancel と instance dispose は linger を待たず、subscription、AUTH waiter、timer、lease を即時解放します。
 
 ### reconnect
 

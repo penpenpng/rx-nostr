@@ -1,6 +1,9 @@
 import type * as Nostr from "nostr-typedef";
 import { ReplaySubject, type Observer, type Subscription } from "rxjs";
-import { RxNostrCallbackError, RxNostrPublicationError } from "../../libs/error.ts";
+import {
+  RxNostrCallbackError,
+  RxNostrPublicationError,
+} from "../../libs/error.ts";
 import { ensureEventFields, type RelayUrl } from "../../libs/index.ts";
 import type { OkPacket } from "../../packets/index.ts";
 import type {
@@ -10,7 +13,10 @@ import type {
 } from "../../publication/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RelayInput } from "../../types/index.ts";
-import { ConnectionDemandScope, type QuerySegment } from "../connection-demand-scope.ts";
+import {
+  ConnectionDemandScope,
+  type RelayDemandWindow,
+} from "../connection-demand-scope.ts";
 import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrPublishOptions } from "../rx-nostr.config.ts";
 import { NostrTransportOperationError } from "../transport/index.ts";
@@ -26,7 +32,12 @@ export function publish({
   relayInput: RelayInput;
   config: FilledRxNostrPublishOptions;
 }): PublicationOperation {
-  return new PublicationOperation(relays, params, RxRelays.array(relayInput), config);
+  return new PublicationOperation(
+    relays,
+    params,
+    RxRelays.array(relayInput),
+    config,
+  );
 }
 
 interface RelayDelivery {
@@ -34,7 +45,7 @@ interface RelayDelivery {
   state: "pending" | "accepted" | "failed";
   lastOk?: OkPacket;
   failure?: PublicationFailure;
-  segment?: QuerySegment;
+  demandWindow?: RelayDemandWindow;
   subscription?: Subscription;
 }
 
@@ -83,7 +94,10 @@ export class PublicationOperation implements Publication, Disposable {
     });
     this.#resolveClosed = resolveClosed;
 
-    this.#connectionDemand = new ConnectionDemandScope({ defer: false, weak: config.weak });
+    this.#connectionDemand = new ConnectionDemandScope({
+      defer: false,
+      weak: config.weak,
+    });
     for (const relay of destinations) {
       this.#deliveries.set(relay, { relay, state: "pending" });
     }
@@ -95,7 +109,9 @@ export class PublicationOperation implements Publication, Disposable {
       return;
     }
 
-    this.relays.forEach(destinations, (relay) => this.#connectionDemand.prewarm(relay));
+    this.relays.forEach(destinations, (relay) =>
+      this.#connectionDemand.prewarm(relay),
+    );
 
     let signed: Promise<Nostr.Event>;
     try {
@@ -117,7 +133,10 @@ export class PublicationOperation implements Publication, Disposable {
     complete?: (() => void) | null,
   ): Subscription;
   subscribe(
-    observerOrNext?: Partial<Observer<OkPacket>> | ((value: OkPacket) => void) | null,
+    observerOrNext?:
+      | Partial<Observer<OkPacket>>
+      | ((value: OkPacket) => void)
+      | null,
     error?: ((error: unknown) => void) | null,
     complete?: (() => void) | null,
   ): Subscription {
@@ -141,7 +160,7 @@ export class PublicationOperation implements Publication, Disposable {
     for (const delivery of this.#deliveries.values()) {
       if (delivery.state !== "pending") continue;
       delivery.subscription?.unsubscribe();
-      delivery.segment?.endSegment();
+      delivery.demandWindow?.close();
       const failure = Object.freeze({
         relay: delivery.relay,
         kind: "cancelled" as const,
@@ -174,7 +193,10 @@ export class PublicationOperation implements Publication, Disposable {
     for (const delivery of this.#deliveries.values()) {
       if (delivery.state !== "pending") continue;
       const relay = this.relays.get(delivery.relay);
-      delivery.segment = this.#connectionDemand.beginSegment(relay, this.config.linger);
+      delivery.demandWindow = this.#connectionDemand.openDemandWindow(
+        relay,
+        this.config.linger,
+      );
       delivery.subscription = relay
         .event(snapshot as Nostr.Event, {
           authenticator: this.config.authenticator,
@@ -186,7 +208,8 @@ export class PublicationOperation implements Publication, Disposable {
             this.#okPackets.next(packet);
           },
           complete: () => this.#completeRelay(delivery),
-          error: (error) => this.#failRelay(delivery, failureFrom(error, delivery)),
+          error: (error) =>
+            this.#failRelay(delivery, failureFrom(error, delivery)),
         });
     }
   }
@@ -226,9 +249,11 @@ export class PublicationOperation implements Publication, Disposable {
 
   #finishRelay(delivery: RelayDelivery): void {
     delivery.subscription?.unsubscribe();
-    delivery.segment?.endSegment();
+    delivery.demandWindow?.close();
     this.#settleWaiters();
-    if ([...this.#deliveries.values()].every((item) => item.state !== "pending")) {
+    if (
+      [...this.#deliveries.values()].every((item) => item.state !== "pending")
+    ) {
       this.#finishPacketStream();
       this.#scheduleNaturalCleanup();
     }
@@ -239,7 +264,7 @@ export class PublicationOperation implements Publication, Disposable {
     this.#operationError = error;
     for (const delivery of this.#deliveries.values()) {
       delivery.subscription?.unsubscribe();
-      delivery.segment?.endSegment();
+      delivery.demandWindow?.close();
     }
     this.#settleWaiters();
     this.#terminal = true;
@@ -268,7 +293,9 @@ export class PublicationOperation implements Publication, Disposable {
     const deliveries = [...this.#deliveries.values()];
     if (waiter.policy === "all") {
       if (deliveries.some((delivery) => delivery.state === "failed")) {
-        waiter.reject(new RxNostrPublicationError("not-all-accepted", failures(deliveries)));
+        waiter.reject(
+          new RxNostrPublicationError("not-all-accepted", failures(deliveries)),
+        );
         return true;
       }
       if (deliveries.every((delivery) => delivery.state === "accepted")) {
@@ -282,7 +309,9 @@ export class PublicationOperation implements Publication, Disposable {
       return true;
     }
     if (deliveries.every((delivery) => delivery.state === "failed")) {
-      waiter.reject(new RxNostrPublicationError("all-failed", failures(deliveries)));
+      waiter.reject(
+        new RxNostrPublicationError("all-failed", failures(deliveries)),
+      );
       return true;
     }
     return false;
@@ -313,11 +342,17 @@ export class PublicationOperation implements Publication, Disposable {
 }
 
 function snapshotEvent(value: unknown): Readonly<Nostr.Event> {
-  if (typeof value !== "object" || value === null || !ensureEventFields(value)) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !ensureEventFields(value)
+  ) {
     throw new TypeError("The signer did not return a valid Nostr event.");
   }
   const event = value as Nostr.Event;
-  const tags = event.tags.map((tag) => Object.freeze([...tag])) as Nostr.Tag.Any[];
+  const tags = event.tags.map((tag) =>
+    Object.freeze([...tag]),
+  ) as Nostr.Tag.Any[];
   Object.freeze(tags);
   return Object.freeze({ ...event, tags });
 }
@@ -329,7 +364,10 @@ function cloneEvent(event: Readonly<Nostr.Event>): Nostr.Event {
   };
 }
 
-function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailure {
+function failureFrom(
+  error: unknown,
+  delivery: RelayDelivery,
+): PublicationFailure {
   if (error instanceof RxNostrCallbackError) {
     return Object.freeze({
       relay: delivery.relay,
@@ -355,5 +393,7 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
 }
 
 function failures(deliveries: readonly RelayDelivery[]): PublicationFailure[] {
-  return deliveries.flatMap((delivery) => (delivery.failure ? [delivery.failure] : []));
+  return deliveries.flatMap((delivery) =>
+    delivery.failure ? [delivery.failure] : [],
+  );
 }

@@ -1,15 +1,16 @@
 import { Deferrer, once, RelayMap } from "../libs/index.ts";
 import type { IRelayCommunication } from "./relay-communication.ts";
 
-export interface QuerySegment {
-  endSegment: () => void;
+/** The time-bounded connection demand for one relay-local vreq. */
+export interface RelayDemandWindow {
+  close: () => void;
 }
 
 /**
  * Owns connection demand for one operation without owning its protocol work.
  *
  * A query or publication uses this scope to hold per-relay leases while its
- * segments run, optionally warming connections first and releasing them after
+ * vreqs run, optionally warming connections first and releasing them after
  * their configured linger period.
  */
 export class ConnectionDemandScope {
@@ -29,16 +30,19 @@ export class ConnectionDemandScope {
 
     this.relays.get(relay.url);
 
-    return this.getSessionPerRelay(relay).prewarm();
+    return this.getRelayDemand(relay).prewarm();
   }
 
-  beginSegment(relay: IRelayCommunication, linger: number): QuerySegment {
+  openDemandWindow(
+    relay: IRelayCommunication,
+    linger: number,
+  ): RelayDemandWindow {
     if (this.weak) {
-      return { endSegment: once(() => {}) };
+      return { close: once(() => {}) };
     }
 
-    const endSegment = this.getSessionPerRelay(relay).beginSegment(linger);
-    return { endSegment: once(endSegment) };
+    const close = this.getRelayDemand(relay).openDemandWindow(linger);
+    return { close: once(close) };
   }
 
   [Symbol.dispose] = once(() => {
@@ -48,7 +52,7 @@ export class ConnectionDemandScope {
   });
   dispose = this[Symbol.dispose];
 
-  private getSessionPerRelay(relay: IRelayCommunication) {
+  private getRelayDemand(relay: IRelayCommunication) {
     return this.relays.setDefault(relay.url, () => new RelayDemand(relay));
   }
 }
@@ -74,7 +78,7 @@ class RelayDemand {
     return true;
   }
 
-  beginSegment(linger: number): () => void {
+  openDemandWindow(linger: number): () => void {
     this.warmed = true;
 
     if (this.dropPrewarming) {

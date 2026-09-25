@@ -4,8 +4,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/index.ts";
 import type { EventPacket, OkPacket } from "../packets/index.ts";
-import type { IRelayCommunication } from "./relay-communication.ts";
 import { ConnectionDemandScope } from "./connection-demand-scope.ts";
+import type { IRelayCommunication } from "./relay-communication.ts";
 
 class LeaseRelay implements IRelayCommunication {
   leases = 0;
@@ -32,10 +32,13 @@ describe("ConnectionDemandScope leases", () => {
   test("holds a segment lease through linger", () => {
     vi.useFakeTimers();
     const relay = new LeaseRelay("wss://relay.example.com");
-    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
-    const segment = connectionDemand.beginSegment(relay, 100);
+    const connectionDemand = new ConnectionDemandScope({
+      defer: true,
+      weak: false,
+    });
+    const demandWindow = connectionDemand.openDemandWindow(relay, 100);
 
-    segment.endSegment();
+    demandWindow.close();
     expect(relay.leases).toBe(1);
     vi.advanceTimersByTime(99);
     expect(relay.leases).toBe(1);
@@ -47,8 +50,11 @@ describe("ConnectionDemandScope leases", () => {
   test("dispose cancels linger callbacks and releases immediately", () => {
     vi.useFakeTimers();
     const relay = new LeaseRelay("wss://relay.example.com");
-    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
-    connectionDemand.beginSegment(relay, 100).endSegment();
+    const connectionDemand = new ConnectionDemandScope({
+      defer: true,
+      weak: false,
+    });
+    connectionDemand.openDemandWindow(relay, 100).close();
 
     connectionDemand.dispose();
     expect(relay.leases).toBe(0);
@@ -58,10 +64,13 @@ describe("ConnectionDemandScope leases", () => {
 
   test("weak sessions never acquire a lease", () => {
     const relay = new LeaseRelay("wss://relay.example.com");
-    const connectionDemand = new ConnectionDemandScope({ defer: false, weak: true });
+    const connectionDemand = new ConnectionDemandScope({
+      defer: false,
+      weak: true,
+    });
 
     expect(connectionDemand.prewarm(relay)).toBe(false);
-    connectionDemand.beginSegment(relay, 0).endSegment();
+    connectionDemand.openDemandWindow(relay, 0).close();
     expect(relay.leases).toBe(0);
     connectionDemand.dispose();
   });

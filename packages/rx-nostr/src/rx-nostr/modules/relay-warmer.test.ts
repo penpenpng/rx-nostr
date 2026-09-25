@@ -7,7 +7,10 @@ import type { RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import { ConnectionDemandScope } from "../connection-demand-scope.ts";
-import { RelayCommunication, type IRelayCommunication } from "../relay-communication.ts";
+import {
+  RelayCommunication,
+  type IRelayCommunication,
+} from "../relay-communication.ts";
 import { RelayPool, type RelayCommunicationCollection } from "../relay-pool.ts";
 import { RelayWarmer } from "./relay-warmer.ts";
 
@@ -47,11 +50,17 @@ class LeaseRelayCollection implements RelayCommunicationCollection<LeaseRelay> {
     return relay;
   }
 
-  forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (relay: LeaseRelay) => void) {
+  forEach(
+    relays: Iterable<RelayUrl> | null | undefined,
+    callback: (relay: LeaseRelay) => void,
+  ) {
     if (relays) for (const relay of relays) callback(this.get(relay));
   }
 
-  map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (relay: LeaseRelay) => R) {
+  map<R>(
+    relays: Iterable<RelayUrl> | null | undefined,
+    project: (relay: LeaseRelay) => R,
+  ) {
     return relays ? [...relays].map((relay) => project(this.get(relay))) : [];
   }
 }
@@ -100,18 +109,21 @@ describe("RelayWarmer", () => {
     const collection = new LeaseRelayCollection();
     const warmer = new RelayWarmer(collection);
     const relay = collection.get("wss://relay.example.com");
-    const connectionDemand = new ConnectionDemandScope({ defer: true, weak: false });
+    const connectionDemand = new ConnectionDemandScope({
+      defer: true,
+      weak: false,
+    });
 
     warmer.setHotRelays([relay.url]);
-    const segment = connectionDemand.beginSegment(relay, 0);
+    const demandWindow = connectionDemand.openDemandWindow(relay, 0);
     expect(relay.leases).toBe(2);
 
-    segment.endSegment();
+    demandWindow.close();
     expect(relay.leases).toBe(1);
-    const active = connectionDemand.beginSegment(relay, 0);
+    const activeDemandWindow = connectionDemand.openDemandWindow(relay, 0);
     warmer.unsetHotRelays();
     expect(relay.leases).toBe(1);
-    active.endSegment();
+    activeDemandWindow.close();
     expect(relay.leases).toBe(0);
 
     connectionDemand.dispose();
@@ -136,7 +148,9 @@ describe("RelayWarmer", () => {
     expect(server.sockets.latest.sent).toEqual([]);
 
     warmer.unsetHotRelays();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(server.sockets.latest.closeRequests).toHaveLength(1),
+    );
     server.sockets.latest.acknowledgeClose();
     warmer.dispose();
     pool.dispose();
