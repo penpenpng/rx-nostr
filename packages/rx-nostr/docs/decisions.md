@@ -19,7 +19,7 @@
 
 - Status: **decided at 2026-09-21**
 - Question: process-wide の `GlobalRelayDirectory` を既定値とし、`new RxNostr({ relayDirectory })` で instance/test ごとに注入可能にしたうえで、directory は metadata 観測だけを担い `relay.retry()` のような connection 制御 API を持たない方針でよいですか。
-- Recommended: 上記のとおり。connection 制御は各 RxNostr pool/unipls に限定する。
+- Recommended: 上記のとおり。connection 制御は各 RxNostr collection/unipls に限定する。
 - Alternatives: global singleton のみ／directory が全 instance の connection handle も集約し retry を broadcast する。
 - Decision: Recommended を採用する。global default と注入可能な directory を用意し、directory から connection を操作しない。
 - Rationale: relay metadata の共有と、RxNostr instance ごとの connection ownership を分離する。

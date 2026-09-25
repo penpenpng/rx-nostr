@@ -4,21 +4,21 @@
 
 タスクは番号順が基本です。並行可能と明記したもの以外は、先行タスクの受入条件を満たしてから開始します。詳細は各リンク先にあります。
 
-| ID  | Task                                                                          | Depends on | Decision gate                 | Status   |
-| --- | ----------------------------------------------------------------------------- | ---------- | ----------------------------- | -------- |
-| 00  | [Baseline と contract matrix](./tasks/00-baseline-contracts.md)               | -          | D8                            | complete |
-| 01  | [Public model と config の固定](./tasks/01-public-model.md)                   | 00         | D1, D5, D6, D9, D10, D13, D14 | complete |
-| 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                      | 00, 01     | D4, D11                       | complete |
-| 03  | [RelayPool、lease、hot relays](./tasks/03-relay-pool-hot.md)                  | 02         | D9, D14                       | complete |
-| 04  | [RelayDirectory](./tasks/04-relay-directory.md)                               | 01         | D2, D3, D12                   | complete |
-| 05  | [Reconnect と connection state](./tasks/05-reconnect-state.md)                | 02, 04     | D2, D4, D5, D11               | complete |
-| 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                    | 03, 05     | D5, D9, D12, D13, D14         | complete |
-| 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                             | 06         | D7                            | complete |
-| 08  | [Publish pipeline](./tasks/08-publish.md)                                     | 03, 05, 07 | D5, D6, D10, D11, D14         | complete |
-| 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)                  | 06, 08     | D1                            | complete |
-| 10  | [Source、workspace、依存関係、release 管理の整理](./tasks/10-code-quality.md) | 09         | -                             | complete |
-| 11  | [Linter、formatter、静的品質ゲートの再設計](./tasks/11-lint-format.md)        | 10         | -                             | complete |
-| 12  | [Package、contract test、release readiness](./tasks/12-package-release.md)    | 11         | D8                            | ready    |
+| ID  | Task                                                                                  | Depends on | Decision gate                 | Status   |
+| --- | ------------------------------------------------------------------------------------- | ---------- | ----------------------------- | -------- |
+| 00  | [Baseline と contract matrix](./tasks/00-baseline-contracts.md)                       | -          | D8                            | complete |
+| 01  | [Public model と config の固定](./tasks/01-public-model.md)                           | 00         | D1, D5, D6, D9, D10, D13, D14 | complete |
+| 02  | [unipls transport adapter](./tasks/02-unipls-adapter.md)                              | 00, 01     | D4, D11                       | complete |
+| 03  | [RelayCommunicationCollection、lease、hot relays](./tasks/03-relay-collection-hot.md) | 02         | D9, D14                       | complete |
+| 04  | [RelayDirectory](./tasks/04-relay-directory.md)                                       | 01         | D2, D3, D12                   | complete |
+| 05  | [Reconnect と connection state](./tasks/05-reconnect-state.md)                        | 02, 04     | D2, D4, D5, D11               | complete |
+| 06  | [REQ protocol と query engine](./tasks/06-query-engine.md)                            | 03, 05     | D5, D9, D12, D13, D14         | complete |
+| 07  | [NIP-42 AUTH](./tasks/07-auth.md)                                                     | 06         | D7                            | complete |
+| 08  | [Publish pipeline](./tasks/08-publish.md)                                             | 03, 05, 07 | D5, D6, D10, D11, D14         | complete |
+| 09  | [RxNostr facade と lifecycle](./tasks/09-rx-nostr-facade.md)                          | 06, 08     | D1                            | complete |
+| 10  | [Source、workspace、依存関係、release 管理の整理](./tasks/10-code-quality.md)         | 09         | -                             | complete |
+| 11  | [Linter、formatter、静的品質ゲートの再設計](./tasks/11-lint-format.md)                | 10         | -                             | complete |
+| 12  | [Package、contract test、release readiness](./tasks/12-package-release.md)            | 11         | D8                            | ready    |
 
 ## Milestones
 

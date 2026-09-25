@@ -3,10 +3,9 @@ import { ExponentialBackoffReconnector } from "../connection-reconnector/index.t
 import { NoopSigner } from "../event-signer/index.ts";
 import { NoopVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import { GlobalRelayDirectory, RelayDirectory } from "../relay-directory/index.ts";
+import { FilledRxNostrPublishOptions, FilledRxNostrReqOptions } from "./operation/index.ts";
 import {
   FilledRxNostrConfig,
-  FilledRxNostrPublishOptions,
-  FilledRxNostrReqOptions,
   RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "./rx-nostr.config.ts";

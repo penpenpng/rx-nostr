@@ -5,12 +5,17 @@ import type { ConnectionDropDetector } from "../connection-drop-detector/index.t
 import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
-import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
 import type { RelayDirectory } from "../relay-directory/index.ts";
-import type { RxReq } from "../rx-req/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
+import type {
+  RxNostrPublishConfig,
+  RxNostrPublishOptions,
+  RxNostrReqConfig,
+  RxNostrReqInput,
+  RxNostrReqOptions,
+} from "./operation/index.ts";
 
 export interface IRxNostr {
   req(
@@ -29,17 +34,6 @@ export interface IRxNostr {
   [Symbol.dispose](): void;
   dispose(): void;
 }
-
-export type RxNostrReqInput =
-  | RxReq
-  | Readonly<{
-      strategy: "forward";
-      filters: LazyFilter | Iterable<LazyFilter>;
-    }>
-  | Readonly<{
-      strategy: "oneshot";
-      filters: LazyFilter | Iterable<LazyFilter>;
-    }>;
 
 export interface RxNostrConfig {
   /**
@@ -95,48 +89,4 @@ export interface RxNostrStaticDefaultConfig {
   nip11Timeout: number;
   skipFetchNip11: boolean;
   WebSocket: WebSocketConstructor | undefined;
-}
-
-export interface RxNostrReqOptions {
-  defer?: boolean;
-  linger?: number;
-  weak?: boolean;
-  /**
-   * Specify how long rx-nostr waits for EOSE messages when following backward strategy (milliseconds).
-   *
-   * If EOSE doesn't come after waiting for this amount of time,
-   * rx-nostr is considered to get EOSE.
-   */
-  timeout?: number;
-  /**
-   * If true, skip filtering EVENTs based on matching with REQ filter.
-   */
-  skipValidateFilterMatching?: boolean;
-  /**
-   * If true, skip automatic expiration check based on NIP-40.
-   */
-  skipExpirationCheck?: boolean;
-}
-
-export interface RxNostrReqConfig extends RxNostrReqOptions {
-  verifier?: EventVerifier;
-  /** Override the instance authenticator, or disable AUTH for this operation. */
-  authenticator?: AuthenticatorInput | false;
-}
-
-export interface RxNostrPublishOptions {
-  signer?: EventSigner;
-  linger?: number;
-  weak?: boolean;
-  /**
-   * Specify how long rx-nostr waits for OK messages (milliseconds).
-   *
-   * If OK doesn't come after waiting for this amount of time, rx-nostr stops listening OK.
-   */
-  timeout?: number;
-}
-
-export interface RxNostrPublishConfig extends RxNostrPublishOptions {
-  /** Override the instance authenticator, or disable AUTH for this operation. */
-  authenticator?: AuthenticatorInput | false;
 }

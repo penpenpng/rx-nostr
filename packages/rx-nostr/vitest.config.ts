@@ -14,7 +14,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          include: ["src/__test__/contract/**/*.spec.{ts,mts}"],
+          include: ["src/__test__/specs/**/*.spec.{ts,mts}"],
           name: "contract",
         },
       },

@@ -11,7 +11,7 @@ Application
 RxNostr facade
   | destination planning, verification, progress aggregation
   v
-per-instance RelayPool
+per-instance RelayCommunicationCollection
   | one RelayCommunication per normalized relay URL (v4 initial scope)
   v
 Nostr protocol adapter
@@ -56,17 +56,17 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 
 通信先 relay URL の reactive な集合です。connection pool や socket を所有しません。query 全体の既定集合と個々の `ReqPacket` の上書き集合の両方に利用できます。
 
-### RelayPool
+### RelayCommunicationCollection
 
 ひとつの `RxNostr` instance が所有する normalized URL -> `RelayCommunication` の map です。v4 初期リリースでは同じ instance/URL に一つの `RelayCommunication` と一つの unipls client を持ちます。将来の多重化は `RelayCommunication` 内の planner/physical connection 層で追加し、上位 API を変えません。
 
-初期 v4 では idle entry の eviction は行わず、RxNostr instance の dispose まで entry を保持します。これにより active lease/query の誤 eviction と、同じ URL の再生成による transport state の分裂を避けます。idle eviction が必要になった場合は、lease count と active protocol operation の両方を確認する pool 内部 policy として追加します。
+初期 v4 では idle entry の eviction は行わず、RxNostr instance の dispose まで entry を保持します。これにより active lease/query の誤 eviction と、同じ URL の再生成による transport state の分裂を避けます。idle eviction が必要になった場合は、lease count と active protocol operation の両方を確認する collection 内部 policy として追加します。
 
 ### RelayCommunication
 
 単一 relay に対する facade です。connection lease を所有し、次の relay-local collaborator を組み立てます。
 
-- `RelayProtocolSession`: `NostrTransport`、vreq から REQ への planning、subId allocator、REQ/CLOSE/EVENT/AUTH/OK と AUTH coordinator
+- `NostrOperationExecutor`: `NostrTransport`、vreq から REQ への planning、subId allocator、REQ/CLOSE/EVENT/AUTH/OK と AUTH coordinator
 - `RelayReqScheduler`: RelayDirectory の `maxSubscriptions` に従う REQ FIFO queue
 - `RelayDirectoryBridge`: NIP-11 capacity の観測と connection lifecycle/health の report
 
@@ -89,7 +89,7 @@ hot relay は宛先ではありません。hot だが query の `RxRelays` に�
 
 ### vreq と REQ
 
-vreq は RxNostr 内部の relay-local logical request、REQ は relay に送る Nostr message です。`RelayProtocolSession` が vreq を REQ plan 群へ変換して結果と完了を merge し、`RelayReqScheduler` が各 REQ に NIP-11 subscription slot を割り当てます。scheduler は REQ の terminal を downstream へ通知する前に slot を解放します。v4 初期リリースの既定 planner は 1 vreq -> 1 REQ / relay ですが、両者を別の型と registry で扱います。
+vreq は RxNostr 内部の relay-local logical request、REQ は relay に送る Nostr message です。`NostrOperationExecutor` が vreq を REQ plan 群へ変換して結果と完了を merge し、`RelayReqScheduler` が各 REQ に NIP-11 subscription slot を割り当てます。scheduler は REQ の terminal を downstream へ通知する前に slot を解放します。v4 初期リリースの既定 planner は 1 vreq -> 1 REQ / relay ですが、両者を別の型と registry で扱います。
 
 この境界により、将来次を追加できます。
 
@@ -113,7 +113,7 @@ relay URL 自体に紐づく共有 metadata を持ち、socket を所有しま�
 - 連続失敗回数
 - 現在観測される connection 数（複数 RxNostr instance の合計）
 
-connection の再試行を直接命令する API は、directory と pool の責務を再結合するため置きません。connection lifecycle の書き込みは internal reporter に限定し、public entry は内部状態から切り離した mutable snapshot として公開します（D2）。
+connection の再試行を直接命令する API は、directory と collection の責務を再結合するため置きません。connection lifecycle の書き込みは internal reporter に限定し、public entry は内部状態から切り離した mutable snapshot として公開します（D2）。
 
 ## protocol flow
 
@@ -128,7 +128,7 @@ connection の再試行を直接命令する API は、directory と pool の責
 7. local unsubscribe 時、現在 ready な connection 上の active REQ には Nostr `CLOSE` を enqueue してから local handle を解放する。既に drop 済みなら stale connection へは送らない。
 8. packet は filter match、signature、NIP-40 の順序を明示した pipeline を通し、internal subId/vreqId を除いて利用者指定 `traceTag` を付与する。
 
-RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の cached NIP-11 fetch を開始します。metadata 取得は query の送信をブロックせず、取得後の `maxSubscriptions` は以後の queue drain に反映されます。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
+RelayCommunicationCollection は URL の entry を初めて作る際、既定で RelayDirectory の cached NIP-11 fetch を開始します。metadata 取得は query の送信をブロックせず、取得後の `maxSubscriptions` は以後の queue drain に反映されます。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
 
 ### publish
 
@@ -151,7 +151,7 @@ terminal 後は各 relay demand window の linger を維持し、finite linger c
 - reconnect recovery 中の REQ は同じ scheduler slot を予約し続け、回復後に同じ subId で resend する。これにより queued REQ が recovery 中の REQ を追い越さず、replacement connection 上でも `maxSubscriptions` を超えない。
 - lazy filter は resend の直前に再評価する。
 - RelayDirectory は lifecycle event を観測して health を更新するが、reconnect engine にはならない。
-- 公開 connection state と RelayDirectory health は同じ unipls lifecycle transition から導出する。`monitorConnectionState()` は監視だけでは pool entry を作らず、既存および後から作られた entry の最新 snapshot を relay ごとに replay する。
+- 公開 connection state と RelayDirectory health は同じ unipls lifecycle transition から導出する。`monitorConnectionState()` は監視だけでは collection entry を作らず、既存および後から作られた entry の最新 snapshot を relay ごとに replay する。
 - retry policy には triggering failure を記録した後の RelayDirectory aggregate health を渡すが、decision の実行主体と connection ownership は各 RxNostr instance/unipls session に留める。
 
 ### AUTH
@@ -187,9 +187,9 @@ RxNostr instance は disposal gate と active Publication registry を facade �
 2. facade の dispose signal で active REQ を complete する。
 3. active Publication を cancel し、send/AUTH/retry/timeout と publication lease を止める。
 4. RelayWarmer を dispose して hot lease を解放する。
-5. RelayPool を dispose し、各 RelayCommunication、transport、state observer を終端する。
+5. RelayCommunicationCollection を dispose し、各 RelayCommunication、transport、state observer を終端する。
 
-pool は instance local であり、同じ relay URL を使う複数 instance も別 socket/session を持ちます。共有可能なのは注入した RelayDirectory の metadata/health record だけです。
+collection は instance local であり、同じ relay URL を使う複数 instance も別 socket/session を持ちます。共有可能なのは注入した RelayDirectory の metadata/health record だけです。
 
 ## 明示的な初期スコープ外
 

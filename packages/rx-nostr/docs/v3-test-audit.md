@@ -14,7 +14,7 @@ The classification follows [behavior-matrix.md](./behavior-matrix.md):
 
 | v3 scenario                         | Classification | v4 coverage                                                                                    |
 | ----------------------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
-| Respond to the first AUTH challenge | replace        | `src/__test__/contract/auth.spec.ts`: explicit opt-in and `SimpleAuthenticator` event contents |
+| Respond to the first AUTH challenge | replace        | `src/__test__/specs/auth.spec.ts`: explicit opt-in and `SimpleAuthenticator` event contents |
 | Respond to an additional challenge  | replace        | `auth.spec.ts`: new challenge invalidates stale work and is generation scoped                  |
 | Resend an auth-rejected REQ         | keep           | `auth.spec.ts`: deduplicated AUTH and one resend per REQ                                       |
 
@@ -42,10 +42,10 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 
 | v3 scenario                                            | Classification | v4 coverage                                                                    |
 | ------------------------------------------------------ | -------------- | ------------------------------------------------------------------------------ |
-| Forward packets replace the current REQ                | keep           | `src/__test__/contract/query.spec.ts`: replacement and local CLOSE             |
+| Forward packets replace the current REQ                | keep           | `src/__test__/specs/query.spec.ts`: replacement and local CLOSE             |
 | A forward request reused one REQ subId                 | remove         | REQ subIds are internal; replacement behavior is the public contract           |
 | Filter-mismatched EVENT is rejected                    | keep           | `query.spec.ts`: filter, verifier, and expiration pipeline                     |
-| Forward/backward unsubscribe sends CLOSE               | keep           | `query.spec.ts` and `src/rx-nostr/relay-communication.test.ts`                 |
+| Forward/backward unsubscribe sends CLOSE               | keep           | `query.spec.ts` and `src/rx-nostr/communication/relay-communication.test.ts`   |
 | EOSE sends an additional CLOSE                         | replace        | v4 treats EOSE as remote terminal and explicitly avoids redundant CLOSE        |
 | Backward EOSE does not end later/older active segments | keep           | `src/rx-nostr/modules/req-backward.test.ts`: concurrent segments remain active |
 | Backward `over()` completes after all segments         | keep           | `req-backward.test.ts` and `query.spec.ts`                                     |
@@ -59,14 +59,14 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 
 | v3 scenario                                             | Classification | v4 coverage                                                                                                     |
 | ------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
-| Unexpected drop resends an active forward REQ           | keep           | `src/rx-nostr/transport/nostr-transport.test.ts` and `relay-communication.test.ts`                              |
+| Unexpected drop resends an active forward REQ           | keep           | `src/rx-nostr/communication/transport/nostr-transport.test.ts` and `relay-communication.test.ts`                |
 | Drop before backward EOSE resends REQ                   | keep           | `relay-communication.test.ts`: active REQ recovery                                                              |
 | Drop after backward EOSE does not resend                | keep           | remote-terminal cleanup removes the active query before recovery                                                |
 | Close code 4000 always disables retry                   | remove         | v4 delegates unexpected-drop retry to `ConnectionReconnector`; no magic application close code is public policy |
 | Retry `maxCount`                                        | replace        | `src/connection-reconnector/exponential-backoff-reconnector.test.ts`: `maxRetries` exhaustion                   |
 | Lazy `since`/`until` is re-evaluated on resend          | keep           | `relay-communication.test.ts`                                                                                   |
 | Manual reconnect restores REQ                           | remove         | v4 exposes retry policy and connection demand, not the v3 manual reconnect API                                  |
-| Events attempted while manually disconnected are resent | replace        | `src/__test__/contract/publish.spec.ts`: an unconfirmed EVENT is resent after reconnect                         |
+| Events attempted while manually disconnected are resent | replace        | `src/__test__/specs/publish.spec.ts`: an unconfirmed EVENT is resent after reconnect                         |
 
 Tests assert the v4 logical-operation guarantee—active work is recovered or
 terminated according to its configured retry policy—without fixing tests to

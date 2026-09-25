@@ -9,24 +9,28 @@ import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
 import { RxReq, RxStaticReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
-import { publish, RelayWarmer, reqBackward, reqForward } from "./modules/index.ts";
-import { RelayCommunication } from "./relay-communication.ts";
-import { RelayPool } from "./relay-pool.ts";
+import {
+  FilledRxNostrPublishOptions,
+  FilledRxNostrReqOptions,
+  publish,
+  RelayWarmer,
+  reqBackward,
+  reqForward,
+  type RxNostrPublishConfig,
+  type RxNostrReqConfig,
+  type RxNostrReqInput,
+} from "./operation/index.ts";
+import { RelayCommunication, RelayCommunicationCollection } from "./communication/index.ts";
 import {
   cloneStaticDefaultConfig,
   cloneStaticDefaultOptions,
   FilledRxNostrConfig,
-  FilledRxNostrPublishOptions,
-  FilledRxNostrReqOptions,
   RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "./rx-nostr.config.ts";
 import type {
   IRxNostr,
   RxNostrConfig,
-  RxNostrPublishConfig,
-  RxNostrReqConfig,
-  RxNostrReqInput,
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
@@ -44,7 +48,7 @@ export class RxNostr implements IRxNostr {
     cloneStaticDefaultOptions(RX_NOSTR_DEFAULT_OPTIONS);
 
   readonly #stack = new RxDisposableStack();
-  readonly #relays: RelayPool<RelayCommunication>;
+  readonly #relays: RelayCommunicationCollection<RelayCommunication>;
   readonly #config: FilledRxNostrConfig;
   readonly #warmer: RelayWarmer;
   readonly #dispose$ = new Subject<void>();
@@ -53,7 +57,7 @@ export class RxNostr implements IRxNostr {
 
   constructor(config: RxNostrConfig = {}) {
     this.#config = new FilledRxNostrConfig(config, RxNostr.defaultConfig, RxNostr.defaultOptions);
-    this.#relays = new RelayPool((url) => {
+    this.#relays = new RelayCommunicationCollection((url) => {
       return new RelayCommunication(url, {
         WebSocket: this.#config.WebSocket,
         reconnector: this.#config.reconnector,

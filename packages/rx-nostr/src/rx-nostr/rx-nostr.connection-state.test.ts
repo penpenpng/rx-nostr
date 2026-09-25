@@ -34,7 +34,7 @@ describe("RxNostr connection state", () => {
     server.sockets.latest.acknowledgeClose();
   });
 
-  test("observes created relays without creating monitor-only pool entries", async () => {
+  test("observes created relays without creating monitor-only collection entries", async () => {
     const server = new ControlledWebSocketServer();
     const firstRelay = "wss://one.example.com";
     const secondRelay = "wss://two.example.com";

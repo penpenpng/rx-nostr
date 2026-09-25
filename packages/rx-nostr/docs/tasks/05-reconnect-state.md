@@ -11,10 +11,10 @@ unipls の lifecycle/reconnector を唯一の transport state source とし、rx
 - D4 に従う reconnector factory config と D11 の default policy を実装する。
 - D5a に従い initial open failure、ready、drop、retry wait、retry attempt、terminal failure、idle close、dispose を rx-nostr 独自 state へ写像する。
 - `monitorConnectionState()` を replay semantics が明確な Observable として実装する。
-- pool にまだ entry がない relay を監視対象にするか、作成済み entry のみかを public docs へ明記する。
+- collection にまだ entry がない relay を監視対象にするか、作成済み entry のみかを public docs へ明記する。
 - unipls diagnostic/drop metadata から公開する情報と隠す transport detail を分ける。
 - RelayDirectory reporter を lifecycle events へ接続する。
-- manual recovery が必要なら directory ではなく RxNostr/pool の明示 API として設計する。
+- manual recovery が必要なら directory ではなく RxNostr/collection の明示 API として設計する。
 - active REQ/publish operation の retry preset/custom recovery を Task 06/08 が利用できる internal policy にまとめる。
 
 ## state mapping の要件
@@ -41,7 +41,7 @@ unipls の lifecycle/reconnector を唯一の transport state source とし、rx
 ## 実装結果
 
 - unipls lifecycle snapshot を唯一の transport state source とし、rx-nostr の `ConnectionState` へ写像した。内部 snapshot は不変に保ち、公開時には detached mutable copy を返す。初回接続と retry attempt を分け、policy が確定した正確な delay を `waiting-for-retry` に保持する。
-- `monitorConnectionState()` は pool に存在する relay と subscription 後に作られた relay を統合する。監視だけでは pool entry/connection を作らず、relay ごとの最新 state は replay される。
+- `monitorConnectionState()` は collection に存在する relay と subscription 後に作られた relay を統合する。監視だけでは collection entry/connection を作らず、relay ごとの最新 state は replay される。
 - 同一 state の重複 emission を抑え、idle/user close は `dormant`、retry terminal は typed failure を持つ `failed`、instance cleanup は `disposed` として区別した。
 - reconnector は引き続き rx-nostr 独自 I/F とし、unipls reconnector への adapter 内で wait/cancel/exhaust と AbortSignal を扱う。pending timer は close/dispose で中断される。
 - RelayDirectory reporter を同じ lifecycle transition に接続した。ready connection ごとの冪等 close handle と、drop/attempt failure report により live count と failure counter を公開 state と同期し、更新後の共有 health snapshot を reconnector context に渡す。

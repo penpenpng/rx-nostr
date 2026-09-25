@@ -6,22 +6,22 @@ v4 の core implementation と Task 11 の静的品質ゲートまで完成し�
 
 ## モジュール別状況
 
-| 領域                                  | 状況           | 根拠・注意点                                                                                                                                           |
-| ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `rx-req`                              | 契約固定       | forward/backward、pipe、one-shot を維持し、one-shot の backward semantics と `traceTag` を検証済み。                                                   |
-| `rx-relays`                           | 概ね維持       | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                                                   |
-| signer/verifier/lazy-filter/operators | 概ね維持       | v4 向けに分離済み。Task 01 で public export を監査し、明確な型欠陥だけを修正した。                                                                     |
-| forward/backward REQ                  | 実装済み       | real adapter で REQ/CLOSE、forward replacement、backward terminal、動的 relay、weak/defer/linger、empty destination を検証済み。                       |
-| connection demand scope / hot relays  | 実装済み       | query/publish/hot が同じ idempotent lease を使用し、prewarm、weak、linger、rapid reacquire、dispose を検証済み。                                       |
-| relay pool                            | 実装済み       | instance ごと・normalized URL ごとに一 entry。初期 v4 は idle eviction せず instance dispose で一括解放する。                                          |
-| relay communication                   | query 実装済み | facade、protocol session、REQ scheduler、directory bridge を分離し、REQ slot、AUTH再取得、reconnect予約、filter snapshot、dispose cleanup を検証済み。 |
-| publish                               | 実装済み       | hot Publication、raw OK replay、all/any、cancel、snapshot、AUTH/reconnect resend、relay-local failure isolation を検証済み。                           |
-| authenticator                         | 実装済み       | opt-in の relay coordinator が challenge 世代、dedupe、AUTH OK/timeout、REQ/EVENT一回再送、unsubscribe/dispose cleanup を管理する。                    |
-| relay directory                       | 実装済み       | global/injected directory、mutable entries、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。               |
-| connection state/retry                | 実装済み       | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。             |
-| `RxNostr` 公開 API                    | 実装済み       | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local pool を検証済み。                          |
-| WebSocket 抽象化                      | 移行済み       | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                                       |
-| package/build                         | 品質ゲート済み | `src`、pnpm、TypeScript 6、Vite+ pack/Oxlint/Oxfmt、peer dependency、Changesetsへ移行済み。Task 12で配布 artifactを最終監査する。                      |
+| 領域                                  | 状況           | 根拠・注意点                                                                                                                                                   |
+| ------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rx-req`                              | 契約固定       | forward/backward、pipe、one-shot を維持し、one-shot の backward semantics と `traceTag` を検証済み。                                                           |
+| `rx-relays`                           | 概ね維持       | 動的集合と union/intersection/difference がある。dispose と派生集合の所有権は TODO。                                                                           |
+| signer/verifier/lazy-filter/operators | 概ね維持       | v4 向けに分離済み。Task 01 で public export を監査し、明確な型欠陥だけを修正した。                                                                             |
+| forward/backward REQ                  | 実装済み       | real adapter で REQ/CLOSE、forward replacement、backward terminal、動的 relay、weak/defer/linger、empty destination を検証済み。                               |
+| connection demand scope / hot relays  | 実装済み       | query/publish/hot が同じ idempotent lease を使用し、prewarm、weak、linger、rapid reacquire、dispose を検証済み。                                               |
+| relay communication collection        | 実装済み       | instance ごと・normalized URL ごとに一 entry。初期 v4 は idle eviction せず instance dispose で一括解放する。                                                  |
+| relay communication                   | query 実装済み | facade、Nostr operation executor、REQ scheduler、directory bridge を分離し、REQ slot、AUTH再取得、reconnect予約、filter snapshot、dispose cleanup を検証済み。 |
+| publish                               | 実装済み       | hot Publication、raw OK replay、all/any、cancel、snapshot、AUTH/reconnect resend、relay-local failure isolation を検証済み。                                   |
+| authenticator                         | 実装済み       | opt-in の relay coordinator が challenge 世代、dedupe、AUTH OK/timeout、REQ/EVENT一回再送、unsubscribe/dispose cleanup を管理する。                            |
+| relay directory                       | 実装済み       | global/injected directory、mutable entries、NIP-11 dedupe/cache、health reporter、versioned merge snapshot と lifecycle 配線を実装済み。                       |
+| connection state/retry                | 実装済み       | unipls lifecycle を rx-nostr state へ写像し、replay/重複抑制、retry wait/attempt、terminal/idle/dispose、directory health 配線を実装済み。                     |
+| `RxNostr` 公開 API                    | 実装済み       | `req()`、`publish()`、hot relays、state monitoring、disposed guard、operation-first cleanup、instance-local collection を検証済み。                            |
+| WebSocket 抽象化                      | 移行済み       | production の direct WebSocket 利用を削除し、constructor を含む伝送路操作は internal unipls adapter に限定した。                                               |
+| package/build                         | 品質ゲート済み | `src`、pnpm、TypeScript 6、Vite+ pack/Oxlint/Oxfmt、peer dependency、Changesetsへ移行済み。Task 12で配布 artifactを最終監査する。                              |
 
 ## 現在確認できる品質ゲート
 

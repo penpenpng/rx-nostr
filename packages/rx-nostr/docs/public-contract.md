@@ -95,7 +95,7 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 `ConnectionState` is an rx-nostr discriminated union: `dormant`, `connecting`, `connected`, `waiting-for-retry`, `retrying`, `failed`, or `disposed`. Public packets contain detached mutable state copies. Retry states carry one-based attempts; wait state carries its delay; failure states contain only an rx-nostr `ConnectionFailure` snapshot. Transport implementation objects are not exposed.
 
-`monitorConnectionState()` observes every relay entry that already exists in the instance pool and entries created later. Subscribing does not itself create a relay entry or open a connection. Each relay stream replays its latest state to a new observer; identical consecutive snapshots are suppressed, while relay ordering remains independent.
+`monitorConnectionState()` observes every relay entry that already exists in the instance collection and entries created later. Subscribing does not itself create a relay entry or open a connection. Each relay stream replays its latest state to a new observer; identical consecutive snapshots are suppressed, while relay ordering remains independent.
 
 - `dormant` means there is no connection demand; it is not a failure.
 - `connecting` is the first physical attempt. `waiting-for-retry` is emitted after the retry policy chooses a valid delay, and `retrying` identifies the corresponding one-based retry attempt.

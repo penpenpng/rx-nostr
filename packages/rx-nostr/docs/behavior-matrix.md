@@ -11,24 +11,24 @@
 
 ## Core、relay、connection
 
-| v3 behavior                                                | v4 classification | v4 contract / reason                                                                                           | Task           |
-| ---------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------- | -------------- |
-| 一つの RxNostr instance が複数 relay node と同時通信する   | keep              | per-instance pool は URL ごとに connection を持ち、query/publish は複数 relay を並行利用する                   | 03, 06, 08, 09 |
-| instance ごとに同一 relay への connection を分離する       | keep              | pool は instance local。共有するのは RelayDirectory metadata だけ                                              | 03, 04, 09     |
-| default relays が宛先集合を表す                            | replace           | query/publish ごとの `RxRelays`/`RelayInput` が宛先を表す                                                      | 01, 06, 08     |
-| default relays が常時接続対象を表す                        | replace           | `setHotRelays()` が connection の保温だけを担う                                                                | 03, 09         |
-| default relay の read/write flag                           | remove            | read/write の宛先は各 `req()`/`publish()` 呼び出しで明示する                                                   | 01, 09, 10     |
-| default relay 集合の reactive な更新                       | replace           | dynamic `RxRelays` が query destination を更新する。publication は開始時 snapshot                              | 03, 06, 08     |
-| temporary relays (`on.relays`)                             | replace           | operation の `relays` は default/temporary を区別しない                                                        | 01, 06, 08     |
-| lazy/lazy-keep/aggressive connection strategy              | replace           | lease、`defer`、`linger`、hot relays に分解する                                                                | 03             |
-| 未使用 connection を既定 10 秒後に閉じる                   | keep              | REQ/publish の既定 `linger` は 10 秒                                                                           | 03             |
-| connection state の Observable                             | keep              | rx-nostr 独自 state の `monitorConnectionState()` に置換                                                       | 05, 09         |
-| transport error/message/outgoing-message の全量 Observable | remove            | transport detail は公開せず、relay state、diagnostic、operation result へ分類する                              | 01, 05, 09     |
-| `reconnect(url)` による手動再接続                          | replace           | retry policy は RxNostr/pool が所有し、RelayDirectory からは操作しない。明示 API の要否は Task 05 で契約化する | 05             |
-| exponential retry（初期 1 秒、最大 5 回）                  | keep              | rx-nostr 独自 retry policy を internal adapter で unipls に接続する                                            | 02, 05         |
-| retry 時の `polite` option                                 | remove            | 初期 v4 には含めない。RelayDirectory health に基づく戦略は custom policy で実現可能にする                      | 05, 10         |
-| WebSocket constructor injection                            | keep              | rx-nostr 独自 config として受け、unipls へ渡す。unipls 型は公開しない                                          | 01, 02         |
-| direct WebSocket implementation/types                      | remove            | production code は unipls のみを伝送路として使う                                                               | 02             |
+| v3 behavior                                                | v4 classification | v4 contract / reason                                                                                                 | Task           |
+| ---------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 一つの RxNostr instance が複数 relay node と同時通信する   | keep              | per-instance collection は URL ごとに connection を持ち、query/publish は複数 relay を並行利用する                   | 03, 06, 08, 09 |
+| instance ごとに同一 relay への connection を分離する       | keep              | collection は instance local。共有するのは RelayDirectory metadata だけ                                              | 03, 04, 09     |
+| default relays が宛先集合を表す                            | replace           | query/publish ごとの `RxRelays`/`RelayInput` が宛先を表す                                                            | 01, 06, 08     |
+| default relays が常時接続対象を表す                        | replace           | `setHotRelays()` が connection の保温だけを担う                                                                      | 03, 09         |
+| default relay の read/write flag                           | remove            | read/write の宛先は各 `req()`/`publish()` 呼び出しで明示する                                                         | 01, 09, 10     |
+| default relay 集合の reactive な更新                       | replace           | dynamic `RxRelays` が query destination を更新する。publication は開始時 snapshot                                    | 03, 06, 08     |
+| temporary relays (`on.relays`)                             | replace           | operation の `relays` は default/temporary を区別しない                                                              | 01, 06, 08     |
+| lazy/lazy-keep/aggressive connection strategy              | replace           | lease、`defer`、`linger`、hot relays に分解する                                                                      | 03             |
+| 未使用 connection を既定 10 秒後に閉じる                   | keep              | REQ/publish の既定 `linger` は 10 秒                                                                                 | 03             |
+| connection state の Observable                             | keep              | rx-nostr 独自 state の `monitorConnectionState()` に置換                                                             | 05, 09         |
+| transport error/message/outgoing-message の全量 Observable | remove            | transport detail は公開せず、relay state、diagnostic、operation result へ分類する                                    | 01, 05, 09     |
+| `reconnect(url)` による手動再接続                          | replace           | retry policy は RxNostr/collection が所有し、RelayDirectory からは操作しない。明示 API の要否は Task 05 で契約化する | 05             |
+| exponential retry（初期 1 秒、最大 5 回）                  | keep              | rx-nostr 独自 retry policy を internal adapter で unipls に接続する                                                  | 02, 05         |
+| retry 時の `polite` option                                 | remove            | 初期 v4 には含めない。RelayDirectory health に基づく戦略は custom policy で実現可能にする                            | 05, 10         |
+| WebSocket constructor injection                            | keep              | rx-nostr 独自 config として受け、unipls へ渡す。unipls 型は公開しない                                                | 01, 02         |
+| direct WebSocket implementation/types                      | remove            | production code は unipls のみを伝送路として使う                                                                     | 02             |
 
 ## REQ と受信 EVENT
 

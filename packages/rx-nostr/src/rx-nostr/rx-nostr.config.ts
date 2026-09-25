@@ -11,8 +11,6 @@ import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type {
   RxNostrConfig,
   RxNostrDefaultOptions,
-  RxNostrPublishOptions,
-  RxNostrReqOptions,
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
@@ -86,71 +84,6 @@ export function cloneStaticDefaultConfig(
   config: RxNostrStaticDefaultConfig,
 ): RxNostrStaticDefaultConfig {
   return { ...config, dropDetectors: [...config.dropDetectors] };
-}
-
-export class FilledRxNostrReqOptions {
-  readonly defer: boolean;
-  readonly linger: number;
-  readonly weak: boolean;
-  readonly timeout: number;
-  readonly skipExpirationCheck: boolean;
-  readonly skipValidateFilterMatching: boolean;
-  readonly verifier: EventVerifier;
-  readonly authenticator: AuthenticatorInput | undefined;
-
-  constructor(
-    config: RxNostrReqOptions & {
-      verifier?: EventVerifier;
-      authenticator?: AuthenticatorInput | false;
-    },
-    rootConfig: FilledRxNostrConfig,
-  ) {
-    const base = rootConfig.defaultOptions.req;
-    const staticBase = rootConfig.staticDefaultOptions.req;
-
-    this.defer = config.defer ?? base?.defer ?? staticBase.defer;
-    this.linger = config.linger ?? base?.linger ?? staticBase.linger;
-    this.weak = config.weak ?? base?.weak ?? staticBase.weak;
-    this.timeout = config.timeout ?? base?.timeout ?? staticBase.timeout;
-    this.skipExpirationCheck =
-      config.skipExpirationCheck ?? base?.skipExpirationCheck ?? staticBase.skipExpirationCheck;
-    this.skipValidateFilterMatching =
-      config.skipValidateFilterMatching ??
-      base?.skipValidateFilterMatching ??
-      staticBase.skipValidateFilterMatching;
-    this.verifier = config.verifier ?? rootConfig.verifier;
-    this.authenticator =
-      config.authenticator === false
-        ? undefined
-        : (config.authenticator ?? rootConfig.authenticator);
-  }
-}
-
-export class FilledRxNostrPublishOptions {
-  readonly signer: EventSigner;
-  readonly linger: number;
-  readonly weak: boolean;
-  readonly timeout: number;
-  readonly authenticator: AuthenticatorInput | undefined;
-
-  constructor(
-    config: RxNostrPublishOptions & {
-      authenticator?: AuthenticatorInput | false;
-    },
-    rootConfig: FilledRxNostrConfig,
-  ) {
-    const base = rootConfig.defaultOptions.publish;
-    const staticBase = rootConfig.staticDefaultOptions.publish;
-
-    this.signer = config.signer ?? base?.signer ?? rootConfig.signer;
-    this.linger = config.linger ?? base?.linger ?? staticBase.linger;
-    this.weak = config.weak ?? base?.weak ?? staticBase.weak;
-    this.timeout = config.timeout ?? base?.timeout ?? staticBase.timeout;
-    this.authenticator =
-      config.authenticator === false
-        ? undefined
-        : (config.authenticator ?? rootConfig.authenticator);
-  }
 }
 
 function freezeDefaultOptions(

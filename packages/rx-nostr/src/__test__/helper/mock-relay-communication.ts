@@ -3,7 +3,7 @@ import { assert, expect } from "vitest";
 import type { LazyFilter } from "../../index.ts";
 import { AwaitableQueue, once, u, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets";
-import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
+import type { IRelayCommunication } from "../../rx-nostr/communication/index.ts";
 
 export class RelayCommunicationMock implements IRelayCommunication {
   isHot = false;

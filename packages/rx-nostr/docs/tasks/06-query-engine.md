@@ -44,11 +44,11 @@
 
 2026-09-21 に完了。
 
-- `RelayCommunication` は facade として connection demand、`RelayProtocolSession`、`RelayReqScheduler`、`RelayDirectoryBridge` を構成する。protocol session が vreq を REQ plan 群へ変換・集約し、scheduler が各 REQ に NIP-11 `max_subscriptions` slot を割り当てる。queue 待機中は timeout を開始せず、取消・zero capacity・dispose で未開始 REQ を残さない。
+- `RelayCommunication` は facade として connection demand、`NostrOperationExecutor`、`RelayReqScheduler`、`RelayDirectoryBridge` を構成する。executor が vreq を REQ plan 群へ変換・集約し、scheduler が各 REQ に NIP-11 `max_subscriptions` slot を割り当てる。queue 待機中は timeout を開始せず、取消・zero capacity・dispose で未開始 REQ を残さない。
 - lazy filter は初回送信と reconnect resend の直前に再評価する。filter callback 例外と verifier callback 例外は callback kind を保持した `RxNostrCallbackError` にする。
 - backward の EOSE/CLOSED/timeout と relay-local transport failure はその relay segment だけを完了する。local unsubscribe、relay removal、forward replacement は対象 REQ subId に CLOSE を送り、remote terminal 後は重複 CLOSE を送らない。
 - forward replacement は新 segment を開始してから旧 segment を終了する。empty destination は接続を作らず即 complete する。
 - filter matching は relay へ実際に送った filter snapshot に対して行い、その後 verifier、NIP-40 expiration の順に処理する。公開 packet には指定時だけ `traceTag` を付け、subId/vreqId は含めない。
-- pool entry の初回利用時に NIP-11 を自動取得する。`skipFetchNip11` は取得だけを無効化し、注入済み RelayDirectory metadata の利用は妨げない。
+- collection entry の初回利用時に NIP-11 を自動取得する。`skipFetchNip11` は取得だけを無効化し、注入済み RelayDirectory metadata の利用は妨げない。
 - public contract は複数 relay、forward replacement、backward completion、CLOSE、reconnect、filter callback、validation option、timeout、queue、empty destination、NIP-11 fetch を controlled WebSocket で検証する。
 - `auth-required:` CLOSED は REQ slot を先に解放し、AUTH 後の再送を新しい subId の REQ として再度 queue に通す。reconnect recovery は同じ slot を予約して同じ subId を resend する。複数 REQ plan、AUTH 待機、reconnect、queued timeout と scheduler 単体の FIFO/cancel/zero/dispose を実装詳細 test で検証する。

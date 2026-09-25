@@ -40,7 +40,7 @@
 - Status: **completed at 2026-09-21**
 - v3/v4 の対応を [behavior matrix](../behavior-matrix.md) に分類した。
 - production の対象を `next` に限定し、tests も検査する `tsconfig.check.json` を追加した。
-- unit (`*.test.ts`) と public contract (`next/__test__/contract/**/*.spec.ts`) を Vitest project として分離した。
+- unit (`*.test.ts`) と public contract (`next/__test__/specs/**/*.spec.ts`) を Vitest project として分離した。
 - contract spec から production code を parent-relative import しない lint rule と、package entry point `rx-nostr` の test alias を追加した。
 - declaration diagnostics を Vite の失敗へ反映し、独立 typecheck を build の前段に置いた。
 - 現在の診断、direct WebSocket 残骸、controlled transport 方針、runtime 注意点を [typecheck baseline](../typecheck-baseline.md) に記録した。
