@@ -1,7 +1,7 @@
 import { filter, Subject, type Observable } from "rxjs";
 import { assert, expect } from "vitest";
 import type { LazyFilter } from "../../index.ts";
-import { AwaitableQueue, Latch, u, type RelayUrl } from "../../libs/index.ts";
+import { AwaitableQueue, once, u, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/relay-communication";
 
@@ -9,21 +9,24 @@ export class RelayCommunicationMock implements IRelayCommunication {
   isHot = false;
   channels = new AwaitableQueue<Observable<EventPacket>>();
   queryLog = new AwaitableQueue<LazyFilter[]>();
-  latch = new Latch({
-    onHeldUp: () => {
-      this.latchedCount++;
-    },
-    onDropped: () => {
-      this.unlatchedCount++;
-    },
-  });
-  latchedCount = 0;
-  unlatchedCount = 0;
+  #activeLeaseCount = 0;
+  connectionAttemptCount = 0;
 
   constructor(public url: RelayUrl) {}
 
+  get hasActiveLease(): boolean {
+    return this.#activeLeaseCount > 0;
+  }
+
   hold() {
-    return this.latch.hold();
+    if (!this.hasActiveLease) {
+      this.connectionAttemptCount++;
+    }
+    this.#activeLeaseCount++;
+
+    return once(() => {
+      this.#activeLeaseCount--;
+    });
   }
 
   vreq(_strategy: "forward" | "backward", filters: LazyFilter[]): Observable<EventPacket> {
@@ -36,7 +39,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
           // emulate that closed stream provides no events.
           .pipe(
             filter((packet) => {
-              const flag = this.latch.isHeld || this.isHot;
+              const flag = this.hasActiveLease || this.isHot;
               if (!flag) {
                 console.warn(
                   `An EventPacket was attempted to be sent from relay, but was not sent:\n`,

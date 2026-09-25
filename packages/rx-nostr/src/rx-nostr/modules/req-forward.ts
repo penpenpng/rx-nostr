@@ -47,7 +47,7 @@ export function reqForward({
         authenticator: config.authenticator,
       }),
     ),
-    // Forward: To keep the latch, we need to subsccribe next stream before the previous one ends.
+    // Forward: To keep the lease, subscribe to the next stream before the previous one ends.
     mapStored(
       (obs, cleanupPrev) => {
         const stream = new Subject<EventPacket>();

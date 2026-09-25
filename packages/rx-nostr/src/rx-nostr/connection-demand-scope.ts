@@ -58,10 +58,10 @@ export class ConnectionDemandScope {
 class RelayDemand {
   private deferrer = new Deferrer();
   private warmed = false;
-  private dropPrewarming?: () => void;
+  private releasePrewarming?: () => void;
 
-  private nextId = 0;
-  private undropped = new Map<number, () => void>();
+  private nextLeaseId = 0;
+  private activeLeases = new Map<number, () => void>();
 
   constructor(private relay: IRelayCommunication) {}
 
@@ -71,58 +71,56 @@ class RelayDemand {
     }
 
     this.warmed = true;
-    this.dropPrewarming = this.holdLatch();
+    this.releasePrewarming = this.acquireLease();
     return true;
   }
 
   openDemandWindow(linger: number): () => void {
     this.warmed = true;
 
-    if (this.dropPrewarming) {
-      const drop = this.dropPrewarming;
-      this.dropPrewarming = undefined;
-      return this.lingered(drop, linger);
+    if (this.releasePrewarming) {
+      const release = this.releasePrewarming;
+      this.releasePrewarming = undefined;
+      return this.releaseAfterLinger(release, linger);
     } else {
-      const drop = this.holdLatch();
-      return this.lingered(drop, linger);
+      const release = this.acquireLease();
+      return this.releaseAfterLinger(release, linger);
     }
   }
 
-  private holdLatch() {
-    const drop = this.relay.hold();
+  private acquireLease() {
+    const release = this.relay.hold();
 
-    const id = this.nextId;
-    this.nextId++;
+    const id = this.nextLeaseId;
+    this.nextLeaseId++;
 
-    this.undropped.set(id, drop);
+    this.activeLeases.set(id, release);
 
     return () => {
-      this.undropped.delete(id);
-      drop();
+      this.activeLeases.delete(id);
+      release();
     };
   }
 
-  private lingered(drop: () => void, linger: number): () => void {
+  private releaseAfterLinger(release: () => void, linger: number): () => void {
     if (!Number.isFinite(linger)) {
       return () => {
-        // never drop the latch
+        // never release the lease
       };
     }
 
     if (linger <= 0) {
-      // drop immediately
-      return drop;
+      return release;
     }
 
-    // drop after linger
-    return () => this.deferrer.invoke(drop, linger);
+    return () => this.deferrer.invoke(release, linger);
   }
 
   [Symbol.dispose] = once(() => {
     this.deferrer.cancelAll();
 
-    for (const drop of this.undropped.values()) {
-      drop();
+    for (const release of this.activeLeases.values()) {
+      release();
     }
   });
   dispose = this[Symbol.dispose];
