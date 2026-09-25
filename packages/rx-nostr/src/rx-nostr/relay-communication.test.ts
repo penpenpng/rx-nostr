@@ -225,7 +225,7 @@ describe("RelayCommunication transport integration", () => {
     server.sockets.latest.acknowledgeClose();
   });
 
-  test("queues physical REQs at the NIP-11 max_subscriptions limit", async () => {
+  test("queues REQs at the NIP-11 max_subscriptions limit", async () => {
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory();
     directory.setNip11("wss://relay.example.com", {
@@ -256,6 +256,90 @@ describe("RelayCommunication transport integration", () => {
     server.sockets.latest.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
     expect(server.sockets.latest.sent).toHaveLength(2);
+
+    release();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
+  });
+
+  test("starts a backward timeout only after its REQ leaves the queue", async () => {
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory();
+    directory.setNip11("wss://relay.example.com", {
+      limitation: { max_subscriptions: 1 },
+    });
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+    });
+    const release = relay.hold();
+    server.sockets.latest.open();
+    const queuedComplete = vi.fn();
+    const thirdComplete = vi.fn();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe();
+    relay.vreq("backward", [{ kinds: [2] }], { timeout: 10 }).subscribe({
+      complete: queuedComplete,
+    });
+    relay.vreq("backward", [{ kinds: [3] }]).subscribe({ complete: thirdComplete });
+
+    const first = await expectSent(server.sockets.latest, "REQ");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(queuedComplete).not.toHaveBeenCalled();
+    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
+
+    server.sockets.latest.message(["EOSE", first[1]]);
+    await vi.waitFor(() =>
+      expect(server.sockets.latest.sentOfType("REQ").length).toBeGreaterThanOrEqual(2),
+    );
+    const second = server.sockets.latest.sentOfType("REQ")[1];
+    expect(second[2]).toMatchObject({ kinds: [2] });
+    await vi.waitFor(() => expect(queuedComplete).toHaveBeenCalledOnce());
+    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", second[1]]);
+    const third = await expectSent(server.sockets.latest, "REQ", 3);
+    expect(third[2]).toMatchObject({ kinds: [3] });
+    expect(server.sockets.latest.sent.slice(1, 4)).toEqual([second, ["CLOSE", second[1]], third]);
+    server.sockets.latest.message(["EOSE", third[1]]);
+    await vi.waitFor(() => expect(thirdComplete).toHaveBeenCalledOnce());
+
+    release();
+    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    server.sockets.latest.acknowledgeClose();
+  });
+
+  test("keeps a REQ slot reserved while unipls reconnects and resends it", async () => {
+    const server = new ControlledWebSocketServer();
+    const directory = new RelayDirectory();
+    directory.setNip11("wss://relay.example.com", {
+      limitation: { max_subscriptions: 1 },
+    });
+    const relay = new RelayCommunication("wss://relay.example.com", {
+      WebSocket: server.WebSocket,
+      relayDirectory: directory,
+      reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+    });
+    const release = relay.hold();
+    server.sockets.latest.open();
+    const firstComplete = vi.fn();
+    const secondComplete = vi.fn();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe({ complete: firstComplete });
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe({ complete: secondComplete });
+
+    const initial = await expectSent(server.sockets.latest, "REQ");
+    server.sockets.latest.peerClose(1006, "offline");
+    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    server.sockets.latest.open();
+
+    const resent = await expectSent(server.sockets.latest, "REQ");
+    expect(resent[1]).toBe(initial[1]);
+    expect(resent[2]).toMatchObject({ kinds: [1] });
+    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
+    server.sockets.latest.message(["EOSE", resent[1]]);
+
+    const second = await expectSent(server.sockets.latest, "REQ", 2);
+    expect(second[2]).toMatchObject({ kinds: [2] });
+    server.sockets.latest.message(["EOSE", second[1]]);
+    await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
+    expect(firstComplete).toHaveBeenCalledOnce();
 
     release();
     await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));

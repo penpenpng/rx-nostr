@@ -123,7 +123,7 @@ describe("public entry point", () => {
     expect(structuralClient).not.toBeInstanceOf(publicApi.RxNostr);
   });
 
-  test("keeps physical query identifiers out of results", () => {
+  test("keeps REQ identifiers out of results", () => {
     expectTypeOf<EventPacket>().toHaveProperty("traceTag");
     expectTypeOf<EventPacket>().not.toHaveProperty("subId");
     expectTypeOf<EventPacket>().not.toHaveProperty("vreqId");

@@ -44,7 +44,7 @@ export interface MessagePacketBase<
 }
 
 /**
- * A public query result. Physical subscription identifiers and their raw
+ * A public query result. Wire-level subscription identifiers and their raw
  * tuples are intentionally kept out of this type.
  */
 export interface EventPacket {

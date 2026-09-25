@@ -41,7 +41,7 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 ### rx-nostr の責務
 
 - Nostr message の encode/decode と validation
-- logical vreq から physical REQ/subId への変換
+- logical vreq から REQ/subId への変換
 - REQ/CLOSE、EOSE、CLOSED、EVENT の lifecycle
 - EVENT publish、OK、AUTH challenge と NIP-42 retry
 - relay destination の動的変更
@@ -64,17 +64,13 @@ rx-nostr から `WebSocket` を直接生成・監視してはいけません。
 
 ### RelayCommunication
 
-単一 relay に対する Nostr protocol adapter です。次を所有します。
+単一 relay に対する facade です。connection lease を所有し、次の relay-local collaborator を組み立てます。
 
-- unipls client
-- connection demand の lease count
-- physical subId allocator と active query registry
-- RelayDirectory の `maxSubscriptions` に従う physical query queue
-- Nostr message codec
-- AUTH coordinator
-- RelayDirectory への lifecycle/health report
+- `RelayProtocolSession`: `NostrTransport`、vreq から REQ への planning、subId allocator、REQ/CLOSE/EVENT/AUTH/OK と AUTH coordinator
+- `RelayReqScheduler`: RelayDirectory の `maxSubscriptions` に従う REQ FIFO queue
+- `RelayDirectoryBridge`: NIP-11 capacity の観測と connection lifecycle/health の report
 
-外部へは当面 `hold()`、`vreq()`、`event()`、state observation だけを見せます。unipls や WebSocket の型を query module へ漏らしません。
+`RelayCommunication` 自身は `hold()`、`vreq()`、`event()`、state observation だけを見せます。unipls や WebSocket の型を query module へ漏らしません。
 
 ### connection lease と hot relays
 
@@ -91,15 +87,15 @@ query、publish、hot relay はすべて同じ lease を取得します。最初
 
 hot relay は宛先ではありません。hot だが query の `RxRelays` に含まれない relay へメッセージを送ってはいけません。
 
-### vreq と physical REQ
+### vreq と REQ
 
-vreq は RxNostr 内部の logical query、REQ は relay に送る Nostr message です。v4 初期リリースでは原則 1 vreq -> 1 physical REQ / relay としますが、両者を別の型と registry で扱います。
+vreq は RxNostr 内部の relay-local logical request、REQ は relay に送る Nostr message です。`RelayProtocolSession` が vreq を REQ plan 群へ変換して結果と完了を merge し、`RelayReqScheduler` が各 REQ に NIP-11 subscription slot を割り当てます。scheduler は REQ の terminal を downstream へ通知する前に slot を解放します。v4 初期リリースの既定 planner は 1 vreq -> 1 REQ / relay ですが、両者を別の型と registry で扱います。
 
 この境界により、将来次を追加できます。
 
 - filter 数/サイズ/NIP-11 制限による一つの vreq の分割
 - 複数 physical connection への配置
-- NIP-11 `max_subscriptions` に基づく queue
+- NIP-11 `max_subscriptions` に基づく REQ queue
 - relay ごとの query rewriting
 
 subId と vreqId は内部識別子であり、公開 query result には含めません。application が logical query を対応付ける必要がある場合は、利用者が `ReqPacket` に指定した `traceTag` をそのまま result へ伝播します。
@@ -125,11 +121,11 @@ connection の再試行を直接命令する API は、directory と pool の責
 
 1. `RxNostr.req()` の subscription ごとに connection demand scope を作る。
 2. RxRelays の差分から relay demand window を開閉する。
-3. demand window は vreq の実行中に relay lease を保持する。vreq は physical subId を取り、NIP-11 subscription limit に空きがなければ relay-local FIFO queue で待つ。
-4. queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
+3. demand window は vreq の実行中に relay lease を保持する。vreq は一つ以上の REQ を plan し、各 REQ は subId を取る。NIP-11 subscription limit に空きがなければ、その REQ が relay-local FIFO queue で待つ。
+4. REQ が queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
 5. selector は同じ subId の EVENT/EOSE/CLOSED だけを受ける。
 6. backward は EOSE/CLOSED/timeout で終端、forward は次の ReqPacket または unsubscribe まで継続する。
-7. local unsubscribe 時、現在 ready な connection 上の active physical REQ には Nostr `CLOSE` を enqueue してから local handle を解放する。既に drop 済みなら stale connection へは送らない。
+7. local unsubscribe 時、現在 ready な connection 上の active REQ には Nostr `CLOSE` を enqueue してから local handle を解放する。既に drop 済みなら stale connection へは送らない。
 8. packet は filter match、signature、NIP-40 の順序を明示した pipeline を通し、internal subId/vreqId を除いて利用者指定 `traceTag` を付与する。
 
 RelayPool は URL の entry を初めて作る際、既定で RelayDirectory の cached NIP-11 fetch を開始します。metadata 取得は query の送信をブロックせず、取得後の `maxSubscriptions` は以後の queue drain に反映されます。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
@@ -152,6 +148,7 @@ terminal 後は各 relay demand window の linger を維持し、finite linger c
 
 - socket の再接続時期と terminal 判定は unipls reconnector が決める。
 - active REQ/EVENT の resend 内容は rx-nostr が unipls operation の recovery policy/query factory を通じて決める。
+- reconnect recovery 中の REQ は同じ scheduler slot を予約し続け、回復後に同じ subId で resend する。これにより queued REQ が recovery 中の REQ を追い越さず、replacement connection 上でも `maxSubscriptions` を超えない。
 - lazy filter は resend の直前に再評価する。
 - RelayDirectory は lifecycle event を観測して health を更新するが、reconnect engine にはならない。
 - 公開 connection state と RelayDirectory health は同じ unipls lifecycle transition から導出する。`monitorConnectionState()` は監視だけでは pool entry を作らず、既存および後から作られた entry の最新 snapshot を relay ごとに replay する。
@@ -162,7 +159,7 @@ terminal 後は各 relay demand window の linger を維持し、finite linger c
 - RelayCommunication ごとの coordinator が transport message stream から最新 AUTH challenge を保持する。challenge は connection generation に紐づき、drop/reconnect で無効化する。
 - operation は `auth-required:` CLOSED/OK を受けたときだけ coordinator へ参加する。同じ challenge の参加者は署名、AUTH送信、OK待機を共有するが、`authenticator: false` の operation は参加しない。
 - coordinator は kind 22242 event を `['AUTH', event]` として送り、その event id の OK を attempt を開始した Authenticator の `authTimeout` まで待つ。成功した generation は後続 operation が共有できる。
-- AUTH成功後の元 operation 再送は各 physical REQ/EVENT が一度だけ管理する。coordinator 自身は query/publish state を所有しない。
+- `auth-required:` CLOSED は元の REQ を terminal にして scheduler slot を解放する。AUTH 成功後の REQ 再送は新しい subId の REQ として再度 scheduler を通し、各 plan につき一度だけ行う。EVENT 再送も各 operation が一度だけ管理する。coordinator 自身は query/publish state を所有しない。
 - 各参加者は AbortSignal を持ち、最後の waiter が外れれば共有 attempt を中止する。新 challenge、reconnect、dispose も旧 attempt を abort/stale にし、古い結果で operation を再開しない。
 
 ## 不変条件
@@ -173,14 +170,14 @@ terminal 後は各 relay demand window の linger を維持し、finite linger c
 2. 全 URL は境界で一度 normalize し、以降は branded `RelayUrl` を使う。
 3. RxRelays は destination、lease は connection lifetime、RelayDirectory は metadata を表し、相互に代用しない。
 4. relay 一つの drop が別 relay の query/publish を巻き込まない。
-5. 同じ physical REQ に `CLOSE` を高々一回送り、local resources も高々一回解放する。
+5. 同じ REQ に `CLOSE` を高々一回送り、local resources も高々一回解放する。
 6. reconnect 後の古い connection から届いた message は query state を変更しない（unipls epoch isolation を利用）。
 7. query factory、signer、verifier、authenticator の例外は分類され、unhandled rejection にしない。
 8. dispose は冪等で、新しい operation を拒否し、socket/subscription/timer/listener を残さない。
 9. RelayDirectory の永続 snapshot に live handle、timer、unknown error object を入れない。
 10. 実装詳細テストは `*.test.ts`、公開契約テストは public entry point だけを使う `*.spec.ts` とする。
 11. rx-nostr の public declaration に unipls の型を露出させない。
-12. query result に physical subId または logical vreqId を露出させない。
+12. query result に REQ subId または logical vreqId を露出させない。
 
 ## RxNostr lifecycle
 

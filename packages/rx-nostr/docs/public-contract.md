@@ -9,13 +9,13 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 - The public call shape is `req(relays, request, options?)`: destinations first, then an `RxReq` or a `{ strategy, filters }` descriptor, then operation-specific options.
 - `req()` returns a cold Observable. Each subscription creates an independent logical query and connection demand; merely calling `req()` does not open a connection.
 - A `strategy: "oneshot"` descriptor creates one backward segment and completes at its terminal condition. A `strategy: "forward"` descriptor creates one forward segment that remains active after EOSE until unsubscribe. Both descriptors accept one or multiple filters. `RxForwardReq` replaces its previous segment, while `RxBackwardReq` keeps emitted segments active until their individual terminal conditions and completes after `over()` and all segments finish.
-- A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future physical split.
-- Physical `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.
+- A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future REQ split.
+- REQ `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.
 - The public result pipeline is filter matching, signature verification, then NIP-40 expiration filtering. A disabled stage is skipped in that same position.
 - A relay-local timeout, drop, CLOSED, or retry exhaustion terminates only that relay segment. It does not error a merged query while another relay can still produce results.
-- Lazy filters are evaluated immediately before each physical send, including a reconnect resend. Local unsubscribe/removal/replacement sends CLOSE for an active physical REQ; EOSE or CLOSED terminal completion does not send a redundant CLOSE.
-- A finite backward timeout starts only when its physical REQ leaves the NIP-11 queue. `0` requests immediate timeout and `Infinity` disables it. Timeout is relay-local completion and sends CLOSE for the active REQ.
-- `RelayDirectory.maxSubscriptions` limits concurrent physical REQs per relay. Excess work is FIFO queued, queued cancellation never sends REQ/CLOSE, and a zero limit completes queued work instead of leaving it pending. Disposal completes both active and queued work without starting another REQ.
+- Lazy filters are evaluated immediately before each REQ send, including a reconnect resend. Local unsubscribe/removal/replacement sends CLOSE for an active REQ; EOSE or CLOSED terminal completion does not send a redundant CLOSE.
+- A finite backward timeout starts only when its REQ leaves the NIP-11 queue. `0` requests immediate timeout and `Infinity` disables it. Timeout is relay-local completion and sends CLOSE for the active REQ.
+- `RelayDirectory.maxSubscriptions` limits concurrent REQs per relay. Excess work is FIFO queued, queued cancellation never sends REQ/CLOSE, and a zero limit completes queued work instead of leaving it pending. A remote terminal releases its slot before logical vreq continuation such as AUTH retry. Reconnect recovery retains the existing reservation until the recovered REQ terminates. Disposal completes both active and queued work without starting another REQ.
 
 ### Publication
 
@@ -88,8 +88,8 @@ The optional WebSocket constructor is described by rx-nostr-owned structural typ
 
 - `from` is the canonical relay-origin property for inbound EVENT/OK and connection-state packets.
 - `message` is the canonical name for an exposed protocol tuple. `raw` is not public.
-- Query EVENT results intentionally expose neither `message` nor any other tuple because the EVENT tuple contains a physical `subId`.
-- EOSE, CLOSED, COUNT, AUTH, NOTICE, unknown protocol packets, and their physical identifiers remain adapter/query-engine internals unless a later explicit decision introduces a safe public model.
+- Query EVENT results intentionally expose neither `message` nor any other tuple because the EVENT tuple contains a REQ `subId`.
+- EOSE, CLOSED, COUNT, AUTH, NOTICE, unknown protocol packets, and their wire-level identifiers remain adapter/query-engine internals unless a later explicit decision introduces a safe public model.
 
 ## Connection state
 
@@ -123,7 +123,7 @@ AUTH is opt-in. A root or operation authenticator may be an `Authenticator` or a
 - `Authenticator.challenge()` returns a kind 22242 event. `SimpleAuthenticator` asks its signer to sign empty content with the normalized `relay` and received `challenge` tags.
 - `Authenticator.authTimeout` controls how long the shared attempt waits for the AUTH EVENT's OK. The authenticator that starts an attempt supplies its timeout; omitting it uses 30 seconds.
 - The latest challenge is connection-generation scoped. Concurrent operations using the same challenge share one AUTH event and OK result. A new challenge or reconnect invalidates older pending work and an old OK cannot resume a new connection.
-- An `auth-required:` CLOSED retries the affected REQ once after successful AUTH. An `auth-required:` `OK false` remains observable with `reason: "auth"`, then retries the affected EVENT once. A second auth-required result is final and cannot form a loop.
+- An `auth-required:` CLOSED terminates the affected REQ, releases its NIP-11 slot, and retries it once with a new internal subId through the scheduler after successful AUTH. An `auth-required:` `OK false` remains observable with `reason: "auth"`, then retries the affected EVENT once. A second auth-required result is final and cannot form a loop.
 - Disabled/missing authentication, AUTH `OK false`, AUTH timeout, stale work, and transport failure terminate only that relay effort. Factory or authenticator exceptions are `RxNostrCallbackError` with callback kind `authenticator`.
 - Unsubscribing the last waiting operation aborts an unsent AUTH or active OK wait. Relay disposal also removes the challenge/state listeners and aborts all attempts.
 

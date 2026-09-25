@@ -22,7 +22,7 @@
 - empty/invalid relay input の挙動
 - `strategy: "oneshot"` descriptor が backward strategy になること
 - verifier/filter/expiration pipeline の順序と失敗時の挙動
-- query result が利用者指定 `traceTag` を保持し、physical/logical internal ID を公開しないこと
+- query result が利用者指定 `traceTag` を保持し、REQ/logical internal ID を公開しないこと
 - publication を開始する時点、all/any Promise の resolve value と error、cancel/timeout/drop の扱い
 
 ## 受入条件
@@ -48,7 +48,7 @@
 - `Publication`、all/any policy、failure snapshot、typed publication/callback errors を公開 model として追加した。
 - connection state を rx-nostr 独自 discriminated union に置き換え、公開時には detached mutable copy を返すようにした。
 - config defaults と merge を一箇所へ集約し、D14 の `defer: true` / `linger: 10_000ms`、AUTH opt-in、operation override を反映した。constructor-level の `RxNostr.defaultConfig` と operation-level の `RxNostr.defaultOptions` を別 namespace に置き、instance override を static default より優先して解決する。
-- v3 compatibility placeholder を削除し、concrete `RxNostr` class、未完成 RelayDirectory、physical packet types を root entry point から隠した。
+- v3 compatibility placeholder を削除し、concrete `RxNostr` class、未完成 RelayDirectory、protocol packet types を root entry point から隠した。
 - `RelayUrl` の `ws://` hostname 型欠陥、`RxOneshotReq` の stale `traceId`、`batch()` の `RelayInput` 型欠陥を修正した。
 
 検証結果:

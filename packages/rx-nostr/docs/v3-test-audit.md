@@ -43,7 +43,7 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 | v3 scenario                                            | Classification | v4 coverage                                                                    |
 | ------------------------------------------------------ | -------------- | ------------------------------------------------------------------------------ |
 | Forward packets replace the current REQ                | keep           | `src/__test__/contract/query.spec.ts`: replacement and local CLOSE             |
-| A forward request reused one physical subId            | remove         | physical subIds are internal; replacement behavior is the public contract      |
+| A forward request reused one REQ subId                 | remove         | REQ subIds are internal; replacement behavior is the public contract           |
 | Filter-mismatched EVENT is rejected                    | keep           | `query.spec.ts`: filter, verifier, and expiration pipeline                     |
 | Forward/backward unsubscribe sends CLOSE               | keep           | `query.spec.ts` and `src/rx-nostr/relay-communication.test.ts`                 |
 | EOSE sends an additional CLOSE                         | replace        | v4 treats EOSE as remote terminal and explicitly avoids redundant CLOSE        |
@@ -52,7 +52,7 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 | One-shot completes on EOSE                             | keep           | `query.spec.ts`: an explicit oneshot descriptor creates a backward request     |
 | Multiple relays can reach EOSE at different times      | keep           | `req-backward.test.ts`: dynamic/multi-relay segment completion                 |
 | Dynamic relays affect live forward/backward work       | keep           | `req-forward.test.ts`, `req-backward.test.ts`, and `query.spec.ts`             |
-| `max_subscriptions` queues overflowed REQs             | keep           | `query.spec.ts` and `relay-communication.test.ts`: FIFO physical queue         |
+| `max_subscriptions` queues overflowed REQs             | keep           | `query.spec.ts` and `relay-communication.test.ts`: FIFO REQ queue              |
 | CLOSED frees queue capacity                            | keep           | `relay-communication.test.ts`: relay-local terminal cleanup drains queued work |
 
 ## Reconnection and retry
@@ -60,7 +60,7 @@ v4 contracts. Their declared effects are covered through `defer`, `weak`,
 | v3 scenario                                             | Classification | v4 coverage                                                                                                     |
 | ------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | Unexpected drop resends an active forward REQ           | keep           | `src/rx-nostr/transport/nostr-transport.test.ts` and `relay-communication.test.ts`                              |
-| Drop before backward EOSE resends REQ                   | keep           | `relay-communication.test.ts`: active physical query recovery                                                   |
+| Drop before backward EOSE resends REQ                   | keep           | `relay-communication.test.ts`: active REQ recovery                                                              |
 | Drop after backward EOSE does not resend                | keep           | remote-terminal cleanup removes the active query before recovery                                                |
 | Close code 4000 always disables retry                   | remove         | v4 delegates unexpected-drop retry to `ConnectionReconnector`; no magic application close code is public policy |
 | Retry `maxCount`                                        | replace        | `src/connection-reconnector/exponential-backoff-reconnector.test.ts`: `maxRetries` exhaustion                   |

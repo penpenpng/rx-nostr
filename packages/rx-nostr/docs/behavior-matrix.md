@@ -35,19 +35,19 @@
 | v3 behavior                                       | v4 classification | v4 contract / reason                                                         | Task              |
 | ------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------- | ----------------- |
 | RxReq → RxNostr → Observable の一方向 flow        | keep              | `RxReq` と `req()` の Observable を維持する                                  | 01, 06, 09        |
-| forward strategy は直前の REQ を置換する          | keep              | relay ごとに current physical REQ を高々一つ保持する                         | 06                |
+| forward strategy は直前の REQ を置換する          | keep              | relay ごとに current REQ を高々一つ保持する                                  | 06                |
 | backward strategy は複数 REQ を並行する           | keep              | EOSE/CLOSED/timeout/failure/removal まで各 segment を保持する                | 06                |
 | `RxBackwardReq.over()` 後、全 REQ 完了で complete | keep              | 全 relay segment の terminal 後に complete する                              | 06                |
-| Rx unsubscribe で Nostr CLOSE を送る              | keep              | ready な active physical REQ へ CLOSE を enqueue し、一度だけ cleanup する   | 06                |
+| Rx unsubscribe で Nostr CLOSE を送る              | keep              | ready な active REQ へ CLOSE を enqueue し、一度だけ cleanup する            | 06                |
 | reconnect 後に active REQ を再発行する            | keep              | unipls recovery と protocol registry を接続する                              | 05, 06            |
 | lazy `since`/`until` を送信直前に評価する         | keep              | 初回送信と resend の直前に評価する                                           | 06                |
 | EVENT signature verification                      | keep              | operation/root verifier と `verify` operator を利用する                      | 01, 06            |
 | REQ filter と EVENT の一致検証                    | keep              | opt-out option を維持する                                                    | 01, 06            |
 | NIP-40 expiration filtering                       | keep              | opt-out option を維持する                                                    | 01, 06            |
 | 一 relay の失敗で merged REQ を error にしない    | keep              | 正常な別 relay の EVENT を継続し、失敗は state/diagnostic へ出す             | 05, 06            |
-| physical subId を EventPacket で公開する          | remove            | `subId`/`vreqId` は internal。利用者指定 `traceTag` だけを result へ伝播する | 01, 06            |
-| NIP-11 `max_subscriptions` queue                  | keep              | RelayDirectory metadata を physical query planner が利用する                 | 04, 06            |
-| 一つの vreq を複数 physical REQ へ分割する        | defer             | planner/vreq 境界だけを初期 v4 で固定する                                    | 01, 06, follow-up |
+| REQ subId を EventPacket で公開する               | remove            | `subId`/`vreqId` は internal。利用者指定 `traceTag` だけを result へ伝播する | 01, 06            |
+| NIP-11 `max_subscriptions` queue                  | keep              | RelayDirectory metadata を REQ planner が利用する                            | 04, 06            |
+| 一つの vreq を複数 REQ へ分割する                 | defer             | planner/vreq 境界だけを初期 v4 で固定する                                    | 01, 06, follow-up |
 | 同一 relay URL へ複数 physical connection を張る  | defer             | RelayCommunication 内に将来の多重化 seam を置く                              | 02, 03, follow-up |
 
 ## Publish と AUTH

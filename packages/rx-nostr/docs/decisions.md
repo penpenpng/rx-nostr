@@ -90,10 +90,10 @@
 ## D9: 初期 v4 の query planning scope
 
 - Status: **decided at 2026-09-21**
-- Question: 初期 v4 は「1 RxNostr instance・1 relay URL・1 physical connection」「1 vreq・1 relay・1 physical REQ」を実装範囲とし、多重接続と自動 filter 分割は seam と contract だけを用意して後続版へ送ってよいですか。
+- Question: 初期 v4 は「1 RxNostr instance・1 relay URL・1 physical connection」「1 vreq・1 relay・1 REQ」を実装範囲とし、多重接続と自動 filter 分割は seam と contract だけを用意して後続版へ送ってよいですか。
 - Recommended: 初期範囲から外す。planner 境界と opaque vreq identity を維持し、将来の実装で public API を壊さない。
 - Alternatives: v4 リリース条件として多重化または filter 分割の少なくとも一方を実装する。
-- Decision: Recommended を採用する。初期 v4 では一つの relay URL あたり一つの physical connection、一つの vreq/relay あたり一つの physical REQ とする。ただし、一つの RxNostr instance は v3 と同様に複数 relay node と同時通信できなければならない。
+- Decision: Recommended を採用する。初期 v4 では一つの relay URL あたり一つの physical connection、一つの vreq/relay あたり一つの REQ とする。ただし、一つの RxNostr instance は v3 と同様に複数 relay node と同時通信できなければならない。
 - Rationale: 将来の同一 relay 多重化・filter 分割は seam を維持しつつ後続版へ送り、v3 の multi-relay 能力は退行させない。
 
 ## D10: publish 中の RxRelays 更新
@@ -117,20 +117,20 @@
 ## D12: NIP-11 max_subscriptions queue
 
 - Status: **decided at 2026-09-21**
-- Question: v3 にあった NIP-11 `limitation.max_subscriptions` に基づく physical REQ queue を、初期 v4 の完成条件に含めますか。
+- Question: v3 にあった NIP-11 `limitation.max_subscriptions` に基づく REQ queue を、初期 v4 の完成条件に含めますか。
 - Recommended: 含める。RelayDirectory を導入する直接的な利用価値があり、query planner の境界を実戦で検証できる。metadata がない場合は queue 制限なしとする。
 - Alternatives: directory は cache/health のみで使い、queue は filter splitting/multiplexing と同じ後続版へ送る。
 - Decision: Recommended を採用し、NIP-11 `max_subscriptions` queue を初期 v4 に含める。
-- Rationale: v3 の能力を維持し、RelayDirectory と physical query planner を実際の制御に利用する。
+- Rationale: v3 の能力を維持し、RelayDirectory と REQ planner を実際の制御に利用する。
 
-## D13: logical vreq と physical subId の公開
+## D13: logical vreq と REQ subId の公開
 
 - Status: **decided at 2026-09-21**
 - Question: query result packet では wire 上の `subId` と、relay/分割をまたいで同じ logical query を表す opaque `vreqId` を別フィールドとして公開してよいですか。
 - Recommended: 両方を区別して公開する。`subId` は protocol inspection 用で安定した correlation key ではないと明記し、application の対応付けには `vreqId` または利用者指定 `traceTag` を使う。
-- Alternatives: physical `subId` だけ公開／`subId` を raw tuple にだけ残して top-level から除去／logical id は公開せず `traceTag` だけ使う。
-- Decision: query result では利用者指定の `traceTag` だけを correlation value として公開する。physical `subId` と logical `vreqId` は top-level field、raw tuple を含め public result に露出させず、internal value とする。
-- Rationale: 一つの vreq が複数 physical REQ へ分割されても public identity contract を変えず、application が transport 内部 ID に依存することを防ぐ。
+- Alternatives: REQ `subId` だけ公開／`subId` を raw tuple にだけ残して top-level から除去／logical id は公開せず `traceTag` だけ使う。
+- Decision: query result では利用者指定の `traceTag` だけを correlation value として公開する。REQ `subId` と logical `vreqId` は top-level field、raw tuple を含め public result に露出させず、internal value とする。
+- Rationale: 一つの vreq が複数 REQ へ分割されても public identity contract を変えず、application が transport 内部 ID に依存することを防ぐ。
 
 ## D14: operation connection の既定 lifetime
 

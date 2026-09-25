@@ -1,11 +1,4 @@
-import {
-  finalize,
-  map,
-  Subject,
-  switchAll,
-  type Observable,
-  type Subscription,
-} from "rxjs";
+import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import { emitDiagnostic } from "../../diagnostics/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
@@ -16,10 +9,7 @@ import type { EventPacket } from "../../packets/index.ts";
 import { RxRelays } from "../../rx-relays/index.ts";
 import type { RxReq } from "../../rx-req/index.ts";
 import type { RelayInput } from "../../types/index.ts";
-import {
-  ConnectionDemandScope,
-  type RelayDemandWindow,
-} from "../connection-demand-scope.ts";
+import { ConnectionDemandScope, type RelayDemandWindow } from "../connection-demand-scope.ts";
 import type { RelayCommunicationCollection } from "../relay-pool.ts";
 import { FilledRxNostrReqOptions } from "../rx-nostr.config.ts";
 
@@ -49,9 +39,7 @@ export function reqForward({
         connectionDemand,
         relays,
         sessionRelays,
-        segmentRelays: packet.relays
-          ? RxRelays.from(packet.relays)
-          : RxRelays.from(sessionRelays),
+        segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
         filters: packet.filters,
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
@@ -119,10 +107,7 @@ function req({
 
   // Use Map because we assume that `relay.url` is normalized.
   // Forward: Only one subscription (segment) at most is held on the same relay.
-  const ongoings = new Map<
-    RelayUrl,
-    { demandWindow: RelayDemandWindow; sub: Subscription }
-  >();
+  const ongoings = new Map<RelayUrl, { demandWindow: RelayDemandWindow; sub: Subscription }>();
 
   const stream = new Subject<EventPacket>();
 
@@ -142,8 +127,7 @@ function req({
           return;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
-          const message =
-            "The last relay was removed; no destination relays remain.";
+          const message = "The last relay was removed; no destination relays remain.";
           emitDiagnostic({
             severity: "warning",
             occurredAt: Date.now(),
@@ -165,9 +149,7 @@ function req({
             authenticator,
           })
           .pipe(
-            map((packet) =>
-              traceTag === undefined ? packet : { ...packet, traceTag },
-            ),
+            map((packet) => (traceTag === undefined ? packet : { ...packet, traceTag })),
             finalize(() => {
               finalized = true;
               const currentQuery = ongoings.get(relay.url);

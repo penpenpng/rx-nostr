@@ -70,7 +70,8 @@ describe("NIP-42 AUTH public contract", () => {
     server.sockets.latest.message(["OK", "auth-event", true, "authenticated"]);
     await expectSent(server.sockets.latest, "REQ", 4);
 
-    for (const request of requests) {
+    const retriedRequests = server.sockets.latest.sentOfType("REQ").slice(2);
+    for (const request of retriedRequests) {
       server.sockets.latest.message(["CLOSED", request[1], "auth-required: still rejected"]);
     }
     await vi.waitFor(() => {

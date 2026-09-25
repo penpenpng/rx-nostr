@@ -33,10 +33,7 @@ export class ConnectionDemandScope {
     return this.getRelayDemand(relay).prewarm();
   }
 
-  openDemandWindow(
-    relay: IRelayCommunication,
-    linger: number,
-  ): RelayDemandWindow {
+  openDemandWindow(relay: IRelayCommunication, linger: number): RelayDemandWindow {
     if (this.weak) {
       return { close: once(() => {}) };
     }
