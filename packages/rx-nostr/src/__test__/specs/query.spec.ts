@@ -443,6 +443,43 @@ describe("REQ public contract", () => {
       rxNostr.dispose();
     });
 
+    test("runs multiple backward emissions concurrently without a subscription limit", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxReq();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+
+      rxNostr.backward(relay, request).subscribe({
+        next: (packet) => packets.push(packet),
+        complete,
+      });
+
+      request.emit([{ kinds: [1] }]);
+      server.sockets.latest.open();
+      const first = await expectSent(server.sockets.latest, "REQ");
+      expect(first[2]).toEqual({ kinds: [1] });
+
+      request.emit([{ kinds: [2] }]);
+      const second = await expectSent(server.sockets.latest, "REQ", 2);
+      expect(second[2]).toEqual({ kinds: [2] });
+      expect(server.sockets.latest.sent).not.toContainEqual(["CLOSE", first[1]]);
+
+      server.sockets.latest.message(["EVENT", first[1], event({ id: "first" })]);
+      server.sockets.latest.message(["EVENT", second[1], event({ id: "second" })]);
+      await expectEventIds(packets, ["first", "second"]);
+
+      server.sockets.latest.message(["EOSE", first[1]]);
+      server.sockets.latest.message(["EOSE", second[1]]);
+      expect(complete).not.toHaveBeenCalled();
+
+      request.dispose();
+      await expectObservableCompleted(complete);
+
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
     test("honors the RelayDirectory max_subscriptions queue", async () => {
       const directory = new RelayDirectory();
       directory.setNip11(relay, {
