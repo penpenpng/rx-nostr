@@ -1,5 +1,5 @@
 import * as Nostr from "nostr-typedef";
-import { defer, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
+import { defer, EMPTY, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
 import { diagnostics, emitDiagnostic } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
@@ -99,7 +99,9 @@ export class RxNostr implements IRxNostr {
     const source$: Observable<ReqPacket> =
       request instanceof RxReq
         ? request.asObservable()
-        : of({ filters: [...request] });
+        : request.length === 0
+          ? EMPTY
+          : of({ filters: [...request] });
 
     return defer(() => {
       this.#assertActive();
