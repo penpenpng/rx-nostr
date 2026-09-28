@@ -480,7 +480,48 @@ describe("REQ public contract", () => {
       rxNostr.dispose();
     });
 
-    test("honors the RelayDirectory max_subscriptions queue", async () => {
+    test("runs up to the standard max_subscriptions limit concurrently and queues overflow", async () => {
+      const directory = new RelayDirectory();
+      directory.setNip11(relay, {
+        limitation: { max_subscriptions: 3 },
+      });
+      const { server, rxNostr } = createRxNostrScenario({
+        relayDirectory: directory,
+      });
+      const request = new RxReq();
+
+      rxNostr.backward(relay, request).subscribe();
+
+      request.emit([{ kinds: [1] }]);
+      request.emit([{ kinds: [2] }]);
+      request.emit([{ kinds: [3] }]);
+      request.emit([{ kinds: [4] }]);
+
+      server.sockets.latest.open();
+      const first = await expectSent(server.sockets.latest, "REQ");
+      const second = await expectSent(server.sockets.latest, "REQ", 2);
+      const third = await expectSent(server.sockets.latest, "REQ", 3);
+      expect(first[2]).toEqual({ kinds: [1] });
+      expect(second[2]).toEqual({ kinds: [2] });
+      expect(third[2]).toEqual({ kinds: [3] });
+      expect(server.sockets.latest.sent).toHaveLength(3);
+
+      server.sockets.latest.message(["EOSE", first[1]]);
+
+      const fourth = await expectSent(server.sockets.latest, "REQ", 4);
+      expect(fourth[2]).toEqual({ kinds: [4] });
+
+      server.sockets.latest.message(["EOSE", second[1]]);
+      server.sockets.latest.message(["EOSE", third[1]]);
+      server.sockets.latest.message(["EOSE", fourth[1]]);
+      request.dispose();
+
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("serializes backward REQs when max_subscriptions is 1", async () => {
       const directory = new RelayDirectory();
       directory.setNip11(relay, {
         limitation: { max_subscriptions: 1 },
