@@ -7,14 +7,14 @@ import {
   RelayCommunicationMock,
 } from "../../../__test__/helper/index.ts";
 import { RelayMapOperator } from "../../../libs/index.ts";
-import { RxBackwardReq } from "../../../rx-req/index.ts";
+import { RxReq } from "../../../rx-req/index.ts";
 
 import { Expect } from "../../../__test__/helper/expect.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
 import { reqBackward } from "./req-backward.ts";
 
 test("single relay", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -22,7 +22,7 @@ test("single relay", async () => {
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -74,7 +74,8 @@ test("single relay", async () => {
   await obs.expectNext(Expect.eventPacket({ id: "6", traceTag: 3 }));
 
   req3.complete();
-  rxReq.over();
+  assert(!obs.isComplete, "A hot source remains subscribed after its segments finish");
+  rxReq.dispose();
 
   await obs.expectComplete();
   sub.unsubscribe();
@@ -83,7 +84,7 @@ test("single relay", async () => {
 });
 
 test("single relay, defer=true", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -91,7 +92,7 @@ test("single relay, defer=true", async () => {
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -135,7 +136,7 @@ test("single relay, defer=true", async () => {
 });
 
 test("single relay, weak=true", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -143,7 +144,7 @@ test("single relay, weak=true", async () => {
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -175,14 +176,14 @@ test("single relay, weak=true", async () => {
 });
 
 test("dynamic relays", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({
         linger: 0,
@@ -262,7 +263,7 @@ test("dynamic relays", async () => {
 });
 
 test("removing an unfinished relay completes a segment whose other relay finished", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays(["wss://relay1.example.com", "wss://relay2.example.com"]);
   const relay1 = relays.get("wss://relay1.example.com");
@@ -272,7 +273,7 @@ test("removing an unfinished relay completes a segment whose other relay finishe
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({ linger: 0, defer: false, weak: false }),
     }),
@@ -285,20 +286,20 @@ test("removing an unfinished relay completes a segment whose other relay finishe
   req1.complete();
 
   sessionRelays.remove("wss://relay2.example.com");
-  rxReq.over();
+  rxReq.dispose();
   await obs.expectComplete();
   sub.unsubscribe();
 });
 
 test("dynamic relays - uncompleted REQ should be performed on added relays", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({
         linger: 0,
@@ -370,14 +371,14 @@ test("dynamic relays - uncompleted REQ should be performed on added relays", asy
 });
 
 test("segment scope relays", async () => {
-  const rxReq = new RxBackwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqBackward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({
         linger: 0,

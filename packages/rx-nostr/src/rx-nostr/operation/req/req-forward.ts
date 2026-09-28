@@ -3,7 +3,6 @@ import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import { emitDiagnostic } from "../../../diagnostics/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../../libs/index.ts";
-import { mapStored } from "../../../operators/general/map-stored.ts";
 import { setDiff } from "../../../operators/index.ts";
 import type { EventPacket, ReqPacket } from "../../../packets/index.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
@@ -31,6 +30,7 @@ export function reqForward({
       connectionDemand.prewarm(relay);
     });
   });
+  let cleanupLast = () => {};
 
   return source$.pipe(
     map((packet) =>
@@ -47,29 +47,20 @@ export function reqForward({
       }),
     ),
     // Forward: To keep the lease, subscribe to the next stream before the previous one ends.
-    mapStored(
-      (obs, cleanupPrev) => {
-        const stream = new Subject<EventPacket>();
-        const sub = obs.subscribe(stream);
-        cleanupPrev();
-        return [
-          stream,
-          once(() => {
-            sub.unsubscribe();
-            stream.complete();
-          }),
-        ];
-      },
-      {
-        initialStore: () => {},
-        cleanup: (cleanupLast) => {
-          cleanupLast();
-        },
-      },
-    ),
+    map((obs) => {
+      const stream = new Subject<EventPacket>();
+      const sub = obs.subscribe(stream);
+      cleanupLast();
+      cleanupLast = once(() => {
+        sub.unsubscribe();
+        stream.complete();
+      });
+      return stream;
+    }),
     // Forward: New coming req unsubscribes the previous one.
     switchAll(),
     finalize(() => {
+      cleanupLast();
       warming.unsubscribe();
       connectionDemand.dispose();
       sessionRelays.dispose();

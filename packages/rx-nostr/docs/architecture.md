@@ -119,7 +119,7 @@ connection の再試行を直接命令する API は、directory と collection 
 
 ### REQ
 
-1. `RxNostr.req()` の subscription ごとに connection demand scope を作る。
+1. `RxNostr.forward()` / `RxNostr.backward()` の subscription ごとに connection demand scope を作る。`RxReq` は戦略を持たない hot source、filter 配列は subscription ごとの cold source として扱う。空配列は connection demand を作らず完了する。
 2. RxRelays の差分から relay demand window を開閉する。
 3. demand window は vreq の実行中に relay lease を保持する。vreq は一つ以上の REQ を plan し、各 REQ は subId を取る。NIP-11 subscription limit に空きがなければ、その REQ が relay-local FIFO queue で待つ。
 4. REQ が queue から開始すると unipls `subscribe()` へ lazy query factory を渡し、実送信直前と resend 時に `LazyFilter` を評価する。backward timeout はこの時点から開始する。
@@ -128,7 +128,7 @@ connection の再試行を直接命令する API は、directory と collection 
 7. local unsubscribe 時、現在 ready な connection 上の active REQ には Nostr `CLOSE` を enqueue してから local handle を解放する。既に drop 済みなら stale connection へは送らない。
 8. packet は filter match、signature、NIP-40 の順序を明示した pipeline を通し、internal subId/vreqId を除いて利用者指定 `traceTag` を付与する。
 
-RelayCommunicationCollection は URL の entry を初めて作る際、既定で RelayDirectory の cached NIP-11 fetch を開始します。metadata 取得は query の送信をブロックせず、取得後の `maxSubscriptions` は以後の queue drain に反映されます。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
+最初の connection demand は RelayDirectory の NIP-11 cache を確認し、空なら `nip11Timeout` で制限した fetch を開始します。REQ はその試行が終わるまで待ち、取得した `maxSubscriptions` に従って queue を処理します。取得に失敗した場合は最新の cache または空の metadata にフォールバックします。`skipFetchNip11` はこの自動取得だけを止め、既存 metadata による制限は維持します。
 
 ### publish
 

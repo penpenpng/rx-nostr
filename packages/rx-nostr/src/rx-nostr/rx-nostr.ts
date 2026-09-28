@@ -105,6 +105,8 @@ export class RxNostr implements IRxNostr {
 
     return defer(() => {
       this.#assertActive();
+      // An empty static request has no demand, even when prewarming is enabled.
+      if (source$ === EMPTY) return EMPTY;
       return req({
         source$,
         config,

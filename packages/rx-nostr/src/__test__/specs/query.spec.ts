@@ -39,10 +39,12 @@ describe("REQ public contract", () => {
       const packets: EventPacket[] = [];
       const complete = vi.fn();
 
-      rxNostr.backward(relay, request).subscribe({ next: (packet) => packets.push(packet), complete });
+      rxNostr
+        .backward(relay, request)
+        .subscribe({ next: (packet) => packets.push(packet), complete });
 
       request.emit([{ kinds: [1] }], { traceTag: "timeline" });
-            server.sockets.latest.open();
+      server.sockets.latest.open();
       const req = await expectSent(server.sockets.latest, "REQ");
       expect(req[0]).toBe("REQ");
       expect(req[2]).toEqual({ kinds: [1] });
@@ -76,7 +78,9 @@ describe("REQ public contract", () => {
 
   describe("reconnect", () => {
     test("resends an active backward REQ after an abnormal disconnect", async () => {
-      const { server, rxNostr } = createRxNostrScenario();
+      const { server, rxNostr } = createRxNostrScenario({
+        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+      });
       const complete = vi.fn();
 
       rxNostr.backward(relay, [{}]).subscribe({ complete });
@@ -102,7 +106,9 @@ describe("REQ public contract", () => {
     });
 
     test("resends an active forward REQ after an abnormal disconnect", async () => {
-      const { server, rxNostr } = createRxNostrScenario();
+      const { server, rxNostr } = createRxNostrScenario({
+        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+      });
       const complete = vi.fn();
       const subscription = rxNostr.forward(relay, [{ kinds: [1] }]).subscribe({ complete });
 
@@ -129,6 +135,59 @@ describe("REQ public contract", () => {
   });
 
   describe("forward queries", () => {
+    test("keeps the latest forward segment active after its hot source is disposed", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxReq();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+      const subscription = rxNostr.forward(relay, request).subscribe({
+        next: (packet) => packets.push(packet),
+        complete,
+      });
+
+      request.emit([{ kinds: [1] }]);
+      server.sockets.latest.open();
+      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      request.dispose();
+      server.sockets.latest.message(["EVENT", subId, event({ id: "after-source-completion" })]);
+
+      await expectEventIds(packets, ["after-source-completion"]);
+      expect(complete).not.toHaveBeenCalled();
+      expect(server.sockets.latest.sentOfType("CLOSE")).toEqual([]);
+
+      subscription.unsubscribe();
+      expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", subId]);
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("gives each static forward subscription its own active REQ", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const query = rxNostr.forward(relay, [{ kinds: [1] }]);
+      const packets: EventPacket[] = [];
+      expect(server.connections).toEqual([]);
+
+      const firstSubscription = query.subscribe();
+      server.sockets.latest.open();
+      const first = await expectSent(server.sockets.latest, "REQ");
+      const secondSubscription = query.subscribe((packet) => packets.push(packet));
+      const second = await expectSent(server.sockets.latest, "REQ", 2);
+      expect(second[1]).not.toBe(first[1]);
+
+      firstSubscription.unsubscribe();
+      expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", first[1]]);
+      server.sockets.latest.message(["EVENT", second[1], event({ id: "second-subscription" })]);
+      await expectEventIds(packets, ["second-subscription"]);
+      expect(server.sockets.latest.closeRequests).toEqual([]);
+
+      secondSubscription.unsubscribe();
+      expect(await expectSent(server.sockets.latest, "CLOSE", 2)).toEqual(["CLOSE", second[1]]);
+      await expectSocketCloseRequested(server.sockets.latest);
+      server.sockets.latest.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
     test("replaces a forward REQ and sends CLOSE for each local end", async () => {
       const { server, rxNostr } = createRxNostrScenario();
       const request = new RxReq();
@@ -191,18 +250,26 @@ describe("REQ public contract", () => {
       rxNostr.dispose();
     });
 
-    test("completes an empty cold request without creating a connection", async () => {
-      const { server, rxNostr } = createRxNostrScenario();
-      const complete = vi.fn();
-      const error = vi.fn();
+    test.each([
+      ["forward", true],
+      ["forward", false],
+      ["backward", true],
+      ["backward", false],
+    ] as const)(
+      "completes an empty %s request with defer=%s without connecting",
+      async (strategy, defer) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const complete = vi.fn();
+        const error = vi.fn();
 
-      rxNostr.backward(relay, []).subscribe({ complete, error });
+        rxNostr[strategy](relay, [], { defer }).subscribe({ complete, error });
 
-      await expectObservableCompleted(complete, error);
-      expect(server.connections).toEqual([]);
+        await expectObservableCompleted(complete, error);
+        expect(server.connections).toEqual([]);
 
-      rxNostr.dispose();
-    });
+        rxNostr.dispose();
+      },
+    );
 
     test("applies filter matching, verification, and expiration in order", async () => {
       const verified: string[] = [];
@@ -274,14 +341,10 @@ describe("REQ public contract", () => {
       const packets: EventPacket[] = [];
 
       rxNostr
-        .backward(
-          relay,
-          [{ kinds: [1] }],
-          {
-            skipExpirationCheck: true,
-            skipValidateFilterMatching: true,
-          },
-        )
+        .backward(relay, [{ kinds: [1] }], {
+          skipExpirationCheck: true,
+          skipValidateFilterMatching: true,
+        })
         .subscribe((packet) => packets.push(packet));
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
@@ -310,13 +373,12 @@ describe("REQ public contract", () => {
 
       callbackRxNostr
         .backward(relay, [
-            {
-              since: () => {
-                throw cause;
-              },
+          {
+            since: () => {
+              throw cause;
             },
-          ],
-        )
+          },
+        ])
         .subscribe({ error });
 
       callbackServer.sockets.latest.open();
@@ -465,7 +527,7 @@ describe("REQ public contract", () => {
       expect(server.sockets.latest.sent).not.toContainEqual(["CLOSE", first[1]]);
 
       server.sockets.latest.message(["EVENT", first[1], event({ id: "first" })]);
-      server.sockets.latest.message(["EVENT", second[1], event({ id: "second" })]);
+      server.sockets.latest.message(["EVENT", second[1], event({ id: "second", kind: 2 })]);
       await expectEventIds(packets, ["first", "second"]);
 
       server.sockets.latest.message(["EOSE", first[1]]);
@@ -498,9 +560,8 @@ describe("REQ public contract", () => {
       request.emit([{ kinds: [4] }]);
 
       server.sockets.latest.open();
-      const first = await expectSent(server.sockets.latest, "REQ");
-      const second = await expectSent(server.sockets.latest, "REQ", 2);
-      const third = await expectSent(server.sockets.latest, "REQ", 3);
+      await expectSent(server.sockets.latest, "REQ", 3);
+      const [first, second, third] = server.sockets.latest.sentOfType("REQ");
       expect(first[2]).toEqual({ kinds: [1] });
       expect(second[2]).toEqual({ kinds: [2] });
       expect(third[2]).toEqual({ kinds: [3] });
@@ -536,7 +597,7 @@ describe("REQ public contract", () => {
 
       request.emit([{ kinds: [1] }]);
       request.emit([{ kinds: [2] }]);
-            server.sockets.latest.open();
+      server.sockets.latest.open();
       const first = await expectSent(server.sockets.latest, "REQ");
       expect(first[2]).toEqual({ kinds: [1] });
       server.sockets.latest.message(["EOSE", first[1]]);
@@ -565,7 +626,7 @@ describe("REQ public contract", () => {
         complete,
       });
       request.emit([{ kinds: [1] }]);
-            await expectConnectionCount(server, 1);
+      await expectConnectionCount(server, 1);
       const first = server.sockets.latestFor(one);
       first.open();
       const [, firstSubId] = await expectSent(first, "REQ");
@@ -580,11 +641,12 @@ describe("REQ public contract", () => {
       second.message(["EOSE", secondSubId]);
 
       expect(complete).not.toHaveBeenCalled();
-      expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);
+      await expectEventIds(packets, ["dynamic"]);
 
       await expectAllSocketsCloseRequested(server);
 
       for (const socket of server.connections) socket.acknowledgeClose();
+      request.dispose();
       destinations.dispose();
       rxNostr.dispose();
     });

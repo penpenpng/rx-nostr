@@ -8,6 +8,7 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 - The public query call shapes are `forward(relays, request, options?)` and `backward(relays, request, options?)`. The method selects the query strategy. `request` is either a shared `RxReq` hot source or a filter array.
 - `RxReq` is always treated as a hot source and owns no strategy or completion marker. Passing a filter array creates a cold one-segment source for that `forward()` or `backward()` subscription.
+- An empty filter array completes without opening a connection, including with `defer: false`. A nonempty static `forward()` keeps its segment active after the source completes, as does a hot source's latest forward segment after source disposal; unsubscribing the result or disposing the client ends it.
 - `forward()` replaces the previous segment when a hot `RxReq` emits again. `backward()` keeps emitted segments active until their individual terminal conditions. A filter-array `backward()` completes after its single segment reaches EOSE/CLOSED/timeout/failure/removal, so no `over()` marker is required.
 - A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future REQ split.
 - REQ `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.

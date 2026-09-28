@@ -7,14 +7,14 @@ import {
   RelayCommunicationMock,
 } from "../../../__test__/helper/index.ts";
 import { RelayMapOperator } from "../../../libs/index.ts";
-import { RxForwardReq } from "../../../rx-req/index.ts";
+import { RxReq } from "../../../rx-req/index.ts";
 
 import { Expect } from "../../../__test__/helper/expect.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
 import { reqForward } from "./req-forward.ts";
 
 test("single relay", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -22,7 +22,7 @@ test("single relay", async () => {
   const obs = new ObservableInspector(
     reqForward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -68,7 +68,7 @@ test("single relay", async () => {
 });
 
 test("single relay, defer=true", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -76,7 +76,7 @@ test("single relay, defer=true", async () => {
   const obs = new ObservableInspector(
     reqForward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -109,7 +109,7 @@ test("single relay, defer=true", async () => {
 });
 
 test("single relay, weak=true", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxReq();
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
@@ -117,7 +117,7 @@ test("single relay, weak=true", async () => {
   const obs = new ObservableInspector(
     reqForward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: ["wss://relay1.example.com"],
       config: getTestReqOptions({
         linger: 0,
@@ -149,14 +149,14 @@ test("single relay, weak=true", async () => {
 });
 
 test("dynamic relays", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqForward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({
         linger: 0,
@@ -226,14 +226,14 @@ test("dynamic relays", async () => {
 });
 
 test("segment scope relays", async () => {
-  const rxReq = new RxForwardReq();
+  const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const sessionRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqForward({
       relays,
-      rxReq,
+      source$: rxReq.asObservable(),
       relayInput: sessionRelays,
       config: getTestReqOptions({
         linger: 0,

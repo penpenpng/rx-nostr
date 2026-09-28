@@ -143,7 +143,7 @@ describe("RxNostr diagnostics", () => {
     server.sockets.latest.send = () => {
       throw cause;
     };
-    rxNostr.req(relay, { strategy: "oneshot", filters: {} }).subscribe();
+    rxNostr.backward(relay, [{}]).subscribe();
 
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
@@ -172,7 +172,7 @@ describe("RxNostr diagnostics", () => {
       skipFetchNip11: true,
     });
 
-    rxNostr.req([], { strategy: "oneshot", filters: {} }).subscribe();
+    rxNostr.backward([], [{}]).subscribe();
 
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
