@@ -1,13 +1,13 @@
 import * as Nostr from "nostr-typedef";
-import { defer, identity, map, mergeMap, Observable, Subject, takeUntil } from "rxjs";
+import { defer, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
 import { diagnostics, emitDiagnostic } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
-import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
+import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
 import type { Publication } from "../publication/index.ts";
-import { RxReq, RxStaticReq } from "../rx-req/index.ts";
+import { RxReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
 import {
   FilledRxNostrPublishOptions,
@@ -73,34 +73,38 @@ export class RxNostr implements IRxNostr {
     this.#stack.use(this.#warmer);
   }
 
-  req(
+  forward(
     relays: RelayInput,
     request: RxNostrReqInput,
     options: RxNostrReqConfig = {},
   ): Observable<EventPacket> {
+    return this.#req(reqForward, relays, request, options);
+  }
+
+  backward(
+    relays: RelayInput,
+    request: RxNostrReqInput,
+    options: RxNostrReqConfig = {},
+  ): Observable<EventPacket> {
+    return this.#req(reqBackward, relays, request, options);
+  }
+
+  #req(
+    req: typeof reqForward | typeof reqBackward,
+    relays: RelayInput,
+    request: RxNostrReqInput,
+    options: RxNostrReqConfig,
+  ): Observable<EventPacket> {
     const config = new FilledRxNostrReqOptions(options, this.#config);
-
-    const rxReq: RxReq = (() => {
-      if (request instanceof RxReq) {
-        return request;
-      } else {
-        const filters = Symbol.iterator in request.filters ? [...request.filters] : request.filters;
-        return new RxStaticReq(request.strategy === "forward" ? "forward" : "backward", filters);
-      }
-    })();
-
-    const req = (() => {
-      if (rxReq.strategy === "forward") {
-        return reqForward;
-      } else {
-        return reqBackward;
-      }
-    })();
+    const source$: Observable<ReqPacket> =
+      request instanceof RxReq
+        ? request.asObservable()
+        : of({ filters: [...request] });
 
     return defer(() => {
       this.#assertActive();
       return req({
-        rxReq,
+        source$,
         config,
         relayInput: relays,
         relays: this.#relays,
