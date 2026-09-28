@@ -6,9 +6,9 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ### REQ
 
-- The public call shape is `req(relays, request, options?)`: destinations first, then an `RxReq` or a `{ strategy, filters }` descriptor, then operation-specific options.
-- `req()` returns a cold Observable. Each subscription creates an independent logical query and connection demand; merely calling `req()` does not open a connection.
-- A `strategy: "oneshot"` descriptor creates one backward segment and completes at its terminal condition. A `strategy: "forward"` descriptor creates one forward segment that remains active after EOSE until unsubscribe. Both descriptors accept one or multiple filters. `RxForwardReq` replaces its previous segment, while `RxBackwardReq` keeps emitted segments active until their individual terminal conditions and completes after `over()` and all segments finish.
+- The public query call shapes are `forward(relays, request, options?)` and `backward(relays, request, options?)`. The method selects the query strategy. `request` is either a shared `RxReq` hot source or a filter array.
+- `RxReq` is always treated as a hot source and owns no strategy or completion marker. Passing a filter array creates a cold one-segment source for that `forward()` or `backward()` subscription.
+- `forward()` replaces the previous segment when a hot `RxReq` emits again. `backward()` keeps emitted segments active until their individual terminal conditions. A filter-array `backward()` completes after its single segment reaches EOSE/CLOSED/timeout/failure/removal, so no `over()` marker is required.
 - A query result is `{ type: "EVENT", from, event, traceTag? }`. `traceTag` is copied from the originating `ReqPacket` across relays and any future REQ split.
 - REQ `subId`, logical `vreqId`, and protocol tuples containing them are internal. They are not properties of `EventPacket`.
 - The public result pipeline is filter matching, signature verification, then NIP-40 expiration filtering. A disabled stage is skipped in that same position.
@@ -62,7 +62,7 @@ An authenticator's `authTimeout` defaults to 30 seconds, and NIP-11 fetching is 
 Precedence is the most specific defined value first:
 
 1. a `ReqPacket` override (`relays`, `linger`, `traceTag`) where applicable;
-2. the `req()` or `publish()` call config;
+2. the `forward()`/`backward()` or `publish()` call config;
 3. `RxNostrConfig.defaultOptions.req/publish`;
 4. `RxNostr.defaultOptions.req/publish`, which initially holds the built-in defaults.
 
