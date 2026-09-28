@@ -35,7 +35,7 @@ export {
   type VerificationResponse,
   type VerificationServiceStatus,
 } from "./event-verifier/index.ts";
-export { evalFilters, type LazyFilter } from "./lazy-filter/index.ts";
+export type { LazyFilter } from "./lazy-filter/index.ts";
 export {
   RxNostrAlreadyDisposedError,
   RxNostrCallbackError,
@@ -51,37 +51,7 @@ export {
   type RxNostrNip11ErrorCode,
   type RelayDirectorySnapshotErrorCode,
 } from "./libs/error.ts";
-export { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./libs/nostr/event.ts";
-export { fetchRelayInfo } from "./libs/nostr/nip11.ts";
-export type { FetchRelayInfoOptions } from "./libs/nostr/nip11.ts";
-export { normalizeRelayUrl, RelayMap, RelaySet, type RelayUrl } from "./libs/relay-urls.ts";
-export { RxDisposableStack } from "./libs/rxjs/rx-disposable-stack.ts";
-export {
-  batch,
-  chunk,
-  createTie,
-  createUniq,
-  dropExpiredEvents,
-  filterAsync,
-  filterBy,
-  filterByEventId,
-  filterByKind,
-  filterByKinds,
-  filterByPow,
-  filterByType,
-  latest,
-  latestEach,
-  setDiff,
-  sort,
-  sortEvents,
-  tie,
-  timeline,
-  uniq,
-  verify,
-  withPrevious,
-  type MergeFilterFunction,
-  type SetDiff,
-} from "./operators/index.ts";
+export type { RelayUrl } from "./libs/relay-urls.ts";
 export type {
   ConnectionStatePacket,
   EventPacket,

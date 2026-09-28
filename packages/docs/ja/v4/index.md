@@ -85,7 +85,7 @@ URL は境界で正規化、重複排除されます。query と hot relay に�
 query と接続状態は RxJS の `Observable` です。標準の RxJS operator と、rx-nostr が提供する Nostr 向け operatorを組み合わせられます。
 
 ```ts
-import { filterByKinds, timeline } from "rx-nostr";
+import { filterByKinds, timeline } from "rx-nostr/operators";
 
 rxNostr
   .req(["wss://relay.example.com"], { strategy: "oneshot", filters: [{}] })

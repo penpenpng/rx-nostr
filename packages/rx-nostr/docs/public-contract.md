@@ -4,6 +4,8 @@ This document fixes the public model used by Tasks 02–12. Later tasks may add 
 
 ## Operations
 
+Public entry points are separated by responsibility: `rx-nostr` exports the client, request/relay sources, protocol types, configuration, and errors; `rx-nostr/operators` exports public RxJS operators and their types; `rx-nostr/utils` exports standalone helpers (`now`, event comparison/completion, filter evaluation, NIP-11 fetching, relay URL normalization/collections, and `RxDisposableStack`). Operators and standalone helpers are no longer re-exported from the root. `RelayUrl` remains available from the root as a core API type.
+
 ### REQ
 
 - The public query call shapes are `forward(relays, request, options?)` and `backward(relays, request, options?)`. The method selects the query strategy. `request` is either a shared `RxReq` hot source or a filter array.

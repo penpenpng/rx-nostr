@@ -2,11 +2,11 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RelayDirectory,
   RelayDirectorySnapshotError,
-  fetchRelayInfo,
   type IRelayDirectory,
   type RelayDirectoryEntry,
   type RxNostrConfig,
 } from "rx-nostr";
+import { fetchRelayInfo } from "rx-nostr/utils";
 import {
   createDeferred,
   createRxNostrScenario,

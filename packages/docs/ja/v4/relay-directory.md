@@ -113,7 +113,7 @@ directory.forget("wss://relay.example.com");
 Directory を使わず単発で取得する場合は `fetchRelayInfo()` を使えます。
 
 ```ts
-import { fetchRelayInfo } from "rx-nostr";
+import { fetchRelayInfo } from "rx-nostr/utils";
 
 const info = await fetchRelayInfo("wss://relay.example.com");
 ```

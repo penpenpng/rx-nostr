@@ -1,6 +1,6 @@
 # Operators
 
-rx-nostr は `EventPacket`、`ReqPacket`、一般的な RxJS stream のための operator を公開しています。
+rx-nostr は `EventPacket`、`ReqPacket`、一般的な RxJS stream のための operator を `rx-nostr/operators` から公開しています。
 
 ## EventPacket operator
 
@@ -56,7 +56,8 @@ source$.pipe(tie()).subscribe((packet) => {
 
 ```ts
 import { bufferTime } from "rxjs";
-import { RxForwardReq, batch } from "rx-nostr";
+import { RxForwardReq } from "rx-nostr";
+import { batch } from "rx-nostr/operators";
 
 const source = new RxForwardReq();
 const batched = source.pipe(bufferTime(50), batch());

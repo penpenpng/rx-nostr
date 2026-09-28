@@ -7,7 +7,9 @@
     "types": ["vitest/importMeta"],
     "moduleResolution": "bundler",
     "paths": {
-      "rx-nostr": ["./src/index.ts"]
+      "rx-nostr": ["./src/index.ts"],
+      "rx-nostr/operators": ["./src/operators.ts"],
+      "rx-nostr/utils": ["./src/utils.ts"]
     },
     "strict": true,
     "resolveJsonModule": true,
