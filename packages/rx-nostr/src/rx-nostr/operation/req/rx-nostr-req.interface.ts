@@ -3,16 +3,7 @@ import type { EventVerifier } from "../../../event-verifier/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RxReq } from "../../../rx-req/index.ts";
 
-export type RxNostrReqInput =
-  | RxReq
-  | Readonly<{
-      strategy: "forward";
-      filters: LazyFilter | Iterable<LazyFilter>;
-    }>
-  | Readonly<{
-      strategy: "oneshot";
-      filters: LazyFilter | Iterable<LazyFilter>;
-    }>;
+export type RxNostrReqInput = RxReq | readonly LazyFilter[];
 
 export interface RxNostrReqOptions {
   defer?: boolean;
