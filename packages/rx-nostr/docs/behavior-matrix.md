@@ -34,10 +34,10 @@
 
 | v3 behavior                                       | v4 classification | v4 contract / reason                                                         | Task              |
 | ------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------- | ----------------- |
-| RxReq → RxNostr → Observable の一方向 flow        | keep              | `RxReq` と `req()` の Observable を維持する                                  | 01, 06, 09        |
+| RxReq → RxNostr → Observable の一方向 flow        | change            | `RxReq` は hot source のみに限定し、strategy は `forward()` / `backward()` で選択する             | 01, 06, 09        |
 | forward strategy は直前の REQ を置換する          | keep              | relay ごとに current REQ を高々一つ保持する                                  | 06                |
 | backward strategy は複数 REQ を並行する           | keep              | EOSE/CLOSED/timeout/failure/removal まで各 segment を保持する                | 06                |
-| `RxBackwardReq.over()` 後、全 REQ 完了で complete | keep              | 全 relay segment の terminal 後に complete する                              | 06                |
+| `RxBackwardReq.over()` 後、全 REQ 完了で complete | remove            | static filters は cold source として終端を表現し、hot `RxReq` は明示的な終端 marker を持たない     | 06                |
 | Rx unsubscribe で Nostr CLOSE を送る              | keep              | ready な active REQ へ CLOSE を enqueue し、一度だけ cleanup する            | 06                |
 | reconnect 後に active REQ を再発行する            | keep              | unipls recovery と protocol registry を接続する                              | 05, 06            |
 | lazy `since`/`until` を送信直前に評価する         | keep              | 初回送信と resend の直前に評価する                                           | 06                |
