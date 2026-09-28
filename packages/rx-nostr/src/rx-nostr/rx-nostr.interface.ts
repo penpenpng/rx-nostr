@@ -18,7 +18,12 @@ import type {
 } from "./operation/index.ts";
 
 export interface IRxNostr {
-  req(
+  forward(
+    relays: RelayInput,
+    request: RxNostrReqInput,
+    options?: RxNostrReqConfig,
+  ): Observable<EventPacket>;
+  backward(
     relays: RelayInput,
     request: RxNostrReqInput,
     options?: RxNostrReqConfig,
