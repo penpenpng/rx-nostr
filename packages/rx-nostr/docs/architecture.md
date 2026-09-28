@@ -82,8 +82,10 @@ query、publish、hot relay はすべて同じ lease を取得します。最初
 - normal vreq: 対応する relay demand window 中に lease を保持
 - `defer: false`: 最初の demand window より前に prewarm lease を取得
 - `defer: true`: demand window 開始時まで lease を取得しない
-- `weak: true`: demand window は lease を取得せず、既に ready な connection だけを利用
+- `weak: true`: demand window 自身は lease を取得せず、他の demand が保持する未解放の lease を利用する。接続開始中なら ready になるまで待つ。lease がなければその relay の vreq は完了し、後から接続されても復活しない
 - `linger`: demand window を閉じてから lease を解放するまでの猶予。hot lease には影響しない
+
+backward query は完了・error・unsubscribe のいずれでも、閉じた demand window の linger を維持する。`ConnectionDemandScope.finish()` は未使用の prewarm lease だけを解放し、残存する demand は RxNostr が保持する。finite linger の最後の lease が解放されたら registry から除去する。`Infinity` は RxNostr の dispose まで残り、dispose は全 scope の timer と lease を直ちに解放する。入力が static filters か RxReq かによってこの寿命は変わらない。
 
 hot relay は宛先ではありません。hot だが query の `RxRelays` に含まれない relay へメッセージを送ってはいけません。
 

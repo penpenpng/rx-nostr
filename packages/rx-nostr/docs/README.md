@@ -12,6 +12,7 @@
 6. [typecheck-baseline.md](./typecheck-baseline.md): Task 00 時点の型エラー分類
 7. [public-contract.md](./public-contract.md): Task 01 で固定した公開型・operation・error の契約
 8. [v3-test-audit.md](./v3-test-audit.md): Task 10 で実施した v3 test 契約の全件監査
+9. [query-test-coverage.md](./query-test-coverage.md): REQ の寿命・宛先・weak・linger・回復処理の複合ケース
 
 ## この資料の扱い
 

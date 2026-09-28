@@ -16,28 +16,33 @@ export function reqBackward({
   source$,
   relayInput,
   config,
+  connectionDemand = new ConnectionDemandScope(config),
 }: {
   relays: IRelayCommunicationCollection;
   source$: Observable<ReqPacket>;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
+  connectionDemand?: ConnectionDemandScope;
 }): Observable<EventPacket> {
-  const connectionDemand = new ConnectionDemandScope(config);
-  const sessionRelays = RxRelays.from(relayInput);
+  const defaultRelays = RxRelays.from(relayInput);
 
-  const warming = sessionRelays.subscribe((destRelays) => {
-    relays.forEach(destRelays, (relay) => {
-      connectionDemand.prewarm(relay);
+  const warming = defaultRelays
+    .asObservable()
+    .pipe(setDiff())
+    .subscribe(({ appended, outdated }) => {
+      relays.forEach(appended, (relay) => {
+        connectionDemand.prewarm(relay);
+      });
+      relays.forEach(outdated, (relay) => connectionDemand.releasePrewarm(relay));
     });
-  });
 
   return source$.pipe(
     map((packet) =>
       req({
         connectionDemand,
         relays,
-        sessionRelays,
-        segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
+        defaultRelays,
+        requestRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(defaultRelays),
         filters: packet.filters,
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
@@ -50,8 +55,8 @@ export function reqBackward({
     mergeAll(),
     finalize(() => {
       warming.unsubscribe();
-      connectionDemand.dispose();
-      sessionRelays.dispose();
+      connectionDemand.finish();
+      defaultRelays.dispose();
     }),
   );
 }
@@ -59,8 +64,8 @@ export function reqBackward({
 function req({
   connectionDemand,
   relays,
-  sessionRelays,
-  segmentRelays,
+  defaultRelays,
+  requestRelays,
   filters,
   linger,
   traceTag,
@@ -70,8 +75,8 @@ function req({
 }: {
   connectionDemand: ConnectionDemandScope;
   relays: IRelayCommunicationCollection;
-  sessionRelays: RxRelays;
-  segmentRelays: RxRelays;
+  defaultRelays: RxRelays;
+  requestRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
   traceTag?: string | number;
@@ -79,7 +84,7 @@ function req({
   eoseTimeout: number;
   authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
-  const warming = segmentRelays.subscribe((destRelays) => {
+  const warming = requestRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       connectionDemand.prewarm(relay);
     });
@@ -92,16 +97,16 @@ function req({
 
   const stream = new Subject<EventPacket>();
   const completeIfFinished = () => {
-    if ([...segmentRelays].every((url) => finished.has(url))) {
+    if ([...requestRelays].every((url) => finished.has(url))) {
       stream.complete();
     }
   };
 
-  const sub = segmentRelays
+  const sub = requestRelays
     .asObservable()
     .pipe(setDiff())
     .subscribe(({ current, appended, outdated }) => {
-      if (!sessionRelays.disposed) {
+      if (!defaultRelays.disposed) {
         let nomore = false;
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           const message = "A REQ was issued without any destination relays.";
@@ -174,7 +179,7 @@ function req({
         const query = ongoings.get(relay.url);
         ongoings.delete(relay.url);
 
-        // Backward: End a segment here because we don't know when the next REQ will come.
+        // Backward: End a demand window here because we don't know when the next REQ will come.
         query?.sub.unsubscribe();
         query?.demandWindow.close();
       });
@@ -194,7 +199,7 @@ function req({
 
       sub.unsubscribe();
 
-      segmentRelays.dispose();
+      requestRelays.dispose();
 
       stream.complete();
     }),

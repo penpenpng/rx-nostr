@@ -1,4 +1,4 @@
-import { filter, Subject, type Observable } from "rxjs";
+import { EMPTY, filter, Subject, type Observable } from "rxjs";
 import { assert, expect } from "vitest";
 import type { LazyFilter } from "../../index.ts";
 import { AwaitableQueue, once, u, type RelayUrl } from "../../libs/index.ts";
@@ -30,6 +30,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
   }
 
   vreq(_strategy: "forward" | "backward", filters: LazyFilter[]): Observable<EventPacket> {
+    if (!this.hasActiveLease && !this.isHot) return EMPTY;
     try {
       this.queryLog.enqueue(filters);
 

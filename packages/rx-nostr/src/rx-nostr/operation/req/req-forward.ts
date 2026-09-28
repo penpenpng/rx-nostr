@@ -23,13 +23,17 @@ export function reqForward({
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
   const connectionDemand = new ConnectionDemandScope(config);
-  const sessionRelays = RxRelays.from(relayInput);
+  const defaultRelays = RxRelays.from(relayInput);
 
-  const warming = sessionRelays.subscribe((destRelays) => {
-    relays.forEach(destRelays, (relay) => {
-      connectionDemand.prewarm(relay);
+  const warming = defaultRelays
+    .asObservable()
+    .pipe(setDiff())
+    .subscribe(({ appended, outdated }) => {
+      relays.forEach(appended, (relay) => {
+        connectionDemand.prewarm(relay);
+      });
+      relays.forEach(outdated, (relay) => connectionDemand.releasePrewarm(relay));
     });
-  });
   let cleanupLast = () => {};
 
   return source$.pipe(
@@ -37,8 +41,8 @@ export function reqForward({
       req({
         connectionDemand,
         relays,
-        sessionRelays,
-        segmentRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(sessionRelays),
+        defaultRelays,
+        requestRelays: packet.relays ? RxRelays.from(packet.relays) : RxRelays.from(defaultRelays),
         filters: packet.filters,
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
@@ -63,7 +67,7 @@ export function reqForward({
       cleanupLast();
       warming.unsubscribe();
       connectionDemand.dispose();
-      sessionRelays.dispose();
+      defaultRelays.dispose();
     }),
   );
 }
@@ -71,8 +75,8 @@ export function reqForward({
 function req({
   connectionDemand,
   relays,
-  sessionRelays,
-  segmentRelays,
+  defaultRelays,
+  requestRelays,
   filters,
   linger,
   traceTag,
@@ -81,31 +85,31 @@ function req({
 }: {
   connectionDemand: ConnectionDemandScope;
   relays: IRelayCommunicationCollection;
-  sessionRelays: RxRelays;
-  segmentRelays: RxRelays;
+  defaultRelays: RxRelays;
+  requestRelays: RxRelays;
   filters: LazyFilter[];
   linger: number;
   traceTag?: string | number;
   skipValidateFilterMatching: boolean;
   authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
-  const warming = segmentRelays.subscribe((destRelays) => {
+  const warming = requestRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
       connectionDemand.prewarm(relay);
     });
   });
 
   // Use Map because we assume that `relay.url` is normalized.
-  // Forward: Only one subscription (segment) at most is held on the same relay.
+  // Forward: At most one active vreq is held on the same relay for this request.
   const ongoings = new Map<RelayUrl, { demandWindow: RelayDemandWindow; sub: Subscription }>();
 
   const stream = new Subject<EventPacket>();
 
-  const relaySub = segmentRelays
+  const relaySub = requestRelays
     .asObservable()
     .pipe(setDiff())
     .subscribe(({ current, appended, outdated }) => {
-      if (!sessionRelays.disposed) {
+      if (!defaultRelays.disposed) {
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           const message = "A REQ was issued without any destination relays.";
           emitDiagnostic({
@@ -180,12 +184,12 @@ function req({
 
       relaySub.unsubscribe();
 
-      relays.forEach(sessionRelays, (relay) => {
+      relays.forEach(defaultRelays, (relay) => {
         ongoings.get(relay.url)?.demandWindow.close();
       });
       ongoings.clear();
 
-      segmentRelays.dispose();
+      requestRelays.dispose();
 
       stream.complete();
     }),

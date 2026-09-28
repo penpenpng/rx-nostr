@@ -17,10 +17,30 @@ export class ConnectionDemandScope {
   private defer: boolean;
   private weak: boolean;
   private relays = new RelayMap<RelayDemand>();
+  private finished = false;
+  private readonly onDrained: () => void;
 
-  constructor(params: { defer: boolean; weak: boolean }) {
+  constructor(params: { defer: boolean; weak: boolean }, onDrained = () => {}) {
     this.defer = params.defer;
     this.weak = params.weak;
+    this.onDrained = once(onDrained);
+  }
+
+  /** Stop prewarming while allowing already closed windows to finish lingering. */
+  finish(): void {
+    this.finished = true;
+    for (const relay of this.relays.values()) relay.releasePrewarm();
+    this.checkDrained();
+  }
+
+  releasePrewarm(relay: IRelayCommunication): void {
+    this.relays.get(relay.url)?.releasePrewarm();
+  }
+
+  private checkDrained(): void {
+    if (this.finished && [...this.relays.values()].every((relay) => relay.idle)) {
+      this.onDrained();
+    }
   }
 
   prewarm(relay: IRelayCommunication): boolean {
@@ -43,27 +63,46 @@ export class ConnectionDemandScope {
   }
 
   [Symbol.dispose] = once(() => {
+    this.finished = true;
     for (const relay of this.relays.values()) {
       relay.dispose();
     }
+    this.checkDrained();
   });
   dispose = this[Symbol.dispose];
 
   private getRelayDemand(relay: IRelayCommunication) {
-    return this.relays.setDefault(relay.url, () => new RelayDemand(relay));
+    return this.relays.setDefault(
+      relay.url,
+      () => new RelayDemand(relay, () => this.checkDrained()),
+    );
   }
 }
 
 /** Manages the leases this scope holds for one relay. */
 class RelayDemand {
   private deferrer = new Deferrer();
+  private disposed = false;
   private warmed = false;
   private releasePrewarming?: () => void;
 
   private nextLeaseId = 0;
   private activeLeases = new Map<number, () => void>();
 
-  constructor(private relay: IRelayCommunication) {}
+  constructor(
+    private relay: IRelayCommunication,
+    private onRelease: () => void,
+  ) {}
+
+  get idle(): boolean {
+    return this.activeLeases.size === 0;
+  }
+
+  releasePrewarm(): void {
+    if (this.releasePrewarming) this.warmed = false;
+    this.releasePrewarming?.();
+    this.releasePrewarming = undefined;
+  }
 
   prewarm(): boolean {
     if (this.warmed) {
@@ -99,6 +138,7 @@ class RelayDemand {
     return () => {
       this.activeLeases.delete(id);
       release();
+      this.onRelease();
     };
   }
 
@@ -113,10 +153,13 @@ class RelayDemand {
       return release;
     }
 
-    return () => this.deferrer.invoke(release, linger);
+    return () => {
+      if (!this.disposed) this.deferrer.invoke(release, linger);
+    };
   }
 
   [Symbol.dispose] = once(() => {
+    this.disposed = true;
     this.deferrer.cancelAll();
 
     for (const release of this.activeLeases.values()) {

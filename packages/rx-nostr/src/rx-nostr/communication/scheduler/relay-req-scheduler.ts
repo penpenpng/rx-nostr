@@ -13,6 +13,7 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   #capacityReady = false;
   #disposed = false;
   #drainSuppression = 0;
+  #drainScheduled = false;
 
   setMaxSubscriptions(maxSubscriptions: number | undefined): void {
     this.#maxSubscriptions = maxSubscriptions;
@@ -46,7 +47,13 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   dispose = this[Symbol.dispose];
 
   #drain(): void {
-    if (this.#disposed || this.#drainSuppression > 0 || !this.#capacityReady) return;
+    if (
+      this.#disposed ||
+      this.#drainScheduled ||
+      this.#drainSuppression > 0 ||
+      !this.#capacityReady
+    )
+      return;
     const limit = this.#maxSubscriptions ?? Number.POSITIVE_INFINITY;
     if (limit === 0) {
       for (const task of this.#pending) task.subscriber.complete();
@@ -88,7 +95,15 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
       this.#active.delete(task);
       task.subscription?.unsubscribe();
     }
-    this.#drain();
+    // A query may cancel several active/queued REQs in one synchronous teardown.
+    // Let that teardown remove all siblings before admitting another REQ.
+    if (!this.#disposed && !this.#drainScheduled) {
+      this.#drainScheduled = true;
+      queueMicrotask(() => {
+        this.#drainScheduled = false;
+        this.#drain();
+      });
+    }
   }
 
   #terminate(task: ReqTask, terminal: ReqTerminal): void {

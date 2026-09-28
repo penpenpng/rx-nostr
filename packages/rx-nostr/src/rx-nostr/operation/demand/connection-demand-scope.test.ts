@@ -29,7 +29,38 @@ class LeaseRelay implements IRelayCommunication {
 afterEach(() => vi.useRealTimers());
 
 describe("ConnectionDemandScope leases", () => {
-  test("holds a segment lease through linger", () => {
+  test("notifies its owner once after all finalized demand has drained", () => {
+    vi.useFakeTimers();
+    const relay = new LeaseRelay("wss://relay.example.com");
+    const drained = vi.fn();
+    const demand = new ConnectionDemandScope({ defer: true, weak: false }, drained);
+    demand.openDemandWindow(relay, 100).close();
+    demand.openDemandWindow(relay, 200).close();
+    demand.finish();
+
+    vi.advanceTimersByTime(100);
+    expect(relay.leases).toBe(1);
+    expect(drained).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(100);
+    expect(relay.leases).toBe(0);
+    expect(drained).toHaveBeenCalledOnce();
+    demand.finish();
+    demand.dispose();
+    expect(drained).toHaveBeenCalledOnce();
+  });
+
+  test("does not schedule a late window close after disposal", () => {
+    vi.useFakeTimers();
+    const relay = new LeaseRelay("wss://relay.example.com");
+    const demand = new ConnectionDemandScope({ defer: true, weak: false });
+    const window = demand.openDemandWindow(relay, 100);
+    demand.dispose();
+    window.close();
+    expect(relay.leases).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("holds a demand window lease through linger", () => {
     vi.useFakeTimers();
     const relay = new LeaseRelay("wss://relay.example.com");
     const connectionDemand = new ConnectionDemandScope({
@@ -62,7 +93,7 @@ describe("ConnectionDemandScope leases", () => {
     expect(relay.leases).toBe(0);
   });
 
-  test("weak sessions never acquire a lease", () => {
+  test("weak demand scopes never acquire a lease", () => {
     const relay = new LeaseRelay("wss://relay.example.com");
     const connectionDemand = new ConnectionDemandScope({
       defer: false,

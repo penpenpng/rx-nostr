@@ -95,7 +95,10 @@ test("single relay, defer=true", async () => {
   await req1.subscribed;
   await relay.expectFilters([{ kinds: [1] }]);
 
-  assert(relay.hasActiveLease, "Relay should be warmed up just before a segment (defer=true)");
+  assert(
+    relay.hasActiveLease,
+    "Relay should be warmed up just before a demand window (defer=true)",
+  );
 
   req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
@@ -113,6 +116,7 @@ test("single relay, weak=true", async () => {
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
+  relay.isHot = true;
 
   const obs = new ObservableInspector(
     reqForward({
@@ -138,8 +142,6 @@ test("single relay, weak=true", async () => {
 
   assert(!relay.hasActiveLease, "Relay should be disconnected (weak=true)");
 
-  req1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
-  relay.isHot = true;
   req1.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
@@ -151,13 +153,13 @@ test("single relay, weak=true", async () => {
 test("dynamic relays", async () => {
   const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
-  const sessionRelays = new RxRelays();
+  const defaultRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqForward({
       relays,
       source$: rxReq.asObservable(),
-      relayInput: sessionRelays,
+      relayInput: defaultRelays,
       config: getTestReqOptions({
         linger: 0,
         defer: false,
@@ -175,7 +177,7 @@ test("dynamic relays", async () => {
 
   const req1relay1 = relay1.attachNextStream();
   assert(!relay1.hasActiveLease, "Relay1 should be disconnected before being added");
-  sessionRelays.append(relayUrl1);
+  defaultRelays.append(relayUrl1);
   assert(relay1.hasActiveLease, "Relay1 should be connected after being added");
   assert(!relay2.hasActiveLease, "Relay2 should be disconnected");
   rxReq.emit([{ kinds: [1] }]);
@@ -187,7 +189,7 @@ test("dynamic relays", async () => {
 
   const req1relay2 = relay2.attachNextStream();
   assert(!relay2.hasActiveLease, "Relay2 should be disconnected before being added");
-  sessionRelays.append(relayUrl2);
+  defaultRelays.append(relayUrl2);
   assert(relay1.hasActiveLease, "Relay1 should still be connected");
   assert(relay2.hasActiveLease, "Relay2 should be connected after being added");
   await req1relay2.subscribed;
@@ -213,7 +215,7 @@ test("dynamic relays", async () => {
   req2relay2.next(Faker.eventPacket({ id: "5" }));
   await obs.expectNext(Expect.eventPacket({ id: "5" }));
 
-  sessionRelays.remove(relayUrl1);
+  defaultRelays.remove(relayUrl1);
   assert(!relay1.hasActiveLease, "Relay1 should be disconnected after being removed");
 
   req2relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
@@ -225,16 +227,16 @@ test("dynamic relays", async () => {
   assert(!relay2.hasActiveLease, "Relay2 should be released");
 });
 
-test("segment scope relays", async () => {
+test("request-specific relays", async () => {
   const rxReq = new RxReq();
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
-  const sessionRelays = new RxRelays();
+  const defaultRelays = new RxRelays();
 
   const obs = new ObservableInspector(
     reqForward({
       relays,
       source$: rxReq.asObservable(),
-      relayInput: sessionRelays,
+      relayInput: defaultRelays,
       config: getTestReqOptions({
         linger: 0,
         defer: false,
@@ -252,29 +254,29 @@ test("segment scope relays", async () => {
   const relayUrl3 = "wss://relay3.example.com";
   const relay3 = relays.get(relayUrl3);
 
-  sessionRelays.append(relayUrl1);
+  defaultRelays.append(relayUrl1);
 
-  const segmentRelays = new RxRelays();
-  segmentRelays.append(relayUrl2);
+  const requestRelays = new RxRelays();
+  requestRelays.append(relayUrl2);
 
   const stream1 = relay1.attachNextStream();
   const stream2 = relay2.attachNextStream();
   const stream3 = relay3.attachNextStream();
 
-  rxReq.emit({ kinds: [1] }, { relays: segmentRelays });
+  rxReq.emit({ kinds: [1] }, { relays: requestRelays });
   await stream2.subscribed;
   await relay2.expectFilters([{ kinds: [1] }]);
-  assert(relay1.hasActiveLease, "Relay1 should be connected (session scope)");
-  assert(relay2.hasActiveLease, "Relay2 should be connected (segment scope)");
+  assert(relay1.hasActiveLease, "Relay1 should be connected (query defaults)");
+  assert(relay2.hasActiveLease, "Relay2 should be connected (request destinations)");
 
   stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
   stream2.next(Faker.eventPacket({ id: "1" }));
   await obs.expectNext(Expect.eventPacket({ id: "1" }));
 
-  segmentRelays.append(relayUrl3);
+  requestRelays.append(relayUrl3);
   await stream3.subscribed;
   await relay3.expectFilters([{ kinds: [1] }]);
-  assert(relay3.hasActiveLease, "Relay3 should be connected (segment scope)");
+  assert(relay3.hasActiveLease, "Relay3 should be connected (request destinations)");
 
   stream3.next(Faker.eventPacket({ id: "2" }));
   await obs.expectNext(Expect.eventPacket({ id: "2" }));

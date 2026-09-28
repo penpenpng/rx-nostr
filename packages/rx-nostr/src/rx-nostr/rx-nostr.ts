@@ -9,6 +9,7 @@ import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/i
 import type { Publication } from "../publication/index.ts";
 import { RxReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
+import { ConnectionDemandScope } from "./operation/demand/index.ts";
 import {
   FilledRxNostrPublishOptions,
   FilledRxNostrReqOptions,
@@ -53,6 +54,7 @@ export class RxNostr implements IRxNostr {
   readonly #warmer: RelayWarmer;
   readonly #dispose$ = new Subject<void>();
   readonly #publications = new Set<ReturnType<typeof publish>>();
+  readonly #queryDemands = new Set<ConnectionDemandScope>();
   #disposed = false;
 
   constructor(config: RxNostrConfig = {}) {
@@ -107,7 +109,13 @@ export class RxNostr implements IRxNostr {
       this.#assertActive();
       // An empty static request has no demand, even when prewarming is enabled.
       if (source$ === EMPTY) return EMPTY;
+      const connectionDemand =
+        req === reqBackward
+          ? new ConnectionDemandScope(config, () => this.#queryDemands.delete(connectionDemand!))
+          : undefined;
+      if (connectionDemand) this.#queryDemands.add(connectionDemand);
       return req({
+        connectionDemand,
         source$,
         config,
         relayInput: relays,
@@ -169,6 +177,8 @@ export class RxNostr implements IRxNostr {
     this.#dispose$.complete();
     for (const publication of this.#publications) publication.cancel();
     this.#publications.clear();
+    for (const demand of this.#queryDemands) demand.dispose();
+    this.#queryDemands.clear();
     this.#stack.dispose();
   });
   dispose = this[Symbol.dispose];
