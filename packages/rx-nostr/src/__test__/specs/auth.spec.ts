@@ -48,10 +48,10 @@ describe("NIP-42 AUTH public contract", () => {
       });
       const completed = [vi.fn(), vi.fn()];
 
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+      rxNostr.backward(relay, [{}]).subscribe({
         complete: completed[0],
       });
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+      rxNostr.backward(relay, [{}]).subscribe({
         complete: completed[1],
       });
 
@@ -99,7 +99,7 @@ describe("NIP-42 AUTH public contract", () => {
         const complete = vi.fn();
         const error = vi.fn();
 
-        rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+        rxNostr.backward(relay, [{}]).subscribe({
           complete,
           error,
         });
@@ -139,7 +139,7 @@ describe("NIP-42 AUTH public contract", () => {
       const complete = vi.fn();
 
       rxNostr
-        .req(relay, { strategy: "oneshot", filters: [{}] }, { authenticator: false })
+        .backward(relay, [{}], { authenticator: false })
         .subscribe({ complete });
 
       server.sockets.latest.open();
@@ -163,7 +163,7 @@ describe("NIP-42 AUTH public contract", () => {
       const complete = vi.fn();
 
       rxNostr
-        .req("wss://RELAY.example.com/", { strategy: "oneshot", filters: [{}] })
+        .backward("wss://RELAY.example.com/", [{}])
         .subscribe({ complete });
 
       server.sockets.latest.open();
@@ -231,7 +231,7 @@ describe("NIP-42 AUTH public contract", () => {
       });
       const complete = vi.fn();
 
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({ complete });
+      rxNostr.backward(relay, [{}]).subscribe({ complete });
 
       server.sockets.latest.open();
       const firstConnection = server.sockets.latest;
@@ -258,7 +258,7 @@ describe("NIP-42 AUTH public contract", () => {
       });
       const error = vi.fn();
 
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+      rxNostr.backward(relay, [{}]).subscribe({
         error,
       });
 
@@ -284,7 +284,7 @@ describe("NIP-42 AUTH public contract", () => {
       });
       const complete = vi.fn();
 
-      rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe({
+      rxNostr.backward(relay, [{}]).subscribe({
         complete,
       });
 
@@ -311,7 +311,7 @@ describe("NIP-42 AUTH public contract", () => {
         },
       });
 
-      const subscription = rxNostr.req(relay, { strategy: "oneshot", filters: [{}] }).subscribe();
+      const subscription = rxNostr.backward(relay, [{}]).subscribe();
 
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
