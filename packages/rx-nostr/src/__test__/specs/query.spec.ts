@@ -52,6 +52,8 @@ describe("REQ public contract", () => {
       server.sockets.latest.message(["EOSE", req[1]]);
 
       expect(complete).not.toHaveBeenCalled();
+      request.dispose();
+      await expectObservableCompleted(complete);
       expect(packets).toEqual([
         {
           from: relay,
@@ -128,6 +130,19 @@ describe("REQ public contract", () => {
       const error = vi.fn();
 
       rxNostr.backward([], [{}]).subscribe({ complete, error });
+
+      await expectObservableCompleted(complete, error);
+      expect(server.connections).toEqual([]);
+
+      rxNostr.dispose();
+    });
+
+    test("completes an empty cold request without creating a connection", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const complete = vi.fn();
+      const error = vi.fn();
+
+      rxNostr.backward(relay, []).subscribe({ complete, error });
 
       await expectObservableCompleted(complete, error);
       expect(server.connections).toEqual([]);
@@ -295,6 +310,82 @@ describe("REQ public contract", () => {
 
       await expectSocketCloseRequested(second);
       second.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("stops a removed relay while keeping the remaining backward relay active", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const destinations = new RxRelays([one, two]);
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxReq();
+      const packets: EventPacket[] = [];
+      const complete = vi.fn();
+
+      rxNostr.backward(destinations, request).subscribe({
+        next: (packet) => packets.push(packet),
+        complete,
+      });
+      request.emit([{}]);
+
+      await expectConnectionCount(server, 2);
+      const first = server.sockets.latestFor(one);
+      const second = server.sockets.latestFor(two);
+      first.open();
+      second.open();
+      const [, firstSubId] = await expectSent(first, "REQ");
+      const [, secondSubId] = await expectSent(second, "REQ");
+
+      destinations.remove(one);
+      await expectSent(first, "CLOSE");
+      expect(first.sent).toContainEqual(["CLOSE", firstSubId]);
+
+      second.message(["EVENT", secondSubId, event({ id: "remaining" })]);
+      second.message(["EOSE", secondSubId]);
+      await expectEventIds(packets, ["remaining"]);
+      expect(complete).not.toHaveBeenCalled();
+
+      request.dispose();
+      await expectObservableCompleted(complete);
+
+      await expectAllSocketsCloseRequested(server);
+      for (const socket of server.connections) socket.acknowledgeClose();
+      destinations.dispose();
+      rxNostr.dispose();
+    });
+
+    test("ends the current segment when all backward relays are removed", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const destinations = new RxRelays([one, two]);
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxReq();
+      const complete = vi.fn();
+
+      rxNostr.backward(destinations, request).subscribe({ complete });
+      request.emit([{}]);
+
+      await expectConnectionCount(server, 2);
+      const first = server.sockets.latestFor(one);
+      const second = server.sockets.latestFor(two);
+      first.open();
+      second.open();
+      const [, firstSubId] = await expectSent(first, "REQ");
+      const [, secondSubId] = await expectSent(second, "REQ");
+
+      destinations.clear();
+      await expectSent(first, "CLOSE");
+      await expectSent(second, "CLOSE");
+      expect(first.sent).toContainEqual(["CLOSE", firstSubId]);
+      expect(second.sent).toContainEqual(["CLOSE", secondSubId]);
+      expect(complete).not.toHaveBeenCalled();
+
+      request.dispose();
+      await expectObservableCompleted(complete);
+
+      await expectAllSocketsCloseRequested(server);
+      for (const socket of server.connections) socket.acknowledgeClose();
+      destinations.dispose();
       rxNostr.dispose();
     });
 
