@@ -119,7 +119,7 @@ export {
   type RxNostrStaticDefaultOptions,
 } from "./rx-nostr/index.ts";
 export { RxRelays } from "./rx-relays/index.ts";
-export { RxBackwardReq, RxForwardReq, RxReq, type RxReqStrategy } from "./rx-req/index.ts";
+export { RxReq } from "./rx-req/index.ts";
 export type {
   RelayInput,
   WebSocketBlob,
