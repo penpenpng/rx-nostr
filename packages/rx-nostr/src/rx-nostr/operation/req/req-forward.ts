@@ -5,9 +5,8 @@ import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../../libs/index.ts";
 import { mapStored } from "../../../operators/general/map-stored.ts";
 import { setDiff } from "../../../operators/index.ts";
-import type { EventPacket } from "../../../packets/index.ts";
+import type { EventPacket, ReqPacket } from "../../../packets/index.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
-import type { RxReq } from "../../../rx-req/index.ts";
 import type { RelayInput } from "../../../types/index.ts";
 import type { IRelayCommunicationCollection } from "../../communication/index.ts";
 import { ConnectionDemandScope, type RelayDemandWindow } from "../demand/index.ts";
@@ -15,12 +14,12 @@ import { FilledRxNostrReqOptions } from "./options.ts";
 
 export function reqForward({
   relays,
-  rxReq,
+  source$,
   relayInput,
   config,
 }: {
   relays: IRelayCommunicationCollection;
-  rxReq: RxReq;
+  source$: Observable<ReqPacket>;
   relayInput: RelayInput;
   config: FilledRxNostrReqOptions;
 }): Observable<EventPacket> {
@@ -33,7 +32,7 @@ export function reqForward({
     });
   });
 
-  return rxReq.asObservable().pipe(
+  return source$.pipe(
     map((packet) =>
       req({
         connectionDemand,
