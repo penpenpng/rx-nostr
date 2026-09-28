@@ -66,9 +66,11 @@ describe("public entry point", () => {
     });
 
     test("exposes the REQ operation types", () => {
-      expectTypeOf<Parameters<IRxNostr["req"]>[0]>().toEqualTypeOf<RelayInput>();
-      expectTypeOf<Parameters<IRxNostr["req"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
-      expectTypeOf<Parameters<IRxNostr["req"]>[2]>().toEqualTypeOf<RxNostrReqConfig | undefined>();
+      expectTypeOf<Parameters<IRxNostr["forward"]>[0]>().toEqualTypeOf<RelayInput>();
+      expectTypeOf<Parameters<IRxNostr["forward"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
+      expectTypeOf<Parameters<IRxNostr["forward"]>[2]>().toEqualTypeOf<RxNostrReqConfig | undefined>();
+      expectTypeOf<Parameters<IRxNostr["backward"]>[0]>().toEqualTypeOf<RelayInput>();
+      expectTypeOf<Parameters<IRxNostr["backward"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
     });
 
     test("exposes publication and relay input types", () => {
@@ -136,7 +138,8 @@ describe("public entry point", () => {
     test("keeps IRxNostr independent from the concrete class", () => {
       const dispose = () => {};
       const structuralClient = {
-        req: undefined as unknown as IRxNostr["req"],
+        forward: undefined as unknown as IRxNostr["forward"],
+        backward: undefined as unknown as IRxNostr["backward"],
         publish: undefined as unknown as IRxNostr["publish"],
         setHotRelays: undefined as unknown as IRxNostr["setHotRelays"],
         unsetHotRelays: undefined as unknown as IRxNostr["unsetHotRelays"],
