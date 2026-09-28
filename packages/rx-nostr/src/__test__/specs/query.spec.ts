@@ -51,7 +51,7 @@ describe("REQ public contract", () => {
       server.sockets.latest.message(["EVENT", req[1], result]);
       server.sockets.latest.message(["EOSE", req[1]]);
 
-      await expectObservableCompleted(complete);
+      expect(complete).not.toHaveBeenCalled();
       expect(packets).toEqual([
         {
           from: relay,
@@ -322,10 +322,10 @@ describe("REQ public contract", () => {
       expect(second[2]).toEqual({ kinds: [2] });
       server.sockets.latest.message(["EOSE", second[1]]);
 
-      await expectObservableCompleted(complete);
+      expect(complete).not.toHaveBeenCalled();
+      rxNostr.dispose();
       await expectSocketCloseRequested(server.sockets.latest);
       server.sockets.latest.acknowledgeClose();
-      rxNostr.dispose();
     });
 
     test("sends an unfinished backward query to a dynamically added relay", async () => {
@@ -356,7 +356,7 @@ describe("REQ public contract", () => {
       first.message(["EOSE", firstSubId]);
       second.message(["EOSE", secondSubId]);
 
-      await expectObservableCompleted(complete);
+      expect(complete).not.toHaveBeenCalled();
       expect(packets.map((packet) => packet.event.id)).toEqual(["dynamic"]);
 
       await expectAllSocketsCloseRequested(server);
