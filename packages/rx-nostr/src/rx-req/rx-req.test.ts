@@ -1,11 +1,11 @@
 import "disposablestack/auto";
 import { filter } from "rxjs";
-import { expect, test } from "vitest";
+import { test } from "vitest";
 import { ObservableInspector } from "../__test__/helper/index.ts";
-import { RxBackwardReq, RxOneshotReq, RxStaticReq } from "./rx-req.ts";
+import { RxReq } from "./rx-req.ts";
 
 test("RxReq emits a filter", async () => {
-  const rxq = new RxBackwardReq();
+  const rxq = new RxReq();
   const obs = new ObservableInspector(rxq.asObservable());
   obs.subscribe();
 
@@ -15,7 +15,7 @@ test("RxReq emits a filter", async () => {
 });
 
 test("Piped RxReq emits a filter", async () => {
-  const rxq = new RxBackwardReq();
+  const rxq = new RxReq();
   const obs = new ObservableInspector(rxq.pipe(filter((_, idx) => idx % 2 === 0)).asObservable());
   obs.subscribe();
 
@@ -28,7 +28,7 @@ test("Piped RxReq emits a filter", async () => {
 });
 
 test("Extended RxReq emits a filter", async () => {
-  class RxCustomReq extends RxBackwardReq {
+  class RxCustomReq extends RxReq {
     fetchByKind(kind: number) {
       this.emit({ kinds: [kind] });
     }
@@ -44,21 +44,4 @@ test("Extended RxReq emits a filter", async () => {
 
   await obs.expectNext({ filters: [{ kinds: [0] }] });
   await obs.expectNext({ filters: [{ kinds: [2] }] });
-});
-
-test("one-shot requests are backward and preserve traceTag", async () => {
-  const rxq = new RxOneshotReq({ kinds: [1] }, { traceTag: "profile" });
-  const obs = new ObservableInspector(rxq.asObservable());
-  obs.subscribe();
-
-  expect(rxq.strategy).toBe("backward");
-  await obs.expectNext({
-    filters: [{ kinds: [1] }],
-    traceTag: "profile",
-  });
-});
-
-test("static requests preserve their selected strategy", () => {
-  expect(new RxStaticReq("forward", {}).strategy).toBe("forward");
-  expect(new RxStaticReq("backward", {}).strategy).toBe("backward");
 });
