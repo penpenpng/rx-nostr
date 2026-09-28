@@ -74,6 +74,60 @@ describe("REQ public contract", () => {
     });
   });
 
+  describe("reconnect", () => {
+    test("resends an active backward REQ after an abnormal disconnect", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const complete = vi.fn();
+
+      rxNostr.backward(relay, [{}]).subscribe({ complete });
+
+      const first = server.sockets.latest;
+      first.open();
+      const firstReq = await expectSent(first, "REQ");
+
+      first.peerClose(1006, "offline");
+
+      await expectConnectionCount(server, 2);
+      const second = server.sockets.latest;
+      second.open();
+      const secondReq = await expectSent(second, "REQ");
+
+      expect(secondReq[2]).toEqual(firstReq[2]);
+      second.message(["EOSE", secondReq[1]]);
+      await expectObservableCompleted(complete);
+
+      await expectSocketCloseRequested(second);
+      second.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("resends an active forward REQ after an abnormal disconnect", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const complete = vi.fn();
+      const subscription = rxNostr.forward(relay, [{ kinds: [1] }]).subscribe({ complete });
+
+      const first = server.sockets.latest;
+      first.open();
+      const firstReq = await expectSent(first, "REQ");
+
+      first.peerClose(1006, "offline");
+
+      await expectConnectionCount(server, 2);
+      const second = server.sockets.latest;
+      second.open();
+      const secondReq = await expectSent(second, "REQ");
+
+      expect(secondReq[2]).toEqual(firstReq[2]);
+      second.message(["EOSE", secondReq[1]]);
+      expect(complete).not.toHaveBeenCalled();
+
+      subscription.unsubscribe();
+      await expectSocketCloseRequested(second);
+      second.acknowledgeClose();
+      rxNostr.dispose();
+    });
+  });
+
   describe("forward queries", () => {
     test("replaces a forward REQ and sends CLOSE for each local end", async () => {
       const { server, rxNostr } = createRxNostrScenario();
