@@ -1,3 +1,0 @@
-[submodule "packages/unipls"]
-	path = packages/unipls
-	url = git@github.com:penpenpng/unipls.git

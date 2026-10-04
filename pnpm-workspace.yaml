@@ -7,6 +7,8 @@ catalog:
 # New releases must age for one day before they are eligible for installation.
 # Add narrowly scoped exceptions only when an urgent security fix cannot wait.
 minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - unipls
 
 onlyBuiltDependencies:
   - esbuild

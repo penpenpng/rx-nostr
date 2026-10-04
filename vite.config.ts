@@ -4,7 +4,6 @@ const ignored = [
   "**/dist/**",
   "**/node_modules/**",
   "packages/docs/**",
-  "packages/unipls/**",
   "pnpm-lock.yaml",
 ];
 
