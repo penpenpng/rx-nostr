@@ -58,6 +58,38 @@ describe("Publication public contract", () => {
   });
 
   describe("settlement", () => {
+    test("isolates acknowledgements between concurrent publications to different relays", async () => {
+      const { server, rxNostr } = createPublicationScenario();
+      const signed = event();
+      const sendA = rxNostr.publish([relay1], signed);
+      const sendB = rxNostr.publish([relay2], signed);
+      const packetsA: OkPacket[] = [];
+      const packetsB: OkPacket[] = [];
+      sendA.subscribe((packet) => packetsA.push(packet));
+      sendB.subscribe((packet) => packetsB.push(packet));
+      let settledA = false;
+      const allA = sendA.waitFor("all").then(() => (settledA = true));
+      const allB = sendB.waitFor("all");
+      const first = socket(server, relay1);
+      const second = socket(server, relay2);
+
+      first.open();
+      second.open();
+      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+
+      second.message(["OK", "event", true, "saved on relay B"]);
+      await expect(allB).resolves.toBeUndefined();
+      expect(packetsB.map((packet) => packet.from)).toEqual([relay2]);
+      expect(packetsA).toEqual([]);
+      expect(settledA).toBe(false);
+
+      first.message(["OK", "event", true, "saved on relay A"]);
+      await expect(allA).resolves.toBe(true);
+      expect(packetsA.map((packet) => packet.from)).toEqual([relay1]);
+
+      rxNostr.dispose();
+    });
+
     test("publishes to multiple relays, settles all/any, and replays raw OK packets", async () => {
       const signed = event();
       const { server, rxNostr } = createPublicationScenario();
