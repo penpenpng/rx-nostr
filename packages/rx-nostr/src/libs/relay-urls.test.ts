@@ -16,7 +16,8 @@ test(normalizeRelayUrl.name, () => {
   expect(f("wss://example.com/#/test")).toBe("wss://example.com");
 
   // Sort query parameters
-  expect(f("wss://example.com/?b=1&a=1")).toBe("wss://example.com/?a=1&b=1");
+  expect(f("wss://example.com/?b=1&a=1")).toBe("wss://example.com?a=1&b=1");
+  expect(f("wss://example.com/?a=1")).toBe(f("wss://example.com?a=1"));
 
   // Invalid URL
   expect(f("invalid-url")).toBe(null);

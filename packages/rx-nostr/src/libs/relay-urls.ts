@@ -351,6 +351,10 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
 
   if (!u.search) {
     s = s.replace(/\/$/, "") as RelayUrl;
+  } else {
+    // URL serialization restores the root path slash when a query is present.
+    // Keep the same slash-free form used for the equivalent URL without a query.
+    s = s.replace("/?", "?") as RelayUrl;
   }
 
   return s;
