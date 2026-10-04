@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import type { Observable } from "rxjs";
 import * as publicApi from "rx-nostr";
 import type {
   Authenticator,
@@ -13,6 +12,7 @@ import type {
   RelayInput,
   RelayUrl,
   RxNostrDiagnostic,
+  RxNostrDiagnosticSink,
   RxNostr,
   RxNostrConfig,
   RxNostrPublishConfig,
@@ -38,11 +38,16 @@ describe("public entry point", () => {
   });
 
   describe("type surface", () => {
-    test("exposes diagnostics and authentication types", () => {
+    test("exposes the process-wide log sink and authentication types", () => {
       expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
-      expectTypeOf(publicApi.RxNostr.diagnostics).toEqualTypeOf<Observable<RxNostrDiagnostic>>();
+      expectTypeOf(publicApi.RxNostr.logSink).toEqualTypeOf<RxNostrDiagnosticSink | undefined>();
       expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("source");
       expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("type");
+      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("severity");
+      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("occurredAt");
+      expectTypeOf<RxNostrDiagnostic["level"]>().toEqualTypeOf<
+        "debug" | "info" | "warning" | "error"
+      >();
       expectTypeOf<RxNostrDiagnostic["message"]>().toEqualTypeOf<string>();
 
       expectTypeOf<Authenticator>().toHaveProperty("authTimeout");

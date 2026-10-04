@@ -23,7 +23,7 @@ export type {
   ConnectionState,
   ConnectionStateSymbol,
 } from "./connection-state.ts";
-export type { RxNostrDiagnostic } from "./diagnostics/index.ts";
+export type { RxNostrDiagnostic, RxNostrDiagnosticSink } from "./diagnostics/index.ts";
 export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
 export {
   NoopVerifier,

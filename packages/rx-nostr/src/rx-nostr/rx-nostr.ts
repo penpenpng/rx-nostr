@@ -1,6 +1,11 @@
 import * as Nostr from "nostr-typedef";
 import { defer, EMPTY, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
-import { diagnostics, emitDiagnostic } from "../diagnostics/index.ts";
+import {
+  emitDiagnostic,
+  getDiagnosticSink,
+  setDiagnosticSink,
+  type RxNostrDiagnosticSink,
+} from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
@@ -37,8 +42,14 @@ import type {
 } from "./rx-nostr.interface.ts";
 
 export class RxNostr implements IRxNostr {
-  /** Process-wide diagnostics emitted by every RxNostr instance. */
-  static readonly diagnostics = diagnostics;
+  /** Process-wide synchronous log callback for every RxNostr instance. */
+  static get logSink(): RxNostrDiagnosticSink | undefined {
+    return getDiagnosticSink();
+  }
+
+  static set logSink(sink: RxNostrDiagnosticSink | undefined) {
+    setDiagnosticSink(sink);
+  }
 
   /** Process-wide constructor defaults snapshotted by each new instance. */
   static defaultConfig: RxNostrStaticDefaultConfig =

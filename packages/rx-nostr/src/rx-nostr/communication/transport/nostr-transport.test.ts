@@ -6,6 +6,7 @@ import type {
   ConnectionReconnector,
   ConnectionReconnectorContext,
 } from "../../../connection-reconnector/index.ts";
+import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "./nostr-transport.ts";
 
 const relay = "wss://relay.example.com" as const;
@@ -15,11 +16,13 @@ afterEach(() => vi.useRealTimers());
 async function openTransport(
   server: ControlledWebSocketServer,
   reconnector?: ConnectionReconnector,
+  onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void,
 ) {
   const transport = new NostrTransport({
     url: relay,
     WebSocket: server.WebSocket,
     reconnector,
+    onDiagnostic,
   });
   const opened = transport.open();
   server.sockets.latest.open();
@@ -170,20 +173,21 @@ describe("NostrTransport", () => {
     "reports invalid input as a diagnostic and keeps the session alive",
     async (input) => {
       const server = new ControlledWebSocketServer();
-      const transport = await openTransport(server);
-      const diagnostics: string[] = [];
+      const diagnostics: RxNostrDiagnostic[] = [];
+      const transport = await openTransport(server, undefined, (diagnostic) => {
+        diagnostics.push(diagnostic);
+      });
       const messages: string[] = [];
-      transport.diagnostics$.subscribe((value) => diagnostics.push(value.message));
       transport.messages$.subscribe((value) => messages.push(value.type));
 
       server.sockets.latest.rawMessage(input);
       server.sockets.latest.message(["NOTICE", "still alive"]);
 
-      await vi.waitFor(() =>
-        expect(diagnostics).toEqual([
-          "A message received from the relay could not be decoded and was ignored.",
-        ]),
-      );
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]).toMatchObject({
+        event: "message/deserialization",
+        context: { relay, input: expect.any(Object) },
+      });
       expect(messages).toEqual(["NOTICE"]);
       await closeTransport(transport, server);
     },

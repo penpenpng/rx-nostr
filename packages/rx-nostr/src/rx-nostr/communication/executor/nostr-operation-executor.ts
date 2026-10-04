@@ -177,11 +177,11 @@ export class NostrOperationExecutor implements Disposable {
         if (!remoteTerminated && queryEvaluated) {
           void this.transport.cast(["CLOSE", subId]).catch((cause) => {
             this.options.onDiagnostic?.({
-              severity: "warning",
-              occurredAt: Date.now(),
-              relay: this.url,
+              level: "warning",
+              event: "relay/close-send-failed",
               message: "A best-effort CLOSE message could not be sent to the relay.",
               cause,
+              context: { relay: this.url },
             });
           });
         }

@@ -67,11 +67,11 @@ export class RelayCommunication implements IRelayCommunication {
         if (options.nip11Timeout !== undefined) {
           void this.#directory.acquireNip11(options.nip11Timeout).catch((cause) => {
             options.onDiagnostic?.({
-              severity: "warning",
-              occurredAt: Date.now(),
-              relay: url,
+              level: "warning",
+              event: "relay/nip11-retrieval-failed",
               message: "Automatic NIP-11 relay information retrieval failed.",
               cause,
+              context: { relay: url },
             });
           });
         }

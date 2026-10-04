@@ -1,7 +1,6 @@
 import { expect, test } from "vitest";
-import { firstValueFrom } from "rxjs";
 
-import { diagnostics } from "../diagnostics/index.ts";
+import { setDiagnosticSink, type RxNostrDiagnostic } from "../diagnostics/index.ts";
 import { normalizeRelayUrl, RelayMap, RelayMapOperator, RelaySet } from "./relay-urls.ts";
 
 test(normalizeRelayUrl.name, () => {
@@ -121,21 +120,26 @@ test(RelaySet.name, () => {
   expect(s(relay).union(s(alias)).size).toBe(1);
 });
 
-test(`${RelayMapOperator.name} reports swallowed callback failures as diagnostics`, async () => {
+test(`${RelayMapOperator.name} reports swallowed callback failures synchronously`, () => {
   const relay = "wss://example.com";
   const cause = new Error("factory failed");
-  const diagnostic = firstValueFrom(diagnostics);
+  const diagnostics: RxNostrDiagnostic[] = [];
+  setDiagnosticSink((log) => diagnostics.push(log));
   const relays = new RelayMapOperator<never>(() => {
     throw cause;
   });
 
-  relays.forEach([relay], () => {});
-
-  await expect(diagnostic).resolves.toMatchObject({
-    severity: "error",
-    relay,
-    message: "A callback used by a relay collection forEach operation failed.",
-    cause,
-    details: { operation: "forEach" },
-  });
+  try {
+    relays.forEach([relay], () => {});
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      level: "error",
+      event: "relay-collection/callback-failed",
+      message: "A callback used by a relay collection forEach operation failed.",
+      cause,
+      context: { relay, operation: "forEach" },
+    });
+  } finally {
+    setDiagnosticSink(undefined);
+  }
 });

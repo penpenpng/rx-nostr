@@ -310,12 +310,11 @@ function emitRelayCollectionCallbackFailure(
   cause: unknown,
 ): void {
   emitDiagnostic({
-    severity: "error",
-    occurredAt: Date.now(),
-    relay,
+    level: "error",
+    event: "relay-collection/callback-failed",
     message: `A callback used by a relay collection ${operation} operation failed.`,
     cause,
-    details: { operation },
+    context: { relay, operation },
   });
 }
 

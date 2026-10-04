@@ -111,18 +111,20 @@ function req({
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           const message = "A REQ was issued without any destination relays.";
           emitDiagnostic({
-            severity: "warning",
-            occurredAt: Date.now(),
+            level: "warning",
+            event: "req/no-destination-relays",
             message,
+            context: { operation: "backward" },
           });
           nomore = true;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
           const message = "The last relay was removed; no destination relays remain.";
           emitDiagnostic({
-            severity: "warning",
-            occurredAt: Date.now(),
+            level: "warning",
+            event: "req/no-destination-relays",
             message,
+            context: { operation: "backward" },
           });
           nomore = true;
         }

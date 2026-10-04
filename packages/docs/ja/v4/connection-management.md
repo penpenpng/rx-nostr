@@ -123,22 +123,18 @@ const rxNostr = new RxNostr({ verifier, dropDetectors: [heartbeat] });
 
 v4 は手動 `reconnect()` API を持ちません。再試行の可否と時期は `ConnectionReconnector` で制御します。
 
-## Diagnostics
+## Structured logs
 
-`RxNostr.diagnostics` は、すべての `RxNostr` インスタンスから発生した diagnostic をまとめる process-wide の hot Observable です。
+`RxNostr.logSink` は、すべての `RxNostr` インスタンスから発生した log を受け取る process-wide callback です。ログ発生箇所から同期的に呼ばれます。新しい callback を設定すると既存 instance にも適用され、`undefined` を設定すると無効になります。
 
 ```ts
-const subscription = RxNostr.diagnostics.subscribe((diagnostic) => {
-  console.debug(diagnostic.occurredAt, diagnostic.severity, diagnostic.relay);
-  console.debug(diagnostic.message);
-  if (diagnostic.cause !== undefined) console.debug(diagnostic.cause);
-});
+RxNostr.logSink = (log) => {
+  console.debug(log.level, log.event, log.message, log.context, log.cause);
+};
 ```
 
-diagnostic は、デバッグや記録に役立つものの、application が受け取って処理を分岐する必要がない補助情報です。operation の成否、callback 例外、connection の現在状態の代わりにはなりません。これらはそれぞれ `Publication`／REQ の error、`RxNostrCallbackError`、`monitorConnectionState()` で扱います。
+値は unipls と同じく `level`、`event`、`message`、任意の `context` と `cause` を持ちます。relay 固有の log では normalized relay URL が `context.relay` にあります。ログと context は callback に渡す前に freeze されます。callback が投げた例外は無視され、operation へ伝播しません。message は人向けの説明なので、filter には machine-readable な `event` を使います。
 
-diagnostic は実装上の発生元を区別せず、下位実装の名前、型、session ID、connection ID、operation ID も露出しません。application が処理を分岐できる machine-readable な `type` も持たず、内容は `message` で説明します。
+log はデバッグや記録に役立つ補助情報です。operation の成否、callback 例外、connection の現在状態の代わりにはなりません。これらはそれぞれ `Publication`／REQ の error、`RxNostrCallbackError`、`monitorConnectionState()` で扱います。
 
-v3 の `createAllErrorObservable()` が通知していた不正な relay message、WebSocket send の失敗、予期しない WebSocket close、初回接続／再接続 attempt の失敗も含まれます。このほか drop detector／reconnector／resource cleanup の失敗、NIP-11 自動取得失敗、宛先のない REQ なども通知します。
-
-この stream は過去の値を replay しないため、必要なら application の起動時に購読してください。個々の `RxNostr` を dispose しても process-wide stream は complete しません。各 observer は独立した変更可能な diagnostic copy を受け取ります。
+unipls の structured log を転送し、rx-nostr 固有の接続失敗、NIP-11 自動取得失敗、宛先のない REQ なども同じ形式で記録します。ログには timestamp を付けないため、必要なら callback 内で追加してください。

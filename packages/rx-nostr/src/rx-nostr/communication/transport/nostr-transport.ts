@@ -90,12 +90,12 @@ export interface NostrTransportSubscribeOptions {
 export class NostrTransport {
   readonly messages$ = new Subject<MessagePacket>();
   readonly state$ = new BehaviorSubject<NostrTransportState>(Object.freeze({ state: "dormant" }));
-  readonly diagnostics$ = new Subject<NostrTransportDiagnostic>();
 
   readonly #client: Unipls<Nostr.ToRelayMessage.Any, MessagePacket>;
   readonly #removeListeners: Array<() => void> = [];
   #closeDirectoryConnection?: () => void;
   #disposePromise?: Promise<void>;
+  #hasBeenReady = false;
 
   constructor(readonly options: NostrTransportOptions) {
     this.#client = new Unipls({
@@ -169,25 +169,31 @@ export class NostrTransport {
       this.#emitState(Object.freeze({ state: "disposed" }));
       this.messages$.complete();
       this.state$.complete();
-      this.diagnostics$.complete();
     })();
     return this.#disposePromise;
   }
 
   #onLifecycle(previous: UniplsLifecycleSnapshot, current: UniplsLifecycleSnapshot): void {
+    if (current.phase === "open") this.#hasBeenReady = true;
     const attempt = failedAttemptFromTransition(previous, current);
     if (attempt) {
-      const droppedError = dropFromCause(attempt.cause);
-      const drop = droppedError ?? attempt.drop;
-      this.#emitDiagnostic({
-        severity: "warning",
-        occurredAt: attempt.endedAt,
-        relay: this.options.url,
-        message: "A relay connection attempt failed.",
-        cause: attempt.cause,
-        ...(drop ? { details: detailsFromDrop(drop) } : {}),
-      });
-      if (droppedError) this.#emitDiagnostic(diagnosticFromDrop(droppedError));
+      const drop = attempt.drop ?? dropFromCause(attempt.cause);
+      if (this.#hasBeenReady && drop && attempt.origin === "initial") {
+        this.#emitDiagnostic(diagnosticFromDrop(drop));
+      } else {
+        this.#emitDiagnostic({
+          level: "warning",
+          event: "connection/attempt-failed",
+          message: "A relay connection attempt failed.",
+          cause: attempt.cause,
+          context: {
+            relay: this.options.url,
+            attempt: attempt.attempt,
+            origin: attempt.origin,
+            ...(drop ? dropContext(drop) : {}),
+          },
+        });
+      }
     }
     this.#reportHealth(previous, current);
     const state = stateFromLifecycle(current);
@@ -218,13 +224,14 @@ export class NostrTransport {
   }
 
   #emitDiagnostic(diagnostic: RxNostrDiagnostic): void {
-    const withRelay =
-      diagnostic.relay === undefined ? { ...diagnostic, relay: this.options.url } : diagnostic;
-    this.diagnostics$.next(withRelay);
-    this.options.onDiagnostic?.({
-      ...withRelay,
-      ...(withRelay.details === undefined ? {} : { details: { ...withRelay.details } }),
+    const withRelay: RxNostrDiagnostic = Object.freeze({
+      ...diagnostic,
+      context: Object.freeze({
+        ...diagnostic.context,
+        relay: diagnostic.context?.relay ?? this.options.url,
+      }),
     });
+    this.options.onDiagnostic?.(withRelay);
   }
 
   #emitStreamFailureDiagnostic(
@@ -232,31 +239,21 @@ export class NostrTransport {
   ): void {
     if (finalization.reason !== "fatal-error") return;
     this.#emitDiagnostic({
-      severity: "error",
-      occurredAt: Date.now(),
-      relay: this.options.url,
+      level: "error",
+      event: "operation/stream-failed",
       message: "A relay operation failed unexpectedly.",
       cause: finalization.error,
-      details: { reason: finalization.reason },
+      context: { relay: this.options.url, reason: finalization.reason },
     });
   }
 
   #onUniplsLog(log: UniplsLog): void {
-    if (log.event !== "message/deserialization") return;
-    const input = log.context?.input;
     this.#emitDiagnostic({
-      severity: "warning",
-      occurredAt: Date.now(),
-      message: "A message received from the relay could not be decoded and was ignored.",
+      level: log.level,
+      event: log.event,
+      message: log.message,
+      context: { ...log.context, relay: this.options.url },
       ...(log.cause === undefined ? {} : { cause: log.cause }),
-      details: {
-        ...(typeof input === "object" && input !== null && "kind" in input
-          ? { inputKind: input.kind }
-          : {}),
-        ...(typeof input === "object" && input !== null && "size" in input
-          ? { inputSize: input.size }
-          : {}),
-      },
     });
   }
 }
@@ -556,17 +553,17 @@ function failureFromCause(kind: ConnectionFailure["kind"], cause: unknown): Conn
 
 function diagnosticFromDrop(drop: UniplsDrop): NostrTransportDiagnostic {
   return {
-    severity: "warning",
-    occurredAt: drop.detectedAt,
+    level: "warning",
+    event: "connection/dropped",
     message: "The relay connection dropped unexpectedly.",
     ...(drop.cause === undefined ? {} : { cause: drop.cause }),
-    details: detailsFromDrop(drop),
+    context: { ...dropContext(drop), detectedAt: drop.detectedAt },
   };
 }
 
-function detailsFromDrop(drop: UniplsDrop): Record<string, unknown> {
+function dropContext(drop: UniplsDrop): Record<string, unknown> {
   return {
-    source: drop.source.type,
+    dropSource: drop.source.type,
     ...(drop.close === undefined
       ? {}
       : {

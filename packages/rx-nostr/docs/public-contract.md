@@ -111,15 +111,13 @@ The `ConnectionReconnector` receives the aggregate health snapshot from the conf
 
 `RxNostrConfig.dropDetectors` and `RxNostr.defaultConfig.dropDetectors` accept rx-nostr-owned `ConnectionDropDetector` values. The configured iterable is snapshotted when an instance is constructed. A detector is set up for every ready physical connection and receives the normalized relay, its stable registration identity, a connection-scoped abort signal, cleanup/task supervision helpers, `drop()`, and a Nostr-tuple `request()` operation. Returned and deferred disposers run when that physical connection ends. Reporting a drop enters the same reconnector-controlled recovery cycle as a transport-detected drop. No unipls detector, packet, or resource-scope type is public.
 
-## Diagnostics
+## Structured logs
 
-`RxNostr.diagnostics` is one process-wide hot `Observable<RxNostrDiagnostic>` combining diagnostics from every RxNostr instance. It does not replay, error, or complete when an instance is disposed. Every observer receives a detached mutable copy.
+`RxNostr.logSink` is one process-wide callback for structured logs from every RxNostr instance. Set it to receive logs synchronously, or set it to `undefined` to disable logging. Changing the callback affects existing and future instances alike.
 
-A diagnostic is supplemental debugging information, not an operation outcome or an exception on which application behavior should depend. The public value intentionally neither exposes nor distinguishes its implementation origin, and contains no lower-level implementation name, type, or session/connection/operation identifier. It has no machine-readable diagnostic category; its required `message` explains what happened without defining a new application control-flow contract.
+Each callback value follows unipls' structured log shape: `level`, `event`, `message`, optional `context`, and optional `cause`. `event` is a machine-readable identifier; `message` is for people and is not a stable identifier. Relay-specific entries include the normalized URL in `context.relay`. The callback receives unipls logs with their level, event, message, context, and cause, plus rx-nostr events using the same shape. It does not add a timestamp; include timestamps in the callback if needed. The log and its context are frozen before delivery. Exceptions thrown by the callback are swallowed so logging cannot change operation behavior.
 
-The package does not write diagnostics directly to the console and has no logger or log-level API. Applications choose their own destination and filtering by subscribing to `RxNostr.diagnostics`. Routine successful lifecycle tracing is not a diagnostic.
-
-The stream includes the information formerly available through v3 `createAllErrorObservable()`: malformed relay messages, WebSocket send failures, unexpected ready-connection drops, and failed initial/recovery WebSocket attempts, all with a normalized relay when applicable. It also includes supervised unipls failures and rx-nostr supplemental failures such as automatic NIP-11 fetch or best-effort CLOSE-send failure. Actionable callback exceptions remain `RxNostrCallbackError`; publication outcomes remain `PublicationFailure`; current connection status remains `ConnectionState`.
+The package does not write logs directly to the console. Applications choose their own destination in `RxNostr.logSink`. Operation outcomes remain observable through their operation APIs; logs are supplemental records and do not replace those outcomes.
 
 ## NIP-42 authentication
 
