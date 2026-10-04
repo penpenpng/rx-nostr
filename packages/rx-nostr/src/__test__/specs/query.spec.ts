@@ -1,10 +1,20 @@
 import type * as Nostr from "nostr-typedef";
 import { RelayDirectory, RxRelays, RxReq, type EventPacket } from "rx-nostr";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
-import { createRxNostrScenario, Faker, SubscriptionInspector } from "../helper/index.ts";
+import {
+  createDeferred,
+  createRxNostrScenario,
+  Faker,
+  SubscriptionInspector,
+} from "../helper/index.ts";
+import { settleProtocol, scenarioTest } from "../helper/protocol-scenario.ts";
 
 const relay = "wss://relay.example.com";
+const a = "wss://a.example.com";
+const b = "wss://b.example.com";
+const c = "wss://c.example.com";
+const d = "wss://d.example.com";
 
 function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
   return Faker.event({
@@ -20,6 +30,40 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 }
 
 describe("REQ public contract", () => {
+  describe("input", () => {
+    test("completes an empty destination without creating a connection", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward([], [{}]).subscribe(inspector);
+
+      await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      expect(server.connections.length).toBe(0);
+
+      rxNostr.dispose();
+    });
+
+    test.each([
+      ["forward", true],
+      ["forward", false],
+      ["backward", true],
+      ["backward", false],
+    ] as const)(
+      "completes an empty %s request with defer=%s without connecting",
+      async (strategy, defer) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr[strategy](relay, [], { defer }).subscribe(inspector);
+
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+        expect(server.connections.length).toBe(0);
+
+        rxNostr.dispose();
+      },
+    );
+  });
+
   describe("backward queries", () => {
     test("sends a backward REQ, exposes traceTag, and ends on EOSE", async () => {
       const { server, rxNostr } = createRxNostrScenario();
@@ -55,65 +99,6 @@ describe("REQ public contract", () => {
       await expect(socket.closeRequested).resolves.toBeDefined();
 
       socket.acknowledgeClose();
-      rxNostr.dispose();
-    });
-  });
-
-  describe("reconnect", () => {
-    test("resends an active backward REQ after an abnormal disconnect", async () => {
-      const { server, rxNostr } = createRxNostrScenario({
-        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
-      });
-      const inspector = new SubscriptionInspector<EventPacket>();
-
-      rxNostr.backward(relay, [{}]).subscribe(inspector);
-
-      const first = server.sockets.latest;
-      first.open();
-      const firstReq = await first.inbox.waitNext("REQ");
-
-      first.peerClose(1006, "offline");
-
-      await expect(server.connections.wait(1)).resolves.toBeDefined();
-      const second = server.sockets.latest;
-      second.open();
-      const secondReq = await second.inbox.waitNext("REQ");
-
-      expect(secondReq[2]).toEqual(firstReq[2]);
-      second.message(["EOSE", secondReq[1]]);
-      await expect(inspector.waitComplete()).resolves.toBeUndefined();
-
-      await expect(second.closeRequested).resolves.toBeDefined();
-      second.acknowledgeClose();
-      rxNostr.dispose();
-    });
-
-    test("resends an active forward REQ after an abnormal disconnect", async () => {
-      const { server, rxNostr } = createRxNostrScenario({
-        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
-      });
-      const inspector = new SubscriptionInspector<EventPacket>();
-
-      const subscription = rxNostr.forward(relay, [{ kinds: [1] }]).subscribe(inspector);
-
-      const first = server.sockets.latest;
-      first.open();
-      const firstReq = await first.inbox.waitNext("REQ");
-
-      first.peerClose(1006, "offline");
-
-      await expect(server.connections.wait(1)).resolves.toBeDefined();
-      const second = server.sockets.latest;
-      second.open();
-      const secondReq = await second.inbox.waitNext("REQ");
-
-      expect(secondReq[2]).toEqual(firstReq[2]);
-      second.message(["EOSE", secondReq[1]]);
-      expect(inspector.completed).toBe(false);
-
-      subscription.unsubscribe();
-      await expect(second.closeRequested).resolves.toBeDefined();
-      second.acknowledgeClose();
       rxNostr.dispose();
     });
   });
@@ -224,39 +209,7 @@ describe("REQ public contract", () => {
     });
   });
 
-  describe("input and filtering", () => {
-    test("completes an empty destination without creating a connection", async () => {
-      const { server, rxNostr } = createRxNostrScenario();
-      const inspector = new SubscriptionInspector<EventPacket>();
-
-      rxNostr.backward([], [{}]).subscribe(inspector);
-
-      await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      expect(server.connections.length).toBe(0);
-
-      rxNostr.dispose();
-    });
-
-    test.each([
-      ["forward", true],
-      ["forward", false],
-      ["backward", true],
-      ["backward", false],
-    ] as const)(
-      "completes an empty %s request with defer=%s without connecting",
-      async (strategy, defer) => {
-        const { server, rxNostr } = createRxNostrScenario();
-        const inspector = new SubscriptionInspector<EventPacket>();
-
-        rxNostr[strategy](relay, [], { defer }).subscribe(inspector);
-
-        await expect(inspector.waitComplete()).resolves.toBeUndefined();
-        expect(server.connections.length).toBe(0);
-
-        rxNostr.dispose();
-      },
-    );
-
+  describe("event validation", () => {
     test("applies filter matching, verification, and expiration in order", async () => {
       const verified: string[] = [];
       const { server, rxNostr } = createRxNostrScenario({
@@ -382,36 +335,210 @@ describe("REQ public contract", () => {
     });
   });
 
-  describe("multiple relays", () => {
-    test("isolates one relay's retry exhaustion from another relay", async () => {
-      const one = "wss://one.example.com";
-      const two = "wss://two.example.com";
-      const { server, rxNostr } = createRxNostrScenario();
-      const inspector = new SubscriptionInspector<EventPacket>();
+  describe("source completion and subscriptions", () => {
+    scenarioTest(
+      "drains active and queued backward requests on every subscriber after source disposal",
+      async ({ createScenario }) => {
+        const directory = new RelayDirectory();
+        directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+        const { rxNostr, server } = createScenario({ relayDirectory: directory });
+        using source = new RxReq();
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const secondInspector = new SubscriptionInspector<EventPacket>();
 
-      rxNostr.backward([one, two], [{}]).subscribe(inspector);
+        rxNostr.backward(a, source).subscribe(firstInspector);
+        rxNostr.backward(a, source).subscribe(secondInspector);
+        source.emit([{}], { traceTag: 1 });
+        source.emit([{}], { traceTag: 2 });
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+        await settleProtocol();
 
-      await expect(server.connections.wait(1)).resolves.toBeDefined();
-      const first = server.sockets.latestFor(one);
-      const second = server.sockets.latestFor(two);
-      first.open();
-      second.open();
-      const [, secondSubId] = await second.inbox.waitNext("REQ");
-      await expect(first.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
-      first.peerClose(1006, "offline");
-      second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
-      second.message(["EOSE", secondSubId]);
+        source.dispose();
+        source.emit([{}], { traceTag: "ignored" });
+        expect(firstInspector.completed).toBe(false);
+        expect(secondInspector.completed).toBe(false);
+        const results = [
+          { inspector: secondInspector, traceTag: 1 },
+          { inspector: firstInspector, traceTag: 2 },
+          { inspector: secondInspector, traceTag: 2 },
+        ];
+        for (const [index, { inspector, traceTag }] of results.entries()) {
+          const id = (await socket.inbox.waitNext("REQ"))[1];
+          const event = Faker.event({ id: `result-${index + 1}` });
+          socket.message(["EVENT", id, event]);
+          await settleProtocol();
+          await expect(inspector.waitNext()).resolves.toMatchObject({ event, traceTag });
+          socket.message(["EOSE", id]);
+          await settleProtocol();
+        }
 
-      await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      await expect(inspector.waitNext().then((packet) => packet.event.id)).resolves.toEqual(
-        "from-two",
-      );
+        expect(socket.inbox.length).toBe(4);
+        expect(firstInspector.completed).toBe(true);
+        expect(secondInspector.completed).toBe(true);
+        expect(socket.isCloseRequested).toBe(true);
+      },
+    );
 
-      await expect(second.closeRequested).resolves.toBeDefined();
-      second.acknowledgeClose();
-      rxNostr.dispose();
-    });
+    scenarioTest(
+      "keeps the shared source and other subscriber alive when one observer unsubscribes",
+      async ({ createScenario }) => {
+        const { rxNostr, server } = createScenario();
+        using source = new RxReq();
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const first = rxNostr.forward(a, source).subscribe(firstInspector);
+        const secondInspector = new SubscriptionInspector<EventPacket>();
+        const second = rxNostr.forward(a, source).subscribe(secondInspector);
+        source.emit([{}]);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        const firstReq = await socket.inbox.waitNext("REQ");
+        const secondReq = await socket.inbox.waitNext("REQ");
+        first.unsubscribe();
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", firstReq[1]]);
+        source.emit([{}], { traceTag: "remaining" });
+        await settleProtocol();
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", secondReq[1]]);
+        const remaining = await socket.inbox.waitNext("REQ");
+        socket.message(["EVENT", remaining[1], Faker.event({ id: "remaining" })]);
+        await settleProtocol();
+        await expect(secondInspector.waitNext()).resolves.toMatchObject({ traceTag: "remaining" });
+        expect(socket.inbox.length).toBe(5);
+        expect(socket.isCloseRequested).toBe(false);
+        second.unsubscribe();
+      },
+    );
 
+    scenarioTest.for(["forward", "backward"] as const)(
+      "%s completes without work when the source is already disposed",
+      async (strategy, { createScenario }) => {
+        const { rxNostr, server } = createScenario();
+        using source = new RxReq();
+        source.dispose();
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr[strategy](a, source).subscribe(inspector);
+        await settleProtocol();
+        expect(inspector.completed).toBe(true);
+        expect(server.connections).toHaveLength(0);
+      },
+    );
+  });
+
+  describe("asynchronous event delivery", () => {
+    scenarioTest(
+      "a verifier failure cancels every relay's active and queued requests",
+      async ({ createScenario }) => {
+        const verification = createDeferred<boolean>();
+        const directory = new RelayDirectory();
+        for (const url of [a, b]) directory.setNip11(url, { limitation: { max_subscriptions: 1 } });
+        const { rxNostr, server } = createScenario({
+          relayDirectory: directory,
+          verifier: { verifyEvent: () => verification.promise },
+        });
+        using source = new RxReq();
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward([a, b], source).subscribe(inspector);
+        source.emit([{}]);
+        source.emit([{}]);
+        for (const socket of server.connections) socket.open();
+        await settleProtocol();
+        const requests = await Promise.all(
+          [...server.connections].map(async (socket) => ({
+            socket,
+            req: await socket.inbox.waitNext("REQ"),
+          })),
+        );
+        const first = requests.find(({ socket }) => socket.url === a)!;
+        first.socket.message(["EVENT", first.req[1], Faker.event()]);
+        await settleProtocol();
+        const cause = new Error("verification failed");
+        verification.reject(cause);
+        await settleProtocol();
+
+        await expect(inspector.waitError()).resolves.toEqual(
+          expect.objectContaining({ callback: "verifier", cause }),
+        );
+        for (const { socket, req } of requests) {
+          await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+          expect(socket.inbox.length).toBe(2);
+          await expect(socket.closeRequested).resolves.toBeDefined();
+        }
+      },
+    );
+
+    scenarioTest.for(["unsubscribe", "dispose"] as const)(
+      "ignores pending verifier results after %s",
+      async (ending, { createScenario }) => {
+        const verification = createDeferred<boolean>();
+        const verify = vi.fn(() => verification.promise);
+        const { rxNostr, server } = createScenario({ verifier: { verifyEvent: verify } });
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        const query = rxNostr.backward(a, [{}]).subscribe(inspector);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        socket.message(["EVENT", (await socket.inbox.waitNext("REQ"))[1], Faker.event()]);
+        await settleProtocol();
+        expect(verify).toHaveBeenCalledOnce();
+
+        if (ending === "dispose") rxNostr.dispose();
+        else query.unsubscribe();
+        verification.resolve(true);
+        await settleProtocol();
+        expect(inspector.length).toBe(0);
+        expect(inspector.errored).toBe(false);
+        expect(socket.isCloseRequested).toBe(true);
+      },
+    );
+
+    scenarioTest(
+      "delivers already received events after forward replacement but ignores old wire messages",
+      async ({ createScenario }) => {
+        const verification = createDeferred<boolean>();
+        const { rxNostr, server } = createScenario({
+          verifier: { verifyEvent: () => verification.promise },
+        });
+        using source = new RxReq();
+        const inspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.forward(a, source).subscribe(inspector);
+        source.emit([{}], { traceTag: "old" });
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        const old = (await socket.inbox.waitNext("REQ"))[1];
+        socket.message(["EVENT", old, Faker.event({ id: "received-before-replacement" })]);
+        await settleProtocol();
+        source.emit([{}], { traceTag: "new" });
+        await settleProtocol();
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", old]);
+        socket.message(["EVENT", old, Faker.event({ id: "stale-wire-message" })]);
+        socket.message([
+          "EVENT",
+          (await socket.inbox.waitNext("REQ"))[1],
+          Faker.event({ id: "new" }),
+        ]);
+        verification.resolve(true);
+        await settleProtocol();
+        await expect(inspector.waitNext()).resolves.toMatchObject({
+          event: { id: "received-before-replacement" },
+          traceTag: "old",
+        });
+        await expect(inspector.waitNext()).resolves.toMatchObject({
+          event: { id: "new" },
+          traceTag: "new",
+        });
+        query.unsubscribe();
+      },
+    );
+  });
+
+  describe("destinations", () => {
     test("stops a removed relay while keeping the remaining backward relay active", async () => {
       const one = "wss://one.example.com";
       const two = "wss://two.example.com";
@@ -489,6 +616,173 @@ describe("REQ public contract", () => {
       rxNostr.dispose();
     });
 
+    test("sends an unfinished backward query to a dynamically added relay", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const destinations = new RxRelays([one]);
+      const { server, rxNostr } = createRxNostrScenario();
+      const request = new RxReq();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward(destinations, request).subscribe(inspector);
+      request.emit([{ kinds: [1] }]);
+      await expect(server.connections.wait(0)).resolves.toBeDefined();
+      const first = server.sockets.latestFor(one);
+      first.open();
+      const [, firstSubId] = await first.inbox.waitNext("REQ");
+
+      destinations.append(two);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
+      const second = server.sockets.latestFor(two);
+      second.open();
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
+      second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
+      first.message(["EOSE", firstSubId]);
+      second.message(["EOSE", secondSubId]);
+
+      expect(inspector.completed).toBe(false);
+      await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "dynamic" } });
+
+      await Promise.all(
+        [...server.connections].map((socket) =>
+          expect(socket.closeRequested).resolves.toBeDefined(),
+        ),
+      );
+
+      for (const socket of server.connections) socket.acknowledgeClose();
+      request.dispose();
+      destinations.dispose();
+      rxNostr.dispose();
+    });
+
+    for (const strategy of ["forward", "backward"] as const) {
+      scenarioTest(
+        `${strategy} keeps dynamic packet destinations independent from defaults and hot relays`,
+        async ({ createScenario }) => {
+          const { rxNostr, server } = createScenario();
+          using defaults = new RxRelays([a, b]);
+          using temporary = new RxRelays([b, c]);
+          using source = new RxReq();
+          rxNostr.setHotRelays([a, b, c, d]);
+          for (const socket of server.connections) socket.open();
+          await settleProtocol();
+          const inspector = new SubscriptionInspector<EventPacket>();
+          const query = rxNostr[strategy](defaults, source, { weak: true }).subscribe(inspector);
+          source.emit([{}], { relays: temporary });
+          await settleProtocol();
+          const socketA = server.sockets.latestFor(a);
+          expect(socketA.inbox.length).toBe(0);
+          const socketB = server.sockets.latestFor(b);
+          const reqB = await socketB.inbox.waitNext("REQ");
+          const socketC = server.sockets.latestFor(c);
+          const reqC = await socketC.inbox.waitNext("REQ");
+
+          defaults.remove(b);
+          defaults.append(d);
+          temporary.remove(c);
+          temporary.append(a);
+          await settleProtocol();
+          expect(socketB.inbox.length).toBe(1);
+          await expect(socketC.inbox.waitNext()).resolves.toEqual(["CLOSE", reqC[1]]);
+          const reqA = await socketA.inbox.waitNext("REQ");
+          const socketD = server.sockets.latestFor(d);
+          expect(socketD.inbox.length).toBe(0);
+
+          source.emit([{}]);
+          await settleProtocol();
+          await expect(socketD.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+          if (strategy === "forward") {
+            await expect(socketB.inbox.waitNext()).resolves.toEqual(["CLOSE", reqB[1]]);
+            await expect(socketA.inbox.waitNext()).resolves.toEqual(["CLOSE", reqA[1]]);
+          } else {
+            expect(socketB.inbox.length).toBe(1);
+          }
+          await expect(socketA.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+          temporary.append(c);
+          await settleProtocol();
+          expect(socketC.inbox.length).toBe(2);
+          query.unsubscribe();
+          await settleProtocol();
+          expect([...server.connections].every((socket) => socket.isCloseRequested === false)).toBe(
+            true,
+          );
+          rxNostr.unsetHotRelays();
+          await settleProtocol();
+          expect([...server.connections].every((socket) => socket.isCloseRequested === true)).toBe(
+            true,
+          );
+        },
+      );
+    }
+
+    scenarioTest(
+      "forward restores its latest filters after all dynamic relays are removed and readded",
+      async ({ createScenario }) => {
+        const { rxNostr, server } = createScenario();
+        using destinations = new RxRelays([a, b]);
+        using source = new RxReq();
+        rxNostr.setHotRelays([a, b]);
+        for (const socket of server.connections) socket.open();
+        await settleProtocol();
+        const inspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.forward(destinations, source).subscribe(inspector);
+        source.emit([{ kinds: [1] }]);
+        await settleProtocol();
+        destinations.clear();
+        await settleProtocol();
+        for (const socket of server.connections) {
+          const req = await socket.inbox.waitNext("REQ");
+          expect(req[2]).toEqual({ kinds: [1] });
+          await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+        }
+        destinations.append(a);
+        await settleProtocol();
+        const socketA = server.sockets.latestFor(a);
+        expect((await socketA.inbox.waitNext("REQ"))[2]).toEqual({ kinds: [1] });
+        expect(socketA.inbox.length).toBe(3);
+        expect(server.sockets.latestFor(b).inbox.length).toBe(2);
+        query.unsubscribe();
+      },
+    );
+
+    scenarioTest(
+      "backward does not restart removed or completed relays within an active request",
+      async ({ createScenario }) => {
+        const { rxNostr, server } = createScenario();
+        using destinations = new RxRelays([a, b]);
+        rxNostr.setHotRelays([a, b, c]);
+        for (const socket of server.connections) socket.open();
+        await settleProtocol();
+        const inspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.backward(destinations, [{}]).subscribe(inspector);
+        await settleProtocol();
+        destinations.remove(a);
+        destinations.append(a);
+        destinations.append(c);
+        await settleProtocol();
+        const socketA = server.sockets.latestFor(a);
+        const reqA = await socketA.inbox.waitNext("REQ");
+        await expect(socketA.inbox.waitNext()).resolves.toEqual(["CLOSE", reqA[1]]);
+        expect(socketA.inbox.length).toBe(2);
+        await expect(server.sockets.latestFor(c).inbox.waitNext()).resolves.toEqual([
+          "REQ",
+          expect.any(String),
+          {},
+        ]);
+        const socketB = server.sockets.latestFor(b);
+        const reqB = await socketB.inbox.waitNext("REQ");
+        socketB.message(["EOSE", reqB[1]]);
+        destinations.remove(b);
+        destinations.append(b);
+        await settleProtocol();
+        await expect(socketB.inbox.waitNext()).resolves.toEqual(["CLOSE", reqB[1]]);
+        expect(socketB.inbox.length).toBe(2);
+        query.unsubscribe();
+      },
+    );
+  });
+
+  describe("subscription limits and queued requests", () => {
     test("runs multiple backward emissions concurrently without a subscription limit", async () => {
       const { server, rxNostr } = createRxNostrScenario();
       const request = new RxReq();
@@ -599,43 +893,218 @@ describe("REQ public contract", () => {
       socket.acknowledgeClose();
     });
 
-    test("sends an unfinished backward query to a dynamically added relay", async () => {
-      const one = "wss://one.example.com";
-      const two = "wss://two.example.com";
-      const destinations = new RxRelays([one]);
-      const { server, rxNostr } = createRxNostrScenario();
-      const request = new RxReq();
+    scenarioTest(
+      "unsubscribes active and queued backward requests without briefly sending cancelled work",
+      async ({ createScenario }) => {
+        const directory = new RelayDirectory();
+        directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+        const { rxNostr, server } = createScenario({ relayDirectory: directory });
+        using source = new RxReq();
+        const inspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.backward(a, source).subscribe(inspector);
+        source.emit([{ kinds: [1] }]);
+        source.emit([{ kinds: [2] }]);
+        source.emit([{ kinds: [3] }]);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        const req = await socket.inbox.waitNext("REQ");
+        expect(req[2]).toEqual({ kinds: [1] });
+
+        query.unsubscribe();
+        await settleProtocol();
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+        expect(socket.inbox.length).toBe(2);
+      },
+    );
+
+    scenarioTest(
+      "replaces queued forward work without sending superseded filters",
+      async ({ createScenario }) => {
+        const directory = new RelayDirectory();
+        directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+        const { rxNostr, server } = createScenario({ relayDirectory: directory });
+        using source = new RxReq();
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const blocker = rxNostr.backward(a, [{}]).subscribe(firstInspector);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        const blockerId = (await socket.inbox.waitNext("REQ"))[1];
+        const secondInspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.forward(a, source).subscribe(secondInspector);
+        source.emit([{ kinds: [1] }]);
+        source.emit([{ kinds: [2] }]);
+        await settleProtocol();
+        expect(socket.inbox.length).toBe(1);
+
+        socket.message(["EOSE", blockerId]);
+        await settleProtocol();
+        await expect(socket.inbox.waitNext()).resolves.toEqual([
+          "REQ",
+          expect.any(String),
+          { kinds: [2] },
+        ]);
+        query.unsubscribe();
+        blocker.unsubscribe();
+      },
+    );
+
+    scenarioTest(
+      "removes queued work on one relay while the other relay keeps delivering",
+      async ({ createScenario }) => {
+        const directory = new RelayDirectory();
+        directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+        const { rxNostr, server } = createScenario({ relayDirectory: directory });
+        using destinations = new RxRelays([a, b]);
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const blocker = rxNostr.backward(a, [{}]).subscribe(firstInspector);
+        const secondInspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(destinations, [{}]).subscribe(secondInspector);
+        for (const socket of server.connections) socket.open();
+        await settleProtocol();
+        destinations.remove(a);
+        const first = server.sockets.latestFor(a);
+        const second = server.sockets.latestFor(b);
+        first.message(["EOSE", (await first.inbox.waitNext("REQ"))[1]]);
+        const [, secondId] = await second.inbox.waitNext("REQ");
+        second.message(["EVENT", secondId, Faker.event()]);
+        second.message(["EOSE", secondId]);
+        await settleProtocol();
+        expect(first.inbox.length).toBe(1);
+        await expect(secondInspector.waitNext()).resolves.toMatchObject({ from: b });
+        expect(secondInspector.completed).toBe(true);
+        blocker.unsubscribe();
+      },
+    );
+  });
+
+  describe("reconnection", () => {
+    test("resends an active backward REQ after an abnormal disconnect", async () => {
+      const { server, rxNostr } = createRxNostrScenario({
+        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+      });
       const inspector = new SubscriptionInspector<EventPacket>();
 
-      rxNostr.backward(destinations, request).subscribe(inspector);
-      request.emit([{ kinds: [1] }]);
-      await expect(server.connections.wait(0)).resolves.toBeDefined();
-      const first = server.sockets.latestFor(one);
+      rxNostr.backward(relay, [{}]).subscribe(inspector);
+
+      const first = server.sockets.latest;
       first.open();
-      const [, firstSubId] = await first.inbox.waitNext("REQ");
+      const firstReq = await first.inbox.waitNext("REQ");
 
-      destinations.append(two);
+      first.peerClose(1006, "offline");
+
       await expect(server.connections.wait(1)).resolves.toBeDefined();
-      const second = server.sockets.latestFor(two);
+      const second = server.sockets.latest;
       second.open();
-      const [, secondSubId] = await second.inbox.waitNext("REQ");
-      second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
-      first.message(["EOSE", firstSubId]);
-      second.message(["EOSE", secondSubId]);
+      const secondReq = await second.inbox.waitNext("REQ");
 
-      expect(inspector.completed).toBe(false);
-      await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "dynamic" } });
+      expect(secondReq[2]).toEqual(firstReq[2]);
+      second.message(["EOSE", secondReq[1]]);
+      await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await Promise.all(
-        [...server.connections].map((socket) =>
-          expect(socket.closeRequested).resolves.toBeDefined(),
-        ),
-      );
-
-      for (const socket of server.connections) socket.acknowledgeClose();
-      request.dispose();
-      destinations.dispose();
+      await expect(second.closeRequested).resolves.toBeDefined();
+      second.acknowledgeClose();
       rxNostr.dispose();
     });
+
+    test("resends an active forward REQ after an abnormal disconnect", async () => {
+      const { server, rxNostr } = createRxNostrScenario({
+        reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
+      });
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      const subscription = rxNostr.forward(relay, [{ kinds: [1] }]).subscribe(inspector);
+
+      const first = server.sockets.latest;
+      first.open();
+      const firstReq = await first.inbox.waitNext("REQ");
+
+      first.peerClose(1006, "offline");
+
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
+      const second = server.sockets.latest;
+      second.open();
+      const secondReq = await second.inbox.waitNext("REQ");
+
+      expect(secondReq[2]).toEqual(firstReq[2]);
+      second.message(["EOSE", secondReq[1]]);
+      expect(inspector.completed).toBe(false);
+
+      subscription.unsubscribe();
+      await expect(second.closeRequested).resolves.toBeDefined();
+      second.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test("isolates one relay's retry exhaustion from another relay", async () => {
+      const one = "wss://one.example.com";
+      const two = "wss://two.example.com";
+      const { server, rxNostr } = createRxNostrScenario();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward([one, two], [{}]).subscribe(inspector);
+
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
+      const first = server.sockets.latestFor(one);
+      const second = server.sockets.latestFor(two);
+      first.open();
+      second.open();
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
+      await expect(first.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
+      first.peerClose(1006, "offline");
+      second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
+      second.message(["EOSE", secondSubId]);
+
+      await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      await expect(inspector.waitNext().then((packet) => packet.event.id)).resolves.toEqual(
+        "from-two",
+      );
+
+      await expect(second.closeRequested).resolves.toBeDefined();
+      second.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    scenarioTest.for(["replace", "remove"] as const)(
+      "does not recover obsolete work after %s during retry",
+      async (change, { createScenario }) => {
+        const { rxNostr, server } = createScenario({
+          reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
+        });
+        using destinations = new RxRelays([a]);
+        using source = new RxReq();
+        rxNostr.setHotRelays(a);
+        const inspector = new SubscriptionInspector<EventPacket>();
+        const query = rxNostr.forward(destinations, source).subscribe(inspector);
+        source.emit([{ kinds: [1] }]);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        const initial = await socket.inbox.waitNext("REQ");
+        expect(initial[2]).toEqual({ kinds: [1] });
+        socket.peerClose(1006, "offline");
+        await settleProtocol();
+        if (change === "replace") source.emit([{ kinds: [2] }]);
+        else destinations.clear();
+        await vi.advanceTimersByTimeAsync(100);
+        const recovered = server.sockets.latest;
+        expect(server.connections).toHaveLength(2);
+        recovered.open();
+        await settleProtocol();
+        await expect(recovered.inbox.waitNext()).resolves.toEqual(["CLOSE", initial[1]]);
+        if (change === "replace") {
+          await expect(recovered.inbox.waitNext()).resolves.toEqual([
+            "REQ",
+            expect.any(String),
+            { kinds: [2] },
+          ]);
+        } else {
+          expect(recovered.inbox.length).toBe(1);
+        }
+        query.unsubscribe();
+      },
+    );
   });
 });

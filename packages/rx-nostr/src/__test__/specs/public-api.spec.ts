@@ -1,5 +1,8 @@
 import type {
   Authenticator,
+  ConnectionFailure,
+  ConnectionState,
+  ConnectionStatePacket,
   ConnectionDropDetector,
   ConnectionDropDetectorContext,
   ConnectionReconnector,
@@ -20,6 +23,7 @@ import type {
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
 import * as publicApi from "rx-nostr";
+import type { Observable } from "rxjs";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 describe("public entry point", () => {
@@ -81,6 +85,30 @@ describe("public entry point", () => {
       expectTypeOf<string>().toMatchTypeOf<RelayInput>();
       expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
       expectTypeOf<"ws://relay.example">().toMatchTypeOf<RelayUrl>();
+    });
+
+    test("exposes connection state monitoring and snapshot types", () => {
+      expectTypeOf<IRxNostr["monitorConnectionState"]>().returns.toEqualTypeOf<
+        Observable<ConnectionStatePacket>
+      >();
+
+      expectTypeOf<ConnectionState>().toMatchTypeOf<
+        | { state: "dormant" }
+        | { state: "connecting"; attempt: number }
+        | { state: "connected" }
+        | {
+            state: "waiting-for-retry";
+            attempt: number;
+            delay: number;
+            reason: ConnectionFailure;
+          }
+        | { state: "retrying"; attempt: number }
+        | { state: "failed"; attempt: number; reason: ConnectionFailure }
+        | { state: "disposed" }
+      >();
+
+      expectTypeOf<ConnectionStatePacket>().toHaveProperty("from");
+      expectTypeOf<ConnectionStatePacket>().toHaveProperty("state");
     });
   });
 

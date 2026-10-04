@@ -14,8 +14,12 @@ import {
 } from "rx-nostr";
 import { describe, expect, test, vi } from "vitest";
 
-import { ControlledWebSocketServer } from "../helper/index.ts";
+import { ControlledWebSocketServer, createDeferred, Faker } from "../helper/index.ts";
+import { settleProtocol, scenarioTest } from "../helper/protocol-scenario.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
+
+const a = "wss://a.example.com";
+const b = "wss://b.example.com";
 
 const relay = "wss://relay.example.com";
 
@@ -59,7 +63,7 @@ async function expectLiveConnections(directory: RelayDirectory, count: number): 
   await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(count));
 }
 
-describe("RxNostr facade lifecycle", () => {
+describe("RxNostr public contract", () => {
   describe("static defaults", () => {
     test("applies static constructor defaults to subsequently constructed instances", async () => {
       const previous = RxNostr.defaultConfig;
@@ -208,6 +212,134 @@ describe("RxNostr facade lifecycle", () => {
         state: { state: "disposed" },
       });
       await expect(firstInspector.waitComplete()).resolves.toBeUndefined();
+    });
+
+    describe("connection states", () => {
+      scenarioTest(
+        "closes ready, opening and lingering sockets and cancels retry and queued work",
+        async ({ createScenario }) => {
+          const opening = "wss://opening.example.com";
+          const retrying = "wss://retrying.example.com";
+          const directory = new RelayDirectory();
+          directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+          const { rxNostr, server } = createScenario({
+            relayDirectory: directory,
+            reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
+          });
+          using source = new RxReq();
+          const firstInspector = new SubscriptionInspector<EventPacket>();
+
+          rxNostr.backward(a, source).subscribe(firstInspector);
+          source.emit([{}]);
+          source.emit([{}]);
+          const secondInspector = new SubscriptionInspector<EventPacket>();
+          rxNostr.backward(b, [{}], { linger: Infinity }).subscribe(secondInspector);
+          rxNostr.setHotRelays([opening, retrying]);
+          for (const socket of server.connections) if (socket.url !== opening) socket.open();
+          await settleProtocol();
+          const socketB = server.sockets.latestFor(b);
+          socketB.message(["EOSE", (await socketB.inbox.waitNext("REQ"))[1]]);
+          server.sockets.latestFor(retrying).peerClose(1006, "offline");
+          await settleProtocol();
+
+          rxNostr.dispose();
+          rxNostr.dispose();
+          await settleProtocol();
+          expect(firstInspector.completed).toBe(true);
+          for (const url of [a, b, opening]) {
+            const socket = server.sockets.latestFor(url);
+            expect(socket.isCloseRequested).toBe(true);
+            socket.acknowledgeClose();
+          }
+          await vi.advanceTimersByTimeAsync(1_000);
+          expect(server.connections).toHaveLength(4);
+          expect(server.sockets.latestFor(a).inbox.length).toBe(2);
+          expect(vi.getTimerCount()).toBe(0);
+        },
+      );
+    });
+
+    describe("finalized demand", () => {
+      const relay = "wss://linger.example.com";
+
+      scenarioTest.for([100, Infinity])(
+        "dispose ends finalized demand immediately with linger=%s",
+        async (linger, { createScenario }) => {
+          const { rxNostr, server } = createScenario();
+          const inspector = new SubscriptionInspector<EventPacket>();
+          rxNostr.backward(relay, [{}], { linger }).subscribe(inspector);
+          const socket = server.sockets.latest;
+          socket.open();
+          await settleProtocol();
+          socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+          await settleProtocol();
+          expect(socket.isCloseRequested).toBe(false);
+
+          await vi.advanceTimersByTimeAsync(linger === Infinity ? 60_000 : 50);
+          expect(socket.isCloseRequested).toBe(false);
+          rxNostr.dispose();
+          await settleProtocol();
+          expect(socket.isCloseRequested).toBe(true);
+          socket.acknowledgeClose();
+          await vi.advanceTimersByTimeAsync(1_000);
+          expect(server.connections).toHaveLength(1);
+          expect(vi.getTimerCount()).toBe(0);
+        },
+      );
+    });
+
+    describe("pending callbacks", () => {
+      scenarioTest.for(["auth-signing", "auth-ok", "event-signing"] as const)(
+        "does not send delayed work after disposal during %s",
+        async (phase, { createScenario }) => {
+          const signing = createDeferred<ReturnType<typeof Faker.authEvent>>();
+          const signed = Faker.authEvent({ id: "late-event" });
+          const { rxNostr, server } = createScenario({
+            authenticator: {
+              challenge: () => (phase === "auth-ok" ? Promise.resolve(signed) : signing.promise),
+            },
+          });
+          if (phase === "event-signing") {
+            rxNostr.publish(
+              a,
+              { kind: 1, content: "" },
+              {
+                signer: {
+                  getPublicKey: async () => signed.pubkey,
+                  signEvent: async <K extends number>() =>
+                    (await signing.promise) as import("nostr-typedef").Event<K>,
+                },
+              },
+            );
+          } else {
+            const inspector = new SubscriptionInspector<EventPacket>();
+            rxNostr.backward(a, [{}]).subscribe(inspector);
+          }
+          const socket = server.sockets.latest;
+          socket.open();
+          await settleProtocol();
+          if (phase !== "event-signing") {
+            socket.message(["AUTH", "challenge"]);
+            socket.message([
+              "CLOSED",
+              (await socket.inbox.waitNext("REQ"))[1],
+              "auth-required: login",
+            ]);
+            await settleProtocol();
+          }
+          const receivedCount = socket.inbox.length;
+          rxNostr.dispose();
+          signing.resolve(signed);
+          socket.message(["OK", signed.id, true, "late"]);
+          await vi.advanceTimersByTimeAsync(60_000);
+          expect(socket.inbox.length).toBe(receivedCount);
+          expect(socket.isCloseRequested).toBe(true);
+          expect(server.connections).toHaveLength(1);
+          socket.acknowledgeClose();
+          await settleProtocol();
+          expect(vi.getTimerCount()).toBe(0);
+        },
+      );
     });
   });
 

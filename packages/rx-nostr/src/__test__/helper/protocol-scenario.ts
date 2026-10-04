@@ -4,11 +4,11 @@ import { test, vi } from "vitest";
 import { createRxNostrScenario, type RxNostrScenario } from "./rx-nostr-scenario.ts";
 
 /** Drain protocol promises without advancing operation deadlines. */
-export async function settleQuery(): Promise<void> {
+export async function settleProtocol(): Promise<void> {
   await vi.advanceTimersByTimeAsync(0);
 }
 
-export const queryTest = test.extend<{
+export const scenarioTest = test.extend<{
   createScenario: (config?: Partial<RxNostrConfig>) => RxNostrScenario;
 }>({
   // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
@@ -26,7 +26,7 @@ export const queryTest = test.extend<{
         rxNostr.dispose();
         for (const socket of server.connections) socket.acknowledgeClose();
       }
-      await settleQuery();
+      await settleProtocol();
       vi.useRealTimers();
     }
   },

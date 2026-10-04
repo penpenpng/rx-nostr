@@ -2,19 +2,22 @@ import type * as Nostr from "nostr-typedef";
 import {
   RxNostrCallbackError,
   SimpleAuthenticator,
+  type EventPacket,
   type EventSigner,
   type RxNostrConfig,
 } from "rx-nostr";
 import { describe, expect, test, vi } from "vitest";
 
-import type { EventPacket } from "../../packets/packets.interface.ts";
 import {
   createDeferred,
   createRxNostrScenario,
   expectCallbackCalled,
   Faker,
 } from "../helper/index.ts";
+import { settleProtocol, scenarioTest } from "../helper/protocol-scenario.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
+
+const a = "wss://a.example.com";
 
 const relay = "wss://relay.example.com";
 
@@ -333,5 +336,43 @@ describe("NIP-42 AUTH public contract", () => {
 
       rxNostr.dispose();
     });
+  });
+
+  describe("shared authentication", () => {
+    scenarioTest(
+      "keeps shared authentication alive when only one waiting query unsubscribes",
+      async ({ createScenario }) => {
+        const auth = createDeferred<ReturnType<typeof Faker.authEvent>>();
+        const challenge = vi.fn(() => auth.promise);
+        const { rxNostr, server } = createScenario({ authenticator: { challenge } });
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const first = rxNostr.backward(a, [{ kinds: [1] }]).subscribe(firstInspector);
+        const secondInspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(a, [{ kinds: [2] }]).subscribe(secondInspector);
+        const socket = server.sockets.latest;
+        socket.open();
+        await settleProtocol();
+        socket.message(["AUTH", "challenge"]);
+        for (const req of [await socket.inbox.waitNext("REQ"), await socket.inbox.waitNext("REQ")])
+          socket.message(["CLOSED", req[1], "auth-required: login"]);
+        await settleProtocol();
+        expect(challenge).toHaveBeenCalledOnce();
+
+        first.unsubscribe();
+        const signed = Faker.authEvent({ id: "shared-auth" });
+        auth.resolve(signed);
+        await settleProtocol();
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["AUTH", signed]);
+        socket.message(["OK", signed.id, true, "authenticated"]);
+        await settleProtocol();
+        const retried = await socket.inbox.waitNext("REQ");
+        expect(retried[2]).toEqual({ kinds: [2] });
+        expect(socket.inbox.length).toBe(4);
+        socket.message(["EOSE", retried[1]]);
+        await settleProtocol();
+        expect(secondInspector.completed).toBe(true);
+      },
+    );
   });
 });
