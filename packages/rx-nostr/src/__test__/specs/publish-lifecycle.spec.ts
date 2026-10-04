@@ -197,7 +197,10 @@ describe("Publication lifecycle", () => {
 
       connection.message(["OK", "event-first", true, "saved after authentication"]);
       connection.message(["OK", "event-later", true, "saved after authentication"]);
-      await Promise.all([expect(firstAll).resolves.toBeUndefined(), expect(laterAll).resolves.toBeUndefined()]);
+      await Promise.all([
+        expect(firstAll).resolves.toBeUndefined(),
+        expect(laterAll).resolves.toBeUndefined(),
+      ]);
 
       rxNostr.dispose();
     });

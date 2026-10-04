@@ -64,12 +64,12 @@ with ordinary protocol operations.
 
 Track AUTH status per challenge generation:
 
-| State | Meaning | Effect on `auth-required` |
-| --- | --- | --- |
-| `unstarted` | Challenge is known; AUTH has not started | Start AUTH, then wait |
-| `pending` | AUTH is in progress | Join the attempt and wait |
-| `authenticated` | AUTH succeeded | Retransmit the operation once |
-| `failed` | AUTH was rejected or failed | Fail the operation without retrying AUTH |
+| State           | Meaning                                  | Effect on `auth-required`                |
+| --------------- | ---------------------------------------- | ---------------------------------------- |
+| `unstarted`     | Challenge is known; AUTH has not started | Start AUTH, then wait                    |
+| `pending`       | AUTH is in progress                      | Join the attempt and wait                |
+| `authenticated` | AUTH succeeded                           | Retransmit the operation once            |
+| `failed`        | AUTH was rejected or failed              | Fail the operation without retrying AUTH |
 
 The state is reset to `unstarted` when a new challenge arrives and discarded
 when the connection ends.

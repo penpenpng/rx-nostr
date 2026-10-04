@@ -36,9 +36,7 @@ describe("RxNostr diagnostics", () => {
     anotherRxNostr.setHotRelays(anotherRelay);
     const connected = Promise.all([
       firstValueFrom(
-        rxNostr
-          .monitorConnectionState()
-          .pipe(filter(({ state }) => state.state === "connected")),
+        rxNostr.monitorConnectionState().pipe(filter(({ state }) => state.state === "connected")),
       ),
       firstValueFrom(
         anotherRxNostr

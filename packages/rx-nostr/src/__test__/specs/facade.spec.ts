@@ -284,7 +284,7 @@ describe("RxNostr facade lifecycle", () => {
         relays: "wss://packet.example.com",
         traceTag: "packet",
       });
-      
+
       expect(server.connections).toHaveLength(1);
       expect(server.sockets.latest.url).toBe("wss://packet.example.com");
 

@@ -12,14 +12,7 @@ export type PublishEventParameters = Omit<Nostr.EventParameters, "content"> & {
 
 export type PublicationFailure = {
   relay: RelayUrl;
-  kind:
-    | "rejected"
-    | "timeout"
-    | "dropped"
-    | "retry-exhausted"
-    | "cancelled"
-    | "auth"
-    | "failed";
+  kind: "rejected" | "timeout" | "dropped" | "retry-exhausted" | "cancelled" | "auth" | "failed";
   ok?: OkPacket;
   cause?: unknown;
 };

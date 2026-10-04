@@ -73,7 +73,9 @@ describe("public entry point", () => {
     test("exposes the REQ operation types", () => {
       expectTypeOf<Parameters<IRxNostr["forward"]>[0]>().toEqualTypeOf<RelayInput>();
       expectTypeOf<Parameters<IRxNostr["forward"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
-      expectTypeOf<Parameters<IRxNostr["forward"]>[2]>().toEqualTypeOf<RxNostrReqConfig | undefined>();
+      expectTypeOf<Parameters<IRxNostr["forward"]>[2]>().toEqualTypeOf<
+        RxNostrReqConfig | undefined
+      >();
       expectTypeOf<Parameters<IRxNostr["backward"]>[0]>().toEqualTypeOf<RelayInput>();
       expectTypeOf<Parameters<IRxNostr["backward"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
     });
