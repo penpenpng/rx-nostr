@@ -5,6 +5,11 @@ import type { OkPacket } from "../packets/index.ts";
 
 export type PublicationSettlePolicy = "all" | "any";
 
+/** Event parameters accepted by publish(). Omitted content is published as an empty string. */
+export type PublishEventParameters = Omit<Nostr.EventParameters, "content"> & {
+  content?: string;
+};
+
 export type PublicationFailure = {
   relay: RelayUrl;
   kind:

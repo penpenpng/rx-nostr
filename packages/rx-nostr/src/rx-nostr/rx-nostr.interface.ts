@@ -1,4 +1,3 @@
-import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
@@ -6,7 +5,7 @@ import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
-import type { Publication } from "../publication/index.ts";
+import type { Publication, PublishEventParameters } from "../publication/index.ts";
 import type { RelayDirectory } from "../relay-directory/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 import type {
@@ -30,7 +29,7 @@ export interface IRxNostr {
   ): Observable<EventPacket>;
   publish(
     relays: RelayInput,
-    params: Nostr.EventParameters,
+    params: PublishEventParameters,
     options?: RxNostrPublishConfig,
   ): Publication;
   setHotRelays(relays: RelayInput): void;

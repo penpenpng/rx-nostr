@@ -63,6 +63,7 @@ export type {
   Publication,
   PublicationFailure,
   PublicationSettlePolicy,
+  PublishEventParameters,
 } from "./publication/index.ts";
 export {
   GlobalRelayDirectory,
