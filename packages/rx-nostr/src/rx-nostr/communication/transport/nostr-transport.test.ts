@@ -1,7 +1,7 @@
 import { firstValueFrom, map, toArray } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { ControlledWebSocketServer, expectSent, Faker } from "../../../__test__/helper/index.ts";
+import { ControlledWebSocketServer, Faker } from "../../../__test__/helper/index.ts";
 import { SubscriptionInspector } from "../../../__test__/helper/subscription-inspector.ts";
 import type { ConnectionDropDetectorContext } from "../../../connection-drop-detector/index.ts";
 import type {
@@ -169,7 +169,7 @@ describe("NostrTransport", () => {
     await transport.cast(["CLOSE", "sub"]);
 
     await expect(firstInspector.waitNext()).resolves.toEqual("NOTICE");
-    expect(socket.sent).toEqual([["CLOSE", "sub"]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", "sub"]);
 
     await closeTransport(transport, server);
     await expect(secondInspector.waitNext()).resolves.toBe("connected");
@@ -217,7 +217,7 @@ describe("NostrTransport", () => {
       .subscribe(inspector);
 
     const socket = server.sockets.latest;
-    expect(socket.sent).toEqual([["REQ", "sub", {}]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", "sub", {}]);
     await Promise.resolve();
     socket.message(["EVENT", "sub", event]);
     socket.message(["EOSE", "sub"]);
@@ -227,7 +227,7 @@ describe("NostrTransport", () => {
     subscription.unsubscribe();
     subscription.unsubscribe();
     expect(inspector.completed).toBe(true);
-    expect(socket.sent).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
     await closeTransport(transport, server);
   });
 
@@ -266,7 +266,7 @@ describe("NostrTransport", () => {
     transport.state$.pipe(map((state) => state.state)).subscribe(secondInspector);
 
     oldSocket.peerClose(1006, "network lost");
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     const newSocket = server.sockets.latest;
     newSocket.open();
     await vi.waitFor(() => expect(reconnector.reconnect).toHaveBeenCalledOnce());
@@ -327,12 +327,12 @@ describe("NostrTransport", () => {
       query: ["REQ", "health", {}],
       selector: (message) => message[0] === "EOSE" && message[1] === "health",
     });
-    await expectSent(socket, "REQ");
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", "health", {}]);
     socket.message(["EOSE", "health"]);
     await expect(response).resolves.toEqual(["EOSE", "health"]);
 
     contexts[0]!.drop();
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     expect(reconnect).toHaveBeenLastCalledWith(
       expect.objectContaining({
         relay,
@@ -349,7 +349,7 @@ describe("NostrTransport", () => {
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
 
     socket2.peerClose(1006, "again");
-    await vi.waitFor(() => expect(server.connections).toHaveLength(3));
+    await expect(server.connections.wait(2)).resolves.toBeDefined();
     expect(reconnect.mock.calls.map(([context]) => context.attempt)).toEqual([1, 1]);
     const thirdSocket = server.sockets.latest;
     thirdSocket.open();
@@ -374,7 +374,7 @@ describe("NostrTransport", () => {
     const opened = transport.open();
     const socket = server.sockets.latest;
     socket.peerClose(1006, "initial failure");
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
     socket2.open();
     await opened;

@@ -14,11 +14,7 @@ import {
 } from "rx-nostr";
 import { describe, expect, test, vi } from "vitest";
 
-import {
-  ControlledWebSocketServer,
-  expectSent,
-  expectSocketCloseRequested,
-} from "../helper/index.ts";
+import { ControlledWebSocketServer } from "../helper/index.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const relay = "wss://relay.example.com";
@@ -86,11 +82,11 @@ describe("RxNostr facade lifecycle", () => {
           request.emit([{}]);
           const socket = server.sockets.latest;
           socket.open();
-          await expectSent(socket, "REQ");
+          await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
 
           subscription.unsubscribe();
           rxNostr.dispose();
-          await expectSocketCloseRequested(socket);
+          await expect(socket.closeRequested).resolves.toBeDefined();
           socket.acknowledgeClose();
         },
       );
@@ -119,11 +115,11 @@ describe("RxNostr facade lifecycle", () => {
           const socket = server.sockets.latest;
 
           socket.open();
-          const [, subId] = await expectSent(socket, "REQ");
+          const [, subId] = await socket.inbox.waitNext("REQ");
           socket.message(["EOSE", subId]);
 
           await expect(inspector.waitComplete()).resolves.toBeUndefined();
-          await expectSocketCloseRequested(socket);
+          await expect(socket.closeRequested).resolves.toBeDefined();
 
           socket.acknowledgeClose();
           rxNostr.dispose();
@@ -202,7 +198,7 @@ describe("RxNostr facade lifecycle", () => {
         expect.any(RxNostrAlreadyDisposedError),
       );
 
-      await expectSocketCloseRequested(connection);
+      await expect(connection.closeRequested).resolves.toBeDefined();
 
       connection.acknowledgeClose();
       await expect(firstInspector.waitNext()).resolves.toMatchObject({
@@ -249,13 +245,13 @@ describe("RxNostr facade lifecycle", () => {
       await expectLiveConnections(directory, 2);
 
       first.dispose();
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       await expectLiveConnections(directory, 1);
-      expect(socket2.closeRequests).toHaveLength(0);
+      expect(socket2.isCloseRequested).toBe(false);
 
       second.dispose();
-      await expectSocketCloseRequested(socket2);
+      await expect(socket2.closeRequested).resolves.toBeDefined();
       socket2.acknowledgeClose();
       await expectLiveConnections(directory, 0);
     });
@@ -300,7 +296,7 @@ describe("RxNostr facade lifecycle", () => {
       expect(socket.url).toBe("wss://packet.example.com");
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       const now = Math.floor(Date.now() / 1_000);
       socket.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
       socket.message([
@@ -325,7 +321,7 @@ describe("RxNostr facade lifecycle", () => {
         "accepted",
       ]);
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });

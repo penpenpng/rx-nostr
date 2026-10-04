@@ -38,7 +38,7 @@ describe("backward demand after query finalization", () => {
         };
       socket.open();
       await settleQuery();
-      const id = socket.sentOfType("REQ")[0]?.[1];
+      const id = ending === "error" ? undefined : (await socket.inbox.waitNext("REQ"))[1];
 
       if (ending === "eose" || ending === "source-dispose") socket.message(["EOSE", id!]);
       if (ending === "closed") socket.message(["CLOSED", id!, "blocked"]);
@@ -49,14 +49,17 @@ describe("backward demand after query finalization", () => {
       await settleQuery();
 
       expect(subscription.closed).toBe(true);
-      expect(socket.closeRequests).toHaveLength(0);
+      expect(socket.isCloseRequested).toBe(false);
       await vi.advanceTimersByTimeAsync(99);
-      expect(socket.closeRequests).toHaveLength(0);
+      expect(socket.isCloseRequested).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
-      expect(socket.closeRequests).toHaveLength(1);
-      expect(socket.sentOfType("CLOSE")).toHaveLength(
-        ["unsubscribe", "remove", "timeout"].includes(ending) ? 1 : 0,
-      );
+      expect(socket.isCloseRequested).toBe(true);
+      if (["unsubscribe", "remove", "timeout"].includes(ending)) {
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", id]);
+        expect(socket.inbox.length).toBe(2);
+      } else {
+        expect(socket.inbox.length).toBe(ending === "error" ? 0 : 1);
+      }
     },
   );
 
@@ -69,15 +72,15 @@ describe("backward demand after query finalization", () => {
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
-      socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+      socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
       await settleQuery();
-      expect(socket.closeRequests).toHaveLength(0);
+      expect(socket.isCloseRequested).toBe(false);
 
       await vi.advanceTimersByTimeAsync(linger === Infinity ? 60_000 : 50);
-      expect(socket.closeRequests).toHaveLength(0);
+      expect(socket.isCloseRequested).toBe(false);
       rxNostr.dispose();
       await settleQuery();
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.isCloseRequested).toBe(true);
       socket.acknowledgeClose();
       await vi.advanceTimersByTimeAsync(1_000);
       expect(server.connections).toHaveLength(1);
@@ -94,21 +97,21 @@ describe("backward demand after query finalization", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+    socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
     await vi.advanceTimersByTimeAsync(50);
 
     const secondInspector = new SubscriptionInspector<EventPacket>();
     rxNostr.backward(relay, [{}], { linger: 200 }).subscribe(secondInspector);
     await settleQuery();
-    const second = socket.latestSent("REQ");
+    const second = await socket.inbox.waitNext("REQ");
     await vi.advanceTimersByTimeAsync(50);
     expect(server.connections).toHaveLength(1);
-    expect(socket.closeRequests).toHaveLength(0);
+    expect(socket.isCloseRequested).toBe(false);
     socket.message(["EOSE", second[1]]);
     await vi.advanceTimersByTimeAsync(199);
-    expect(socket.closeRequests).toHaveLength(0);
+    expect(socket.isCloseRequested).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    expect(socket.closeRequests).toHaveLength(1);
+    expect(socket.isCloseRequested).toBe(true);
   });
 
   test("keeps independent packet linger deadlines after the source and query finish", async ({
@@ -125,12 +128,15 @@ describe("backward demand after query finalization", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    for (const req of socket.sentOfType("REQ")) socket.message(["EOSE", req[1]]);
+    for (let index = 0; index < 2; index++) {
+      const req = await socket.inbox.waitNext("REQ");
+      socket.message(["EOSE", req[1]]);
+    }
     await settleQuery();
     expect(inspector.completed).toBe(true);
     await vi.advanceTimersByTimeAsync(100);
-    expect(socket.closeRequests).toHaveLength(0);
+    expect(socket.isCloseRequested).toBe(false);
     await vi.advanceTimersByTimeAsync(100);
-    expect(socket.closeRequests).toHaveLength(1);
+    expect(socket.isCloseRequested).toBe(true);
   });
 });

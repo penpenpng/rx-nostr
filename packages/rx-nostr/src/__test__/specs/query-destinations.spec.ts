@@ -37,17 +37,17 @@ describe("weak queries with packet destinations", () => {
       for (const end of endings.slice(0, 2)) {
         end();
         await settleQuery();
-        expect(socket.closeRequests).toHaveLength(0);
+        expect(socket.isCloseRequested).toBe(false);
       }
       endings[2]!();
       await settleQuery();
       await expect(publication.waitFor("all")).resolves.toBeUndefined();
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.isCloseRequested).toBe(true);
       expect(server.connections).toHaveLength(1);
-      const sent = socket.sent.length;
+      const sent = socket.inbox.length;
       weak.unsubscribe();
       await settleQuery();
-      expect(socket.sent.length).toBe(sent);
+      expect(socket.inbox.length).toBe(sent);
     },
   );
 
@@ -61,18 +61,19 @@ describe("weak queries with packet destinations", () => {
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
-      socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+      socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
       await vi.advanceTimersByTimeAsync(50);
       const secondInspector = new SubscriptionInspector<EventPacket>();
       const weak = rxNostr[strategy](b, [{}], { weak: true, linger: Infinity }).subscribe(
         secondInspector,
       );
       await settleQuery();
-      expect(socket.sentOfType("REQ")).toHaveLength(2);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+      expect(socket.inbox.length).toBe(2);
       await vi.advanceTimersByTimeAsync(49);
-      expect(socket.closeRequests).toHaveLength(0);
+      expect(socket.isCloseRequested).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.isCloseRequested).toBe(true);
       socket.acknowledgeClose();
       weak.unsubscribe();
       await settleQuery();
@@ -93,7 +94,7 @@ describe("weak queries with packet destinations", () => {
           await settleQuery();
         }
         if (state === "lingering") {
-          socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+          socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
           await settleQuery();
         }
         const weak = rxNostr[strategy](a, source, { weak: true, defer: false }).subscribe(
@@ -103,14 +104,17 @@ describe("weak queries with packet destinations", () => {
         // The unleased destination comes first to exercise synchronous relay completion.
         source.emit([{}], { relays: [c, b], traceTag: "temporary" });
         await settleQuery();
-        expect(server.connections.map((connection) => connection.url)).toEqual([b]);
+        expect([...server.connections].map((connection) => connection.url)).toEqual([b]);
         if (state === "opening") {
-          expect(socket.sent).toHaveLength(0);
+          expect(socket.inbox.length).toBe(0);
           socket.open();
           await settleQuery();
         }
-        expect(socket.sentOfType("REQ")).toHaveLength(2);
-        const id = socket.latestSent("REQ")[1];
+        if (state !== "lingering") {
+          await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+        }
+        const [, id] = await socket.inbox.waitNext("REQ");
+        expect(socket.inbox.length).toBe(2);
         socket.message(["EVENT", id, Faker.event({ id: "weak-result" })]);
         await settleQuery();
         await expect(firstInspector.waitNext()).resolves.toMatchObject({
@@ -121,8 +125,8 @@ describe("weak queries with packet destinations", () => {
 
         weak.unsubscribe();
         await settleQuery();
-        expect(socket.sentOfType("CLOSE")).toContainEqual(["CLOSE", id]);
-        expect(socket.closeRequests).toHaveLength(0);
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", id]);
+        expect(socket.isCloseRequested).toBe(false);
         owner.unsubscribe();
       },
     );
@@ -142,10 +146,10 @@ describe("weak queries with packet destinations", () => {
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
-      expect(socket.sent).toHaveLength(0);
+      expect(socket.inbox.length).toBe(0);
       source.emit([{}], { relays: c });
       await settleQuery();
-      expect(socket.sentOfType("REQ")).toHaveLength(1);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
       weak.unsubscribe();
     });
 
@@ -164,36 +168,46 @@ describe("weak queries with packet destinations", () => {
       source.emit([{}], { relays: temporary });
       await settleQuery();
       const socketA = server.sockets.latestFor(a);
-      expect(socketA.sent).toHaveLength(0);
+      expect(socketA.inbox.length).toBe(0);
       const socketB = server.sockets.latestFor(b);
-      expect(socketB.sentOfType("REQ")).toHaveLength(1);
+      const reqB = await socketB.inbox.waitNext("REQ");
       const socketC = server.sockets.latestFor(c);
-      expect(socketC.sentOfType("REQ")).toHaveLength(1);
+      const reqC = await socketC.inbox.waitNext("REQ");
 
       defaults.remove(b);
       defaults.append(d);
       temporary.remove(c);
       temporary.append(a);
       await settleQuery();
-      expect(socketB.sentOfType("CLOSE")).toHaveLength(0);
-      expect(socketC.sentOfType("CLOSE")).toHaveLength(1);
-      expect(socketA.sentOfType("REQ")).toHaveLength(1);
+      expect(socketB.inbox.length).toBe(1);
+      await expect(socketC.inbox.waitNext()).resolves.toEqual(["CLOSE", reqC[1]]);
+      const reqA = await socketA.inbox.waitNext("REQ");
       const socketD = server.sockets.latestFor(d);
-      expect(socketD.sent).toHaveLength(0);
+      expect(socketD.inbox.length).toBe(0);
 
       source.emit([{}]);
       await settleQuery();
-      expect(socketD.sentOfType("REQ")).toHaveLength(1);
-      expect(socketB.sentOfType("CLOSE")).toHaveLength(strategy === "forward" ? 1 : 0);
+      await expect(socketD.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+      if (strategy === "forward") {
+        await expect(socketB.inbox.waitNext()).resolves.toEqual(["CLOSE", reqB[1]]);
+        await expect(socketA.inbox.waitNext()).resolves.toEqual(["CLOSE", reqA[1]]);
+      } else {
+        expect(socketB.inbox.length).toBe(1);
+      }
+      await expect(socketA.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
       temporary.append(c);
       await settleQuery();
-      expect(socketC.sentOfType("REQ")).toHaveLength(1);
+      expect(socketC.inbox.length).toBe(2);
       query.unsubscribe();
       await settleQuery();
-      expect(server.connections.every((socket) => socket.closeRequests.length === 0)).toBe(true);
+      expect([...server.connections].every((socket) => socket.isCloseRequested === false)).toBe(
+        true,
+      );
       rxNostr.unsetHotRelays();
       await settleQuery();
-      expect(server.connections.every((socket) => socket.closeRequests.length === 1)).toBe(true);
+      expect([...server.connections].every((socket) => socket.isCloseRequested === true)).toBe(
+        true,
+      );
     });
 
     test(`${strategy} releases a removed prewarm relay before any emit`, async ({
@@ -208,9 +222,9 @@ describe("weak queries with packet destinations", () => {
       await settleQuery();
       destinations.remove(a);
       await settleQuery();
-      expect(server.sockets.latestFor(a).closeRequests).toHaveLength(1);
-      expect(server.sockets.latestFor(b).closeRequests).toHaveLength(0);
-      expect(server.connections.every((socket) => socket.sent.length === 0)).toBe(true);
+      expect(server.sockets.latestFor(a).isCloseRequested).toBe(true);
+      expect(server.sockets.latestFor(b).isCloseRequested).toBe(false);
+      expect([...server.connections].every((socket) => socket.inbox.length === 0)).toBe(true);
       query.unsubscribe();
     });
   }
@@ -230,13 +244,17 @@ describe("weak queries with packet destinations", () => {
     await settleQuery();
     destinations.clear();
     await settleQuery();
-    for (const socket of server.connections) expect(socket.sentOfType("CLOSE")).toHaveLength(1);
+    for (const socket of server.connections) {
+      const req = await socket.inbox.waitNext("REQ");
+      expect(req[2]).toEqual({ kinds: [1] });
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+    }
     destinations.append(a);
     await settleQuery();
     const socketA = server.sockets.latestFor(a);
-    expect(socketA.latestSent("REQ")[2]).toEqual({ kinds: [1] });
-    expect(socketA.sentOfType("REQ")).toHaveLength(2);
-    expect(server.sockets.latestFor(b).sentOfType("REQ")).toHaveLength(1);
+    expect((await socketA.inbox.waitNext("REQ"))[2]).toEqual({ kinds: [1] });
+    expect(socketA.inbox.length).toBe(3);
+    expect(server.sockets.latestFor(b).inbox.length).toBe(2);
     query.unsubscribe();
   });
 
@@ -255,14 +273,23 @@ describe("weak queries with packet destinations", () => {
     destinations.append(a);
     destinations.append(c);
     await settleQuery();
-    expect(server.sockets.latestFor(a).sentOfType("REQ")).toHaveLength(1);
-    expect(server.sockets.latestFor(c).sentOfType("REQ")).toHaveLength(1);
+    const socketA = server.sockets.latestFor(a);
+    const reqA = await socketA.inbox.waitNext("REQ");
+    await expect(socketA.inbox.waitNext()).resolves.toEqual(["CLOSE", reqA[1]]);
+    expect(socketA.inbox.length).toBe(2);
+    await expect(server.sockets.latestFor(c).inbox.waitNext()).resolves.toEqual([
+      "REQ",
+      expect.any(String),
+      {},
+    ]);
     const socketB = server.sockets.latestFor(b);
-    socketB.message(["EOSE", socketB.latestSent("REQ")[1]]);
+    const reqB = await socketB.inbox.waitNext("REQ");
+    socketB.message(["EOSE", reqB[1]]);
     destinations.remove(b);
     destinations.append(b);
     await settleQuery();
-    expect(socketB.sentOfType("REQ")).toHaveLength(1);
+    await expect(socketB.inbox.waitNext()).resolves.toEqual(["CLOSE", reqB[1]]);
+    expect(socketB.inbox.length).toBe(2);
     query.unsubscribe();
   });
 });

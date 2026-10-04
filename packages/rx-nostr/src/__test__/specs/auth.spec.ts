@@ -12,8 +12,6 @@ import {
   createDeferred,
   createRxNostrScenario,
   expectCallbackCalled,
-  expectConnectionCount,
-  expectSent,
   Faker,
 } from "../helper/index.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
@@ -59,26 +57,24 @@ describe("NIP-42 AUTH public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      await expectSent(socket, "REQ", 2);
-      const requests = socket.sentOfType("REQ");
+      const requests = [await socket.inbox.waitNext("REQ"), await socket.inbox.waitNext("REQ")];
 
       socket.message(["AUTH", "challenge-1"]);
       for (const request of requests) {
-        const socket = server.sockets.latest;
         socket.message(["CLOSED", request[1], "auth-required: authenticate first"]);
       }
 
-      const auth = await expectSent(socket, "AUTH");
+      const auth = await socket.inbox.waitNext("AUTH");
       expect(challenge).toHaveBeenCalledOnce();
       expect(challenge).toHaveBeenCalledWith(relay, "challenge-1");
       expect(auth).toEqual(["AUTH", authEvent("auth-event", "challenge-1")]);
 
       socket.message(["OK", "auth-event", true, "authenticated"]);
-      await expectSent(socket, "REQ", 4);
-
-      const retriedRequests = socket.sentOfType("REQ").slice(2);
+      const retriedRequests = [
+        await socket.inbox.waitNext("REQ"),
+        await socket.inbox.waitNext("REQ"),
+      ];
       for (const request of retriedRequests) {
-        const socket = server.sockets.latest;
         socket.message(["CLOSED", request[1], "auth-required: still rejected"]);
       }
 
@@ -86,7 +82,7 @@ describe("NIP-42 AUTH public contract", () => {
         inspectors.map((inspector) => expect(inspector.waitComplete()).resolves.toBeUndefined()),
       );
       expect(challenge).toHaveBeenCalledOnce();
-      expect(socket.sentOfType("AUTH")).toHaveLength(1);
+      expect(socket.inbox.length).toBe(5);
 
       rxNostr.dispose();
     });
@@ -110,17 +106,16 @@ describe("NIP-42 AUTH public contract", () => {
         const socket = server.sockets.latest;
 
         socket.open();
-        const [, subId] = await expectSent(socket, "REQ");
+        const [, subId] = await socket.inbox.waitNext("REQ");
         socket.message(["AUTH", "challenge"]);
         socket.message(["CLOSED", subId, "auth-required: login"]);
-        await expectSent(socket, "AUTH");
+        await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
         if (outcome === "rejected") {
-          const socket = server.sockets.latest;
           socket.message(["OK", "auth-failure", false, "denied"]);
         }
 
         await expect(inspector.waitComplete()).resolves.toBeUndefined();
-        expect(socket.sent).toHaveLength(2);
+        expect(socket.inbox.length).toBe(2);
 
         rxNostr.dispose();
       },
@@ -149,14 +144,14 @@ describe("NIP-42 AUTH public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
 
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
       expect(challenge).not.toHaveBeenCalled();
       expect(signEvent).not.toHaveBeenCalled();
-      expect(socket.sent).toHaveLength(1);
+      expect(socket.inbox.length).toBe(1);
 
       rxNostr.dispose();
     });
@@ -173,14 +168,14 @@ describe("NIP-42 AUTH public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
 
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
       expect(factory).toHaveBeenCalledOnce();
       expect(factory).toHaveBeenCalledWith(relay);
-      expect(socket.sent).toHaveLength(1);
+      expect(socket.inbox.length).toBe(1);
 
       rxNostr.dispose();
     });
@@ -241,19 +236,19 @@ describe("NIP-42 AUTH public contract", () => {
 
       const firstConnection = server.sockets.latest;
       firstConnection.open();
-      const [, subId] = await expectSent(firstConnection, "REQ");
+      const [, subId] = await firstConnection.inbox.waitNext("REQ");
       firstConnection.message(["AUTH", "old-challenge"]);
       firstConnection.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
 
       firstConnection.peerClose(1006, "offline");
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const secondConnection = server.sockets.latest;
       auth.resolve(authEvent("stale-auth", "old-challenge"));
 
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      expect(firstConnection.sent).toHaveLength(1);
-      expect(secondConnection.sent).toHaveLength(0);
+      expect(firstConnection.inbox.length).toBe(1);
+      expect(secondConnection.inbox.length).toBe(0);
 
       rxNostr.dispose();
     });
@@ -270,7 +265,7 @@ describe("NIP-42 AUTH public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expect(inspector.waitError()).resolves.toEqual(expect.any(RxNostrCallbackError));
@@ -291,7 +286,7 @@ describe("NIP-42 AUTH public contract", () => {
       rxNostr.backward(relay, [{}]).subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["AUTH", "old"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
@@ -299,13 +294,13 @@ describe("NIP-42 AUTH public contract", () => {
       await expectCallbackCalled(challenge, 2);
       oldAuth.resolve(authEvent("old-auth", "old"));
       newAuth.resolve(authEvent("new-auth", "new"));
-      expect(await expectSent(socket, "AUTH")).toEqual(["AUTH", authEvent("new-auth", "new")]);
+      expect(await socket.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent("new-auth", "new")]);
       expect(inspector.completed).toBe(false);
       socket.message(["OK", "new-auth", true, "authenticated"]);
-      const [, retryId] = await expectSent(socket, "REQ", 2);
+      const [, retryId] = await socket.inbox.waitNext("REQ");
       socket.message(["EOSE", retryId]);
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      expect(socket.sentOfType("AUTH")).toHaveLength(1);
+      expect(socket.inbox.length).toBe(3);
       rxNostr.dispose();
     });
 
@@ -324,7 +319,7 @@ describe("NIP-42 AUTH public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
@@ -334,7 +329,7 @@ describe("NIP-42 AUTH public contract", () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(socket.sent).toHaveLength(1);
+      expect(socket.inbox.length).toBe(1);
 
       rxNostr.dispose();
     });

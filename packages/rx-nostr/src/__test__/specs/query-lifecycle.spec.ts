@@ -26,7 +26,7 @@ describe("RxReq source completion", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+    socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
     await settleQuery();
 
     source.dispose();
@@ -39,7 +39,7 @@ describe("RxReq source completion", () => {
       { inspector: secondInspector, traceTag: 2 },
     ];
     for (const [index, { inspector, traceTag }] of results.entries()) {
-      const id = socket.latestSent("REQ")[1];
+      const id = (await socket.inbox.waitNext("REQ"))[1];
       const event = Faker.event({ id: `result-${index + 1}` });
       socket.message(["EVENT", id, event]);
       await settleQuery();
@@ -48,11 +48,10 @@ describe("RxReq source completion", () => {
       await settleQuery();
     }
 
-    expect(socket.sentOfType("REQ")).toHaveLength(4);
+    expect(socket.inbox.length).toBe(4);
     expect(firstInspector.completed).toBe(true);
     expect(secondInspector.completed).toBe(true);
-    expect(socket.sentOfType("CLOSE")).toHaveLength(0);
-    expect(socket.closeRequests).toHaveLength(1);
+    expect(socket.isCloseRequested).toBe(true);
   });
 
   test("keeps the shared source and other subscriber alive when one observer unsubscribes", async ({
@@ -68,14 +67,19 @@ describe("RxReq source completion", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
+    const firstReq = await socket.inbox.waitNext("REQ");
+    const secondReq = await socket.inbox.waitNext("REQ");
     first.unsubscribe();
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", firstReq[1]]);
     source.emit([{}], { traceTag: "remaining" });
     await settleQuery();
-    socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event({ id: "remaining" })]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", secondReq[1]]);
+    const remaining = await socket.inbox.waitNext("REQ");
+    socket.message(["EVENT", remaining[1], Faker.event({ id: "remaining" })]);
     await settleQuery();
     await expect(secondInspector.waitNext()).resolves.toMatchObject({ traceTag: "remaining" });
-    expect(socket.sentOfType("REQ")).toHaveLength(3);
-    expect(socket.closeRequests).toHaveLength(0);
+    expect(socket.inbox.length).toBe(5);
+    expect(socket.isCloseRequested).toBe(false);
     second.unsubscribe();
   });
 
@@ -114,8 +118,14 @@ describe("asynchronous verification and query lifetime", () => {
     source.emit([{}]);
     for (const socket of server.connections) socket.open();
     await settleQuery();
-    const socket = server.sockets.latestFor(a);
-    socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event()]);
+    const requests = await Promise.all(
+      [...server.connections].map(async (socket) => ({
+        socket,
+        req: await socket.inbox.waitNext("REQ"),
+      })),
+    );
+    const first = requests.find(({ socket }) => socket.url === a)!;
+    first.socket.message(["EVENT", first.req[1], Faker.event()]);
     await settleQuery();
     const cause = new Error("verification failed");
     verification.reject(cause);
@@ -124,10 +134,10 @@ describe("asynchronous verification and query lifetime", () => {
     await expect(inspector.waitError()).resolves.toEqual(
       expect.objectContaining({ callback: "verifier", cause }),
     );
-    for (const connection of server.connections) {
-      expect(connection.sentOfType("REQ")).toHaveLength(1);
-      expect(connection.sentOfType("CLOSE")).toHaveLength(1);
-      expect(connection.closeRequests).toHaveLength(1);
+    for (const { socket, req } of requests) {
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+      expect(socket.inbox.length).toBe(2);
+      await expect(socket.closeRequested).resolves.toBeDefined();
     }
   });
 
@@ -143,7 +153,7 @@ describe("asynchronous verification and query lifetime", () => {
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
-      socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event()]);
+      socket.message(["EVENT", (await socket.inbox.waitNext("REQ"))[1], Faker.event()]);
       await settleQuery();
       expect(verify).toHaveBeenCalledOnce();
 
@@ -153,7 +163,7 @@ describe("asynchronous verification and query lifetime", () => {
       await settleQuery();
       expect(inspector.length).toBe(0);
       expect(inspector.errored).toBe(false);
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.isCloseRequested).toBe(true);
     },
   );
 
@@ -171,13 +181,14 @@ describe("asynchronous verification and query lifetime", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    const old = socket.latestSent("REQ")[1];
+    const old = (await socket.inbox.waitNext("REQ"))[1];
     socket.message(["EVENT", old, Faker.event({ id: "received-before-replacement" })]);
     await settleQuery();
     source.emit([{}], { traceTag: "new" });
     await settleQuery();
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", old]);
     socket.message(["EVENT", old, Faker.event({ id: "stale-wire-message" })]);
-    socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event({ id: "new" })]);
+    socket.message(["EVENT", (await socket.inbox.waitNext("REQ"))[1], Faker.event({ id: "new" })]);
     verification.resolve(true);
     await settleQuery();
     await expect(inspector.waitNext()).resolves.toMatchObject({
@@ -216,7 +227,7 @@ describe("RxNostr disposal across relay states", () => {
     for (const socket of server.connections) if (socket.url !== opening) socket.open();
     await settleQuery();
     const socketB = server.sockets.latestFor(b);
-    socketB.message(["EOSE", socketB.latestSent("REQ")[1]]);
+    socketB.message(["EOSE", (await socketB.inbox.waitNext("REQ"))[1]]);
     server.sockets.latestFor(retrying).peerClose(1006, "offline");
     await settleQuery();
 
@@ -226,12 +237,12 @@ describe("RxNostr disposal across relay states", () => {
     expect(firstInspector.completed).toBe(true);
     for (const url of [a, b, opening]) {
       const socket = server.sockets.latestFor(url);
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.isCloseRequested).toBe(true);
       socket.acknowledgeClose();
     }
     await vi.advanceTimersByTimeAsync(1_000);
     expect(server.connections).toHaveLength(4);
-    expect(server.sockets.latestFor(a).sentOfType("REQ")).toHaveLength(1);
+    expect(server.sockets.latestFor(a).inbox.length).toBe(2);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

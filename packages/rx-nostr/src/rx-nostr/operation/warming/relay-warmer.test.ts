@@ -1,6 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY, map } from "rxjs";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import { ControlledWebSocketServer } from "../../../__test__/helper/index.ts";
 import { SubscriptionInspector } from "../../../__test__/helper/subscription-inspector.ts";
@@ -145,10 +145,10 @@ describe("RelayWarmer", () => {
     socket.open();
     await inspector.ignoreNexts(1);
     await expect(inspector.waitNext()).resolves.toBe("connected");
-    expect(socket.sent).toEqual([]);
+    expect(socket.inbox.length).toBe(0);
 
     warmer.unsetHotRelays();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
     warmer.dispose();
     collection.dispose();

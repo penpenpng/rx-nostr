@@ -2,15 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { RelayDirectory, RxRelays, RxReq, type EventPacket } from "rx-nostr";
 import { describe, expect, test } from "vitest";
 
-import {
-  createRxNostrScenario,
-  expectAllSocketsCloseRequested,
-  expectConnectionCount,
-  expectSent,
-  expectSocketCloseRequested,
-  Faker,
-  SubscriptionInspector,
-} from "../helper/index.ts";
+import { createRxNostrScenario, Faker, SubscriptionInspector } from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -40,7 +32,7 @@ describe("REQ public contract", () => {
       const socket = server.sockets.latest;
       socket.open();
 
-      const req = await expectSent(socket, "REQ");
+      const req = await socket.inbox.waitNext("REQ");
       expect(req[0]).toBe("REQ");
       expect(req[2]).toEqual({ kinds: [1] });
 
@@ -54,13 +46,13 @@ describe("REQ public contract", () => {
         event: res,
         traceTag: "timeline",
       });
-      expect(socket.sent).toHaveLength(1);
+      expect(socket.inbox.length).toBe(1);
       expect(inspector.completed).toBe(false);
 
       rxReq.dispose();
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
 
       socket.acknowledgeClose();
       rxNostr.dispose();
@@ -78,20 +70,20 @@ describe("REQ public contract", () => {
 
       const first = server.sockets.latest;
       first.open();
-      const firstReq = await expectSent(first, "REQ");
+      const firstReq = await first.inbox.waitNext("REQ");
 
       first.peerClose(1006, "offline");
 
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const second = server.sockets.latest;
       second.open();
-      const secondReq = await expectSent(second, "REQ");
+      const secondReq = await second.inbox.waitNext("REQ");
 
       expect(secondReq[2]).toEqual(firstReq[2]);
       second.message(["EOSE", secondReq[1]]);
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await expectSocketCloseRequested(second);
+      await expect(second.closeRequested).resolves.toBeDefined();
       second.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -106,21 +98,21 @@ describe("REQ public contract", () => {
 
       const first = server.sockets.latest;
       first.open();
-      const firstReq = await expectSent(first, "REQ");
+      const firstReq = await first.inbox.waitNext("REQ");
 
       first.peerClose(1006, "offline");
 
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const second = server.sockets.latest;
       second.open();
-      const secondReq = await expectSent(second, "REQ");
+      const secondReq = await second.inbox.waitNext("REQ");
 
       expect(secondReq[2]).toEqual(firstReq[2]);
       second.message(["EOSE", secondReq[1]]);
       expect(inspector.completed).toBe(false);
 
       subscription.unsubscribe();
-      await expectSocketCloseRequested(second);
+      await expect(second.closeRequested).resolves.toBeDefined();
       second.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -137,7 +129,7 @@ describe("REQ public contract", () => {
       request.emit([{ kinds: [1] }]);
       const socket = server.sockets.latest;
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       request.dispose();
       socket.message(["EVENT", subId, event({ id: "after-source-completion" })]);
 
@@ -145,11 +137,11 @@ describe("REQ public contract", () => {
         event: { id: "after-source-completion" },
       });
       expect(inspector.completed).toBe(false);
-      expect(socket.sentOfType("CLOSE")).toEqual([]);
+      expect(socket.inbox.length).toBe(1);
 
       subscription.unsubscribe();
-      expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", subId]);
-      await expectSocketCloseRequested(socket);
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", subId]);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -158,28 +150,28 @@ describe("REQ public contract", () => {
       const { server, rxNostr } = createRxNostrScenario();
       const query = rxNostr.forward(relay, [{ kinds: [1] }]);
       const firstInspector = new SubscriptionInspector<EventPacket>();
-      expect(server.connections).toEqual([]);
+      expect(server.connections.length).toBe(0);
 
       const secondInspector = new SubscriptionInspector<EventPacket>();
       const firstSubscription = query.subscribe(secondInspector);
       const socket = server.sockets.latest;
       socket.open();
-      const first = await expectSent(socket, "REQ");
+      const first = await socket.inbox.waitNext("REQ");
       const secondSubscription = query.subscribe(firstInspector);
-      const second = await expectSent(socket, "REQ", 2);
+      const second = await socket.inbox.waitNext("REQ");
       expect(second[1]).not.toBe(first[1]);
 
       firstSubscription.unsubscribe();
-      expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", first[1]]);
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", first[1]]);
       socket.message(["EVENT", second[1], event({ id: "second-subscription" })]);
       await expect(firstInspector.waitNext()).resolves.toMatchObject({
         event: { id: "second-subscription" },
       });
-      expect(socket.closeRequests).toEqual([]);
+      expect(socket.isCloseRequested).toBe(false);
 
       secondSubscription.unsubscribe();
-      expect(await expectSent(socket, "CLOSE", 2)).toEqual(["CLOSE", second[1]]);
-      await expectSocketCloseRequested(socket);
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", second[1]]);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -191,21 +183,19 @@ describe("REQ public contract", () => {
       const subscription = rxNostr.forward(relay, request).subscribe(inspector);
 
       request.emit([{ kinds: [1] }]);
-      await expectConnectionCount(server, 1);
+      await expect(server.connections.wait(0)).resolves.toBeDefined();
       const socket = server.sockets.latest;
       socket.open();
-      const first = await expectSent(socket, "REQ");
+      const first = await socket.inbox.waitNext("REQ");
 
       request.emit([{ kinds: [2] }]);
-      const second = await expectSent(socket, "REQ", 2);
-      await expectSent(socket, "CLOSE");
-      expect(socket.sent).toContainEqual(["CLOSE", first[1]]);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
+      const second = await socket.inbox.waitNext("REQ");
       expect(second[2]).toEqual({ kinds: [2] });
 
       subscription.unsubscribe();
-      await expectSent(socket, "CLOSE", 2);
-      expect(socket.sent).toContainEqual(["CLOSE", second[1]]);
-      await expectSocketCloseRequested(socket);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
+      await expect(socket.closeRequested).resolves.toBeDefined();
 
       socket.acknowledgeClose();
       rxNostr.dispose();
@@ -220,7 +210,7 @@ describe("REQ public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["EOSE", subId]);
       socket.message(["EVENT", subId, event({ id: "live" })]);
 
@@ -228,7 +218,7 @@ describe("REQ public contract", () => {
       expect(inspector.completed).toBe(false);
 
       subscription.unsubscribe();
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -242,7 +232,7 @@ describe("REQ public contract", () => {
       rxNostr.backward([], [{}]).subscribe(inspector);
 
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      expect(server.connections).toEqual([]);
+      expect(server.connections.length).toBe(0);
 
       rxNostr.dispose();
     });
@@ -261,7 +251,7 @@ describe("REQ public contract", () => {
         rxNostr[strategy](relay, [], { defer }).subscribe(inspector);
 
         await expect(inspector.waitComplete()).resolves.toBeUndefined();
-        expect(server.connections).toEqual([]);
+        expect(server.connections.length).toBe(0);
 
         rxNostr.dispose();
       },
@@ -282,7 +272,7 @@ describe("REQ public contract", () => {
       rxNostr.backward(relay, [{ kinds: [1] }]).subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       const expiredAt = Math.floor(Date.now() / 1000) - 1;
       for (const value of [
         event({ id: "mismatch", kind: 2 }),
@@ -301,7 +291,7 @@ describe("REQ public contract", () => {
         "valid",
       );
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -316,16 +306,16 @@ describe("REQ public contract", () => {
       rxNostr.backward(relay, [{}]).subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message(["EVENT", subId, event()]);
       expect(await inspector.waitError()).toMatchObject({
         name: "RxNostrCallbackError",
         callback: "verifier",
         cause,
       });
-      expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", subId]);
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", subId]);
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -342,7 +332,7 @@ describe("REQ public contract", () => {
         .subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
-      const [, subId] = await expectSent(socket, "REQ");
+      const [, subId] = await socket.inbox.waitNext("REQ");
       socket.message([
         "EVENT",
         subId,
@@ -355,7 +345,7 @@ describe("REQ public contract", () => {
       socket.message(["EOSE", subId]);
 
       await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "skipped" } });
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
 
       socket.acknowledgeClose();
       rxNostr.dispose();
@@ -384,9 +374,9 @@ describe("REQ public contract", () => {
         callback: "filter",
         cause,
       });
-      expect(socket.sent).toEqual([]);
+      expect(socket.inbox.length).toBe(0);
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       callbackRxNostr.dispose();
     });
@@ -401,13 +391,13 @@ describe("REQ public contract", () => {
 
       rxNostr.backward([one, two], [{}]).subscribe(inspector);
 
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const first = server.sockets.latestFor(one);
       const second = server.sockets.latestFor(two);
       first.open();
       second.open();
-      const [, secondSubId] = await expectSent(second, "REQ");
-      await expectSent(first, "REQ");
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
+      await expect(first.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
       first.peerClose(1006, "offline");
       second.message(["EVENT", secondSubId, event({ id: "from-two" })]);
       second.message(["EOSE", secondSubId]);
@@ -417,7 +407,7 @@ describe("REQ public contract", () => {
         "from-two",
       );
 
-      await expectSocketCloseRequested(second);
+      await expect(second.closeRequested).resolves.toBeDefined();
       second.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -433,17 +423,16 @@ describe("REQ public contract", () => {
       rxNostr.backward(destinations, request).subscribe(inspector);
       request.emit([{}]);
 
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const first = server.sockets.latestFor(one);
       const second = server.sockets.latestFor(two);
       first.open();
       second.open();
-      const [, firstSubId] = await expectSent(first, "REQ");
-      const [, secondSubId] = await expectSent(second, "REQ");
+      const [, firstSubId] = await first.inbox.waitNext("REQ");
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
 
       destinations.remove(one);
-      await expectSent(first, "CLOSE");
-      expect(first.sent).toContainEqual(["CLOSE", firstSubId]);
+      await expect(first.inbox.waitNext()).resolves.toEqual(["CLOSE", firstSubId]);
 
       second.message(["EVENT", secondSubId, event({ id: "remaining" })]);
       second.message(["EOSE", secondSubId]);
@@ -453,7 +442,11 @@ describe("REQ public contract", () => {
       request.dispose();
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await expectAllSocketsCloseRequested(server);
+      await Promise.all(
+        [...server.connections].map((socket) =>
+          expect(socket.closeRequested).resolves.toBeDefined(),
+        ),
+      );
       for (const socket of server.connections) socket.acknowledgeClose();
       destinations.dispose();
       rxNostr.dispose();
@@ -470,25 +463,27 @@ describe("REQ public contract", () => {
       rxNostr.backward(destinations, request).subscribe(inspector);
       request.emit([{}]);
 
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const first = server.sockets.latestFor(one);
       const second = server.sockets.latestFor(two);
       first.open();
       second.open();
-      const [, firstSubId] = await expectSent(first, "REQ");
-      const [, secondSubId] = await expectSent(second, "REQ");
+      const [, firstSubId] = await first.inbox.waitNext("REQ");
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
 
       destinations.clear();
-      await expectSent(first, "CLOSE");
-      await expectSent(second, "CLOSE");
-      expect(first.sent).toContainEqual(["CLOSE", firstSubId]);
-      expect(second.sent).toContainEqual(["CLOSE", secondSubId]);
+      await expect(first.inbox.waitNext()).resolves.toEqual(["CLOSE", firstSubId]);
+      await expect(second.inbox.waitNext()).resolves.toEqual(["CLOSE", secondSubId]);
       expect(inspector.completed).toBe(false);
 
       request.dispose();
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await expectAllSocketsCloseRequested(server);
+      await Promise.all(
+        [...server.connections].map((socket) =>
+          expect(socket.closeRequested).resolves.toBeDefined(),
+        ),
+      );
       for (const socket of server.connections) socket.acknowledgeClose();
       destinations.dispose();
       rxNostr.dispose();
@@ -504,13 +499,13 @@ describe("REQ public contract", () => {
       request.emit([{ kinds: [1] }]);
       const socket = server.sockets.latest;
       socket.open();
-      const first = await expectSent(socket, "REQ");
+      const first = await socket.inbox.waitNext("REQ");
       expect(first[2]).toEqual({ kinds: [1] });
 
       request.emit([{ kinds: [2] }]);
-      const second = await expectSent(socket, "REQ", 2);
+      const second = await socket.inbox.waitNext("REQ");
       expect(second[2]).toEqual({ kinds: [2] });
-      expect(socket.sent).not.toContainEqual(["CLOSE", first[1]]);
+      expect(socket.inbox.length).toBe(2);
 
       socket.message(["EVENT", first[1], event({ id: "first" })]);
       socket.message(["EVENT", second[1], event({ id: "second", kind: 2 })]);
@@ -524,7 +519,7 @@ describe("REQ public contract", () => {
       request.dispose();
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -550,16 +545,17 @@ describe("REQ public contract", () => {
       const socket = server.sockets.latest;
 
       socket.open();
-      await expectSent(socket, "REQ", 3);
-      const [first, second, third] = socket.sentOfType("REQ");
+      const first = await socket.inbox.waitNext("REQ");
+      const second = await socket.inbox.waitNext("REQ");
+      const third = await socket.inbox.waitNext("REQ");
       expect(first[2]).toEqual({ kinds: [1] });
       expect(second[2]).toEqual({ kinds: [2] });
       expect(third[2]).toEqual({ kinds: [3] });
-      expect(socket.sent).toHaveLength(3);
+      expect(socket.inbox.length).toBe(3);
 
       socket.message(["EOSE", first[1]]);
 
-      const fourth = await expectSent(socket, "REQ", 4);
+      const fourth = await socket.inbox.waitNext("REQ");
       expect(fourth[2]).toEqual({ kinds: [4] });
 
       socket.message(["EOSE", second[1]]);
@@ -567,7 +563,7 @@ describe("REQ public contract", () => {
       socket.message(["EOSE", fourth[1]]);
       request.dispose();
 
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -589,17 +585,17 @@ describe("REQ public contract", () => {
       request.emit([{ kinds: [2] }]);
       const socket = server.sockets.latest;
       socket.open();
-      const first = await expectSent(socket, "REQ");
+      const first = await socket.inbox.waitNext("REQ");
       expect(first[2]).toEqual({ kinds: [1] });
       socket.message(["EOSE", first[1]]);
 
-      const second = await expectSent(socket, "REQ", 2);
+      const second = await socket.inbox.waitNext("REQ");
       expect(second[2]).toEqual({ kinds: [2] });
       socket.message(["EOSE", second[1]]);
 
       expect(inspector.completed).toBe(false);
       rxNostr.dispose();
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
     });
 
@@ -613,16 +609,16 @@ describe("REQ public contract", () => {
 
       rxNostr.backward(destinations, request).subscribe(inspector);
       request.emit([{ kinds: [1] }]);
-      await expectConnectionCount(server, 1);
+      await expect(server.connections.wait(0)).resolves.toBeDefined();
       const first = server.sockets.latestFor(one);
       first.open();
-      const [, firstSubId] = await expectSent(first, "REQ");
+      const [, firstSubId] = await first.inbox.waitNext("REQ");
 
       destinations.append(two);
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
       const second = server.sockets.latestFor(two);
       second.open();
-      const [, secondSubId] = await expectSent(second, "REQ");
+      const [, secondSubId] = await second.inbox.waitNext("REQ");
       second.message(["EVENT", secondSubId, event({ id: "dynamic" })]);
       first.message(["EOSE", firstSubId]);
       second.message(["EOSE", secondSubId]);
@@ -630,7 +626,11 @@ describe("REQ public contract", () => {
       expect(inspector.completed).toBe(false);
       await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "dynamic" } });
 
-      await expectAllSocketsCloseRequested(server);
+      await Promise.all(
+        [...server.connections].map((socket) =>
+          expect(socket.closeRequested).resolves.toBeDefined(),
+        ),
+      );
 
       for (const socket of server.connections) socket.acknowledgeClose();
       request.dispose();

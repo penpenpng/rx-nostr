@@ -3,7 +3,6 @@ import { describe, expect, test } from "vitest";
 
 import { createLegacyRxNostr } from "../../legacy.ts";
 import type { EventPacket } from "../../packets/packets.interface.ts";
-import { expectSent } from "../helper/index.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
@@ -32,9 +31,9 @@ describe("createLegacyRxNostr", () => {
 
     const socket = server.sockets.latestFor(readableRelay);
     socket.open();
-    await expectSent(socket, "REQ");
-    expect(server.connections.map(({ url }) => url)).toContain(readableRelay);
-    expect(server.connections.map(({ url }) => url)).not.toContain(writeOnlyRelay);
+    await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
+    expect([...server.connections].map(({ url }) => url)).toContain(readableRelay);
+    expect([...server.connections].map(({ url }) => url)).not.toContain(writeOnlyRelay);
 
     subscription.unsubscribe();
     client.dispose();

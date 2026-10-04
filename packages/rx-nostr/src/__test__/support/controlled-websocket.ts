@@ -1,11 +1,35 @@
 import type * as Nostr from "nostr-typedef";
 import type { WebSocketConstructor, WebSocketData, WebSocketLike } from "rx-nostr";
 
+import { QueueInspector } from "../helper/queue-inspector.ts";
+
+class MessageInspector extends QueueInspector<Nostr.ToRelayMessage.Any> {
+  override waitNext(): Promise<Nostr.ToRelayMessage.Any>;
+  override waitNext<T extends Nostr.ToRelayMessage.Type>(
+    type: T,
+  ): Promise<Nostr.ToRelayMessage.Message<T>>;
+  override async waitNext(type?: Nostr.ToRelayMessage.Type): Promise<Nostr.ToRelayMessage.Any> {
+    const message = await super.waitNext();
+    if (type !== undefined && message[0] !== type) {
+      throw new Error(
+        `${this.name}: expected ${type} as the next message, received ${JSON.stringify(message)}`,
+      );
+    }
+    return message;
+  }
+}
+
 type Handler<T> = ((event: T) => unknown) | null;
 
 export class ControlledWebSocket implements WebSocketLike {
-  readonly sent: Nostr.ToRelayMessage.Any[] = [];
-  readonly closeRequests: Readonly<{ code?: number; reason?: string }>[] = [];
+  readonly inbox: MessageInspector;
+  #closeRequested = Promise.withResolvers<Readonly<{ code?: number; reason?: string }>>();
+  readonly closeRequested = this.#closeRequested.promise;
+  #isCloseRequested = false;
+
+  get isCloseRequested() {
+    return this.#isCloseRequested;
+  }
   readyState = 0;
   onopen: Handler<{ type: string }> = null;
   onmessage: Handler<{ data: WebSocketData }> = null;
@@ -16,7 +40,9 @@ export class ControlledWebSocket implements WebSocketLike {
     wasClean: boolean;
   }> = null;
 
-  constructor(readonly url: string) {}
+  constructor(readonly url: string) {
+    this.inbox = new MessageInspector(`WebSocket inbox (${url})`);
+  }
 
   send(data: WebSocketData): void {
     if (this.readyState !== 1) throw new Error("The controlled socket is not open.");
@@ -27,23 +53,14 @@ export class ControlledWebSocket implements WebSocketLike {
     if (!Array.isArray(message)) {
       throw new TypeError("Expected a Nostr message tuple from the client.");
     }
-    this.sent.push(message as Nostr.ToRelayMessage.Any);
-  }
-
-  sentOfType<T extends Nostr.ToRelayMessage.Type>(type: T): Nostr.ToRelayMessage.Message<T>[] {
-    return this.sent.filter(
-      (message): message is Nostr.ToRelayMessage.Message<T> => message[0] === type,
-    );
-  }
-
-  latestSent<T extends Nostr.ToRelayMessage.Type>(type: T): Nostr.ToRelayMessage.Message<T> {
-    const message = this.sentOfType(type).at(-1);
-    if (!message) throw new Error(`No ${type} message has been sent.`);
-    return message;
+    this.inbox.push(message as Nostr.ToRelayMessage.Any);
   }
 
   close(code?: number, reason?: string): void {
-    this.closeRequests.push(Object.freeze({ code, reason }));
+    if (!this.#isCloseRequested) {
+      this.#isCloseRequested = true;
+      this.#closeRequested.resolve(Object.freeze({ code, reason }));
+    }
     this.readyState = 2;
   }
 
@@ -77,7 +94,7 @@ export class ControlledWebSocket implements WebSocketLike {
 }
 
 export class ControlledWebSocketServer {
-  readonly connections: ControlledWebSocket[] = [];
+  readonly connections = new QueueInspector<ControlledWebSocket>("WebSocket connections");
   readonly sockets: Readonly<{
     readonly latest: ControlledWebSocket;
     latestFor(url: string): ControlledWebSocket;
@@ -88,12 +105,12 @@ export class ControlledWebSocketServer {
     const connections = this.connections;
     this.sockets = Object.freeze({
       get latest(): ControlledWebSocket {
-        const socket = connections.at(-1);
+        const socket = [...connections].at(-1);
         if (!socket) throw new Error("No controlled connection has been created.");
         return socket;
       },
       latestFor(url: string): ControlledWebSocket {
-        const socket = connections.findLast((connection) => connection.url === url);
+        const socket = [...connections].findLast((connection) => connection.url === url);
         if (!socket) throw new Error(`No controlled connection has been created for ${url}.`);
         return socket;
       },

@@ -5,7 +5,6 @@ import type {
   ControlledWebSocket,
   ControlledWebSocketServer,
 } from "../support/controlled-websocket.ts";
-import { expectSent } from "./expect.ts";
 import { Faker } from "./faker.ts";
 import { createRxNostrScenario } from "./rx-nostr-scenario.ts";
 
@@ -30,10 +29,6 @@ export function publicationSocket(
   url: string,
 ): ControlledWebSocket {
   return server.sockets.latestFor(url);
-}
-
-export async function expectPublicationSent(connection: ControlledWebSocket): Promise<void> {
-  await expectSent(connection, "EVENT");
 }
 
 export function createPublicationScenario(overrides: Partial<RxNostrConfig> = {}) {

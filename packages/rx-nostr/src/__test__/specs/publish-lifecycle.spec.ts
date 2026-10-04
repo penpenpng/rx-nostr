@@ -1,15 +1,11 @@
 import type * as Nostr from "nostr-typedef";
 import { type EventSigner, type OkPacket } from "rx-nostr";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import {
   createDeferred,
   createPublicationScenario,
   publicationEvent as event,
-  expectConnectionCount,
-  expectPublicationSent as expectEventSent,
-  expectSent,
-  expectSocketCloseRequested,
   Faker,
   publicationRelay1 as relay1,
   publicationRelay2 as relay2,
@@ -45,7 +41,7 @@ describe("Publication lifecycle", () => {
       });
       await Promise.resolve();
       const socket = server.sockets.latest;
-      expect(socket.sent).toHaveLength(0);
+      expect(socket.inbox.length).toBe(0);
 
       rxNostr.dispose();
     });
@@ -68,7 +64,7 @@ describe("Publication lifecycle", () => {
 
       const connection = socket(server, relay1);
       connection.open();
-      await expectEventSent(connection);
+      await expect(connection.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       connection.message(["OK", "event", true, "saved"]);
 
       await expect(all).resolves.toBeUndefined();
@@ -88,16 +84,19 @@ describe("Publication lifecycle", () => {
       const cold = socket(server, relay2);
 
       cold.open();
-      await Promise.all([expectEventSent(hot), expectEventSent(cold)]);
+      await Promise.all([
+        expect(hot.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(cold.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
       hot.message(["OK", "event", true, "saved"]);
       cold.message(["OK", "event", true, "saved"]);
       await expect(publication.waitFor("all")).resolves.toBeUndefined();
 
-      await expectSocketCloseRequested(cold);
-      expect(hot.closeRequests).toHaveLength(0);
+      await expect(cold.closeRequested).resolves.toBeDefined();
+      expect(hot.isCloseRequested).toBe(false);
 
       rxNostr.unsetHotRelays();
-      await expectSocketCloseRequested(hot);
+      await expect(hot.closeRequested).resolves.toBeDefined();
 
       cold.acknowledgeClose();
       hot.acknowledgeClose();
@@ -124,7 +123,10 @@ describe("Publication lifecycle", () => {
 
       first.open();
       second.open();
-      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+      await Promise.all([
+        expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
       second.peerClose(1006, "offline");
       first.message(["OK", "event", true, "saved"]);
 
@@ -152,15 +154,15 @@ describe("Publication lifecycle", () => {
       const connection = socket(server, relay1);
 
       connection.open();
-      await expectEventSent(connection);
+      await expect(connection.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       connection.message(["AUTH", "challenge"]);
       connection.message(["OK", "event", false, "auth-required: login"]);
-      expect(await expectSent(connection, "AUTH")).toEqual(["AUTH", authEvent]);
+      expect(await connection.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
       expect(settled).toBe(false);
       await expect(inspector.waitNext()).resolves.toMatchObject({ ok: false });
 
       connection.message(["OK", "auth-event", true, "authenticated"]);
-      await expectSent(connection, "EVENT", 2);
+      await expect(connection.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
       connection.message(["OK", "event", true, "saved"]);
       await expect(all).resolves.toBeUndefined();
       await expect(inspector.waitNext()).resolves.toMatchObject({ ok: true });
@@ -184,19 +186,29 @@ describe("Publication lifecycle", () => {
       const connection = socket(server, relay1);
 
       connection.open();
-      await expectSent(connection, "EVENT", 2);
+      await expect(connection.inbox.waitNext()).resolves.toMatchObject([
+        "EVENT",
+        { id: "event-first" },
+      ]);
+      await expect(connection.inbox.waitNext()).resolves.toMatchObject([
+        "EVENT",
+        { id: "event-later" },
+      ]);
       connection.message(["AUTH", "challenge"]);
       connection.message(["OK", "event-first", false, "auth-required: login"]);
-      await vi.waitFor(() =>
-        expect(connection.sentOfType("AUTH")).toContainEqual(["AUTH", authEvent]),
-      );
+      await expect(connection.inbox.waitNext()).resolves.toEqual(["AUTH", authEvent]);
       connection.message(["OK", "auth-event", true, "authenticated"]);
-      await expectSent(connection, "EVENT", 3);
+      await expect(connection.inbox.waitNext()).resolves.toMatchObject([
+        "EVENT",
+        { id: "event-first" },
+      ]);
 
       connection.message(["OK", "event-later", false, "auth-required: login"]);
-      await expectSent(connection, "EVENT", 4);
-      const sentEvents = connection.sentOfType("EVENT").map(([, body]) => body.id);
-      expect(sentEvents).toEqual(["event-first", "event-later", "event-first", "event-later"]);
+      await expect(connection.inbox.waitNext()).resolves.toMatchObject([
+        "EVENT",
+        { id: "event-later" },
+      ]);
+      expect(connection.inbox.length).toBe(5);
 
       connection.message(["OK", "event-first", true, "saved after authentication"]);
       connection.message(["OK", "event-later", true, "saved after authentication"]);
@@ -217,13 +229,13 @@ describe("Publication lifecycle", () => {
       const first = socket(server, relay1);
 
       first.open();
-      await expectEventSent(first);
+      await expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       first.peerClose(1006, "offline");
-      await expectConnectionCount(server, 2);
+      await expect(server.connections.wait(1)).resolves.toBeDefined();
 
       const second = server.sockets.latest;
       second.open();
-      await expectEventSent(second);
+      await expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       second.message(["OK", "event", true, "saved"]);
 
       await expect(all).resolves.toBeUndefined();

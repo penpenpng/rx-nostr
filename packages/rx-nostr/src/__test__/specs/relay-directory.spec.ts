@@ -7,12 +7,7 @@ import {
 import { fetchRelayInfo } from "rx-nostr/utils";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 
-import {
-  createDeferred,
-  createRxNostrScenario,
-  expectCallbackCalled,
-  expectSocketCloseRequested,
-} from "../helper/index.ts";
+import { createDeferred, createRxNostrScenario, expectCallbackCalled } from "../helper/index.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -41,7 +36,7 @@ describe("RelayDirectory public contract", () => {
 
       rxNostr.unsetHotRelays();
       const socket = server.sockets.latest;
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });
@@ -61,7 +56,7 @@ describe("RelayDirectory public contract", () => {
 
       rxNostr.unsetHotRelays();
       const socket = server.sockets.latest;
-      await expectSocketCloseRequested(socket);
+      await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
     });

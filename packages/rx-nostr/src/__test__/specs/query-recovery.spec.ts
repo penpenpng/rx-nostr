@@ -25,12 +25,13 @@ describe("destination changes during queued and recovering REQs", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    const req = await socket.inbox.waitNext("REQ");
+    expect(req[2]).toEqual({ kinds: [1] });
 
     query.unsubscribe();
     await settleQuery();
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
-    expect(socket.sentOfType("CLOSE")).toHaveLength(1);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+    expect(socket.inbox.length).toBe(2);
   });
 
   test("replaces queued forward work without sending superseded filters", async ({
@@ -45,18 +46,21 @@ describe("destination changes during queued and recovering REQs", () => {
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
-    const blockerId = socket.latestSent("REQ")[1];
+    const blockerId = (await socket.inbox.waitNext("REQ"))[1];
     const secondInspector = new SubscriptionInspector<EventPacket>();
     const query = rxNostr.forward(a, source).subscribe(secondInspector);
     source.emit([{ kinds: [1] }]);
     source.emit([{ kinds: [2] }]);
     await settleQuery();
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
-    expect(socket.sentOfType("CLOSE")).toHaveLength(0);
+    expect(socket.inbox.length).toBe(1);
 
     socket.message(["EOSE", blockerId]);
     await settleQuery();
-    expect(socket.sentOfType("REQ").map((message) => message[2])).toEqual([{}, { kinds: [2] }]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual([
+      "REQ",
+      expect.any(String),
+      { kinds: [2] },
+    ]);
     query.unsubscribe();
     blocker.unsubscribe();
   });
@@ -78,12 +82,12 @@ describe("destination changes during queued and recovering REQs", () => {
     destinations.remove(a);
     const first = server.sockets.latestFor(a);
     const second = server.sockets.latestFor(b);
-    first.message(["EOSE", first.latestSent("REQ")[1]]);
-    second.message(["EVENT", second.latestSent("REQ")[1], Faker.event()]);
-    second.message(["EOSE", second.latestSent("REQ")[1]]);
+    first.message(["EOSE", (await first.inbox.waitNext("REQ"))[1]]);
+    const [, secondId] = await second.inbox.waitNext("REQ");
+    second.message(["EVENT", secondId, Faker.event()]);
+    second.message(["EOSE", secondId]);
     await settleQuery();
-    expect(first.sentOfType("REQ")).toHaveLength(1);
-    expect(first.sentOfType("CLOSE")).toHaveLength(0);
+    expect(first.inbox.length).toBe(1);
     await expect(secondInspector.waitNext()).resolves.toMatchObject({ from: b });
     expect(secondInspector.completed).toBe(true);
     blocker.unsubscribe();
@@ -104,6 +108,8 @@ describe("destination changes during queued and recovering REQs", () => {
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
+      const initial = await socket.inbox.waitNext("REQ");
+      expect(initial[2]).toEqual({ kinds: [1] });
       socket.peerClose(1006, "offline");
       await settleQuery();
       if (change === "replace") source.emit([{ kinds: [2] }]);
@@ -113,9 +119,16 @@ describe("destination changes during queued and recovering REQs", () => {
       expect(server.connections).toHaveLength(2);
       recovered.open();
       await settleQuery();
-      expect(recovered.sentOfType("REQ").map((message) => message[2])).toEqual(
-        change === "replace" ? [{ kinds: [2] }] : [],
-      );
+      await expect(recovered.inbox.waitNext()).resolves.toEqual(["CLOSE", initial[1]]);
+      if (change === "replace") {
+        await expect(recovered.inbox.waitNext()).resolves.toEqual([
+          "REQ",
+          expect.any(String),
+          { kinds: [2] },
+        ]);
+      } else {
+        expect(recovered.inbox.length).toBe(1);
+      }
       query.unsubscribe();
     },
   );
@@ -137,7 +150,7 @@ describe("shared AUTH and cancellation", () => {
     socket.open();
     await settleQuery();
     socket.message(["AUTH", "challenge"]);
-    for (const req of socket.sentOfType("REQ"))
+    for (const req of [await socket.inbox.waitNext("REQ"), await socket.inbox.waitNext("REQ")])
       socket.message(["CLOSED", req[1], "auth-required: login"]);
     await settleQuery();
     expect(challenge).toHaveBeenCalledOnce();
@@ -146,15 +159,13 @@ describe("shared AUTH and cancellation", () => {
     const signed = Faker.authEvent({ id: "shared-auth" });
     auth.resolve(signed);
     await settleQuery();
-    expect(socket.sentOfType("AUTH")).toEqual([["AUTH", signed]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["AUTH", signed]);
     socket.message(["OK", signed.id, true, "authenticated"]);
     await settleQuery();
-    expect(socket.sentOfType("REQ").map((req) => req[2])).toEqual([
-      { kinds: [1] },
-      { kinds: [2] },
-      { kinds: [2] },
-    ]);
-    socket.message(["EOSE", socket.latestSent("REQ")[1]]);
+    const retried = await socket.inbox.waitNext("REQ");
+    expect(retried[2]).toEqual({ kinds: [2] });
+    expect(socket.inbox.length).toBe(4);
+    socket.message(["EOSE", retried[1]]);
     await settleQuery();
     expect(secondInspector.completed).toBe(true);
   });
@@ -190,16 +201,16 @@ describe("shared AUTH and cancellation", () => {
       await settleQuery();
       if (phase !== "event-signing") {
         socket.message(["AUTH", "challenge"]);
-        socket.message(["CLOSED", socket.latestSent("REQ")[1], "auth-required: login"]);
+        socket.message(["CLOSED", (await socket.inbox.waitNext("REQ"))[1], "auth-required: login"]);
         await settleQuery();
       }
-      const sent = [...socket.sent];
+      const receivedCount = socket.inbox.length;
       rxNostr.dispose();
       signing.resolve(signed);
       socket.message(["OK", signed.id, true, "late"]);
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(socket.sent).toEqual(sent);
-      expect(socket.closeRequests).toHaveLength(1);
+      expect(socket.inbox.length).toBe(receivedCount);
+      expect(socket.isCloseRequested).toBe(true);
       expect(server.connections).toHaveLength(1);
       socket.acknowledgeClose();
       await settleQuery();

@@ -12,7 +12,6 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   createPublicationScenario,
   publicationEvent as event,
-  expectPublicationSent as expectEventSent,
   publicationRelay1 as relay1,
   publicationRelay2 as relay2,
   publicationSocket as socket,
@@ -77,7 +76,10 @@ describe("Publication public contract", () => {
 
       first.open();
       second.open();
-      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+      await Promise.all([
+        expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
 
       second.message(["OK", "event", true, "saved on relay B"]);
       await expect(allB).resolves.toBeUndefined();
@@ -111,7 +113,10 @@ describe("Publication public contract", () => {
 
       first.open();
       second.open();
-      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+      await Promise.all([
+        expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
       first.message(["OK", "event", true, "saved first"]);
 
       await expect(any).resolves.toBeUndefined();
@@ -164,12 +169,15 @@ describe("Publication public contract", () => {
 
       first.open();
       second.open();
-      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+      await Promise.all([
+        expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
 
       first.message(["OK", "event", false, "blocked: denied"]);
 
       await allFailure;
-      expect(second.closeRequests).toHaveLength(0);
+      expect(second.isCloseRequested).toBe(false);
 
       second.message(["OK", "event", true, "saved"]);
 
@@ -193,7 +201,10 @@ describe("Publication public contract", () => {
 
       first.open();
       second.open();
-      await Promise.all([expectEventSent(first), expectEventSent(second)]);
+      await Promise.all([
+        expect(first.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+        expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]),
+      ]);
       first.message(["OK", "event", true, "saved"]);
 
       await expect(any).resolves.toBeUndefined();

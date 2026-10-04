@@ -34,7 +34,7 @@ describe("RxNostr connection state", () => {
     await expect(inspector.waitNext()).resolves.toBe("connected");
     expect(contexts).toHaveLength(1);
     contexts[0]!.drop();
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
     socket2.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
@@ -109,7 +109,7 @@ describe("RxNostr connection state", () => {
     expect(inspector.length).toBe(7);
 
     rxNostr.unsetHotRelays();
-    await vi.waitFor(() => expect(second.closeRequests).toHaveLength(1));
+    await expect(second.closeRequested).resolves.toBeDefined();
     second.acknowledgeClose();
     rxNostr.dispose();
   });

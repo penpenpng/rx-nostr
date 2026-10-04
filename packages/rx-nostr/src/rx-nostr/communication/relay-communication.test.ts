@@ -1,12 +1,7 @@
 import { map } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
-import {
-  ControlledWebSocketServer,
-  createDeferred,
-  expectSent,
-  Faker,
-} from "../../__test__/helper/index.ts";
+import { ControlledWebSocketServer, createDeferred, Faker } from "../../__test__/helper/index.ts";
 import { SubscriptionInspector } from "../../__test__/helper/subscription-inspector.ts";
 import { NoopReconnector } from "../../connection-reconnector/index.ts";
 import type { EventPacket } from "../../packets/packets.interface.ts";
@@ -35,19 +30,19 @@ describe("RelayCommunication transport integration", () => {
     const secondInspector = new SubscriptionInspector<EventPacket>();
     relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
     await Promise.resolve();
-    expect(socket.sentOfType("REQ")).toHaveLength(0);
+    expect(socket.inbox.length).toBe(0);
 
     response.resolve({ limitation: { max_subscriptions: 1 } });
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     expect(first[2]).toMatchObject({ kinds: [1] });
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
-    const second = await expectSent(socket, "REQ", 2);
+    const second = await socket.inbox.waitNext("REQ");
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -67,14 +62,14 @@ describe("RelayCommunication transport integration", () => {
     const inspector = new SubscriptionInspector<EventPacket>();
     relay.vreq("backward", [{}]).subscribe(inspector);
 
-    const req = await expectSent(socket, "REQ");
+    const req = await socket.inbox.waitNext("REQ");
     expect(directory.get(relay.url)?.nip11FailedAt).toBeTypeOf("number");
     expect(diagnostic).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Automatic NIP-11 relay information retrieval failed." }),
     );
     socket.message(["EOSE", req[1]]);
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -100,7 +95,7 @@ describe("RelayCommunication transport integration", () => {
 
     now = 2;
     socket.peerClose(1000, "restart", true);
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     expect(directory.get(relay.url)).toMatchObject({
       lastFailureAt: 2,
       consecutiveFailures: 1,
@@ -128,7 +123,7 @@ describe("RelayCommunication transport integration", () => {
     );
 
     release();
-    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    await expect(socket2.closeRequested).resolves.toBeDefined();
     socket2.acknowledgeClose();
     await vi.waitFor(() => expect(directory.get(relay.url)?.liveConnections).toBe(0));
     expect(directory.get(relay.url)?.lastFailureAt).toBe(2);
@@ -163,7 +158,7 @@ describe("RelayCommunication transport integration", () => {
       .vreq("forward", [{ kinds: [1], since: () => 10 }])
       .pipe(map((packet) => packet.event.id))
       .subscribe(inspector);
-    const req = await expectSent(socket, "REQ");
+    const req = await socket.inbox.waitNext("REQ");
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1], since: 10 });
 
@@ -171,15 +166,15 @@ describe("RelayCommunication transport integration", () => {
     await expect(inspector.waitNext()).resolves.toEqual("event");
 
     subscription.unsubscribe();
-    expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", req[1]]);
+    expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", req[1]]);
     expect(inspector.completed).toBe(false);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
-  test("backward REQ completes on EOSE and does not expose its subId", async () => {
+  test("backward REQ completes on EOSE", async () => {
     const server = new ControlledWebSocketServer();
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
@@ -190,7 +185,7 @@ describe("RelayCommunication transport integration", () => {
     const inspector = new SubscriptionInspector<object>();
 
     relay.vreq("backward", [{}]).subscribe(inspector);
-    const [, subId] = await expectSent(socket, "REQ");
+    const [, subId] = await socket.inbox.waitNext("REQ");
     socket.message(["EVENT", subId, Faker.event({ id: "event" })]);
     socket.message(["EOSE", subId]);
 
@@ -202,7 +197,7 @@ describe("RelayCommunication transport integration", () => {
     });
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -218,25 +213,25 @@ describe("RelayCommunication transport integration", () => {
     let since = 1;
     const inspector = new SubscriptionInspector<EventPacket>();
     const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe(inspector);
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     expect(first[2]).toMatchObject({
       since: 1,
     });
 
     socket.peerClose(1006, "offline");
     since = 2;
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
     socket2.open();
-    const resent = await expectSent(socket2, "REQ");
+    const resent = await socket2.inbox.waitNext("REQ");
     expect(resent[2]).toMatchObject({
       since: 2,
     });
 
     subscription.unsubscribe();
-    await expectSent(socket2, "CLOSE");
+    await expect(socket2.inbox.waitNext()).resolves.toEqual(["CLOSE", resent[1]]);
     release();
-    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    await expect(socket2.closeRequested).resolves.toBeDefined();
     socket2.acknowledgeClose();
   });
 
@@ -256,17 +251,17 @@ describe("RelayCommunication transport integration", () => {
       })
       .pipe(map((packet) => packet.event.id))
       .subscribe(inspector);
-    const [, subId] = await expectSent(socket, "REQ");
+    const [, subId] = await socket.inbox.waitNext("REQ");
 
     socket.message(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]);
     socket.message(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]);
     socket.message(["EOSE", subId]);
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
     await expect(inspector.waitNext()).resolves.toEqual("right");
-    expect(socket.sent).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -284,12 +279,12 @@ describe("RelayCommunication transport integration", () => {
 
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
     expect(inspector.errored).toBe(false);
-    const req = socket.latestSent("REQ");
-    const close = await expectSent(socket, "CLOSE");
+    const req = await socket.inbox.waitNext("REQ");
+    const close = await socket.inbox.waitNext("CLOSE");
     expect(close).toEqual(["CLOSE", req[1]]);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -315,18 +310,18 @@ describe("RelayCommunication transport integration", () => {
     const thirdInspector = new SubscriptionInspector<EventPacket>();
     const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe(thirdInspector);
     cancelled.unsubscribe();
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     socket.message(["EOSE", first[1]]);
 
-    const second = await expectSent(socket, "REQ", 2);
+    const second = await socket.inbox.waitNext("REQ");
     expect(firstInspector.completed).toBe(true);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
-    expect(socket.sent).toHaveLength(2);
+    expect(socket.inbox.length).toBe(2);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -352,25 +347,24 @@ describe("RelayCommunication transport integration", () => {
 
     relay.vreq("backward", [{ kinds: [3] }]).subscribe(secondInspector);
 
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(firstInspector.completed).toBe(false);
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
 
     socket.message(["EOSE", first[1]]);
-    await vi.waitFor(() => expect(socket.sentOfType("REQ").length).toBeGreaterThanOrEqual(2));
-    const second = socket.sentOfType("REQ")[1];
+    const second = await socket.inbox.waitNext("REQ");
     expect(second[2]).toMatchObject({ kinds: [2] });
     await vi.waitFor(() => expect(firstInspector.completed).toBe(true));
-    expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", second[1]]);
-    const third = await expectSent(socket, "REQ", 3);
+    expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", second[1]]);
+    const third = await socket.inbox.waitNext("REQ");
     expect(third[2]).toMatchObject({ kinds: [3] });
-    expect(socket.sent.slice(1, 4)).toEqual([second, ["CLOSE", second[1]], third]);
+    expect(socket.inbox.length).toBe(4);
     socket.message(["EOSE", third[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -395,26 +389,26 @@ describe("RelayCommunication transport integration", () => {
 
     relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
 
-    const initial = await expectSent(socket, "REQ");
+    const initial = await socket.inbox.waitNext("REQ");
     socket.peerClose(1006, "offline");
-    await vi.waitFor(() => expect(server.connections).toHaveLength(2));
+    await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
     socket2.open();
 
-    const resent = await expectSent(socket2, "REQ");
+    const resent = await socket2.inbox.waitNext("REQ");
     expect(resent[1]).toBe(initial[1]);
     expect(resent[2]).toMatchObject({ kinds: [1] });
-    expect(socket2.sentOfType("REQ")).toHaveLength(1);
+    expect(socket2.inbox.length).toBe(1);
     socket2.message(["EOSE", resent[1]]);
 
-    const second = await expectSent(socket2, "REQ", 2);
+    const second = await socket2.inbox.waitNext("REQ");
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket2.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
     expect(firstInspector.completed).toBe(true);
 
     release();
-    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    await expect(socket2.closeRequested).resolves.toBeDefined();
     socket2.acknowledgeClose();
   });
 
@@ -438,13 +432,14 @@ describe("RelayCommunication transport integration", () => {
     const queued = relay.vreq("backward", [{ kinds: [2] }]);
     const thirdInspector = new SubscriptionInspector<EventPacket>();
     queued.subscribe(thirdInspector);
-    await expectSent(socket, "REQ");
+    const active = await socket.inbox.waitNext("REQ");
 
     relay.dispose();
 
     expect(firstInspector.completed).toBe(true);
     expect(thirdInspector.completed).toBe(true);
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", active[1]]);
+    expect(socket.inbox.length).toBe(2);
 
     queued.subscribe(secondInspector);
     expect(secondInspector.completed).toBe(true);
@@ -475,10 +470,10 @@ describe("RelayCommunication transport integration", () => {
       callback: "filter",
       cause,
     });
-    expect(socket.sent).toEqual([]);
+    expect(socket.inbox.length).toBe(0);
 
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -494,7 +489,7 @@ describe("RelayCommunication transport integration", () => {
     const inspector = new SubscriptionInspector<object>();
 
     relay.event(event).subscribe(inspector);
-    expect(await expectSent(socket, "EVENT")).toEqual(["EVENT", event]);
+    expect(await socket.inbox.waitNext("EVENT")).toEqual(["EVENT", event]);
     socket.message(["OK", "event", true, "saved"]);
 
     await expect(inspector.waitNext()).resolves.toEqual({
@@ -506,7 +501,7 @@ describe("RelayCommunication transport integration", () => {
       message: ["OK", "event", true, "saved"],
     });
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -528,13 +523,13 @@ describe("RelayCommunication transport integration", () => {
     const inspector = new SubscriptionInspector<object>();
 
     relay.event(event).subscribe(inspector);
-    await expectSent(socket, "EVENT");
+    await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
     socket.message(["AUTH", "challenge"]);
     socket.message(["OK", "event", false, "auth-required: login"]);
 
-    expect(await expectSent(socket, "AUTH")).toEqual(["AUTH", authEvent]);
+    expect(await socket.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
     socket.message(["OK", "auth-event", true, "authenticated"]);
-    expect(await expectSent(socket, "EVENT", 2)).toEqual(["EVENT", event]);
+    expect(await socket.inbox.waitNext("EVENT")).toEqual(["EVENT", event]);
     socket.message(["OK", "event", true, "saved"]);
 
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
@@ -556,7 +551,7 @@ describe("RelayCommunication transport integration", () => {
       message: ["OK", "event", true, "saved"],
     });
     release();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
   });
 
@@ -575,12 +570,12 @@ describe("RelayCommunication transport integration", () => {
     await Promise.resolve();
 
     expect(server.connections).toHaveLength(1);
-    expect(socket.closeRequests).toHaveLength(0);
+    expect(socket.isCloseRequested).toBe(false);
     expect(relay.leaseCount).toBe(1);
 
     second();
     second();
-    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    await expect(socket.closeRequested).resolves.toBeDefined();
     expect(relay.leaseCount).toBe(0);
     socket.acknowledgeClose();
   });
@@ -596,13 +591,13 @@ describe("RelayCommunication transport integration", () => {
     await Promise.resolve();
 
     relay.dispose();
-    expect(socket.closeRequests).toHaveLength(1);
+    expect(socket.isCloseRequested).toBe(true);
     release();
     release();
     await Promise.resolve();
 
     expect(relay.leaseCount).toBe(0);
-    expect(socket.closeRequests).toHaveLength(1);
+    expect(socket.isCloseRequested).toBe(true);
     socket.acknowledgeClose();
   });
 });

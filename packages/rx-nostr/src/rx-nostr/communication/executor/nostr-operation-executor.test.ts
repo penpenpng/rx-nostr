@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { ControlledWebSocketServer, expectSent, Faker } from "../../../__test__/helper/index.ts";
+import { ControlledWebSocketServer, Faker } from "../../../__test__/helper/index.ts";
 import { SubscriptionInspector } from "../../../__test__/helper/subscription-inspector.ts";
 import { normalizeRelayUrl } from "../../../libs/index.ts";
 import type { EventPacket } from "../../../packets/packets.interface.ts";
@@ -44,12 +44,12 @@ describe("NostrOperationExecutor", () => {
       .subscribe(inspector);
 
     const socket = harness.server.sockets.latest;
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     expect(first[2]).toMatchObject({ kinds: [1] });
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
 
-    const second = await expectSent(socket, "REQ", 2);
+    const second = await socket.inbox.waitNext("REQ");
     expect(second[1]).not.toBe(first[1]);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
@@ -80,21 +80,21 @@ describe("NostrOperationExecutor", () => {
       .subscribe(secondInspector);
 
     const socket = harness.server.sockets.latest;
-    const first = await expectSent(socket, "REQ");
+    const first = await socket.inbox.waitNext("REQ");
     socket.message(["AUTH", "challenge"]);
     socket.message(["CLOSED", first[1], "auth-required: login"]);
 
-    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    expect(socket.inbox.length).toBe(1);
     expect(firstInspector.completed).toBe(false);
 
     resolveAuthEvent(authEvent);
-    expect(await expectSent(socket, "AUTH")).toEqual(["AUTH", authEvent]);
+    expect(await socket.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
     socket.message(["OK", "auth-event", true, "authenticated"]);
-    const second = await expectSent(socket, "REQ", 2);
+    const second = await socket.inbox.waitNext("REQ");
     expect(second[2]).toMatchObject({ kinds: [2] });
 
     socket.message(["EOSE", second[1]]);
-    const retried = await expectSent(socket, "REQ", 3);
+    const retried = await socket.inbox.waitNext("REQ");
     expect(retried[1]).not.toBe(first[1]);
     expect(retried[2]).toMatchObject({ kinds: [1] });
     socket.message(["EOSE", retried[1]]);
@@ -134,7 +134,7 @@ describe("NostrOperationExecutor", () => {
       cause,
     });
     const socket = harness.server.sockets.latest;
-    expect(socket.sent).toEqual([]);
+    expect(socket.inbox.length).toBe(0);
     dispose(harness);
   });
 });
