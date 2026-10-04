@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import type { WebSocketData } from "unipls";
+
 import { ensureEventFields } from "../../../libs/nostr/event.ts";
 import type { RelayUrl } from "../../../libs/relay-urls.ts";
 import type { MessagePacket } from "../../../packets/index.ts";

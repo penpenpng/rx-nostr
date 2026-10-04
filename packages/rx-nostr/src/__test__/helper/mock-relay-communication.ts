@@ -1,5 +1,6 @@
 import { EMPTY, filter, Subject, type Observable } from "rxjs";
 import { assert, expect } from "vitest";
+
 import type { LazyFilter } from "../../index.ts";
 import { AwaitableQueue, once, u, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets";

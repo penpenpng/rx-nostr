@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+
 import { ControlledWebSocketServer, expectSent, Faker } from "../../../../__test__/helper/index.ts";
 import type { AuthenticatorInput } from "../../../../authenticator/index.ts";
-import { AuthCoordinator } from "./auth-coordinator.ts";
-import { NostrOperationExecutor } from "../nostr-operation-executor.ts";
 import { NostrTransport } from "../../transport/index.ts";
+import { NostrOperationExecutor } from "../nostr-operation-executor.ts";
+import { AuthCoordinator } from "./auth-coordinator.ts";
 
 const relay = "wss://relay.example.com";
 const cleanups: (() => void)[] = [];

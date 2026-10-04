@@ -1,4 +1,5 @@
 import type { Observable } from "rxjs";
+
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import type { ConnectionReconnector } from "../connection-reconnector/index.ts";

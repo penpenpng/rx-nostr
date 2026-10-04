@@ -1,6 +1,7 @@
 import { Observable, Subject } from "rxjs";
-import { once, RelayMap, type RelayUrl } from "../../libs/index.ts";
+
 import { RxNostrAlreadyDisposedError } from "../../libs/error.ts";
+import { once, RelayMap, type RelayUrl } from "../../libs/index.ts";
 import { normalizeRelayUrl } from "../../libs/relay-urls.ts";
 import type { IRelayCommunicationCollection } from "./relay-communication-collection.interface.ts";
 import type { IRelayCommunication } from "./relay-communication.interface.ts";

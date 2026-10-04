@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import { RxNostrInvalidUsageError } from "../libs/index.ts";
 import type { EventSigner } from "./event-signer.interface.ts";
 

@@ -1,4 +1,5 @@
 import { filter, map, pipe, type OperatorFunction } from "rxjs";
+
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

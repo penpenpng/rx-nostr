@@ -1,4 +1,3 @@
-import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RelayDirectory,
   RelayDirectorySnapshotError,
@@ -7,6 +6,8 @@ import {
   type RxNostrConfig,
 } from "rx-nostr";
 import { fetchRelayInfo } from "rx-nostr/utils";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
+
 import {
   createDeferred,
   createRxNostrScenario,

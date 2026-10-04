@@ -1,22 +1,23 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY, Observable, catchError, throwError } from "rxjs";
+
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../../connection-drop-detector/index.ts";
 import type { ConnectionReconnector } from "../../connection-reconnector/index.ts";
+import type { ConnectionState } from "../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../diagnostics/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
-import type { ConnectionState } from "../../connection-state.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import type { RelayDirectory } from "../../relay-directory/index.ts";
 import type { WebSocketConstructor } from "../../types/index.ts";
-import { NostrTransport, NostrTransportOperationError } from "./transport/index.ts";
+import { ConnectionLeaseController } from "./connection-lease.ts";
+import { NostrOperationExecutor, type RelayVreqPlanner } from "./executor/index.ts";
 import { RelayCommunicationError } from "./relay-communication.error.ts";
 import type { IRelayCommunication } from "./relay-communication.interface.ts";
-import { NostrOperationExecutor, type RelayVreqPlanner } from "./executor/index.ts";
-import { RelayReqScheduler } from "./scheduler/index.ts";
-import { ConnectionLeaseController } from "./connection-lease.ts";
 import { RelayDirectoryBridge } from "./relay-directory-bridge.ts";
+import { RelayReqScheduler } from "./scheduler/index.ts";
+import { NostrTransport, NostrTransportOperationError } from "./transport/index.ts";
 
 export interface RelayCommunicationOptions {
   readonly authenticator?: AuthenticatorInput;

@@ -1,4 +1,5 @@
 import { BehaviorSubject, finalize, Subject, Subscription, take, takeUntil } from "rxjs";
+
 import { RxNostrInvalidUsageError } from "../error.ts";
 
 export class RxDisposableStack extends DisposableStack {

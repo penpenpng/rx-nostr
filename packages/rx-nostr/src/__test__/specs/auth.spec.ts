@@ -6,6 +6,7 @@ import {
   type RxNostrConfig,
 } from "rx-nostr";
 import { describe, expect, test, vi } from "vitest";
+
 import {
   createDeferred,
   createRxNostrScenario,

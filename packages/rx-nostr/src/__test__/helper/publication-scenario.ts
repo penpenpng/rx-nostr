@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import { NoopSigner, type RxNostrConfig } from "rx-nostr";
+
 import type {
   ControlledWebSocket,
   ControlledWebSocketServer,

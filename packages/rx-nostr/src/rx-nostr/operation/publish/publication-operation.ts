@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import { ReplaySubject, type Observer, type Subscription } from "rxjs";
+
 import { RxNostrCallbackError, RxNostrPublicationError } from "../../../libs/error.ts";
 import { ensureEventFields, type RelayUrl } from "../../../libs/index.ts";
 import type { OkPacket } from "../../../packets/index.ts";

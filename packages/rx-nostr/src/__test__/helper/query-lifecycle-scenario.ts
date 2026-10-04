@@ -1,5 +1,6 @@
-import { test, vi } from "vitest";
 import type { RxNostrConfig } from "rx-nostr";
+import { test, vi } from "vitest";
+
 import { createRxNostrScenario, type RxNostrScenario } from "./rx-nostr-scenario.ts";
 
 /** Drain protocol promises without advancing operation deadlines. */

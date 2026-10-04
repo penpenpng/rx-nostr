@@ -1,4 +1,5 @@
 import { defer, EMPTY, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
+
 import {
   emitDiagnostic,
   getDiagnosticSink,
@@ -6,13 +7,14 @@ import {
   type RxNostrDiagnosticSink,
 } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
-import { once, RxDisposableStack } from "../libs/index.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
+import { once, RxDisposableStack } from "../libs/index.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
 import type { Publication, PublishEventParameters } from "../publication/index.ts";
 import { RxReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
+import { RelayCommunication, RelayCommunicationCollection } from "./communication/index.ts";
 import { ConnectionDemandScope } from "./operation/demand/index.ts";
 import {
   FilledRxNostrPublishOptions,
@@ -25,7 +27,6 @@ import {
   type RxNostrReqConfig,
   type RxNostrReqInput,
 } from "./operation/index.ts";
-import { RelayCommunication, RelayCommunicationCollection } from "./communication/index.ts";
 import {
   cloneStaticDefaultConfig,
   cloneStaticDefaultOptions,

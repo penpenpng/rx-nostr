@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import type { EventSigner } from "../event-signer/index.ts";
 import { DEFAULT_AUTH_TIMEOUT } from "./authenticator.defaults.ts";
 import type { Authenticator } from "./authenticator.interface.ts";

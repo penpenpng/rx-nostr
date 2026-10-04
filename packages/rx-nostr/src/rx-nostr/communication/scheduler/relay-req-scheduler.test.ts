@@ -1,5 +1,6 @@
 import { Observable, Subject } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
+
 import type { EventPacket } from "../../../packets/index.ts";
 import { RelayReqScheduler, type ReqRunner } from "./relay-req-scheduler.ts";
 

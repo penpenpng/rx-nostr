@@ -1,4 +1,5 @@
 import { type Subscription } from "rxjs";
+
 import { once, type RelayUrl } from "../../../libs/index.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
 import type { RelayInput } from "../../../types/index.ts";

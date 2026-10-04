@@ -1,5 +1,6 @@
-import { describe, expect, vi } from "vitest";
 import { NoopSigner, RxReq, RxRelays, type EventPacket } from "rx-nostr";
+import { describe, expect, vi } from "vitest";
+
 import { Faker } from "../helper/index.ts";
 import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
 

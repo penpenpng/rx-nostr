@@ -1,4 +1,5 @@
 import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
+
 import { emitDiagnostic } from "../../../diagnostics/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../../libs/index.ts";

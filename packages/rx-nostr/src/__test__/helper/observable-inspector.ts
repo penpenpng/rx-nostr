@@ -1,5 +1,6 @@
 import type { Observable, Subscriber, Subscription } from "rxjs";
 import { assert, expect, vi } from "vitest";
+
 import { AwaitableQueue } from "../../libs/awaitable-queue.ts";
 import { u } from "../../libs/utils.ts";
 

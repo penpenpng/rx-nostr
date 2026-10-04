@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import { getPublicKey, signEvent } from "../libs/nostr/crypto.ts";
 import type { EventSigner } from "./event-signer.interface.ts";
 

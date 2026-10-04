@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import type { Observer, Subscription } from "rxjs";
+
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import type { OkPacket } from "../packets/index.ts";
 

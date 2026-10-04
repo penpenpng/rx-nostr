@@ -1,5 +1,6 @@
-import { describe, expect, test } from "vitest";
 import { NoopReconnector, NoopVerifier, RxReq } from "rx-nostr";
+import { describe, expect, test } from "vitest";
+
 import { createLegacyRxNostr } from "../../legacy.ts";
 import { expectSent } from "../helper/index.ts";
 import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";

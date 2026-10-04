@@ -1,4 +1,5 @@
 import * as Nostr from "nostr-typedef";
+
 import type { RelayUrl } from "../../libs";
 import type { EventPacket } from "../../packets";
 

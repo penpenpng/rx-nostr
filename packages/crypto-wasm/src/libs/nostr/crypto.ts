@@ -8,6 +8,7 @@ import {
   Timestamp,
 } from "@rust-nostr/nostr-sdk";
 import type * as Nostr from "nostr-typedef";
+
 import { ensureEventFields } from "./ensure-event-fields.ts";
 
 loadWasmSync();

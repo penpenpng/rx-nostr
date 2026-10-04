@@ -1,4 +1,5 @@
 import { filter, type MonoTypeOperatorFunction } from "rxjs";
+
 import type { EventPacket } from "../../packets/index.ts";
 
 /**

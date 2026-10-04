@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import type { Observable } from "rxjs";
+
 import type { RelayDirectoryEntry, RelayDirectorySnapshotV1 } from "./relay.interface.ts";
 
 export interface FetchNip11Options {

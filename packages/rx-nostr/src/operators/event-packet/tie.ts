@@ -1,4 +1,5 @@
 import { from, type ObservableInput, type OperatorFunction } from "rxjs";
+
 import type { EventPacket } from "../../packets/index.ts";
 import { createTie } from "./create-tie.ts";
 

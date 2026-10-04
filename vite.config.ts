@@ -8,5 +8,6 @@ export default defineConfig({
   },
   fmt: {
     ignorePatterns: ignored,
+    sortImports: true,
   },
 });

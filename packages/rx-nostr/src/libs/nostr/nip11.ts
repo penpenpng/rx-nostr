@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import { RxNostrNip11Error } from "../error.ts";
 
 export interface FetchRelayInfoOptions {

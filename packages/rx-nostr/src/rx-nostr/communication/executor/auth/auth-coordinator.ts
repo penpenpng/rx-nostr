@@ -1,5 +1,6 @@
 import type { Subscription } from "rxjs";
 import { filter, firstValueFrom, take } from "rxjs";
+
 import { DEFAULT_AUTH_TIMEOUT } from "../../../../authenticator/authenticator.defaults.ts";
 import type { Authenticator, AuthenticatorInput } from "../../../../authenticator/index.ts";
 import { RxNostrCallbackError } from "../../../../libs/error.ts";

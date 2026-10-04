@@ -1,4 +1,5 @@
 import { distinctUntilChanged, pipe, scan, type MonoTypeOperatorFunction } from "rxjs";
+
 import { compareEvents } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 

@@ -1,11 +1,11 @@
 import { NoopVerifier } from "../../event-verifier/index.ts";
 import { type RxNostrConfig, type RxNostrReqOptions } from "../../rx-nostr/index.ts";
+import { FilledRxNostrReqOptions } from "../../rx-nostr/operation/index.ts";
 import {
   FilledRxNostrConfig,
   RX_NOSTR_DEFAULT_CONFIG,
   RX_NOSTR_DEFAULT_OPTIONS,
 } from "../../rx-nostr/rx-nostr.config.ts";
-import { FilledRxNostrReqOptions } from "../../rx-nostr/operation/index.ts";
 
 export const getTestReqOptions = (config?: RxNostrReqOptions) =>
   new FilledRxNostrReqOptions(config ?? {}, getTestConfig());

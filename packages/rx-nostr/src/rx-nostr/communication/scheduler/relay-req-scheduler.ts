@@ -1,4 +1,5 @@
 import { Observable, type Subscriber, type Subscription } from "rxjs";
+
 import { once } from "../../../libs/index.ts";
 import type { EventPacket } from "../../../packets/index.ts";
 

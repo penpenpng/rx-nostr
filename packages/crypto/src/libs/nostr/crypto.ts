@@ -3,6 +3,7 @@ import { sha256 as _sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 import * as Nostr from "nostr-typedef";
+
 import { ensureEventFields } from "./ensure-event-fields.ts";
 
 const utf8Encoder = new TextEncoder();

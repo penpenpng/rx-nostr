@@ -1,10 +1,11 @@
 import { finalize, Subject, TimeoutError, type Subscription } from "rxjs";
+
 import { NoopVerifier } from "../event-verifier/index.ts";
+import type { EventVerifier } from "../index.ts";
 import { RxNostr } from "../rx-nostr/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
-import { legacyRetryReconnector } from "./reconnector.ts";
 import { toLegacyConnectionState, withLegacyAuthTimeout } from "./adapters.ts";
-import type { EventVerifier } from "../index.ts";
+import { legacyRetryReconnector } from "./reconnector.ts";
 import type {
   ILegacyRxNostr,
   LegacyConnectionState,
@@ -75,11 +76,13 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
   const additional = new RxRelays();
   const relayStates = new Map<string, LegacyConnectionState>();
   const connectionStates = new Subject<LegacyConnectionStatePacket>();
-  const connectionStateSubscription = client.monitorConnectionState().subscribe(({ from, state }) => {
-    const packet = { from, state: toLegacyConnectionState(state) };
-    relayStates.set(from, packet.state);
-    connectionStates.next(packet);
-  });
+  const connectionStateSubscription = client
+    .monitorConnectionState()
+    .subscribe(({ from, state }) => {
+      const packet = { from, state: toLegacyConnectionState(state) };
+      relayStates.set(from, packet.state);
+      connectionStates.next(packet);
+    });
 
   const entriesOf = (input: LegacyRelayInput): LegacyRelay[] => {
     if (input instanceof RxRelays) return [...input];
@@ -115,11 +118,17 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         const write = writable.has(url);
         const filter = options?.filter;
         if (
-          filter === "read-only" ? !(read && !write) :
-          filter === "write-only" ? !(!read && write) :
-          filter === "read-all" ? !read :
-          filter === "write-all" ? !write : false
-        ) continue;
+          filter === "read-only"
+            ? !(read && !write)
+            : filter === "write-only"
+              ? !(!read && write)
+              : filter === "read-all"
+                ? !read
+                : filter === "write-all"
+                  ? !write
+                  : false
+        )
+          continue;
         result[url] = { url, read, write };
       }
       return result;
@@ -130,9 +139,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       return normalizedUrl ? relays[normalizedUrl] : undefined;
     },
     getAllRelayStatus() {
-      return Object.fromEntries(
-        [...relayStates].map(([url, connection]) => [url, { connection }]),
-      );
+      return Object.fromEntries([...relayStates].map(([url, connection]) => [url, { connection }]));
     },
     getRelayStatus(url) {
       const normalizedUrl = RxRelays.array([url])[0];
@@ -151,15 +158,17 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         const normalized = new RxRelays([url]);
         const key = [...normalized][0] ?? url;
         normalized.dispose();
-        const read = typeof entry === "string" ? true : entry.read ?? true;
-        const write = typeof entry === "string" ? true : entry.write ?? true;
+        const read = typeof entry === "string" ? true : (entry.read ?? true);
+        const write = typeof entry === "string" ? true : (entry.write ?? true);
         current[key] = { url: key, read, write };
       }
       this.setDefaultRelays(Object.values(current));
     },
     removeDefaultRelays(urls) {
       const remove = new Set<string>(RxRelays.array(Array.isArray(urls) ? urls : [urls]));
-      const current = Object.values(this.getDefaultRelays()).filter((relay) => !remove.has(relay.url));
+      const current = Object.values(this.getDefaultRelays()).filter(
+        (relay) => !remove.has(relay.url),
+      );
       this.setDefaultRelays(current);
     },
     setAdditionalRelays(relays) {
@@ -182,14 +191,10 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         options.on?.defaultWriteRelays === false ? new RxRelays() : combine(writable, additional);
       const explicitRelays = options.on?.relays ?? options.relays;
       const relays = explicitRelays ? combine(base, RxRelays.from(explicitRelays)) : base;
-      const publication = client.publish(
-        relays,
-        event,
-        {
-          ...(options.signer ? { signer: options.signer } : {}),
-          ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
-        },
-      );
+      const publication = client.publish(relays, event, {
+        ...(options.signer ? { signer: options.signer } : {}),
+        ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
+      });
       const packets = new Subject<LegacyOkPacket>();
       let finished = false;
       let okSubscription: Subscription | undefined;
@@ -219,14 +224,19 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
                   error instanceof Error && "failures" in error
                     ? (error as { failures?: Array<{ kind?: string }> }).failures
                     : undefined;
-                finish(failures?.some(({ kind }) => kind === "timeout") ? new TimeoutError() : undefined);
+                finish(
+                  failures?.some(({ kind }) => kind === "timeout") ? new TimeoutError() : undefined,
+                );
               },
             );
           } else finish();
         },
       });
       if (completeOn === "sent") {
-        void publication.event.then(() => finish(), (error) => finish(error));
+        void publication.event.then(
+          () => finish(),
+          (error) => finish(error),
+        );
       } else {
         // Keep a rejection handler attached even when no consumer subscribes.
         void publication.event.catch(() => {});

@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
 import { filter, firstValueFrom } from "rxjs";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
 import { ControlledWebSocketServer } from "../__test__/helper/index.ts";
 import { NoopReconnector } from "../connection-reconnector/index.ts";
 import type { RxNostrDiagnostic } from "../diagnostics/index.ts";

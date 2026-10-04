@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import type { RelayUrl } from "../libs/index.ts";
 
 export interface Authenticator {

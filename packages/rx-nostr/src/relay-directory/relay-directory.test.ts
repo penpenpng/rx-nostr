@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+
 import { RelayDirectory, getRelayDirectoryReporter } from "./relay-directory.ts";
 
 describe("RelayDirectory health reporter", () => {

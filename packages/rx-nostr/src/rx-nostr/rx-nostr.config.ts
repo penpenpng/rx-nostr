@@ -1,13 +1,13 @@
+import type { AuthenticatorInput } from "../authenticator/index.ts";
+import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import {
   ExponentialBackoffReconnector,
   type ConnectionReconnector,
 } from "../connection-reconnector/index.ts";
-import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
 import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
-import type { WebSocketConstructor } from "../types/index.ts";
 import { GlobalRelayDirectory, type RelayDirectory } from "../relay-directory/index.ts";
-import type { AuthenticatorInput } from "../authenticator/index.ts";
+import type { WebSocketConstructor } from "../types/index.ts";
 import type {
   RxNostrConfig,
   RxNostrDefaultOptions,

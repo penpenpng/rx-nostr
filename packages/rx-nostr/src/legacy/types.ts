@@ -1,3 +1,6 @@
+import type { Observable } from "rxjs";
+
+import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import type {
   EventPacket,
   EventSigner,
@@ -8,10 +11,8 @@ import type {
   RxNostrReqConfig,
   RxReq,
 } from "../index.ts";
-import type { Observable } from "rxjs";
 import type { RxRelays } from "../rx-relays/index.ts";
 import type { RelayInput } from "../types/index.ts";
-import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 
 /** v3-style relay entry, including the permissions supported by v3. */
 export type LegacyRelay = string | { url: string; read?: boolean; write?: boolean };
@@ -67,7 +68,9 @@ export interface LegacyRxNostrConfig extends Omit<RxNostrConfig, "verifier" | "r
 
 export interface ILegacyRxNostr {
   readonly defaultRelays: RxRelays;
-  getDefaultRelays(options?: { filter?: "read-only" | "write-only" | "read-all" | "write-all" | "all" }): Record<string, { url: string; read: boolean; write: boolean }>;
+  getDefaultRelays(options?: {
+    filter?: "read-only" | "write-only" | "read-all" | "write-all" | "all";
+  }): Record<string, { url: string; read: boolean; write: boolean }>;
   getDefaultRelay(url: string): { url: string; read: boolean; write: boolean } | undefined;
   getAllRelayStatus(): Record<string, LegacyRelayStatus>;
   getRelayStatus(url: string): LegacyRelayStatus | undefined;
@@ -77,7 +80,10 @@ export interface ILegacyRxNostr {
   setAdditionalRelays(relays: LegacyRelayInput): void;
   use(request: RxReq, options?: LegacyUseOptions): Observable<EventPacket>;
   send(event: PublishEventParameters, options?: LegacySendOptions): Observable<LegacyOkPacket>;
-  cast(event: PublishEventParameters, options?: Omit<LegacySendOptions, "completeOn">): Promise<void>;
+  cast(
+    event: PublishEventParameters,
+    options?: Omit<LegacySendOptions, "completeOn">,
+  ): Promise<void>;
   createConnectionStateObservable(): Observable<LegacyConnectionStatePacket>;
   dispose(): void;
   [Symbol.dispose](): void;

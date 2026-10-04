@@ -1,6 +1,7 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, test, vi } from "vitest";
 import { type EventSigner, type OkPacket } from "rx-nostr";
+import { describe, expect, test, vi } from "vitest";
+
 import {
   createDeferred,
   createPublicationScenario,

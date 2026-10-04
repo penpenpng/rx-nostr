@@ -1,5 +1,6 @@
-import { describe, expect, vi } from "vitest";
 import { RelayDirectory, RxReq, RxRelays } from "rx-nostr";
+import { describe, expect, vi } from "vitest";
+
 import { createDeferred, Faker } from "../helper/index.ts";
 import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
 

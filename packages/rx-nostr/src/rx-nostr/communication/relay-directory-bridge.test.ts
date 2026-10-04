@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+
 import { normalizeRelayUrl } from "../../libs/index.ts";
 import { RelayDirectory } from "../../relay-directory/index.ts";
 import { RelayDirectoryBridge } from "./relay-directory-bridge.ts";

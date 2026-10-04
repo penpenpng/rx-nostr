@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { SimpleVerifier } from "./simple-verifier.ts";
 
 test(SimpleVerifier.name, async () => {

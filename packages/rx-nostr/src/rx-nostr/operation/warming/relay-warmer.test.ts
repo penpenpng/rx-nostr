@@ -1,6 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
+
 import { ControlledWebSocketServer } from "../../../__test__/helper/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RelayUrl } from "../../../libs/index.ts";

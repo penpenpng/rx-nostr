@@ -1,7 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import { map, type Observable } from "rxjs";
-import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
+
 import { RelayDirectorySnapshotError } from "../libs/error.ts";
+import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
 import type {
   FetchNip11Options,

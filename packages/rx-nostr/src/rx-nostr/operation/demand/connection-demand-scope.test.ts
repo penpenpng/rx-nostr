@@ -1,11 +1,12 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
+
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RelayUrl } from "../../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../../packets/index.ts";
-import { ConnectionDemandScope } from "./connection-demand-scope.ts";
 import type { IRelayCommunication } from "../../communication/index.ts";
+import { ConnectionDemandScope } from "./connection-demand-scope.ts";
 
 class LeaseRelay implements IRelayCommunication {
   leases = 0;

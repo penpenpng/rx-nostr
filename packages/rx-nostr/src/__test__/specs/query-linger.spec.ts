@@ -1,5 +1,6 @@
-import { describe, expect, vi } from "vitest";
 import { RxReq, RxRelays } from "rx-nostr";
+import { describe, expect, vi } from "vitest";
+
 import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
 
 const relay = "wss://linger.example.com";

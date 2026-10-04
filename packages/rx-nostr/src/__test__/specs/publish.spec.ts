@@ -1,5 +1,4 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import {
   RxNostrCallbackError,
   RxNostrPublicationError,
@@ -8,6 +7,8 @@ import {
   type Publication,
   type PublicationFailure,
 } from "rx-nostr";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
+
 import {
   createPublicationScenario,
   expectPublicationSent as expectEventSent,

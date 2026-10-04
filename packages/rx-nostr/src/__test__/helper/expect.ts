@@ -1,5 +1,6 @@
 import * as Nostr from "nostr-typedef";
 import { expect, vi } from "vitest";
+
 import type { RelayUrl } from "../../libs";
 import type { EventPacket } from "../../packets";
 import type {

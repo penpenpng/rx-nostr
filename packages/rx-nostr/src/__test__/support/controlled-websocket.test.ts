@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, expectTypeOf, test } from "vitest";
+
 import { expectSent } from "../helper/expect.ts";
 import { ControlledWebSocket, ControlledWebSocketServer } from "./controlled-websocket.ts";
 

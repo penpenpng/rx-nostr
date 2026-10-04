@@ -1,4 +1,5 @@
 import { NoopReconnector, NoopVerifier, RxNostr, type RxNostrConfig } from "rx-nostr";
+
 import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 export interface RxNostrScenario {

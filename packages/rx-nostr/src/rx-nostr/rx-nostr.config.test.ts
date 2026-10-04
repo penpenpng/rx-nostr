@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { ExponentialBackoffReconnector } from "../connection-reconnector/index.ts";
 import { NoopSigner } from "../event-signer/index.ts";
 import { NoopVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";

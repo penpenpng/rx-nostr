@@ -1,4 +1,5 @@
 import type * as Nostr from "nostr-typedef";
+
 import { verifyEvent } from "../libs/nostr/crypto.ts";
 import type { EventVerifier } from "./event-verifier.interface.ts";
 

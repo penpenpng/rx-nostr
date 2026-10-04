@@ -1,15 +1,16 @@
 import type * as Nostr from "nostr-typedef";
 import { Observable, type Subscription, filter, map, merge } from "rxjs";
+
 import type { AuthenticatorInput } from "../../../authenticator/index.ts";
+import type { ConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../../../lazy-filter/index.ts";
-import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import { RxNostrCallbackError } from "../../../libs/error.ts";
-import type { ConnectionState } from "../../../connection-state.ts";
+import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import type { EventMessagePacket, EventPacket, OkPacket } from "../../../packets/index.ts";
+import type { ReqScheduler } from "../scheduler/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "../transport/index.ts";
 import { AuthenticationFailure, AuthCoordinator } from "./auth/index.ts";
-import type { ReqScheduler } from "../scheduler/index.ts";
 
 /** Owns relay-local Nostr protocol operations over one transport session. */
 export class NostrOperationExecutor implements Disposable {

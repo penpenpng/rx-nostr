@@ -1,5 +1,6 @@
 import { lastValueFrom, of, toArray } from "rxjs";
 import { describe, expect, test } from "vitest";
+
 import { Faker } from "../__test__/helper/faker.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import { dropExpiredEvents, filterByType, latestEach, tie } from "./index.ts";

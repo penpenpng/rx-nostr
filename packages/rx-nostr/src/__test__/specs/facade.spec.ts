@@ -1,5 +1,4 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, test, vi } from "vitest";
 import {
   RxNostr,
   NoopReconnector,
@@ -13,6 +12,8 @@ import {
   type RxNostrStaticDefaultConfig,
   type RxNostrStaticDefaultOptions,
 } from "rx-nostr";
+import { describe, expect, test, vi } from "vitest";
+
 import {
   ControlledWebSocketServer,
   expectObservableCompleted,

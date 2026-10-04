@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SeckeySigner } from "./seckey-signer.ts";
 

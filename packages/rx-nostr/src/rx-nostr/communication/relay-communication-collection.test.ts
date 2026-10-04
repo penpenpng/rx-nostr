@@ -1,8 +1,9 @@
+import type * as Nostr from "nostr-typedef";
 import { EMPTY } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
+
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
-import type * as Nostr from "nostr-typedef";
 import { RelayCommunicationCollection } from "./relay-communication-collection.ts";
 
 class FakeRelay implements Disposable {

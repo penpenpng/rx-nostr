@@ -1,12 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
+
 import { ControlledWebSocketServer, expectSent, Faker } from "../../../__test__/helper/index.ts";
 import { normalizeRelayUrl } from "../../../libs/index.ts";
+import { RelayReqScheduler } from "../scheduler/index.ts";
+import { NostrTransport } from "../transport/index.ts";
 import {
   NostrOperationExecutor,
   type NostrOperationExecutorOptions,
 } from "./nostr-operation-executor.ts";
-import { RelayReqScheduler } from "../scheduler/index.ts";
-import { NostrTransport } from "../transport/index.ts";
 
 function setup(options: NostrOperationExecutorOptions = {}) {
   const url = normalizeRelayUrl("wss://relay.example.com")!;

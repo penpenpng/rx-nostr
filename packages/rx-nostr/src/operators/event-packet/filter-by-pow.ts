@@ -1,5 +1,6 @@
 import * as Nostr from "nostr-typedef";
 import { filter, type MonoTypeOperatorFunction } from "rxjs";
+
 import { xor } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 

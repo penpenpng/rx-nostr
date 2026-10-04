@@ -1,5 +1,7 @@
 import "disposablestack/auto";
 import { assert, test } from "vitest";
+
+import { Expect } from "../../../__test__/helper/expect.ts";
 import {
   Faker,
   getTestReqOptions,
@@ -7,10 +9,8 @@ import {
   RelayCommunicationMock,
 } from "../../../__test__/helper/index.ts";
 import { RelayMapOperator } from "../../../libs/index.ts";
-import { RxReq } from "../../../rx-req/index.ts";
-
-import { Expect } from "../../../__test__/helper/expect.ts";
 import { RxRelays } from "../../../rx-relays/index.ts";
+import { RxReq } from "../../../rx-req/index.ts";
 import { reqBackward } from "./req-backward.ts";
 
 test("single relay", async () => {

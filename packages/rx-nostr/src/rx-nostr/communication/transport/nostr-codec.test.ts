@@ -1,5 +1,6 @@
 import type * as Nostr from "nostr-typedef";
 import { describe, expect, test } from "vitest";
+
 import { Faker } from "../../../__test__/helper/index.ts";
 import {
   decodeRelayMessage,

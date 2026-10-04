@@ -1,6 +1,7 @@
 import type * as Nostr from "nostr-typedef";
-import { describe, expect, test, vi } from "vitest";
 import { RelayDirectory, RxReq, RxRelays, type EventPacket } from "rx-nostr";
+import { describe, expect, test, vi } from "vitest";
+
 import {
   createRxNostrScenario,
   expectAllSocketsCloseRequested,
@@ -35,15 +36,15 @@ describe("REQ public contract", () => {
   describe("backward queries", () => {
     test("sends a backward REQ, exposes traceTag only, and ends on EOSE", async () => {
       const { server, rxNostr } = createRxNostrScenario();
-      const request = new RxReq();
+      const rxReq = new RxReq();
       const packets: EventPacket[] = [];
       const complete = vi.fn();
 
       rxNostr
-        .backward(relay, request)
+        .backward(relay, rxReq)
         .subscribe({ next: (packet) => packets.push(packet), complete });
 
-      request.emit([{ kinds: [1] }], { traceTag: "timeline" });
+      rxReq.emit([{ kinds: [1] }], { traceTag: "timeline" });
       server.sockets.latest.open();
       const req = await expectSent(server.sockets.latest, "REQ");
       expect(req[0]).toBe("REQ");
@@ -54,7 +55,7 @@ describe("REQ public contract", () => {
       server.sockets.latest.message(["EOSE", req[1]]);
 
       expect(complete).not.toHaveBeenCalled();
-      request.dispose();
+      rxReq.dispose();
       await expectObservableCompleted(complete);
       expect(packets).toEqual([
         {

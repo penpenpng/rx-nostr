@@ -1,7 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import { BehaviorSubject, type Observable } from "rxjs";
-import { once, type RelayUrl } from "../libs/index.ts";
+
 import { RxNostrNip11Error } from "../libs/error.ts";
+import { once, type RelayUrl } from "../libs/index.ts";
 import type { RelayDirectoryEntry, RelayDirectorySnapshotEntry } from "./relay.interface.ts";
 
 export type Nip11Fetcher = (url: string) => Promise<Nostr.Nip11.RelayInfo>;

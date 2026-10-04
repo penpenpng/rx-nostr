@@ -1,4 +1,3 @@
-import { describe, expect, expectTypeOf, test } from "vitest";
 import * as publicApi from "rx-nostr";
 import type {
   Authenticator,
@@ -21,6 +20,7 @@ import type {
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 describe("public entry point", () => {
   describe("runtime exports", () => {
