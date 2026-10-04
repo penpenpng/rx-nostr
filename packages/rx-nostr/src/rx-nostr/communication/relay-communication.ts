@@ -19,6 +19,7 @@ import { ConnectionLeaseController } from "./connection-lease.ts";
 import { RelayDirectoryBridge } from "./relay-directory-bridge.ts";
 
 export interface RelayCommunicationOptions {
+  readonly authenticator?: AuthenticatorInput;
   readonly WebSocket?: WebSocketConstructor;
   readonly reconnector?: ConnectionReconnector;
   readonly dropDetectors?: readonly ConnectionDropDetector[];
@@ -61,6 +62,7 @@ export class RelayCommunication implements IRelayCommunication {
     this.#executor = new NostrOperationExecutor(url, transport, {
       onDiagnostic: options.onDiagnostic,
       vreqPlanner: options.vreqPlanner,
+      authenticator: options.authenticator,
     });
     this.#leases = new ConnectionLeaseController({
       onFirstLease: () => {
@@ -92,7 +94,6 @@ export class RelayCommunication implements IRelayCommunication {
     options: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
-      authenticator?: AuthenticatorInput;
     }> = {},
   ): Observable<EventPacket> {
     if (this.#leases.count === 0) return EMPTY;
@@ -101,10 +102,7 @@ export class RelayCommunication implements IRelayCommunication {
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
   }
 
-  event(
-    event: Nostr.Event,
-    options: Readonly<{ authenticator?: AuthenticatorInput; timeout?: number }> = {},
-  ): Observable<OkPacket> {
+  event(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<OkPacket> {
     if (this.#leases.count === 0) return EMPTY;
     return this.#executor
       .event(event, options)

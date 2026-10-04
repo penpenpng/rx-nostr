@@ -194,7 +194,7 @@ describe("rx-nostr config", () => {
     expect(root.dropDetectors).toEqual([first]);
   });
 
-  test("AUTH defaults can be disabled per instance or operation", () => {
+  test("AUTH defaults can be disabled per instance", () => {
     const authenticator = {
       challenge: async () => {
         throw new Error("not called");
@@ -211,11 +211,8 @@ describe("rx-nostr config", () => {
       RX_NOSTR_DEFAULT_OPTIONS,
     );
 
-    expect(new FilledRxNostrReqOptions({}, root).authenticator).toBe(authenticator);
+    expect(root.authenticator).toBe(authenticator);
     expect(disabledRoot.authenticator).toBeUndefined();
-    expect(
-      new FilledRxNostrPublishOptions({ authenticator: false }, root).authenticator,
-    ).toBeUndefined();
   });
 
   test("uses a failing verifier by default without blocking publish-only construction", async () => {

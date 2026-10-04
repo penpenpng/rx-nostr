@@ -28,82 +28,99 @@ export class AuthenticationFailure extends Error {
 /** Coordinates NIP-42 authentication for one relay connection. */
 export class AuthCoordinator {
   readonly #subscriptions: Subscription[] = [];
-  readonly #attempts = new Map<number, AuthenticationAttempt>();
   #challenge?: Readonly<{ value: string; version: number }>;
-  #authenticatedVersion?: number;
+  #status: "unstarted" | "pending" | "authenticated" | "failed" = "unstarted";
+  #result?: Promise<void>;
+  #controller?: AbortController;
+  #failure?: unknown;
   #nextVersion = 0;
   #disposed = false;
 
   constructor(
     private readonly relay: RelayUrl,
     private readonly transport: NostrTransport,
+    private readonly input?: AuthenticatorInput,
   ) {
     this.#subscriptions.push(
       transport.messages$.subscribe((packet) => {
-        if (packet.type !== "AUTH") return;
-        if (this.#challenge?.value === packet.challenge) return;
-        this.#challenge = Object.freeze({
-          value: packet.challenge,
-          version: this.#nextVersion++,
-        });
+        if (packet.type !== "AUTH" || this.#challenge?.value === packet.challenge) return;
+        this.#invalidateChallenge();
+        this.#challenge = Object.freeze({ value: packet.challenge, version: this.#nextVersion++ });
+        if (this.input !== undefined) void this.#start().catch(() => {});
       }),
       transport.state$.subscribe((state) => {
-        if (state.state !== "connected" && this.#challenge) {
-          this.#invalidateChallenge();
-        }
+        if (state.state !== "connected") this.#invalidateChallenge();
       }),
     );
   }
 
-  authenticate(input: AuthenticatorInput | undefined, signal?: AbortSignal): Promise<void> {
-    if (this.#disposed || input === undefined) {
+  #start(): Promise<void> {
+    if (this.#disposed || this.input === undefined)
       return Promise.reject(new AuthenticationFailure("disabled"));
-    }
     const challenge = this.#challenge;
-    if (!challenge) {
-      return Promise.reject(new AuthenticationFailure("no-challenge"));
-    }
-    let authenticator: Authenticator | undefined;
-    try {
-      authenticator = typeof input === "function" ? input(this.relay) : input;
-    } catch (cause) {
-      return Promise.reject(new RxNostrCallbackError("authenticator", cause));
-    }
-    if (!authenticator) {
-      return Promise.reject(new AuthenticationFailure("disabled"));
-    }
-    if (this.#authenticatedVersion === challenge.version) {
-      return Promise.resolve();
-    }
-
-    const shared = this.#attempts.get(challenge.version);
-    if (shared) {
-      return waitForAttempt(shared, signal, () => this.#abandonAttempt(challenge.version, shared));
-    }
-
+    if (!challenge) return Promise.reject(new AuthenticationFailure("no-challenge"));
+    if (this.#status === "authenticated") return Promise.resolve();
+    if (this.#status === "failed") return Promise.reject(this.#failure);
+    if (this.#result) return this.#result;
     const controller = new AbortController();
-    const attempt: AuthenticationAttempt = {
-      controller,
-      promise: Promise.resolve(),
-      settled: false,
-      waiters: 0,
-    };
-    attempt.promise = this.#run(authenticator, challenge, controller.signal)
+    this.#controller = controller;
+    this.#status = "pending";
+    this.#result = Promise.resolve()
       .then(() => {
-        this.#authenticatedVersion = challenge.version;
-      })
-      .finally(() => {
-        if (this.#attempts.get(challenge.version) === attempt) {
-          this.#attempts.delete(challenge.version);
+        this.#assertCurrent(challenge, controller.signal);
+        let authenticator: Authenticator | undefined;
+        try {
+          authenticator = typeof this.input === "function" ? this.input(this.relay) : this.input;
+        } catch (cause) {
+          throw new RxNostrCallbackError("authenticator", cause);
         }
-        attempt.settled = true;
-      });
-    this.#attempts.set(challenge.version, attempt);
-    return waitForAttempt(attempt, signal, () => this.#abandonAttempt(challenge.version, attempt));
+        if (!authenticator) throw new AuthenticationFailure("disabled");
+        return abortable(this.#run(authenticator, challenge, controller.signal), controller.signal);
+      })
+      .then(
+        () => {
+          this.#assertCurrent(challenge, controller.signal);
+          this.#status = "authenticated";
+        },
+        (error) => {
+          if (this.#challenge?.version === challenge.version) {
+            this.#status = "failed";
+            this.#failure = error;
+          }
+          throw error;
+        },
+      );
+    return this.#result;
   }
 
-  #abandonAttempt(version: number, attempt: AuthenticationAttempt): void {
-    if (this.#attempts.get(version) === attempt) this.#attempts.delete(version);
+  waitBeforeSend(signal: AbortSignal): Promise<void> | undefined {
+    if (this.#status !== "pending") return undefined;
+    return this.#waitPending(signal);
+  }
+
+  async #waitPending(signal: AbortSignal): Promise<void> {
+    while (this.#status === "pending") {
+      try {
+        await abortable(this.#result!, signal);
+      } catch {
+        if (signal.aborted) throw new AuthenticationFailure("stale");
+      }
+    }
+    if (signal.aborted) throw new AuthenticationFailure("stale");
+  }
+
+  async authenticate(signal?: AbortSignal): Promise<void> {
+    for (;;) {
+      const version = this.#challenge?.version;
+      try {
+        await abortable(this.#start(), signal);
+      } catch (error) {
+        if (signal?.aborted || this.#challenge?.version === version || !this.#challenge)
+          throw error;
+        continue;
+      }
+      if (this.#challenge?.version === version) return;
+    }
   }
 
   async #run(
@@ -151,19 +168,18 @@ export class AuthCoordinator {
     challenge: Readonly<{ value: string; version: number }>,
     signal: AbortSignal,
   ): void {
-    if (
-      signal.aborted ||
-      this.#disposed ||
-      this.#challenge?.version !== challenge.version ||
-      this.#challenge.value !== challenge.value
-    ) {
+    if (signal.aborted || this.#disposed || this.#challenge?.version !== challenge.version) {
       throw new AuthenticationFailure("stale");
     }
   }
 
   #invalidateChallenge(): void {
+    this.#controller?.abort();
+    this.#controller = undefined;
     this.#challenge = undefined;
-    this.#authenticatedVersion = undefined;
+    this.#result = undefined;
+    this.#failure = undefined;
+    this.#status = "unstarted";
     this.#nextVersion++;
   }
 
@@ -171,62 +187,16 @@ export class AuthCoordinator {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#invalidateChallenge();
-    for (const attempt of this.#attempts.values()) attempt.controller.abort();
-    for (const subscription of this.#subscriptions.splice(0)) {
-      subscription.unsubscribe();
-    }
-    this.#attempts.clear();
+    for (const subscription of this.#subscriptions.splice(0)) subscription.unsubscribe();
   }
 }
 
-interface AuthenticationAttempt {
-  readonly controller: AbortController;
-  promise: Promise<void>;
-  settled: boolean;
-  waiters: number;
-}
-
-function waitForAttempt(
-  attempt: AuthenticationAttempt,
-  signal?: AbortSignal,
-  onAbandoned?: () => void,
-): Promise<void> {
-  if (signal?.aborted) {
-    if (attempt.waiters === 0 && !attempt.settled) {
-      attempt.controller.abort();
-      onAbandoned?.();
-    }
-    return Promise.reject(new AuthenticationFailure("stale"));
-  }
-  attempt.waiters++;
-  return new Promise<void>((resolve, reject) => {
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      signal?.removeEventListener("abort", onAbort);
-      attempt.waiters--;
-      if (attempt.waiters === 0 && !attempt.settled) {
-        attempt.controller.abort();
-        onAbandoned?.();
-      }
-    };
-    const onAbort = () => {
-      release();
-      reject(new AuthenticationFailure("stale"));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-    void attempt.promise.then(
-      () => {
-        if (released) return;
-        release();
-        resolve();
-      },
-      (error) => {
-        if (released) return;
-        release();
-        reject(error);
-      },
-    );
+function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new AuthenticationFailure("stale"));
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(new AuthenticationFailure("stale"));
+    signal.addEventListener("abort", abort, { once: true });
+    void promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
   });
 }

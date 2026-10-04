@@ -1,10 +1,8 @@
-import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import type { EventVerifier } from "../../../event-verifier/index.ts";
 import type { RxNostrReqConfig, RxNostrReqOptions } from "./rx-nostr-req.interface.ts";
 
 export interface RxNostrReqOptionsContext {
   readonly verifier: EventVerifier;
-  readonly authenticator: AuthenticatorInput | undefined;
   readonly defaultOptions: Readonly<{ req?: RxNostrReqOptions }>;
   readonly staticDefaultOptions: Readonly<{ req: Required<RxNostrReqOptions> }>;
 }
@@ -17,7 +15,6 @@ export class FilledRxNostrReqOptions {
   readonly skipExpirationCheck: boolean;
   readonly skipValidateFilterMatching: boolean;
   readonly verifier: EventVerifier;
-  readonly authenticator: AuthenticatorInput | undefined;
 
   constructor(config: RxNostrReqConfig, rootConfig: RxNostrReqOptionsContext) {
     const base = rootConfig.defaultOptions.req;
@@ -34,9 +31,5 @@ export class FilledRxNostrReqOptions {
       base?.skipValidateFilterMatching ??
       staticBase.skipValidateFilterMatching;
     this.verifier = config.verifier ?? rootConfig.verifier;
-    this.authenticator =
-      config.authenticator === false
-        ? undefined
-        : (config.authenticator ?? rootConfig.authenticator);
   }
 }

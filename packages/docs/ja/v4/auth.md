@@ -40,36 +40,29 @@ const rxNostr = new RxNostr({
 
 factory には正規化済みの URL が渡されます。
 
-## Operation ごとに上書きする
+## 接続単位の認証と再送
 
-REQ と publish の config で root の設定を上書きできます。`false` を指定すると、その operation では AUTH を明示的に無効化します。
+AUTH 状態は relay の接続単位で共有されます。`authenticator` は `RxNostr` の設定に指定します。REQ・publish ごとの上書きはできません。異なる認証主体や認証方針で通信する場合は、別の `RxNostr` インスタンスを使用してください。インスタンスの `authenticator: false` は static default の AUTH 設定を無効化します。
 
-```ts
-rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, {
-  authenticator: false,
-});
+challenge を受信すると、authenticator が設定されている接続では直ちに認証します。接続を温めている場合も署名 callback が呼ばれます。
 
-rxNostr.publish(relays, params, {
-  authenticator: anotherAuthenticator,
-});
-```
-
-## 再送
-
-リレーが `auth-required:` の CLOSED または `OK false` を返すと、rx-nostr は次の順序で処理します。
-
-1. 最新の challenge を authenticator へ渡す
+1. challenge を authenticator へ渡す
 2. kind 22242 の AUTH EVENT を送る
 3. AUTH EVENT に対する `OK true` を待つ
-4. 拒否された元の REQ または EVENT を一度だけ再送する
 
-同じ relay、接続世代、challenge に対する複数 operation は、ひとつの AUTH 送信と結果を共有します。AUTH の再送が再び auth-required で拒否されても loop はせず、その relay effort を終了します。
+認証中は、通常の REQ・EVENT の新規送信と再送を待機させます。AUTH 自体と、リソースを解放する CLOSE は待機しません。認証が成功または失敗したら通常送信を進めます。失敗時は未認証のまま送信します。
 
-AUTH に関連する `OK false` も `Publication.subscribe()` では観測できますが、認証後の再送が残っている間は最終的な publication failure ではありません。
+送信済みの REQ が `auth-required:` の CLOSED、または EVENT が `auth-required:` の `OK false` を受けた場合は、現在の challenge の認証成功後に一度だけ再送します。成功済みなら直ちに再送します。認証失敗済み、challenge なし、AUTH 無効の場合はその relay effort を終了します。再送が再び `auth-required` で拒否されても再認証・再送を繰り返しません。
+
+同じ接続・challenge に対する複数 operation は、ひとつの AUTH 送信と成功・失敗結果を共有します。同じ challenge で失敗した AUTH は再試行しません。新しい challenge が届くと、一度の新しい認証を開始できます。
+
+元の EVENT に対する `auth-required` の `OK false` は `Publication.subscribe()` で観測できますが、認証後の再送が残っている間は最終的な publication failure ではありません。
+
+operation のキャンセルはその operation の待機と再送を取り消します。接続が維持されている間は、共有 AUTH は継続します。
 
 ## Timeout と stale challenge
 
-AUTH の OK 待機時間は Authenticator の `authTimeout` で指定します。省略時は 30 秒です。Authenticator factory を使えば、relay ごとに異なる値を設定できます。
+AUTH の OK 待機時間は Authenticator の `authTimeout` で指定します。省略時は 30 秒です。署名 callback の完了待ちはこの timeout に含まれません。Authenticator factory を使えば、relay ごとに異なる値を設定できます。
 
 ```ts
 const authenticator = new SimpleAuthenticator(signer, {

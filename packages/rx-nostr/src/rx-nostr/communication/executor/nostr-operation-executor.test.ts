@@ -53,7 +53,7 @@ describe("NostrOperationExecutor", () => {
   });
 
   test("releases an auth-required REQ slot and schedules its retry with a new subId", async () => {
-    const harness = setup();
+    const harness = setup({ authenticator: { challenge: () => pendingAuthEvent } });
     harness.scheduler.setMaxSubscriptions(1);
     const authEvent = Faker.authEvent({
       id: "auth-event",
@@ -68,9 +68,7 @@ describe("NostrOperationExecutor", () => {
     const secondComplete = vi.fn();
 
     harness.session
-      .vreq("backward", [{ kinds: [1] }], harness.scheduler, {
-        authenticator: { challenge: () => pendingAuthEvent },
-      })
+      .vreq("backward", [{ kinds: [1] }], harness.scheduler)
       .subscribe({ complete: firstComplete });
     harness.session
       .vreq("backward", [{ kinds: [2] }], harness.scheduler)
@@ -80,15 +78,14 @@ describe("NostrOperationExecutor", () => {
     harness.server.sockets.latest.message(["AUTH", "challenge"]);
     harness.server.sockets.latest.message(["CLOSED", first[1], "auth-required: login"]);
 
-    const second = await expectSent(harness.server.sockets.latest, "REQ", 2);
-    expect(second[2]).toMatchObject({ kinds: [2] });
+    expect(harness.server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
     expect(firstComplete).not.toHaveBeenCalled();
 
     resolveAuthEvent(authEvent);
     expect(await expectSent(harness.server.sockets.latest, "AUTH")).toEqual(["AUTH", authEvent]);
     harness.server.sockets.latest.message(["OK", "auth-event", true, "authenticated"]);
-    await Promise.resolve();
-    expect(harness.server.sockets.latest.sentOfType("REQ")).toHaveLength(2);
+    const second = await expectSent(harness.server.sockets.latest, "REQ", 2);
+    expect(second[2]).toMatchObject({ kinds: [2] });
 
     harness.server.sockets.latest.message(["EOSE", second[1]]);
     const retried = await expectSent(harness.server.sockets.latest, "REQ", 3);

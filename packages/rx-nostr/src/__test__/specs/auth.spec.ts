@@ -134,13 +134,11 @@ describe("NIP-42 AUTH public contract", () => {
       const challenge = vi.fn(async () => authEvent("unused", "unused"));
       const { server, rxNostr } = createAuthScenario({
         signer,
-        authenticator: { challenge },
+        authenticator: false,
       });
       const complete = vi.fn();
 
-      rxNostr
-        .backward(relay, [{}], { authenticator: false })
-        .subscribe({ complete });
+      rxNostr.backward(relay, [{}]).subscribe({ complete });
 
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
@@ -162,9 +160,7 @@ describe("NIP-42 AUTH public contract", () => {
       });
       const complete = vi.fn();
 
-      rxNostr
-        .backward("wss://RELAY.example.com/", [{}])
-        .subscribe({ complete });
+      rxNostr.backward("wss://RELAY.example.com/", [{}]).subscribe({ complete });
 
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
@@ -274,35 +270,38 @@ describe("NIP-42 AUTH public contract", () => {
       rxNostr.dispose();
     });
 
-    test("rejects stale challenge work after a newer challenge", async () => {
-      const auth = createDeferred<Nostr.Event<22242>>();
-      const challenge = vi.fn(() => auth.promise);
-      const { server, rxNostr } = createAuthScenario({
-        authenticator: {
-          challenge,
-        },
-      });
+    test("replaces stale signature work and retries only after the new challenge succeeds", async () => {
+      const oldAuth = createDeferred<Nostr.Event<22242>>();
+      const newAuth = createDeferred<Nostr.Event<22242>>();
+      const challenge = vi.fn((_relay: string, value: string) =>
+        value === "old" ? oldAuth.promise : newAuth.promise,
+      );
+      const { server, rxNostr } = createAuthScenario({ authenticator: { challenge } });
       const complete = vi.fn();
-
-      rxNostr.backward(relay, [{}]).subscribe({
-        complete,
-      });
-
+      rxNostr.backward(relay, [{}]).subscribe({ complete });
       server.sockets.latest.open();
       const [, subId] = await expectSent(server.sockets.latest, "REQ");
       server.sockets.latest.message(["AUTH", "old"]);
       server.sockets.latest.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
       server.sockets.latest.message(["AUTH", "new"]);
-      auth.resolve(authEvent("old-auth", "old"));
-
+      await expectCallbackCalled(challenge, 2);
+      oldAuth.resolve(authEvent("old-auth", "old"));
+      newAuth.resolve(authEvent("new-auth", "new"));
+      expect(await expectSent(server.sockets.latest, "AUTH")).toEqual([
+        "AUTH",
+        authEvent("new-auth", "new"),
+      ]);
+      expect(complete).not.toHaveBeenCalled();
+      server.sockets.latest.message(["OK", "new-auth", true, "authenticated"]);
+      const [, retryId] = await expectSent(server.sockets.latest, "REQ", 2);
+      server.sockets.latest.message(["EOSE", retryId]);
       await expectObservableCompleted(complete);
-      expect(server.sockets.latest.sent).toHaveLength(1);
-
+      expect(server.sockets.latest.sentOfType("AUTH")).toHaveLength(1);
       rxNostr.dispose();
     });
 
-    test("cancels the AUTH effort when its last operation unsubscribes", async () => {
+    test("discards pending AUTH when cancellation releases the last connection demand", async () => {
       const auth = createDeferred<Nostr.Event<22242>>();
       const challenge = vi.fn(() => auth.promise);
       const { server, rxNostr } = createAuthScenario({

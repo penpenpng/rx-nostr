@@ -1,4 +1,3 @@
-import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import type { EventSigner } from "../../../event-signer/index.ts";
 
 export interface RxNostrPublishOptions {
@@ -13,7 +12,4 @@ export interface RxNostrPublishOptions {
   timeout?: number;
 }
 
-export interface RxNostrPublishConfig extends RxNostrPublishOptions {
-  /** Override the instance authenticator, or disable AUTH for this operation. */
-  authenticator?: AuthenticatorInput | false;
-}
+export interface RxNostrPublishConfig extends RxNostrPublishOptions {}

@@ -22,7 +22,8 @@ export class NostrOperationExecutor implements Disposable {
     readonly transport: NostrTransport,
     private readonly options: NostrOperationExecutorOptions = {},
   ) {
-    this.#auth = new AuthCoordinator(url, transport);
+    this.#auth = new AuthCoordinator(url, transport, options.authenticator);
+    transport.beforeSend = (signal) => this.#auth.waitBeforeSend(signal);
     this.#vreqPlanner = options.vreqPlanner ?? defaultVreqPlanner;
   }
 
@@ -45,7 +46,6 @@ export class NostrOperationExecutor implements Disposable {
     options: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
-      authenticator?: AuthenticatorInput;
     }> = {},
   ): Observable<EventPacket> {
     const reqPlans = this.#planVreq(strategy, filters);
@@ -62,7 +62,6 @@ export class NostrOperationExecutor implements Disposable {
     options: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
-      authenticator?: AuthenticatorInput;
     }>,
   ): Observable<EventPacket> {
     return new Observable((subscriber) => {
@@ -85,7 +84,7 @@ export class NostrOperationExecutor implements Disposable {
             complete: () => {
               if (terminalAuthRequired && !authRetried) {
                 authRetried = true;
-                void this.#auth.authenticate(options.authenticator, authAbort.signal).then(
+                void this.#auth.authenticate(authAbort.signal).then(
                   () => {
                     if (!stopped && !subscriber.closed) startReq();
                   },
@@ -118,7 +117,6 @@ export class NostrOperationExecutor implements Disposable {
     options: Readonly<{
       timeout?: number;
       validateFilterMatching?: boolean;
-      authenticator?: AuthenticatorInput;
     }>,
     onRemoteTerminated: (authRequired: boolean) => void,
   ): Observable<EventPacket> {
@@ -190,10 +188,7 @@ export class NostrOperationExecutor implements Disposable {
     });
   }
 
-  event(
-    event: Nostr.Event,
-    options: Readonly<{ authenticator?: AuthenticatorInput; timeout?: number }> = {},
-  ): Observable<OkPacket> {
+  event(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<OkPacket> {
     return new Observable((subscriber) => {
       let stopped = false;
       let authRetried = false;
@@ -217,7 +212,7 @@ export class NostrOperationExecutor implements Disposable {
               subscription?.unsubscribe();
               if (authRequired && !authRetried) {
                 authRetried = true;
-                void this.#auth.authenticate(options.authenticator, authAbort.signal).then(
+                void this.#auth.authenticate(authAbort.signal).then(
                   () => {
                     if (!stopped && !subscriber.closed) start();
                   },
@@ -257,6 +252,7 @@ export type RelayVreqPlanner = (
 ) => ReqPlan[];
 
 export interface NostrOperationExecutorOptions {
+  readonly authenticator?: AuthenticatorInput;
   readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
   readonly vreqPlanner?: RelayVreqPlanner;
 }

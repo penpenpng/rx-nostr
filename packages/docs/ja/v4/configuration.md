@@ -114,7 +114,6 @@ REQ の `timeout` は backward segment が EOSE を待つ時間です。publish 
 ```ts
 rxNostr.req(relays, { strategy: "oneshot", filters }, {
   verifier,
-  authenticator,
   defer: true,
   linger: 10_000,
   weak: false,
@@ -124,7 +123,7 @@ rxNostr.req(relays, { strategy: "oneshot", filters }, {
 });
 ```
 
-`authenticator: false` で root の AUTH を operation 単位に無効化できます。
+AUTH はインスタンスの接続単位の設定です。REQ・publish の config に `authenticator` は指定できません。
 
 ## Publish arguments and options
 
@@ -133,7 +132,6 @@ rxNostr.req(relays, { strategy: "oneshot", filters }, {
 ```ts
 rxNostr.publish(relays, params, {
   signer,
-  authenticator,
   linger: 10_000,
   weak: false,
   timeout: 30_000,
@@ -151,7 +149,7 @@ publish は呼び出し時の relay snapshot を使います。
 3. `RxNostrConfig.defaultOptions.req/publish`
 4. `RxNostr.defaultOptions.req/publish`（built-in defaults の初期値を保持）
 
-constructor-level の値は `RxNostrConfig`、`RxNostr.defaultConfig` の順です。operation-level の verifier、signer、authenticator はいずれの constructor-level 設定よりも優先されます。
+constructor-level の値は `RxNostrConfig`、`RxNostr.defaultConfig` の順です。operation-level の verifier、signer はいずれの constructor-level 設定よりも優先されます。
 
 nullish な値だけを fallback するため、`false`、`0`、`Infinity` はそのまま有効です。
 

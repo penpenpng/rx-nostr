@@ -93,7 +93,6 @@ observer.unsubscribe();
 ```ts
 const publication = rxNostr.publish(relays, params, {
   signer,
-  authenticator,
   timeout: 30_000,
   linger: 10_000,
   weak: false,
@@ -101,7 +100,6 @@ const publication = rxNostr.publish(relays, params, {
 ```
 
 - `signer` — この publication だけで使う signer
-- `authenticator` — root の AUTH 設定を上書きする。`false` で無効化
 - `timeout` — 各リレーの OK 待機時間
 - `linger` — operation 終了後に接続需要を保持する時間
 - `weak` — 新しい接続需要を作らず、既に利用可能な接続だけを使う

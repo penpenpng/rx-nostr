@@ -192,7 +192,7 @@ const rxNostr = new RxNostr({
 });
 ```
 
-signer を指定しても AUTH は暗黙に有効になりません。operation ごとに `authenticator: false` を指定して無効化できます。
+signer を指定しても AUTH は暗黙に有効になりません。AUTH は接続単位で共有されるため、operation ごとの `authenticator` オプションは削除されました。インスタンスの `authenticator: false` で static default を無効化できます。challenge の受信時に認証を開始し、認証中は通常送信・再送を待機します。同じ challenge の失敗結果は保持され、再試行しません。
 
 ## `Nip11Registry` を `RelayDirectory` へ移す
 

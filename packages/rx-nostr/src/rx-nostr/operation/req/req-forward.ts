@@ -1,5 +1,4 @@
 import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
-import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import { emitDiagnostic } from "../../../diagnostics/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../../libs/index.ts";
@@ -47,7 +46,6 @@ export function reqForward({
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
-        authenticator: config.authenticator,
       }),
     ),
     // Forward: To keep the lease, subscribe to the next stream before the previous one ends.
@@ -81,7 +79,6 @@ function req({
   linger,
   traceTag,
   skipValidateFilterMatching,
-  authenticator,
 }: {
   connectionDemand: ConnectionDemandScope;
   relays: IRelayCommunicationCollection;
@@ -91,7 +88,6 @@ function req({
   linger: number;
   traceTag?: string | number;
   skipValidateFilterMatching: boolean;
-  authenticator: AuthenticatorInput | undefined;
 }): Observable<EventPacket> {
   const warming = requestRelays.subscribe((destRelays) => {
     relays.forEach(destRelays, (relay) => {
@@ -142,7 +138,6 @@ function req({
         const sub = relay
           .vreq("forward", filters, {
             validateFilterMatching: !skipValidateFilterMatching,
-            authenticator,
           })
           .pipe(
             map((packet) => (traceTag === undefined ? packet : { ...packet, traceTag })),

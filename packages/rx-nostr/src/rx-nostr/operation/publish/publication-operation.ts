@@ -182,7 +182,6 @@ export class PublicationOperation implements Publication, Disposable {
       delivery.demandWindow = this.#connectionDemand.openDemandWindow(relay, this.config.linger);
       delivery.subscription = relay
         .event(snapshot as Nostr.Event, {
-          authenticator: this.config.authenticator,
           timeout: this.config.timeout,
         })
         .subscribe({

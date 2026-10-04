@@ -72,6 +72,7 @@ export class RxNostr implements IRxNostr {
     this.#relays = new RelayCommunicationCollection((url) => {
       return new RelayCommunication(url, {
         WebSocket: this.#config.WebSocket,
+        authenticator: this.#config.authenticator,
         reconnector: this.#config.reconnector,
         dropDetectors: this.#config.dropDetectors,
         relayDirectory: this.#config.relayDirectory,

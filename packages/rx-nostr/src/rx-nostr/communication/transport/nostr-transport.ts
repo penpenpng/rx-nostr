@@ -1,5 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { BehaviorSubject, Observable, Subject, type Subscription } from "rxjs";
 import {
   Unipls,
   type ConnectionAttemptSnapshot,
@@ -88,6 +88,7 @@ export interface NostrTransportSubscribeOptions {
  * rx-nostr's package entry point.
  */
 export class NostrTransport {
+  beforeSend?: (signal: AbortSignal) => Promise<void> | undefined;
   readonly messages$ = new Subject<MessagePacket>();
   readonly state$ = new BehaviorSubject<NostrTransportState>(Object.freeze({ state: "dormant" }));
 
@@ -152,10 +153,83 @@ export class NostrTransport {
   }
 
   subscribe(options: NostrTransportSubscribeOptions): Observable<MessagePacket> {
-    return createStreamObservable(
-      (onMessage) => this.#client.subscribe({ ...options, onMessage }),
-      (finalization) => this.#emitStreamFailureDiagnostic(finalization),
-    );
+    // AUTH remains a direct transport operation. Ordinary operations own their
+    // resend here so that recovery cannot bypass the authentication barrier.
+    const raw = (retry = options.retry) =>
+      createStreamObservable(
+        (onMessage) => this.#client.subscribe({ ...options, retry, onMessage }),
+        (finalization) => this.#emitStreamFailureDiagnostic(finalization),
+      );
+    if (!this.beforeSend || (typeof options.query !== "function" && options.query[0] === "AUTH")) {
+      return raw();
+    }
+    return new Observable((subscriber) => {
+      const controller = new AbortController();
+      let active: Subscription | undefined;
+      let starting = false;
+      let waiting = true;
+      const abort = () => {
+        controller.abort();
+        subscriber.error(new NostrTransportOperationError("aborted"));
+      };
+      options.signal?.addEventListener("abort", abort, { once: true });
+      const start = async () => {
+        if (starting || !waiting || subscriber.closed || this.state$.value.state !== "connected")
+          return;
+        starting = true;
+        try {
+          // Yield once so connection lifecycle listeners can install a challenge.
+          await Promise.resolve();
+          let barrier = this.beforeSend!(controller.signal);
+          while (barrier) {
+            await barrier;
+            barrier = this.beforeSend!(controller.signal);
+          }
+          if (
+            subscriber.closed ||
+            controller.signal.aborted ||
+            this.state$.value.state !== "connected"
+          )
+            return;
+          waiting = false;
+          active = raw("fail").subscribe({
+            next: (packet) => subscriber.next(packet),
+            complete: () => subscriber.complete(),
+            error: (error) => {
+              if (
+                error instanceof NostrTransportOperationError &&
+                error.reason === "dropped" &&
+                options.retry === "resend" &&
+                this.options.reconnector
+              ) {
+                waiting = true;
+                queueMicrotask(() => void start());
+              } else subscriber.error(error);
+            },
+          });
+        } catch (error) {
+          if (!subscriber.closed) subscriber.error(error);
+        } finally {
+          starting = false;
+          if (waiting && this.state$.value.state === "connected" && !subscriber.closed)
+            queueMicrotask(() => void start());
+        }
+      };
+      const stateSubscription = this.state$.subscribe((state) => {
+        if (state.state === "connected") void start();
+        else if (state.state === "failed" && waiting)
+          subscriber.error(new NostrTransportOperationError("open-error", { cause: state.reason }));
+        else if (state.state === "disposed" || (state.state === "dormant" && waiting))
+          subscriber.complete();
+      });
+      if (options.signal?.aborted) abort();
+      return () => {
+        controller.abort();
+        options.signal?.removeEventListener("abort", abort);
+        active?.unsubscribe();
+        stateSubscription.unsubscribe();
+      };
+    });
   }
 
   dispose(): Promise<void> {
