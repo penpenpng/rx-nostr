@@ -165,6 +165,43 @@ describe("Publication lifecycle", () => {
       rxNostr.dispose();
     });
 
+    test("resends a later auth-required EVENT after another publication authenticated", async () => {
+      const authEvent = Faker.authEvent({ id: "auth-event" });
+      const { server, rxNostr } = createPublicationScenario({
+        defaultOptions: { publish: { linger: 0, timeout: 5_000 } },
+        authenticator: {
+          authTimeout: 1_000,
+          challenge: async () => authEvent,
+        },
+      });
+      const firstPublication = rxNostr.publish(relay1, event({ id: "event-first" }));
+      const laterPublication = rxNostr.publish(relay1, event({ id: "event-later" }));
+      const firstAll = firstPublication.waitFor("all");
+      const laterAll = laterPublication.waitFor("all");
+      const connection = socket(server, relay1);
+
+      connection.open();
+      await expectSent(connection, "EVENT", 2);
+      connection.message(["AUTH", "challenge"]);
+      connection.message(["OK", "event-first", false, "auth-required: login"]);
+      await vi.waitFor(() =>
+        expect(connection.sentOfType("AUTH")).toContainEqual(["AUTH", authEvent]),
+      );
+      connection.message(["OK", "auth-event", true, "authenticated"]);
+      await expectSent(connection, "EVENT", 3);
+
+      connection.message(["OK", "event-later", false, "auth-required: login"]);
+      await expectSent(connection, "EVENT", 4);
+      const sentEvents = connection.sentOfType("EVENT").map(([, body]) => body.id);
+      expect(sentEvents).toEqual(["event-first", "event-later", "event-first", "event-later"]);
+
+      connection.message(["OK", "event-first", true, "saved after authentication"]);
+      connection.message(["OK", "event-later", true, "saved after authentication"]);
+      await Promise.all([expect(firstAll).resolves.toBeUndefined(), expect(laterAll).resolves.toBeUndefined()]);
+
+      rxNostr.dispose();
+    });
+
     test("resends an unconfirmed EVENT after reconnect", async () => {
       const { server, rxNostr } = createPublicationScenario({
         reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
