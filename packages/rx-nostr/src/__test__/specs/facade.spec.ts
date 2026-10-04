@@ -1,12 +1,12 @@
 import type * as Nostr from "nostr-typedef";
 import {
-  RxNostr,
   NoopReconnector,
   NoopSigner,
   NoopVerifier,
   RelayDirectory,
-  RxReq,
+  RxNostr,
   RxNostrAlreadyDisposedError,
+  RxReq,
   type ConnectionStatePacket,
   type EventPacket,
   type RxNostrStaticDefaultConfig,
@@ -16,10 +16,10 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   ControlledWebSocketServer,
-  expectObservableCompleted,
   expectSent,
   expectSocketCloseRequested,
 } from "../helper/index.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -59,19 +59,8 @@ async function withDefaultOptions(
   }
 }
 
-async function expectConnectionState(
-  states: ConnectionStatePacket[],
-  state: ConnectionStatePacket["state"]["state"],
-): Promise<void> {
-  await vi.waitFor(() => expect(states.some((packet) => packet.state.state === state)).toBe(true));
-}
-
 async function expectLiveConnections(directory: RelayDirectory, count: number): Promise<void> {
   await vi.waitFor(() => expect(directory.get(relay)?.liveConnections).toBe(count));
-}
-
-async function expectPacketCount(packets: EventPacket[], count: number): Promise<void> {
-  await vi.waitFor(() => expect(packets).toHaveLength(count));
 }
 
 describe("RxNostr facade lifecycle", () => {
@@ -91,16 +80,18 @@ describe("RxNostr facade lifecycle", () => {
         async () => {
           const rxNostr = new RxNostr();
           const request = new RxReq();
-          const subscription = rxNostr.forward(relay, request).subscribe();
+          const inspector = new SubscriptionInspector<EventPacket>();
+          const subscription = rxNostr.forward(relay, request).subscribe(inspector);
 
           request.emit([{}]);
-          server.sockets.latest.open();
-          await expectSent(server.sockets.latest, "REQ");
+          const socket = server.sockets.latest;
+          socket.open();
+          await expectSent(socket, "REQ");
 
           subscription.unsubscribe();
           rxNostr.dispose();
-          await expectSocketCloseRequested(server.sockets.latest);
-          server.sockets.latest.acknowledgeClose();
+          await expectSocketCloseRequested(socket);
+          socket.acknowledgeClose();
         },
       );
     });
@@ -121,18 +112,20 @@ describe("RxNostr facade lifecycle", () => {
             skipFetchNip11: true,
             WebSocket: server.WebSocket,
           });
-          const complete = vi.fn();
+          const inspector = new SubscriptionInspector<EventPacket>();
 
-          rxNostr.backward(relay, [{}]).subscribe({ complete });
+          rxNostr.backward(relay, [{}]).subscribe(inspector);
 
-          server.sockets.latest.open();
-          const [, subId] = await expectSent(server.sockets.latest, "REQ");
-          server.sockets.latest.message(["EOSE", subId]);
+          const socket = server.sockets.latest;
 
-          await expectObservableCompleted(complete);
-          await expectSocketCloseRequested(server.sockets.latest);
+          socket.open();
+          const [, subId] = await expectSent(socket, "REQ");
+          socket.message(["EOSE", subId]);
 
-          server.sockets.latest.acknowledgeClose();
+          await expect(inspector.waitComplete()).resolves.toBeUndefined();
+          await expectSocketCloseRequested(socket);
+
+          socket.acknowledgeClose();
           rxNostr.dispose();
         },
       );
@@ -150,28 +143,30 @@ describe("RxNostr facade lifecycle", () => {
         skipFetchNip11: true,
         WebSocket: server.WebSocket,
       });
-      const states: ConnectionStatePacket[] = [];
-      const stateComplete = vi.fn();
-      rxNostr.monitorConnectionState().subscribe({
-        next: (packet) => states.push(packet),
-        complete: stateComplete,
-      });
+      const firstInspector = new SubscriptionInspector<ConnectionStatePacket>();
+
+      rxNostr.monitorConnectionState().subscribe(firstInspector);
 
       rxNostr.setHotRelays(relay);
       const connection = server.sockets.latest;
       connection.open();
-      await expectConnectionState(states, "connected");
+      await firstInspector.ignoreNexts(2);
+      await expect(firstInspector.waitNext()).resolves.toMatchObject({
+        state: { state: "connected" },
+      });
 
       const request = new RxReq();
-      const reqComplete = vi.fn();
-      rxNostr.forward(relay, request).subscribe({ complete: reqComplete });
+      const secondInspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.forward(relay, request).subscribe(secondInspector);
       request.emit([{}]);
       const delayedReq = rxNostr.backward(relay, [{}]);
       const delayedMonitor = rxNostr.monitorConnectionState();
 
       const publication = rxNostr.publish(relay, signedEvent);
-      const publicationComplete = vi.fn();
-      publication.subscribe({ complete: publicationComplete });
+      const thirdInspector = new SubscriptionInspector<unknown>();
+
+      publication.subscribe(thirdInspector);
       const cancelled = expect(publication.waitFor("all")).rejects.toMatchObject({
         code: "cancelled",
       });
@@ -180,31 +175,43 @@ describe("RxNostr facade lifecycle", () => {
       rxNostr.dispose();
       rxNostr[Symbol.dispose]();
 
-      expect(reqComplete).toHaveBeenCalledOnce();
-      expect(publicationComplete).toHaveBeenCalledOnce();
+      expect(secondInspector.completed).toBe(true);
+      expect(thirdInspector.completed).toBe(true);
       await cancelled;
       expect(() => rxNostr.setHotRelays(relay)).toThrow(RxNostrAlreadyDisposedError);
       expect(() => rxNostr.unsetHotRelays()).toThrow(RxNostrAlreadyDisposedError);
       expect(() => rxNostr.publish(relay, signedEvent)).toThrow(RxNostrAlreadyDisposedError);
 
-      const delayedReqError = vi.fn();
-      delayedReq.subscribe({ error: delayedReqError });
-      expect(delayedReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
-      const newReqError = vi.fn();
+      const fourthInspector = new SubscriptionInspector<EventPacket>();
 
-      rxNostr.backward(relay, [{}]).subscribe({ error: newReqError });
-      expect(newReqError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
+      delayedReq.subscribe(fourthInspector);
+      await expect(fourthInspector.waitError()).resolves.toEqual(
+        expect.any(RxNostrAlreadyDisposedError),
+      );
+      const fifthInspector = new SubscriptionInspector<EventPacket>();
 
-      const monitorError = vi.fn();
+      rxNostr.backward(relay, [{}]).subscribe(fifthInspector);
+      await expect(fifthInspector.waitError()).resolves.toEqual(
+        expect.any(RxNostrAlreadyDisposedError),
+      );
 
-      delayedMonitor.subscribe({ error: monitorError });
-      expect(monitorError).toHaveBeenCalledWith(expect.any(RxNostrAlreadyDisposedError));
+      const sixthInspector = new SubscriptionInspector<ConnectionStatePacket>();
+
+      delayedMonitor.subscribe(sixthInspector);
+      await expect(sixthInspector.waitError()).resolves.toEqual(
+        expect.any(RxNostrAlreadyDisposedError),
+      );
 
       await expectSocketCloseRequested(connection);
 
       connection.acknowledgeClose();
-      await expectConnectionState(states, "disposed");
-      await expectObservableCompleted(stateComplete);
+      await expect(firstInspector.waitNext()).resolves.toMatchObject({
+        state: { state: "dormant" },
+      });
+      await expect(firstInspector.waitNext()).resolves.toMatchObject({
+        state: { state: "disposed" },
+      });
+      await expect(firstInspector.waitComplete()).resolves.toBeUndefined();
     });
   });
 
@@ -233,21 +240,23 @@ describe("RxNostr facade lifecycle", () => {
 
       expect(firstServer.connections).toHaveLength(1);
       expect(secondServer.connections).toHaveLength(1);
-      expect(firstServer.sockets.latest).not.toBe(secondServer.sockets.latest);
+      const socket2 = secondServer.sockets.latest;
+      const socket = firstServer.sockets.latest;
+      expect(socket).not.toBe(socket2);
 
-      firstServer.sockets.latest.open();
-      secondServer.sockets.latest.open();
+      socket.open();
+      socket2.open();
       await expectLiveConnections(directory, 2);
 
       first.dispose();
-      await expectSocketCloseRequested(firstServer.sockets.latest);
-      firstServer.sockets.latest.acknowledgeClose();
+      await expectSocketCloseRequested(socket);
+      socket.acknowledgeClose();
       await expectLiveConnections(directory, 1);
-      expect(secondServer.sockets.latest.closeRequests).toHaveLength(0);
+      expect(socket2.closeRequests).toHaveLength(0);
 
       second.dispose();
-      await expectSocketCloseRequested(secondServer.sockets.latest);
-      secondServer.sockets.latest.acknowledgeClose();
+      await expectSocketCloseRequested(socket2);
+      socket2.acknowledgeClose();
       await expectLiveConnections(directory, 0);
     });
   });
@@ -271,7 +280,7 @@ describe("RxNostr facade lifecycle", () => {
         WebSocket: server.WebSocket,
       });
       const request = new RxReq();
-      const packets: EventPacket[] = [];
+      const inspector = new SubscriptionInspector<EventPacket>();
 
       rxNostr
         .backward(relay, request, {
@@ -279,7 +288,7 @@ describe("RxNostr facade lifecycle", () => {
           skipValidateFilterMatching: false,
           skipExpirationCheck: false,
         })
-        .subscribe((packet) => packets.push(packet));
+        .subscribe(inspector);
 
       request.emit([{ kinds: [1] }], {
         relays: "wss://packet.example.com",
@@ -287,13 +296,14 @@ describe("RxNostr facade lifecycle", () => {
       });
 
       expect(server.connections).toHaveLength(1);
-      expect(server.sockets.latest.url).toBe("wss://packet.example.com");
+      const socket = server.sockets.latest;
+      expect(socket.url).toBe("wss://packet.example.com");
 
-      server.sockets.latest.open();
-      const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      socket.open();
+      const [, subId] = await expectSent(socket, "REQ");
       const now = Math.floor(Date.now() / 1_000);
-      server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
-      server.sockets.latest.message([
+      socket.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
+      socket.message([
         "EVENT",
         subId,
         {
@@ -302,11 +312,10 @@ describe("RxNostr facade lifecycle", () => {
           tags: [["expiration", `${now - 1}`]],
         },
       ]);
-      server.sockets.latest.message(["EVENT", subId, { ...signedEvent, id: "accepted" }]);
-      server.sockets.latest.message(["EOSE", subId]);
+      socket.message(["EVENT", subId, { ...signedEvent, id: "accepted" }]);
+      socket.message(["EOSE", subId]);
 
-      await expectPacketCount(packets, 1);
-      expect(packets[0]).toMatchObject({
+      await expect(inspector.waitNext()).resolves.toMatchObject({
         traceTag: "packet",
         event: { id: "accepted" },
       });
@@ -316,8 +325,8 @@ describe("RxNostr facade lifecycle", () => {
         "accepted",
       ]);
 
-      await expectSocketCloseRequested(server.sockets.latest);
-      server.sockets.latest.acknowledgeClose();
+      await expectSocketCloseRequested(socket);
+      socket.acknowledgeClose();
       rxNostr.dispose();
     });
   });

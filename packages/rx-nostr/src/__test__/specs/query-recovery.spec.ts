@@ -1,8 +1,10 @@
-import { RelayDirectory, RxReq, RxRelays } from "rx-nostr";
+import { RelayDirectory, RxRelays, RxReq } from "rx-nostr";
 import { describe, expect, vi } from "vitest";
 
+import type { EventPacket } from "../../packets/packets.interface.ts";
 import { createDeferred, Faker } from "../helper/index.ts";
-import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
+import { settleQuery, queryTest as test } from "../helper/query-lifecycle-scenario.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const a = "wss://a.example.com";
 const b = "wss://b.example.com";
@@ -15,7 +17,8 @@ describe("destination changes during queued and recovering REQs", () => {
     directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
     const { rxNostr, server } = createScenario({ relayDirectory: directory });
     using source = new RxReq();
-    const query = rxNostr.backward(a, source).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const query = rxNostr.backward(a, source).subscribe(inspector);
     source.emit([{ kinds: [1] }]);
     source.emit([{ kinds: [2] }]);
     source.emit([{ kinds: [3] }]);
@@ -37,12 +40,14 @@ describe("destination changes during queued and recovering REQs", () => {
     directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
     const { rxNostr, server } = createScenario({ relayDirectory: directory });
     using source = new RxReq();
-    const blocker = rxNostr.backward(a, [{}]).subscribe();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const blocker = rxNostr.backward(a, [{}]).subscribe(firstInspector);
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
     const blockerId = socket.latestSent("REQ")[1];
-    const query = rxNostr.forward(a, source).subscribe();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    const query = rxNostr.forward(a, source).subscribe(secondInspector);
     source.emit([{ kinds: [1] }]);
     source.emit([{ kinds: [2] }]);
     await settleQuery();
@@ -63,10 +68,11 @@ describe("destination changes during queued and recovering REQs", () => {
     directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
     const { rxNostr, server } = createScenario({ relayDirectory: directory });
     using destinations = new RxRelays([a, b]);
-    const blocker = rxNostr.backward(a, [{}]).subscribe();
-    const complete = vi.fn();
-    const next = vi.fn();
-    rxNostr.backward(destinations, [{}]).subscribe({ next, complete });
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const blocker = rxNostr.backward(a, [{}]).subscribe(firstInspector);
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward(destinations, [{}]).subscribe(secondInspector);
     for (const socket of server.connections) socket.open();
     await settleQuery();
     destinations.remove(a);
@@ -78,8 +84,8 @@ describe("destination changes during queued and recovering REQs", () => {
     await settleQuery();
     expect(first.sentOfType("REQ")).toHaveLength(1);
     expect(first.sentOfType("CLOSE")).toHaveLength(0);
-    expect(next).toHaveBeenCalledOnce();
-    expect(complete).toHaveBeenCalledOnce();
+    await expect(secondInspector.waitNext()).resolves.toMatchObject({ from: b });
+    expect(secondInspector.completed).toBe(true);
     blocker.unsubscribe();
   });
 
@@ -92,11 +98,13 @@ describe("destination changes during queued and recovering REQs", () => {
       using destinations = new RxRelays([a]);
       using source = new RxReq();
       rxNostr.setHotRelays(a);
-      const query = rxNostr.forward(destinations, source).subscribe();
+      const inspector = new SubscriptionInspector<EventPacket>();
+      const query = rxNostr.forward(destinations, source).subscribe(inspector);
       source.emit([{ kinds: [1] }]);
-      server.sockets.latest.open();
+      const socket = server.sockets.latest;
+      socket.open();
       await settleQuery();
-      server.sockets.latest.peerClose(1006, "offline");
+      socket.peerClose(1006, "offline");
       await settleQuery();
       if (change === "replace") source.emit([{ kinds: [2] }]);
       else destinations.clear();
@@ -120,9 +128,11 @@ describe("shared AUTH and cancellation", () => {
     const auth = createDeferred<ReturnType<typeof Faker.authEvent>>();
     const challenge = vi.fn(() => auth.promise);
     const { rxNostr, server } = createScenario({ authenticator: { challenge } });
-    const first = rxNostr.backward(a, [{ kinds: [1] }]).subscribe();
-    const complete = vi.fn();
-    rxNostr.backward(a, [{ kinds: [2] }]).subscribe({ complete });
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const first = rxNostr.backward(a, [{ kinds: [1] }]).subscribe(firstInspector);
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward(a, [{ kinds: [2] }]).subscribe(secondInspector);
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
@@ -146,7 +156,7 @@ describe("shared AUTH and cancellation", () => {
     ]);
     socket.message(["EOSE", socket.latestSent("REQ")[1]]);
     await settleQuery();
-    expect(complete).toHaveBeenCalledOnce();
+    expect(secondInspector.completed).toBe(true);
   });
 
   test.for(["auth-signing", "auth-ok", "event-signing"] as const)(
@@ -171,7 +181,10 @@ describe("shared AUTH and cancellation", () => {
             },
           },
         );
-      } else rxNostr.backward(a, [{}]).subscribe();
+      } else {
+        const inspector = new SubscriptionInspector<EventPacket>();
+        rxNostr.backward(a, [{}]).subscribe(inspector);
+      }
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();

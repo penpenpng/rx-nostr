@@ -1,7 +1,11 @@
+import { tap } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer, expectSent, Faker } from "../../../../__test__/helper/index.ts";
+import { SubscriptionInspector } from "../../../../__test__/helper/subscription-inspector.ts";
 import type { AuthenticatorInput } from "../../../../authenticator/index.ts";
+import type { ConnectionState } from "../../../../connection-state.ts";
+import type { OkPacket } from "../../../../packets/packets.interface.ts";
 import { NostrTransport } from "../../transport/index.ts";
 import { NostrOperationExecutor } from "../nostr-operation-executor.ts";
 import { AuthCoordinator } from "./auth-coordinator.ts";
@@ -20,11 +24,13 @@ async function setup(authenticator?: AuthenticatorInput) {
   });
   const executor = new NostrOperationExecutor(relay, transport, { authenticator });
   const opened = executor.open();
-  server.sockets.latest.open();
+  const socket = server.sockets.latest;
+  socket.open();
   await opened;
   cleanups.push(() => {
     executor.dispose();
-    server.sockets.latest.acknowledgeClose();
+    const socket = server.sockets.latest;
+    socket.acknowledgeClose();
   });
   return { server, transport, executor };
 }
@@ -37,53 +43,59 @@ describe("connection AUTH lifecycle", () => {
   test("authenticates proactively, shares duplicate challenges and holds ordinary sends", async () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
-    server.sockets.latest.message(["AUTH", "one"]);
-    server.sockets.latest.message(["AUTH", "one"]);
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
+    socket.message(["AUTH", "one"]);
     const event = Faker.event({ id: "event" });
-    const complete = vi.fn();
-    executor.event(event).subscribe({ complete });
-    await expectSent(server.sockets.latest, "AUTH");
-    expect(server.sockets.latest.sentOfType("EVENT")).toHaveLength(0);
+    const inspector = new SubscriptionInspector<OkPacket>();
+
+    executor.event(event).subscribe(inspector);
+    await expectSent(socket, "AUTH");
+    expect(socket.sentOfType("EVENT")).toHaveLength(0);
     expect(challenge).toHaveBeenCalledOnce();
-    server.sockets.latest.message(["OK", "auth-one", true, ""]);
-    await expectSent(server.sockets.latest, "EVENT");
+    socket.message(["OK", "auth-one", true, ""]);
+    await expectSent(socket, "EVENT");
     // Authentication has already completed when the refusal arrives.
-    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
-    await expectSent(server.sockets.latest, "EVENT", 2);
-    server.sockets.latest.message(["OK", "event", false, "auth-required: again"]);
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    socket.message(["OK", "event", false, "auth-required: login"]);
+    await expectSent(socket, "EVENT", 2);
+    socket.message(["OK", "event", false, "auth-required: again"]);
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
     expect(challenge).toHaveBeenCalledOnce();
   });
 
   test("retains failure, releases unrelated sends and permits a new generation", async () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
-    server.sockets.latest.message(["AUTH", "one"]);
-    const complete = vi.fn();
-    executor.event(Faker.event({ id: "event" })).subscribe({ complete });
-    await expectSent(server.sockets.latest, "AUTH");
-    server.sockets.latest.message(["OK", "auth-one", false, "denied"]);
-    await expectSent(server.sockets.latest, "EVENT");
-    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
+    const inspector = new SubscriptionInspector<OkPacket>();
+
+    executor.event(Faker.event({ id: "event" })).subscribe(inspector);
+    await expectSent(socket, "AUTH");
+    socket.message(["OK", "auth-one", false, "denied"]);
+    await expectSent(socket, "EVENT");
+    socket.message(["OK", "event", false, "auth-required: login"]);
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
     expect(challenge).toHaveBeenCalledOnce();
-    server.sockets.latest.message(["AUTH", "two"]);
-    await expectSent(server.sockets.latest, "AUTH", 2);
+    socket.message(["AUTH", "two"]);
+    await expectSent(socket, "AUTH", 2);
     expect(challenge).toHaveBeenCalledTimes(2);
   });
 
   test("old OK cannot release sends waiting on the replacement generation", async () => {
     const { server, executor } = await setup({ challenge: async (_relay, value) => signed(value) });
-    server.sockets.latest.message(["AUTH", "one"]);
-    await expectSent(server.sockets.latest, "AUTH");
-    executor.event(Faker.event({ id: "event" })).subscribe();
-    server.sockets.latest.message(["AUTH", "two"]);
-    await expectSent(server.sockets.latest, "AUTH", 2);
-    server.sockets.latest.message(["OK", "auth-one", true, ""]);
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
+    await expectSent(socket, "AUTH");
+    const inspector = new SubscriptionInspector<OkPacket>();
+    executor.event(Faker.event({ id: "event" })).subscribe(inspector);
+    socket.message(["AUTH", "two"]);
+    await expectSent(socket, "AUTH", 2);
+    socket.message(["OK", "auth-one", true, ""]);
     await flush();
-    expect(server.sockets.latest.sentOfType("EVENT")).toHaveLength(0);
-    server.sockets.latest.message(["OK", "auth-two", true, ""]);
-    await expectSent(server.sockets.latest, "EVENT");
+    expect(socket.sentOfType("EVENT")).toHaveLength(0);
+    socket.message(["OK", "auth-two", true, ""]);
+    await expectSent(socket, "EVENT");
   });
 
   test("operation cancellation does not abandon connection AUTH or allow a second attempt", async () => {
@@ -95,42 +107,50 @@ describe("connection AUTH lifecycle", () => {
         }),
     );
     const { server, executor } = await setup({ challenge });
+    const firstInspector = new SubscriptionInspector<OkPacket>();
     executor
       .event(Faker.event({ id: "event" }))
-      .subscribe()
+      .subscribe(firstInspector)
       .unsubscribe();
-    server.sockets.latest.message(["AUTH", "one"]);
-    const subscription = executor.event(Faker.event({ id: "cancelled" })).subscribe();
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
+    const secondInspector = new SubscriptionInspector<OkPacket>();
+    const subscription = executor
+      .event(Faker.event({ id: "cancelled" }))
+      .subscribe(secondInspector);
     await vi.waitFor(() => expect(challenge).toHaveBeenCalledOnce());
     subscription.unsubscribe();
     resolve(signed("one"));
-    await expectSent(server.sockets.latest, "AUTH");
-    server.sockets.latest.message(["OK", "auth-one", true, ""]);
+    await expectSent(socket, "AUTH");
+    socket.message(["OK", "auth-one", true, ""]);
     await flush();
-    expect(server.sockets.latest.sentOfType("EVENT")).toHaveLength(0);
-    server.sockets.latest.message(["AUTH", "one"]);
+    expect(socket.sentOfType("EVENT")).toHaveLength(0);
+    socket.message(["AUTH", "one"]);
     await flush();
     expect(challenge).toHaveBeenCalledOnce();
   });
 
   test("a cancelled auth-required operation is not retransmitted", async () => {
     const { server, executor } = await setup({ challenge: async (_relay, value) => signed(value) });
-    const subscription = executor.event(Faker.event({ id: "event" })).subscribe();
-    await expectSent(server.sockets.latest, "EVENT");
-    server.sockets.latest.message(["AUTH", "one"]);
-    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
-    await expectSent(server.sockets.latest, "AUTH");
+    const inspector = new SubscriptionInspector<OkPacket>();
+    const subscription = executor.event(Faker.event({ id: "event" })).subscribe(inspector);
+    const socket = server.sockets.latest;
+    await expectSent(socket, "EVENT");
+    socket.message(["AUTH", "one"]);
+    socket.message(["OK", "event", false, "auth-required: login"]);
+    await expectSent(socket, "AUTH");
     subscription.unsubscribe();
-    server.sockets.latest.message(["OK", "auth-one", true, ""]);
+    socket.message(["OK", "auth-one", true, ""]);
     await flush();
-    expect(server.sockets.latest.sentOfType("EVENT")).toHaveLength(1);
+    expect(socket.sentOfType("EVENT")).toHaveLength(1);
   });
 
   test("reconnect retransmission waits on the new connection challenge", async () => {
     const { server, executor, transport } = await setup({
       challenge: async (_relay, value) => signed(value),
     });
-    executor.event(Faker.event({ id: "event" })).subscribe();
+    const inspector = new SubscriptionInspector<OkPacket>();
+    executor.event(Faker.event({ id: "event" })).subscribe(inspector);
     const oldSocket = server.sockets.latest;
     await expectSent(oldSocket, "EVENT");
     oldSocket.message(["AUTH", "old"]);
@@ -138,9 +158,14 @@ describe("connection AUTH lifecycle", () => {
     oldSocket.peerClose(1006, "offline");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     const socket = server.sockets.latest;
-    const notify = transport.state$.subscribe((state) => {
-      if (state.state === "connected") socket.message(["AUTH", "new"]);
-    });
+    const connectionInspector = new SubscriptionInspector<ConnectionState>();
+    const notify = transport.state$
+      .pipe(
+        tap((state) => {
+          if (state.state === "connected") socket.message(["AUTH", "new"]);
+        }),
+      )
+      .subscribe(connectionInspector);
     socket.open();
     await expectSent(socket, "AUTH");
     notify.unsubscribe();
@@ -156,21 +181,21 @@ describe("connection AUTH lifecycle", () => {
   test("several EVENT operations join pending AUTH and each retransmit once", async () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
-    const completed = [vi.fn(), vi.fn()];
-    executor.event(Faker.event({ id: "first" })).subscribe({ complete: completed[0] });
-    executor.event(Faker.event({ id: "second" })).subscribe({ complete: completed[1] });
-    await expectSent(server.sockets.latest, "EVENT", 2);
-    server.sockets.latest.message(["AUTH", "one"]);
-    for (const id of ["first", "second"])
-      server.sockets.latest.message(["OK", id, false, "auth-required: login"]);
-    await expectSent(server.sockets.latest, "AUTH");
-    expect(server.sockets.latest.sentOfType("EVENT")).toHaveLength(2);
-    server.sockets.latest.message(["OK", "auth-one", true, ""]);
-    await expectSent(server.sockets.latest, "EVENT", 4);
-    for (const id of ["first", "second"]) server.sockets.latest.message(["OK", id, true, "saved"]);
-    await vi.waitFor(() => {
-      for (const complete of completed) expect(complete).toHaveBeenCalledOnce();
-    });
+    const inspectors = [new SubscriptionInspector<unknown>(), new SubscriptionInspector<unknown>()];
+    executor.event(Faker.event({ id: "first" })).subscribe(inspectors[0]);
+    executor.event(Faker.event({ id: "second" })).subscribe(inspectors[1]);
+    const socket = server.sockets.latest;
+    await expectSent(socket, "EVENT", 2);
+    socket.message(["AUTH", "one"]);
+    for (const id of ["first", "second"]) socket.message(["OK", id, false, "auth-required: login"]);
+    await expectSent(socket, "AUTH");
+    expect(socket.sentOfType("EVENT")).toHaveLength(2);
+    socket.message(["OK", "auth-one", true, ""]);
+    await expectSent(socket, "EVENT", 4);
+    for (const id of ["first", "second"]) socket.message(["OK", id, true, "saved"]);
+    await Promise.all(
+      inspectors.map((inspector) => expect(inspector.waitComplete()).resolves.toBeUndefined()),
+    );
     expect(challenge).toHaveBeenCalledOnce();
   });
 
@@ -180,13 +205,14 @@ describe("connection AUTH lifecycle", () => {
       throw cause;
     });
     const { server, executor } = await setup(factory);
-    server.sockets.latest.message(["AUTH", "one"]);
-    const errors = vi.fn();
-    executor.event(Faker.event({ id: "event" })).subscribe({ error: errors });
-    await expectSent(server.sockets.latest, "EVENT");
-    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
-    await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
-    expect(errors.mock.calls[0]![0]).toMatchObject({
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
+    const inspector = new SubscriptionInspector<OkPacket>();
+
+    executor.event(Faker.event({ id: "event" })).subscribe(inspector);
+    await expectSent(socket, "EVENT");
+    socket.message(["OK", "event", false, "auth-required: login"]);
+    expect(await inspector.waitError()).toMatchObject({
       name: "RxNostrCallbackError",
       callback: "authenticator",
       cause,
@@ -196,18 +222,20 @@ describe("connection AUTH lifecycle", () => {
 
   test("CLOSE bypasses pending AUTH", async () => {
     const { server, executor, transport } = await setup({ challenge: () => new Promise(() => {}) });
-    server.sockets.latest.message(["AUTH", "one"]);
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
     await transport.cast(["CLOSE", "subscription"]);
-    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", "subscription"]);
+    expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", "subscription"]);
     executor.dispose();
   });
 
   test("disabled authentication retains challenge without starting an attempt", async () => {
     const { server, transport } = await setup();
     const auth = new AuthCoordinator(relay, transport);
-    server.sockets.latest.message(["AUTH", "one"]);
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "one"]);
     await expect(auth.authenticate()).rejects.toMatchObject({ reason: "disabled" });
-    expect(server.sockets.latest.sentOfType("AUTH")).toHaveLength(0);
+    expect(socket.sentOfType("AUTH")).toHaveLength(0);
     auth.dispose();
   });
 });

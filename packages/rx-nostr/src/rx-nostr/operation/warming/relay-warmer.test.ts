@@ -1,8 +1,9 @@
 import type * as Nostr from "nostr-typedef";
-import { EMPTY } from "rxjs";
+import { EMPTY, map } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer } from "../../../__test__/helper/index.ts";
+import { SubscriptionInspector } from "../../../__test__/helper/subscription-inspector.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RelayUrl } from "../../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../../packets/index.ts";
@@ -134,18 +135,21 @@ describe("RelayWarmer", () => {
     const warmer = new RelayWarmer(collection);
 
     warmer.setHotRelays(["wss://relay.example.com"]);
-    const states: string[] = [];
+    const inspector = new SubscriptionInspector<string>();
     collection
       .get("wss://relay.example.com")
       .monitorConnectionState()
-      .subscribe((state) => states.push(state.state));
-    server.sockets.latest.open();
-    await vi.waitFor(() => expect(states).toContain("connected"));
-    expect(server.sockets.latest.sent).toEqual([]);
+      .pipe(map((state) => state.state))
+      .subscribe(inspector);
+    const socket = server.sockets.latest;
+    socket.open();
+    await inspector.ignoreNexts(1);
+    await expect(inspector.waitNext()).resolves.toBe("connected");
+    expect(socket.sent).toEqual([]);
 
     warmer.unsetHotRelays();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
     warmer.dispose();
     collection.dispose();
   });

@@ -1,7 +1,9 @@
-import { RxReq, RxRelays } from "rx-nostr";
+import { RxRelays, RxReq } from "rx-nostr";
 import { describe, expect, vi } from "vitest";
 
-import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
+import type { EventPacket } from "../../packets/packets.interface.ts";
+import { settleQuery, queryTest as test } from "../helper/query-lifecycle-scenario.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const relay = "wss://linger.example.com";
 
@@ -20,14 +22,14 @@ describe("backward demand after query finalization", () => {
       const { rxNostr, server } = createScenario();
       using request = new RxReq();
       using destinations = new RxRelays([relay]);
-      const complete = vi.fn();
-      const error = vi.fn();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
       const subscription = rxNostr
         .backward(destinations, ending === "source-dispose" ? request : [{}], {
           linger: 100,
           timeout: ending === "timeout" ? 10 : Infinity,
         })
-        .subscribe({ complete, error });
+        .subscribe(inspector);
       if (ending === "source-dispose") request.emit([{}]);
       const socket = server.sockets.latest;
       if (ending === "error")
@@ -62,7 +64,8 @@ describe("backward demand after query finalization", () => {
     "dispose ends finalized demand immediately with linger=%s",
     async (linger, { createScenario }) => {
       const { rxNostr, server } = createScenario();
-      rxNostr.backward(relay, [{}], { linger }).subscribe();
+      const inspector = new SubscriptionInspector<EventPacket>();
+      rxNostr.backward(relay, [{}], { linger }).subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
@@ -86,14 +89,16 @@ describe("backward demand after query finalization", () => {
     createScenario,
   }) => {
     const { rxNostr, server } = createScenario();
-    rxNostr.backward(relay, [{}], { linger: 100 }).subscribe();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    rxNostr.backward(relay, [{}], { linger: 100 }).subscribe(firstInspector);
     const socket = server.sockets.latest;
     socket.open();
     await settleQuery();
     socket.message(["EOSE", socket.latestSent("REQ")[1]]);
     await vi.advanceTimersByTimeAsync(50);
 
-    rxNostr.backward(relay, [{}], { linger: 200 }).subscribe();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    rxNostr.backward(relay, [{}], { linger: 200 }).subscribe(secondInspector);
     await settleQuery();
     const second = socket.latestSent("REQ");
     await vi.advanceTimersByTimeAsync(50);
@@ -111,8 +116,9 @@ describe("backward demand after query finalization", () => {
   }) => {
     const { rxNostr, server } = createScenario();
     using source = new RxReq();
-    const complete = vi.fn();
-    rxNostr.backward(relay, source, { linger: 500 }).subscribe({ complete });
+    const inspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward(relay, source, { linger: 500 }).subscribe(inspector);
     source.emit([{}], { linger: 100 });
     source.emit([{}], { linger: 200 });
     source.dispose();
@@ -121,7 +127,7 @@ describe("backward demand after query finalization", () => {
     await settleQuery();
     for (const req of socket.sentOfType("REQ")) socket.message(["EOSE", req[1]]);
     await settleQuery();
-    expect(complete).toHaveBeenCalledOnce();
+    expect(inspector.completed).toBe(true);
     await vi.advanceTimersByTimeAsync(100);
     expect(socket.closeRequests).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(100);

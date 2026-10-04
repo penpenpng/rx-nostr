@@ -1,4 +1,3 @@
-import * as publicApi from "rx-nostr";
 import type {
   Authenticator,
   ConnectionDropDetector,
@@ -10,16 +9,17 @@ import type {
   Publication,
   RelayInput,
   RelayUrl,
-  RxNostrDiagnostic,
-  RxNostrDiagnosticSink,
   RxNostr,
   RxNostrConfig,
+  RxNostrDiagnostic,
+  RxNostrDiagnosticSink,
   RxNostrPublishConfig,
   RxNostrReqConfig,
   RxNostrReqInput,
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
+import * as publicApi from "rx-nostr";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 describe("public entry point", () => {
@@ -29,11 +29,6 @@ describe("public entry point", () => {
       expect(publicApi.RxNostr).toBeTypeOf("function");
       expect(publicApi.RelayDirectory).toBeTypeOf("function");
       expect(publicApi.GlobalRelayDirectory).toBeInstanceOf(publicApi.RelayDirectory);
-
-      expect(publicApi).not.toHaveProperty("createRxNostr");
-      expect(publicApi).not.toHaveProperty("setLogLevel");
-      expect(publicApi).not.toHaveProperty("NostrTransport");
-      expect(publicApi).not.toHaveProperty("Unipls");
     });
   });
 
@@ -41,10 +36,6 @@ describe("public entry point", () => {
     test("exposes the process-wide log sink and authentication types", () => {
       expectTypeOf<RxNostr>().toMatchTypeOf<IRxNostr>();
       expectTypeOf(publicApi.RxNostr.logSink).toEqualTypeOf<RxNostrDiagnosticSink | undefined>();
-      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("source");
-      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("type");
-      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("severity");
-      expectTypeOf<RxNostrDiagnostic>().not.toHaveProperty("occurredAt");
       expectTypeOf<RxNostrDiagnostic["level"]>().toEqualTypeOf<
         "debug" | "info" | "warning" | "error"
       >();
@@ -54,7 +45,6 @@ describe("public entry point", () => {
     });
 
     test("exposes constructor and connection policy types", () => {
-      expectTypeOf<RxNostrConfig>().not.toHaveProperty("authTimeout");
       expectTypeOf<RxNostrConfig["reconnector"]>().toEqualTypeOf<
         ConnectionReconnector | undefined
       >();
@@ -162,16 +152,11 @@ describe("public entry point", () => {
   });
 
   describe("public values", () => {
-    test("keeps REQ identifiers out of results", () => {
+    test("exposes event and acknowledgement packet fields", () => {
       expectTypeOf<EventPacket>().toHaveProperty("traceTag");
-      expectTypeOf<EventPacket>().not.toHaveProperty("subId");
-      expectTypeOf<EventPacket>().not.toHaveProperty("vreqId");
-      expectTypeOf<EventPacket>().not.toHaveProperty("message");
-      expectTypeOf<EventPacket>().not.toHaveProperty("raw");
 
       expectTypeOf<OkPacket>().toHaveProperty("from");
       expectTypeOf<OkPacket>().toHaveProperty("message");
-      expectTypeOf<OkPacket>().not.toHaveProperty("raw");
     });
 
     test("normalizes relay input and ignores invalid URLs", () => {

@@ -5,16 +5,17 @@ import { describe, expect, test, vi } from "vitest";
 import {
   createDeferred,
   createPublicationScenario,
+  publicationEvent as event,
   expectConnectionCount,
   expectPublicationSent as expectEventSent,
   expectSent,
   expectSocketCloseRequested,
   Faker,
-  publicationEvent as event,
   publicationRelay1 as relay1,
   publicationRelay2 as relay2,
   publicationSocket as socket,
 } from "../helper/index.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 describe("Publication lifecycle", () => {
   describe("cancellation and connection ownership", () => {
@@ -26,16 +27,16 @@ describe("Publication lifecycle", () => {
       };
       const { server, rxNostr } = createPublicationScenario();
       const publication = rxNostr.publish(relay1, event(), { signer });
-      const complete = vi.fn();
+      const inspector = new SubscriptionInspector<unknown>();
 
-      publication.subscribe({ complete });
+      publication.subscribe(inspector);
       const all = publication.waitFor("all");
 
       publication.cancel();
       publication.cancel();
 
       await expect(all).rejects.toMatchObject({ code: "cancelled" });
-      expect(complete).toHaveBeenCalledOnce();
+      expect(inspector.completed).toBe(true);
 
       signing.resolve(event({ id: "cancelled-event" }));
 
@@ -43,7 +44,8 @@ describe("Publication lifecycle", () => {
         id: "cancelled-event",
       });
       await Promise.resolve();
-      expect(server.sockets.latest.sent).toHaveLength(0);
+      const socket = server.sockets.latest;
+      expect(socket.sent).toHaveLength(0);
 
       rxNostr.dispose();
     });
@@ -56,7 +58,7 @@ describe("Publication lifecycle", () => {
       };
       const { server, rxNostr } = createPublicationScenario();
       const publication = rxNostr.publish(relay1, event(), { signer });
-      const observed = vi.fn();
+      const observed = new SubscriptionInspector<OkPacket>();
 
       publication.subscribe(observed).unsubscribe();
       const all = publication.waitFor("all");
@@ -70,7 +72,7 @@ describe("Publication lifecycle", () => {
       connection.message(["OK", "event", true, "saved"]);
 
       await expect(all).resolves.toBeUndefined();
-      expect(observed).not.toHaveBeenCalled();
+      expect(observed.length).toBe(0);
 
       rxNostr.dispose();
     });
@@ -141,9 +143,9 @@ describe("Publication lifecycle", () => {
         },
       });
       const publication = rxNostr.publish(relay1, event());
-      const packets: OkPacket[] = [];
+      const inspector = new SubscriptionInspector<OkPacket>();
 
-      publication.subscribe((packet) => packets.push(packet));
+      publication.subscribe(inspector);
       const all = publication.waitFor("all");
       let settled = false;
       void all.finally(() => (settled = true));
@@ -155,13 +157,13 @@ describe("Publication lifecycle", () => {
       connection.message(["OK", "event", false, "auth-required: login"]);
       expect(await expectSent(connection, "AUTH")).toEqual(["AUTH", authEvent]);
       expect(settled).toBe(false);
-      expect(packets).toHaveLength(1);
+      await expect(inspector.waitNext()).resolves.toMatchObject({ ok: false });
 
       connection.message(["OK", "auth-event", true, "authenticated"]);
       await expectSent(connection, "EVENT", 2);
       connection.message(["OK", "event", true, "saved"]);
       await expect(all).resolves.toBeUndefined();
-      expect(packets.map((packet) => packet.ok)).toEqual([false, true]);
+      await expect(inspector.waitNext()).resolves.toMatchObject({ ok: true });
 
       rxNostr.dispose();
     });

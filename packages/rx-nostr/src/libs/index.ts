@@ -1,7 +1,6 @@
 // Since everything in libs is generally intended for widespread use,
 // wildcard exports are used without consideration for tree shaking.
 
-export * from "./awaitable-queue.ts";
 export * from "./deferrer.ts";
 export * from "./error.ts";
 export * from "./nostr/event.ts";

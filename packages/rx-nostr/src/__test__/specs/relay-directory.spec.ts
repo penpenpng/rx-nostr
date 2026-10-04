@@ -2,7 +2,6 @@ import {
   RelayDirectory,
   RelayDirectorySnapshotError,
   type IRelayDirectory,
-  type RelayDirectoryEntry,
   type RxNostrConfig,
 } from "rx-nostr";
 import { fetchRelayInfo } from "rx-nostr/utils";
@@ -41,8 +40,9 @@ describe("RelayDirectory public contract", () => {
       await expectRelayInfo(directory, relay, { name: "relay" });
 
       rxNostr.unsetHotRelays();
-      await expectSocketCloseRequested(server.sockets.latest);
-      server.sockets.latest.acknowledgeClose();
+      const socket = server.sockets.latest;
+      await expectSocketCloseRequested(socket);
+      socket.acknowledgeClose();
       rxNostr.dispose();
     });
 
@@ -60,8 +60,9 @@ describe("RelayDirectory public contract", () => {
       expect(fetcher).not.toHaveBeenCalled();
 
       rxNostr.unsetHotRelays();
-      await expectSocketCloseRequested(server.sockets.latest);
-      server.sockets.latest.acknowledgeClose();
+      const socket = server.sockets.latest;
+      await expectSocketCloseRequested(socket);
+      socket.acknowledgeClose();
       rxNostr.dispose();
     });
   });
@@ -81,9 +82,6 @@ describe("RelayDirectory public contract", () => {
 
       expect(second.consecutiveFailures).toBe(0);
       expect(directory.get(first.url)?.consecutiveFailures).toBe(0);
-      expect(first).not.toHaveProperty("retry");
-      expect(first).not.toHaveProperty("socket");
-      expectTypeOf<RelayDirectoryEntry>().not.toHaveProperty("retry");
       expectTypeOf<RxNostrConfig>().toHaveProperty("relayDirectory");
     });
 

@@ -2,7 +2,8 @@ import { RelayDirectory, RxReq, type EventPacket } from "rx-nostr";
 import { describe, expect, vi } from "vitest";
 
 import { createDeferred, Faker } from "../helper/index.ts";
-import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
+import { settleQuery, queryTest as test } from "../helper/query-lifecycle-scenario.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const a = "wss://a.example.com";
 const b = "wss://b.example.com";
@@ -15,16 +16,11 @@ describe("RxReq source completion", () => {
     directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
     const { rxNostr, server } = createScenario({ relayDirectory: directory });
     using source = new RxReq();
-    const firstComplete = vi.fn();
-    const secondComplete = vi.fn();
-    const first: EventPacket[] = [];
-    const second: EventPacket[] = [];
-    rxNostr
-      .backward(a, source)
-      .subscribe({ next: (packet) => first.push(packet), complete: firstComplete });
-    rxNostr
-      .backward(a, source)
-      .subscribe({ next: (packet) => second.push(packet), complete: secondComplete });
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward(a, source).subscribe(firstInspector);
+    rxNostr.backward(a, source).subscribe(secondInspector);
     source.emit([{}], { traceTag: 1 });
     source.emit([{}], { traceTag: 2 });
     const socket = server.sockets.latest;
@@ -35,20 +31,26 @@ describe("RxReq source completion", () => {
 
     source.dispose();
     source.emit([{}], { traceTag: "ignored" });
-    expect(firstComplete).not.toHaveBeenCalled();
-    expect(secondComplete).not.toHaveBeenCalled();
-    for (let index = 1; index < 4; index++) {
+    expect(firstInspector.completed).toBe(false);
+    expect(secondInspector.completed).toBe(false);
+    const results = [
+      { inspector: secondInspector, traceTag: 1 },
+      { inspector: firstInspector, traceTag: 2 },
+      { inspector: secondInspector, traceTag: 2 },
+    ];
+    for (const [index, { inspector, traceTag }] of results.entries()) {
       const id = socket.latestSent("REQ")[1];
-      socket.message(["EVENT", id, Faker.event({ id: `result-${index}` })]);
+      const event = Faker.event({ id: `result-${index + 1}` });
+      socket.message(["EVENT", id, event]);
+      await settleQuery();
+      await expect(inspector.waitNext()).resolves.toMatchObject({ event, traceTag });
       socket.message(["EOSE", id]);
       await settleQuery();
     }
 
     expect(socket.sentOfType("REQ")).toHaveLength(4);
-    expect(first.map((packet) => packet.traceTag)).toEqual([2]);
-    expect(second.map((packet) => packet.traceTag)).toEqual([1, 2]);
-    expect(firstComplete).toHaveBeenCalledOnce();
-    expect(secondComplete).toHaveBeenCalledOnce();
+    expect(firstInspector.completed).toBe(true);
+    expect(secondInspector.completed).toBe(true);
     expect(socket.sentOfType("CLOSE")).toHaveLength(0);
     expect(socket.closeRequests).toHaveLength(1);
   });
@@ -58,9 +60,10 @@ describe("RxReq source completion", () => {
   }) => {
     const { rxNostr, server } = createScenario();
     using source = new RxReq();
-    const first = rxNostr.forward(a, source).subscribe();
-    const packets: EventPacket[] = [];
-    const second = rxNostr.forward(a, source).subscribe((packet) => packets.push(packet));
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const first = rxNostr.forward(a, source).subscribe(firstInspector);
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    const second = rxNostr.forward(a, source).subscribe(secondInspector);
     source.emit([{}]);
     const socket = server.sockets.latest;
     socket.open();
@@ -70,7 +73,7 @@ describe("RxReq source completion", () => {
     await settleQuery();
     socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event({ id: "remaining" })]);
     await settleQuery();
-    expect(packets).toMatchObject([{ traceTag: "remaining" }]);
+    await expect(secondInspector.waitNext()).resolves.toMatchObject({ traceTag: "remaining" });
     expect(socket.sentOfType("REQ")).toHaveLength(3);
     expect(socket.closeRequests).toHaveLength(0);
     second.unsubscribe();
@@ -82,10 +85,11 @@ describe("RxReq source completion", () => {
       const { rxNostr, server } = createScenario();
       using source = new RxReq();
       source.dispose();
-      const complete = vi.fn();
-      rxNostr[strategy](a, source).subscribe({ complete });
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr[strategy](a, source).subscribe(inspector);
       await settleQuery();
-      expect(complete).toHaveBeenCalledOnce();
+      expect(inspector.completed).toBe(true);
       expect(server.connections).toHaveLength(0);
     },
   );
@@ -103,8 +107,9 @@ describe("asynchronous verification and query lifetime", () => {
       verifier: { verifyEvent: () => verification.promise },
     });
     using source = new RxReq();
-    const error = vi.fn();
-    rxNostr.backward([a, b], source).subscribe({ error });
+    const inspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward([a, b], source).subscribe(inspector);
     source.emit([{}]);
     source.emit([{}]);
     for (const socket of server.connections) socket.open();
@@ -116,7 +121,9 @@ describe("asynchronous verification and query lifetime", () => {
     verification.reject(cause);
     await settleQuery();
 
-    expect(error).toHaveBeenCalledWith(expect.objectContaining({ callback: "verifier", cause }));
+    await expect(inspector.waitError()).resolves.toEqual(
+      expect.objectContaining({ callback: "verifier", cause }),
+    );
     for (const connection of server.connections) {
       expect(connection.sentOfType("REQ")).toHaveLength(1);
       expect(connection.sentOfType("CLOSE")).toHaveLength(1);
@@ -130,9 +137,9 @@ describe("asynchronous verification and query lifetime", () => {
       const verification = createDeferred<boolean>();
       const verify = vi.fn(() => verification.promise);
       const { rxNostr, server } = createScenario({ verifier: { verifyEvent: verify } });
-      const next = vi.fn();
-      const error = vi.fn();
-      const query = rxNostr.backward(a, [{}]).subscribe({ next, error });
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      const query = rxNostr.backward(a, [{}]).subscribe(inspector);
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
@@ -144,8 +151,8 @@ describe("asynchronous verification and query lifetime", () => {
       else query.unsubscribe();
       verification.resolve(true);
       await settleQuery();
-      expect(next).not.toHaveBeenCalled();
-      expect(error).not.toHaveBeenCalled();
+      expect(inspector.length).toBe(0);
+      expect(inspector.errored).toBe(false);
       expect(socket.closeRequests).toHaveLength(1);
     },
   );
@@ -158,8 +165,8 @@ describe("asynchronous verification and query lifetime", () => {
       verifier: { verifyEvent: () => verification.promise },
     });
     using source = new RxReq();
-    const packets: EventPacket[] = [];
-    const query = rxNostr.forward(a, source).subscribe((packet) => packets.push(packet));
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const query = rxNostr.forward(a, source).subscribe(inspector);
     source.emit([{}], { traceTag: "old" });
     const socket = server.sockets.latest;
     socket.open();
@@ -173,10 +180,14 @@ describe("asynchronous verification and query lifetime", () => {
     socket.message(["EVENT", socket.latestSent("REQ")[1], Faker.event({ id: "new" })]);
     verification.resolve(true);
     await settleQuery();
-    expect(packets.map((packet) => [packet.event.id, packet.traceTag])).toEqual([
-      ["received-before-replacement", "old"],
-      ["new", "new"],
-    ]);
+    await expect(inspector.waitNext()).resolves.toMatchObject({
+      event: { id: "received-before-replacement" },
+      traceTag: "old",
+    });
+    await expect(inspector.waitNext()).resolves.toMatchObject({
+      event: { id: "new" },
+      traceTag: "new",
+    });
     query.unsubscribe();
   });
 });
@@ -194,25 +205,29 @@ describe("RxNostr disposal across relay states", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
     using source = new RxReq();
-    const complete = vi.fn();
-    rxNostr.backward(a, source).subscribe({ complete });
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+
+    rxNostr.backward(a, source).subscribe(firstInspector);
     source.emit([{}]);
     source.emit([{}]);
-    rxNostr.backward(b, [{}], { linger: Infinity }).subscribe();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    rxNostr.backward(b, [{}], { linger: Infinity }).subscribe(secondInspector);
     rxNostr.setHotRelays([opening, retrying]);
     for (const socket of server.connections) if (socket.url !== opening) socket.open();
     await settleQuery();
-    server.sockets.latestFor(b).message(["EOSE", server.sockets.latestFor(b).latestSent("REQ")[1]]);
+    const socketB = server.sockets.latestFor(b);
+    socketB.message(["EOSE", socketB.latestSent("REQ")[1]]);
     server.sockets.latestFor(retrying).peerClose(1006, "offline");
     await settleQuery();
 
     rxNostr.dispose();
     rxNostr.dispose();
     await settleQuery();
-    expect(complete).toHaveBeenCalledOnce();
+    expect(firstInspector.completed).toBe(true);
     for (const url of [a, b, opening]) {
-      expect(server.sockets.latestFor(url).closeRequests).toHaveLength(1);
-      server.sockets.latestFor(url).acknowledgeClose();
+      const socket = server.sockets.latestFor(url);
+      expect(socket.closeRequests).toHaveLength(1);
+      socket.acknowledgeClose();
     }
     await vi.advanceTimersByTimeAsync(1_000);
     expect(server.connections).toHaveLength(4);

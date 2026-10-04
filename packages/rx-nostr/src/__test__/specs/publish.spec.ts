@@ -11,12 +11,13 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 
 import {
   createPublicationScenario,
-  expectPublicationSent as expectEventSent,
   publicationEvent as event,
+  expectPublicationSent as expectEventSent,
   publicationRelay1 as relay1,
   publicationRelay2 as relay2,
   publicationSocket as socket,
 } from "../helper/index.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 describe("Publication public contract", () => {
   describe("public values", () => {
@@ -64,10 +65,10 @@ describe("Publication public contract", () => {
       const signed = event();
       const sendA = rxNostr.publish([relay1], signed);
       const sendB = rxNostr.publish([relay2], signed);
-      const packetsA: OkPacket[] = [];
-      const packetsB: OkPacket[] = [];
-      sendA.subscribe((packet) => packetsA.push(packet));
-      sendB.subscribe((packet) => packetsB.push(packet));
+      const firstInspector = new SubscriptionInspector<OkPacket>();
+      const secondInspector = new SubscriptionInspector<OkPacket>();
+      sendA.subscribe(firstInspector);
+      sendB.subscribe(secondInspector);
       let settledA = false;
       const allA = sendA.waitFor("all").then(() => (settledA = true));
       const allB = sendB.waitFor("all");
@@ -80,13 +81,15 @@ describe("Publication public contract", () => {
 
       second.message(["OK", "event", true, "saved on relay B"]);
       await expect(allB).resolves.toBeUndefined();
-      expect(packetsB.map((packet) => packet.from)).toEqual([relay2]);
-      expect(packetsA).toEqual([]);
+      await expect(secondInspector.waitNext().then((packet) => packet.from)).resolves.toEqual(
+        relay2,
+      );
+      expect(firstInspector.length).toBe(0);
       expect(settledA).toBe(false);
 
       first.message(["OK", "event", true, "saved on relay A"]);
       await expect(allA).resolves.toBe(true);
-      expect(packetsA.map((packet) => packet.from)).toEqual([relay1]);
+      await expect(firstInspector.waitNext()).resolves.toMatchObject({ from: relay1 });
 
       rxNostr.dispose();
     });
@@ -96,8 +99,8 @@ describe("Publication public contract", () => {
       const { server, rxNostr } = createPublicationScenario();
       const publication = rxNostr.publish([relay1, relay2], signed);
 
-      const firstPackets: OkPacket[] = [];
-      const firstObserver = publication.subscribe((packet) => firstPackets.push(packet));
+      const firstInspector = new SubscriptionInspector<OkPacket>();
+      const firstObserver = publication.subscribe(firstInspector);
       const all = publication.waitFor("all");
       const any = publication.waitFor("any");
       let allSettled = false;
@@ -113,20 +116,22 @@ describe("Publication public contract", () => {
 
       await expect(any).resolves.toBeUndefined();
       expect(allSettled).toBe(false);
-      expect(firstPackets).toHaveLength(1);
+      await expect(firstInspector.waitNext()).resolves.toMatchObject({ from: relay1, ok: true });
       firstObserver.unsubscribe();
       second.message(["OK", "event", true, "saved second"]);
       await expect(all).resolves.toBeUndefined();
 
-      const replayed: OkPacket[] = [];
-      const replayComplete = vi.fn();
-      publication.subscribe({
-        next: (packet) => replayed.push(packet),
-        complete: replayComplete,
-      });
+      const secondInspector = new SubscriptionInspector<OkPacket>();
 
-      expect(replayed.map((packet) => packet.from)).toEqual([relay1, relay2]);
-      expect(replayComplete).toHaveBeenCalledOnce();
+      publication.subscribe(secondInspector);
+
+      await expect(secondInspector.waitNext().then((packet) => packet.from)).resolves.toEqual(
+        relay1,
+      );
+      await expect(secondInspector.waitNext().then((packet) => packet.from)).resolves.toEqual(
+        relay2,
+      );
+      expect(secondInspector.completed).toBe(true);
 
       const snapshot = await publication.event;
       signed.content = "after";
@@ -229,16 +234,16 @@ describe("Publication public contract", () => {
       };
       const { rxNostr } = createPublicationScenario();
       const failed = rxNostr.publish(relay1, event(), { signer: rejectingSigner });
-      const observerError = vi.fn();
+      const inspector = new SubscriptionInspector<unknown>();
 
-      failed.subscribe({ error: observerError });
+      failed.subscribe(inspector);
 
       await expect(failed.event).rejects.toMatchObject({
         callback: "signer",
         cause,
       });
       await expect(failed.waitFor("any")).rejects.toBeInstanceOf(RxNostrCallbackError);
-      expect(observerError).toHaveBeenCalledWith(
+      await expect(inspector.waitError()).resolves.toEqual(
         expect.objectContaining({ callback: "signer", cause }),
       );
 

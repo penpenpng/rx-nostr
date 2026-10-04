@@ -1,8 +1,9 @@
-import { NoopSigner, RxReq, RxRelays, type EventPacket } from "rx-nostr";
+import { NoopSigner, RxRelays, RxReq, type EventPacket } from "rx-nostr";
 import { describe, expect, vi } from "vitest";
 
 import { Faker } from "../helper/index.ts";
-import { queryTest as test, settleQuery } from "../helper/query-lifecycle-scenario.ts";
+import { settleQuery, queryTest as test } from "../helper/query-lifecycle-scenario.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 const a = "wss://a.example.com";
 const b = "wss://b.example.com";
@@ -15,12 +16,14 @@ describe("weak queries with packet destinations", () => {
     async (order, { createScenario }) => {
       const { rxNostr, server } = createScenario({ signer: new NoopSigner() });
       rxNostr.setHotRelays(b);
-      const owner = rxNostr.forward(b, [{}]).subscribe();
+      const firstInspector = new SubscriptionInspector<EventPacket>();
+      const owner = rxNostr.forward(b, [{}]).subscribe(firstInspector);
       const publication = rxNostr.publish(b, Faker.event({ id: "published" }), { linger: 0 });
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
-      const weak = rxNostr.forward(b, [{}], { weak: true }).subscribe();
+      const secondInspector = new SubscriptionInspector<EventPacket>();
+      const weak = rxNostr.forward(b, [{}], { weak: true }).subscribe(secondInspector);
       await settleQuery();
       const endHot = () => rxNostr.unsetHotRelays();
       const endQuery = () => owner.unsubscribe();
@@ -53,13 +56,17 @@ describe("weak queries with packet destinations", () => {
       createScenario,
     }) => {
       const { rxNostr, server } = createScenario();
-      rxNostr.backward(b, [{}], { linger: 100 }).subscribe();
+      const firstInspector = new SubscriptionInspector<EventPacket>();
+      rxNostr.backward(b, [{}], { linger: 100 }).subscribe(firstInspector);
       const socket = server.sockets.latest;
       socket.open();
       await settleQuery();
       socket.message(["EOSE", socket.latestSent("REQ")[1]]);
       await vi.advanceTimersByTimeAsync(50);
-      const weak = rxNostr[strategy](b, [{}], { weak: true, linger: Infinity }).subscribe();
+      const secondInspector = new SubscriptionInspector<EventPacket>();
+      const weak = rxNostr[strategy](b, [{}], { weak: true, linger: Infinity }).subscribe(
+        secondInspector,
+      );
       await settleQuery();
       expect(socket.sentOfType("REQ")).toHaveLength(2);
       await vi.advanceTimersByTimeAsync(49);
@@ -77,8 +84,9 @@ describe("weak queries with packet destinations", () => {
       async (state, { createScenario }) => {
         const { rxNostr, server } = createScenario();
         using source = new RxReq();
-        const packets: EventPacket[] = [];
-        const owner = rxNostr.backward(b, [{}], { linger: 100 }).subscribe();
+        const firstInspector = new SubscriptionInspector<EventPacket>();
+        const secondInspector = new SubscriptionInspector<EventPacket>();
+        const owner = rxNostr.backward(b, [{}], { linger: 100 }).subscribe(secondInspector);
         const socket = server.sockets.latest;
         if (state !== "opening") {
           socket.open();
@@ -89,7 +97,7 @@ describe("weak queries with packet destinations", () => {
           await settleQuery();
         }
         const weak = rxNostr[strategy](a, source, { weak: true, defer: false }).subscribe(
-          (packet) => packets.push(packet),
+          firstInspector,
         );
 
         // The unleased destination comes first to exercise synchronous relay completion.
@@ -105,9 +113,11 @@ describe("weak queries with packet destinations", () => {
         const id = socket.latestSent("REQ")[1];
         socket.message(["EVENT", id, Faker.event({ id: "weak-result" })]);
         await settleQuery();
-        expect(packets).toMatchObject([
-          { from: b, traceTag: "temporary", event: { id: "weak-result" } },
-        ]);
+        await expect(firstInspector.waitNext()).resolves.toMatchObject({
+          from: b,
+          traceTag: "temporary",
+          event: { id: "weak-result" },
+        });
 
         weak.unsubscribe();
         await settleQuery();
@@ -122,18 +132,20 @@ describe("weak queries with packet destinations", () => {
     }) => {
       const { rxNostr, server } = createScenario();
       using source = new RxReq();
-      const weak = rxNostr[strategy](a, source, { weak: true }).subscribe();
+      const inspector = new SubscriptionInspector<EventPacket>();
+      const weak = rxNostr[strategy](a, source, { weak: true }).subscribe(inspector);
       source.emit([{}], { relays: c });
       await settleQuery();
       expect(server.connections).toHaveLength(0);
 
       rxNostr.setHotRelays(c);
-      server.sockets.latest.open();
+      const socket = server.sockets.latest;
+      socket.open();
       await settleQuery();
-      expect(server.sockets.latest.sent).toHaveLength(0);
+      expect(socket.sent).toHaveLength(0);
       source.emit([{}], { relays: c });
       await settleQuery();
-      expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
+      expect(socket.sentOfType("REQ")).toHaveLength(1);
       weak.unsubscribe();
     });
 
@@ -147,32 +159,35 @@ describe("weak queries with packet destinations", () => {
       rxNostr.setHotRelays([a, b, c, d]);
       for (const socket of server.connections) socket.open();
       await settleQuery();
-      const query = rxNostr[strategy](defaults, source, { weak: true }).subscribe();
+      const inspector = new SubscriptionInspector<EventPacket>();
+      const query = rxNostr[strategy](defaults, source, { weak: true }).subscribe(inspector);
       source.emit([{}], { relays: temporary });
       await settleQuery();
-      expect(server.sockets.latestFor(a).sent).toHaveLength(0);
-      expect(server.sockets.latestFor(b).sentOfType("REQ")).toHaveLength(1);
-      expect(server.sockets.latestFor(c).sentOfType("REQ")).toHaveLength(1);
+      const socketA = server.sockets.latestFor(a);
+      expect(socketA.sent).toHaveLength(0);
+      const socketB = server.sockets.latestFor(b);
+      expect(socketB.sentOfType("REQ")).toHaveLength(1);
+      const socketC = server.sockets.latestFor(c);
+      expect(socketC.sentOfType("REQ")).toHaveLength(1);
 
       defaults.remove(b);
       defaults.append(d);
       temporary.remove(c);
       temporary.append(a);
       await settleQuery();
-      expect(server.sockets.latestFor(b).sentOfType("CLOSE")).toHaveLength(0);
-      expect(server.sockets.latestFor(c).sentOfType("CLOSE")).toHaveLength(1);
-      expect(server.sockets.latestFor(a).sentOfType("REQ")).toHaveLength(1);
-      expect(server.sockets.latestFor(d).sent).toHaveLength(0);
+      expect(socketB.sentOfType("CLOSE")).toHaveLength(0);
+      expect(socketC.sentOfType("CLOSE")).toHaveLength(1);
+      expect(socketA.sentOfType("REQ")).toHaveLength(1);
+      const socketD = server.sockets.latestFor(d);
+      expect(socketD.sent).toHaveLength(0);
 
       source.emit([{}]);
       await settleQuery();
-      expect(server.sockets.latestFor(d).sentOfType("REQ")).toHaveLength(1);
-      expect(server.sockets.latestFor(b).sentOfType("CLOSE")).toHaveLength(
-        strategy === "forward" ? 1 : 0,
-      );
+      expect(socketD.sentOfType("REQ")).toHaveLength(1);
+      expect(socketB.sentOfType("CLOSE")).toHaveLength(strategy === "forward" ? 1 : 0);
       temporary.append(c);
       await settleQuery();
-      expect(server.sockets.latestFor(c).sentOfType("REQ")).toHaveLength(1);
+      expect(socketC.sentOfType("REQ")).toHaveLength(1);
       query.unsubscribe();
       await settleQuery();
       expect(server.connections.every((socket) => socket.closeRequests.length === 0)).toBe(true);
@@ -187,7 +202,8 @@ describe("weak queries with packet destinations", () => {
       const { rxNostr, server } = createScenario();
       using destinations = new RxRelays([a, b]);
       using source = new RxReq();
-      const query = rxNostr[strategy](destinations, source, { defer: false }).subscribe();
+      const inspector = new SubscriptionInspector<EventPacket>();
+      const query = rxNostr[strategy](destinations, source, { defer: false }).subscribe(inspector);
       for (const socket of server.connections) socket.open();
       await settleQuery();
       destinations.remove(a);
@@ -208,7 +224,8 @@ describe("weak queries with packet destinations", () => {
     rxNostr.setHotRelays([a, b]);
     for (const socket of server.connections) socket.open();
     await settleQuery();
-    const query = rxNostr.forward(destinations, source).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const query = rxNostr.forward(destinations, source).subscribe(inspector);
     source.emit([{ kinds: [1] }]);
     await settleQuery();
     destinations.clear();
@@ -216,8 +233,9 @@ describe("weak queries with packet destinations", () => {
     for (const socket of server.connections) expect(socket.sentOfType("CLOSE")).toHaveLength(1);
     destinations.append(a);
     await settleQuery();
-    expect(server.sockets.latestFor(a).latestSent("REQ")[2]).toEqual({ kinds: [1] });
-    expect(server.sockets.latestFor(a).sentOfType("REQ")).toHaveLength(2);
+    const socketA = server.sockets.latestFor(a);
+    expect(socketA.latestSent("REQ")[2]).toEqual({ kinds: [1] });
+    expect(socketA.sentOfType("REQ")).toHaveLength(2);
     expect(server.sockets.latestFor(b).sentOfType("REQ")).toHaveLength(1);
     query.unsubscribe();
   });
@@ -230,7 +248,8 @@ describe("weak queries with packet destinations", () => {
     rxNostr.setHotRelays([a, b, c]);
     for (const socket of server.connections) socket.open();
     await settleQuery();
-    const query = rxNostr.backward(destinations, [{}]).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const query = rxNostr.backward(destinations, [{}]).subscribe(inspector);
     await settleQuery();
     destinations.remove(a);
     destinations.append(a);
@@ -238,11 +257,12 @@ describe("weak queries with packet destinations", () => {
     await settleQuery();
     expect(server.sockets.latestFor(a).sentOfType("REQ")).toHaveLength(1);
     expect(server.sockets.latestFor(c).sentOfType("REQ")).toHaveLength(1);
-    server.sockets.latestFor(b).message(["EOSE", server.sockets.latestFor(b).latestSent("REQ")[1]]);
+    const socketB = server.sockets.latestFor(b);
+    socketB.message(["EOSE", socketB.latestSent("REQ")[1]]);
     destinations.remove(b);
     destinations.append(b);
     await settleQuery();
-    expect(server.sockets.latestFor(b).sentOfType("REQ")).toHaveLength(1);
+    expect(socketB.sentOfType("REQ")).toHaveLength(1);
     query.unsubscribe();
   });
 });

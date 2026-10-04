@@ -2,6 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import { EMPTY } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
+import { SubscriptionInspector } from "../../__test__/helper/subscription-inspector.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import type { EventPacket, OkPacket } from "../../packets/index.ts";
 import { RelayCommunicationCollection } from "./relay-communication-collection.ts";
@@ -53,22 +54,18 @@ describe("RelayCommunicationCollection", () => {
     );
   });
 
-  test("observes existing and future entries without creating any", () => {
+  test("observes existing and future entries without creating any", async () => {
     const collection = new RelayCommunicationCollection((url) => new FakeRelay(url));
     const first = collection.get("wss://one.example.com");
-    const observed: FakeRelay[] = [];
-    const complete = vi.fn();
+    const inspector = new SubscriptionInspector<FakeRelay>();
 
-    collection.observeEntries().subscribe({
-      next: (relay) => observed.push(relay),
-      complete,
-    });
-    expect(observed).toEqual([first]);
+    collection.observeEntries().subscribe(inspector);
+    await expect(inspector.waitNext()).resolves.toEqual(first);
     expect(collection.size).toBe(1);
 
     const second = collection.get("wss://two.example.com");
-    expect(observed).toEqual([first, second]);
+    await expect(inspector.waitNext()).resolves.toEqual(second);
     collection.dispose();
-    expect(complete).toHaveBeenCalledOnce();
+    expect(inspector.completed).toBe(true);
   });
 });

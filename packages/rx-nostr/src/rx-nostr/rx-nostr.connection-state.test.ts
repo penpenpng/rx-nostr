@@ -1,6 +1,8 @@
+import { map, tap } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer } from "../__test__/helper/index.ts";
+import { SubscriptionInspector } from "../__test__/helper/subscription-inspector.ts";
 import type { ConnectionDropDetectorContext } from "../connection-drop-detector/index.ts";
 import { NoopReconnector } from "../connection-reconnector/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
@@ -19,20 +21,29 @@ describe("RxNostr connection state", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const states: string[] = [];
-    rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state.state));
+    const inspector = new SubscriptionInspector<string>();
+    rxNostr
+      .monitorConnectionState()
+      .pipe(map((packet) => packet.state.state))
+      .subscribe(inspector);
 
     rxNostr.setHotRelays(relay);
-    server.sockets.latest.open();
-    await vi.waitFor(() => expect(contexts).toHaveLength(1));
+    const socket = server.sockets.latest;
+    socket.open();
+    await inspector.ignoreNexts(2);
+    await expect(inspector.waitNext()).resolves.toBe("connected");
+    expect(contexts).toHaveLength(1);
     contexts[0]!.drop();
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    server.sockets.latest.open();
+    const socket2 = server.sockets.latest;
+    socket2.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
 
-    expect(states.filter((state) => state === "connected")).toHaveLength(2);
+    await expect(inspector.waitNext()).resolves.toBe("waiting-for-retry");
+    await expect(inspector.waitNext()).resolves.toBe("retrying");
+    await expect(inspector.waitNext()).resolves.toBe("connected");
     rxNostr.dispose();
-    server.sockets.latest.acknowledgeClose();
+    socket2.acknowledgeClose();
   });
 
   test("observes created relays without creating monitor-only collection entries", async () => {
@@ -45,50 +56,57 @@ describe("RxNostr connection state", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const packets: ConnectionStatePacket[] = [];
+    const inspector = new SubscriptionInspector<ConnectionStatePacket>();
     const states = rxNostr.monitorConnectionState();
-    states.subscribe((packet) => {
-      if (packet.state.state === "connecting") packet.state.attempt = 100;
-    });
-    states.subscribe((packet) => packets.push(packet));
+    const mutatingInspector = new SubscriptionInspector<ConnectionStatePacket>();
+    states
+      .pipe(
+        tap((packet) => {
+          if (packet.state.state === "connecting") packet.state.attempt = 100;
+        }),
+      )
+      .subscribe(mutatingInspector);
+    states.subscribe(inspector);
 
     expect(server.connections).toHaveLength(0);
     rxNostr.setHotRelays([firstRelay, secondRelay]);
     expect(server.connections).toHaveLength(2);
-    expect(packets).toEqual([
-      { from: "wss://one.example.com", state: { state: "dormant" } },
-      {
-        from: "wss://one.example.com",
-        state: { state: "connecting", attempt: 1 },
-      },
-      { from: "wss://two.example.com", state: { state: "dormant" } },
-      {
-        from: "wss://two.example.com",
-        state: { state: "connecting", attempt: 1 },
-      },
-    ]);
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://one.example.com",
+      state: { state: "dormant" },
+    });
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://one.example.com",
+      state: { state: "connecting", attempt: 1 },
+    });
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://two.example.com",
+      state: { state: "dormant" },
+    });
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://two.example.com",
+      state: { state: "connecting", attempt: 1 },
+    });
 
     const first = server.sockets.latestFor(firstRelay);
     const second = server.sockets.latestFor(secondRelay);
     first.open();
     second.open();
-    await vi.waitFor(() =>
-      expect(packets.filter((packet) => packet.state.state === "connected")).toHaveLength(2),
-    );
+    await expect(inspector.waitNext()).resolves.toMatchObject({
+      from: firstRelay,
+      state: { state: "connected" },
+    });
+    await expect(inspector.waitNext()).resolves.toMatchObject({
+      from: secondRelay,
+      state: { state: "connected" },
+    });
 
     first.peerClose(1006, "one failed");
-    await vi.waitFor(() =>
-      expect(
-        packets.find(
-          (packet) => packet.from === "wss://one.example.com" && packet.state.state === "failed",
-        ),
-      ).toBeDefined(),
-    );
-    expect(
-      packets.filter(
-        (packet) => packet.from === "wss://two.example.com" && packet.state.state === "failed",
-      ),
-    ).toHaveLength(0);
+    await expect(inspector.waitNext()).resolves.toMatchObject({
+      from: firstRelay,
+      state: { state: "failed" },
+    });
+    expect(inspector.length).toBe(7);
 
     rxNostr.unsetHotRelays();
     await vi.waitFor(() => expect(second.closeRequests).toHaveLength(1));

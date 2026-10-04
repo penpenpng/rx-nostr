@@ -43,14 +43,6 @@ export async function expectAllSocketsCloseRequested(
   );
 }
 
-export async function expectObservableCompleted(
-  complete: MockCallback,
-  error?: MockCallback,
-): Promise<void> {
-  await expectCallbackCalled(complete);
-  if (error) expect(error.mock.calls).toHaveLength(0);
-}
-
 export async function expectCallbackCalled(callback: MockCallback, count = 1): Promise<void> {
   await vi.waitFor(() => expect(callback.mock.calls).toHaveLength(count));
 }

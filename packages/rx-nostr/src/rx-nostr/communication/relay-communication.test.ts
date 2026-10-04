@@ -1,3 +1,4 @@
+import { map } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import {
@@ -6,7 +7,9 @@ import {
   expectSent,
   Faker,
 } from "../../__test__/helper/index.ts";
+import { SubscriptionInspector } from "../../__test__/helper/subscription-inspector.ts";
 import { NoopReconnector } from "../../connection-reconnector/index.ts";
+import type { EventPacket } from "../../packets/packets.interface.ts";
 import { RelayDirectory } from "../../relay-directory/index.ts";
 import { RelayCommunication } from "./relay-communication.ts";
 
@@ -25,24 +28,27 @@ describe("RelayCommunication transport integration", () => {
     expect(fetcher).not.toHaveBeenCalled();
     const release = relay.hold();
     expect(fetcher).toHaveBeenCalledOnce();
-    server.sockets.latest.open();
-    relay.vreq("backward", [{ kinds: [1] }]).subscribe();
-    relay.vreq("backward", [{ kinds: [2] }]).subscribe();
+    const socket = server.sockets.latest;
+    socket.open();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
     await Promise.resolve();
-    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(0);
+    expect(socket.sentOfType("REQ")).toHaveLength(0);
 
     response.resolve({ limitation: { max_subscriptions: 1 } });
-    const first = await expectSent(server.sockets.latest, "REQ");
+    const first = await expectSent(socket, "REQ");
     expect(first[2]).toMatchObject({ kinds: [1] });
-    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
-    server.sockets.latest.message(["EOSE", first[1]]);
-    const second = await expectSent(server.sockets.latest, "REQ", 2);
+    expect(socket.sentOfType("REQ")).toHaveLength(1);
+    socket.message(["EOSE", first[1]]);
+    const second = await expectSent(socket, "REQ", 2);
     expect(second[2]).toMatchObject({ kinds: [2] });
-    server.sockets.latest.message(["EOSE", second[1]]);
+    socket.message(["EOSE", second[1]]);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("uses empty NIP-11 metadata after retrieval fails", async () => {
@@ -56,18 +62,20 @@ describe("RelayCommunication transport integration", () => {
       onDiagnostic: diagnostic,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    relay.vreq("backward", [{}]).subscribe();
+    const socket = server.sockets.latest;
+    socket.open();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    relay.vreq("backward", [{}]).subscribe(inspector);
 
-    const req = await expectSent(server.sockets.latest, "REQ");
+    const req = await expectSent(socket, "REQ");
     expect(directory.get(relay.url)?.nip11FailedAt).toBeTypeOf("number");
     expect(diagnostic).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Automatic NIP-11 relay information retrieval failed." }),
     );
-    server.sockets.latest.message(["EOSE", req[1]]);
+    socket.message(["EOSE", req[1]]);
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("reports the same lifecycle to RelayDirectory health", async () => {
@@ -81,7 +89,8 @@ describe("RelayCommunication transport integration", () => {
       relayDirectory: directory,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     await vi.waitFor(() =>
       expect(directory.get(relay.url)).toMatchObject({
         lastConnectedAt: 1,
@@ -90,7 +99,7 @@ describe("RelayCommunication transport integration", () => {
     );
 
     now = 2;
-    server.sockets.latest.peerClose(1000, "restart", true);
+    socket.peerClose(1000, "restart", true);
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
     expect(directory.get(relay.url)).toMatchObject({
       lastFailureAt: 2,
@@ -108,7 +117,8 @@ describe("RelayCommunication transport integration", () => {
     );
 
     now = 3;
-    server.sockets.latest.open();
+    const socket2 = server.sockets.latest;
+    socket2.open();
     await vi.waitFor(() =>
       expect(directory.get(relay.url)).toMatchObject({
         lastConnectedAt: 3,
@@ -118,8 +128,8 @@ describe("RelayCommunication transport integration", () => {
     );
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    socket2.acknowledgeClose();
     await vi.waitFor(() => expect(directory.get(relay.url)?.liveConnections).toBe(0));
     expect(directory.get(relay.url)?.lastFailureAt).toBe(2);
   });
@@ -129,11 +139,11 @@ describe("RelayCommunication transport integration", () => {
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
     });
-    const complete = vi.fn();
+    const inspector = new SubscriptionInspector<EventPacket>();
 
-    relay.vreq("forward", [{}]).subscribe({ complete });
+    relay.vreq("forward", [{}]).subscribe(inspector);
 
-    expect(complete).toHaveBeenCalledOnce();
+    expect(inspector.completed).toBe(true);
     expect(server.connections).toHaveLength(0);
     relay.dispose();
   });
@@ -145,28 +155,28 @@ describe("RelayCommunication transport integration", () => {
       reconnector: new NoopReconnector(),
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const events: string[] = [];
-    const complete = vi.fn();
+    const socket = server.sockets.latest;
+    socket.open();
+    const inspector = new SubscriptionInspector<string>();
 
-    const subscription = relay.vreq("forward", [{ kinds: [1], since: () => 10 }]).subscribe({
-      next: (packet) => events.push(packet.event.id),
-      complete,
-    });
-    const req = await expectSent(server.sockets.latest, "REQ");
+    const subscription = relay
+      .vreq("forward", [{ kinds: [1], since: () => 10 }])
+      .pipe(map((packet) => packet.event.id))
+      .subscribe(inspector);
+    const req = await expectSent(socket, "REQ");
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1], since: 10 });
 
-    server.sockets.latest.message(["EVENT", req[1], Faker.event({ id: "event" })]);
-    expect(events).toEqual(["event"]);
+    socket.message(["EVENT", req[1], Faker.event({ id: "event" })]);
+    await expect(inspector.waitNext()).resolves.toEqual("event");
 
     subscription.unsubscribe();
-    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", req[1]]);
-    expect(complete).not.toHaveBeenCalled();
+    expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", req[1]]);
+    expect(inspector.completed).toBe(false);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("backward REQ completes on EOSE and does not expose its subId", async () => {
@@ -175,32 +185,25 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const packets: object[] = [];
-    const complete = vi.fn();
+    const socket = server.sockets.latest;
+    socket.open();
+    const inspector = new SubscriptionInspector<object>();
 
-    relay.vreq("backward", [{}]).subscribe({
-      next: (packet) => packets.push(packet),
-      complete,
+    relay.vreq("backward", [{}]).subscribe(inspector);
+    const [, subId] = await expectSent(socket, "REQ");
+    socket.message(["EVENT", subId, Faker.event({ id: "event" })]);
+    socket.message(["EOSE", subId]);
+
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://relay.example.com",
+      type: "EVENT",
+      event: Faker.event({ id: "event" }),
     });
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "event" })]);
-    server.sockets.latest.message(["EOSE", subId]);
-
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(packets).toEqual([
-      {
-        from: "wss://relay.example.com",
-        type: "EVENT",
-        event: Faker.event({ id: "event" }),
-      },
-    ]);
-    expect(packets[0]).not.toHaveProperty("subId");
-    expect(packets[0]).not.toHaveProperty("message");
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("re-evaluates lazy filters when a REQ is resent after reconnect", async () => {
@@ -210,28 +213,31 @@ describe("RelayCommunication transport integration", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     let since = 1;
-    const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe();
-    const first = await expectSent(server.sockets.latest, "REQ");
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe(inspector);
+    const first = await expectSent(socket, "REQ");
     expect(first[2]).toMatchObject({
       since: 1,
     });
 
-    server.sockets.latest.peerClose(1006, "offline");
+    socket.peerClose(1006, "offline");
     since = 2;
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    server.sockets.latest.open();
-    const resent = await expectSent(server.sockets.latest, "REQ");
+    const socket2 = server.sockets.latest;
+    socket2.open();
+    const resent = await expectSent(socket2, "REQ");
     expect(resent[2]).toMatchObject({
       since: 2,
     });
 
     subscription.unsubscribe();
-    await expectSent(server.sockets.latest, "CLOSE");
+    await expectSent(socket2, "CLOSE");
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    socket2.acknowledgeClose();
   });
 
   test("filters mismatched events and does not CLOSE a remotely terminated REQ", async () => {
@@ -240,29 +246,28 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const events: string[] = [];
-    const complete = vi.fn();
+    const socket = server.sockets.latest;
+    socket.open();
+    const inspector = new SubscriptionInspector<string>();
+
     relay
       .vreq("backward", [{ kinds: [1] }], {
         validateFilterMatching: true,
       })
-      .subscribe({
-        next: (packet) => events.push(packet.event.id),
-        complete,
-      });
-    const [, subId] = await expectSent(server.sockets.latest, "REQ");
+      .pipe(map((packet) => packet.event.id))
+      .subscribe(inspector);
+    const [, subId] = await expectSent(socket, "REQ");
 
-    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]);
-    server.sockets.latest.message(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]);
-    server.sockets.latest.message(["EOSE", subId]);
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(events).toEqual(["right"]);
-    expect(server.sockets.latest.sent).toHaveLength(1);
+    socket.message(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]);
+    socket.message(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]);
+    socket.message(["EOSE", subId]);
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
+    await expect(inspector.waitNext()).resolves.toEqual("right");
+    expect(socket.sent).toHaveLength(1);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("treats a backward timeout as relay-local completion and sends CLOSE", async () => {
@@ -271,23 +276,21 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const complete = vi.fn();
-    const error = vi.fn();
-    relay.vreq("backward", [{}], { timeout: 5 }).subscribe({
-      complete,
-      error,
-    });
+    const socket = server.sockets.latest;
+    socket.open();
+    const inspector = new SubscriptionInspector<EventPacket>();
 
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(error).not.toHaveBeenCalled();
-    const req = server.sockets.latest.latestSent("REQ");
-    const close = await expectSent(server.sockets.latest, "CLOSE");
+    relay.vreq("backward", [{}], { timeout: 5 }).subscribe(inspector);
+
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
+    expect(inspector.errored).toBe(false);
+    const req = socket.latestSent("REQ");
+    const close = await expectSent(socket, "CLOSE");
     expect(close).toEqual(["CLOSE", req[1]]);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("queues REQs at the NIP-11 max_subscriptions limit", async () => {
@@ -301,30 +304,30 @@ describe("RelayCommunication transport integration", () => {
       relayDirectory: directory,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const firstComplete = vi.fn();
-    const secondComplete = vi.fn();
-    relay.vreq("backward", [{ kinds: [1] }]).subscribe({
-      complete: firstComplete,
-    });
-    relay.vreq("backward", [{ kinds: [2] }]).subscribe({
-      complete: secondComplete,
-    });
-    const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe();
-    cancelled.unsubscribe();
-    const first = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.message(["EOSE", first[1]]);
+    const socket = server.sockets.latest;
+    socket.open();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
 
-    const second = await expectSent(server.sockets.latest, "REQ", 2);
-    expect(firstComplete).toHaveBeenCalledOnce();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
+
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
+    const thirdInspector = new SubscriptionInspector<EventPacket>();
+    const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe(thirdInspector);
+    cancelled.unsubscribe();
+    const first = await expectSent(socket, "REQ");
+    socket.message(["EOSE", first[1]]);
+
+    const second = await expectSent(socket, "REQ", 2);
+    expect(firstInspector.completed).toBe(true);
     expect(second[2]).toMatchObject({ kinds: [2] });
-    server.sockets.latest.message(["EOSE", second[1]]);
-    await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
-    expect(server.sockets.latest.sent).toHaveLength(2);
+    socket.message(["EOSE", second[1]]);
+    await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
+    expect(socket.sent).toHaveLength(2);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("starts a backward timeout only after its REQ leaves the queue", async () => {
@@ -338,37 +341,37 @@ describe("RelayCommunication transport integration", () => {
       relayDirectory: directory,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const queuedComplete = vi.fn();
-    const thirdComplete = vi.fn();
-    relay.vreq("backward", [{ kinds: [1] }]).subscribe();
-    relay.vreq("backward", [{ kinds: [2] }], { timeout: 10 }).subscribe({
-      complete: queuedComplete,
-    });
-    relay.vreq("backward", [{ kinds: [3] }]).subscribe({ complete: thirdComplete });
+    const socket = server.sockets.latest;
+    socket.open();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+    const thirdInspector = new SubscriptionInspector<EventPacket>();
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe(thirdInspector);
 
-    const first = await expectSent(server.sockets.latest, "REQ");
+    relay.vreq("backward", [{ kinds: [2] }], { timeout: 10 }).subscribe(firstInspector);
+
+    relay.vreq("backward", [{ kinds: [3] }]).subscribe(secondInspector);
+
+    const first = await expectSent(socket, "REQ");
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(queuedComplete).not.toHaveBeenCalled();
-    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
+    expect(firstInspector.completed).toBe(false);
+    expect(socket.sentOfType("REQ")).toHaveLength(1);
 
-    server.sockets.latest.message(["EOSE", first[1]]);
-    await vi.waitFor(() =>
-      expect(server.sockets.latest.sentOfType("REQ").length).toBeGreaterThanOrEqual(2),
-    );
-    const second = server.sockets.latest.sentOfType("REQ")[1];
+    socket.message(["EOSE", first[1]]);
+    await vi.waitFor(() => expect(socket.sentOfType("REQ").length).toBeGreaterThanOrEqual(2));
+    const second = socket.sentOfType("REQ")[1];
     expect(second[2]).toMatchObject({ kinds: [2] });
-    await vi.waitFor(() => expect(queuedComplete).toHaveBeenCalledOnce());
-    expect(await expectSent(server.sockets.latest, "CLOSE")).toEqual(["CLOSE", second[1]]);
-    const third = await expectSent(server.sockets.latest, "REQ", 3);
+    await vi.waitFor(() => expect(firstInspector.completed).toBe(true));
+    expect(await expectSent(socket, "CLOSE")).toEqual(["CLOSE", second[1]]);
+    const third = await expectSent(socket, "REQ", 3);
     expect(third[2]).toMatchObject({ kinds: [3] });
-    expect(server.sockets.latest.sent.slice(1, 4)).toEqual([second, ["CLOSE", second[1]], third]);
-    server.sockets.latest.message(["EOSE", third[1]]);
-    await vi.waitFor(() => expect(thirdComplete).toHaveBeenCalledOnce());
+    expect(socket.sent.slice(1, 4)).toEqual([second, ["CLOSE", second[1]], third]);
+    socket.message(["EOSE", third[1]]);
+    await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("keeps a REQ slot reserved while unipls reconnects and resends it", async () => {
@@ -383,32 +386,36 @@ describe("RelayCommunication transport integration", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const release = relay.hold();
-    server.sockets.latest.open();
-    const firstComplete = vi.fn();
-    const secondComplete = vi.fn();
-    relay.vreq("backward", [{ kinds: [1] }]).subscribe({ complete: firstComplete });
-    relay.vreq("backward", [{ kinds: [2] }]).subscribe({ complete: secondComplete });
+    const socket = server.sockets.latest;
+    socket.open();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
 
-    const initial = await expectSent(server.sockets.latest, "REQ");
-    server.sockets.latest.peerClose(1006, "offline");
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
+
+    relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
+
+    const initial = await expectSent(socket, "REQ");
+    socket.peerClose(1006, "offline");
     await vi.waitFor(() => expect(server.connections).toHaveLength(2));
-    server.sockets.latest.open();
+    const socket2 = server.sockets.latest;
+    socket2.open();
 
-    const resent = await expectSent(server.sockets.latest, "REQ");
+    const resent = await expectSent(socket2, "REQ");
     expect(resent[1]).toBe(initial[1]);
     expect(resent[2]).toMatchObject({ kinds: [1] });
-    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
-    server.sockets.latest.message(["EOSE", resent[1]]);
+    expect(socket2.sentOfType("REQ")).toHaveLength(1);
+    socket2.message(["EOSE", resent[1]]);
 
-    const second = await expectSent(server.sockets.latest, "REQ", 2);
+    const second = await expectSent(socket2, "REQ", 2);
     expect(second[2]).toMatchObject({ kinds: [2] });
-    server.sockets.latest.message(["EOSE", second[1]]);
-    await vi.waitFor(() => expect(secondComplete).toHaveBeenCalledOnce());
-    expect(firstComplete).toHaveBeenCalledOnce();
+    socket2.message(["EOSE", second[1]]);
+    await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
+    expect(firstInspector.completed).toBe(true);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket2.closeRequests).toHaveLength(1));
+    socket2.acknowledgeClose();
   });
 
   test("dispose completes queued REQs without starting them", async () => {
@@ -422,23 +429,25 @@ describe("RelayCommunication transport integration", () => {
       relayDirectory: directory,
     });
     relay.hold();
-    server.sockets.latest.open();
-    const firstComplete = vi.fn();
-    const queuedComplete = vi.fn();
-    relay.vreq("backward", [{ kinds: [1] }]).subscribe({
-      complete: firstComplete,
-    });
+    const socket = server.sockets.latest;
+    socket.open();
+    const firstInspector = new SubscriptionInspector<EventPacket>();
+    const secondInspector = new SubscriptionInspector<EventPacket>();
+
+    relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
     const queued = relay.vreq("backward", [{ kinds: [2] }]);
-    queued.subscribe({ complete: queuedComplete });
-    await expectSent(server.sockets.latest, "REQ");
+    const thirdInspector = new SubscriptionInspector<EventPacket>();
+    queued.subscribe(thirdInspector);
+    await expectSent(socket, "REQ");
 
     relay.dispose();
 
-    expect(firstComplete).toHaveBeenCalledOnce();
-    expect(queuedComplete).toHaveBeenCalledOnce();
-    expect(server.sockets.latest.sentOfType("REQ")).toHaveLength(1);
-    queued.subscribe({ complete: queuedComplete });
-    expect(queuedComplete).toHaveBeenCalledTimes(2);
+    expect(firstInspector.completed).toBe(true);
+    expect(thirdInspector.completed).toBe(true);
+    expect(socket.sentOfType("REQ")).toHaveLength(1);
+
+    queued.subscribe(secondInspector);
+    expect(secondInspector.completed).toBe(true);
   });
 
   test("wraps a lazy filter exception without sending a REQ or CLOSE", async () => {
@@ -447,9 +456,10 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     const cause = new Error("filter failed");
-    let received: unknown;
+    const inspector = new SubscriptionInspector<EventPacket>();
     relay
       .vreq("backward", [
         {
@@ -458,19 +468,18 @@ describe("RelayCommunication transport integration", () => {
           },
         },
       ])
-      .subscribe({ error: (error) => (received = error) });
+      .subscribe(inspector);
 
-    await vi.waitFor(() => expect(received).toBeDefined());
-    expect(received).toMatchObject({
+    await expect(inspector.waitError()).resolves.toMatchObject({
       name: "RxNostrCallbackError",
       callback: "filter",
       cause,
     });
-    expect(server.sockets.latest.sent).toEqual([]);
+    expect(socket.sent).toEqual([]);
 
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("sends EVENT and maps the matching OK", async () => {
@@ -479,27 +488,26 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     const event = Faker.event({ id: "event" });
-    const packets: object[] = [];
+    const inspector = new SubscriptionInspector<object>();
 
-    relay.event(event).subscribe((packet) => packets.push(packet));
-    expect(await expectSent(server.sockets.latest, "EVENT")).toEqual(["EVENT", event]);
-    server.sockets.latest.message(["OK", "event", true, "saved"]);
+    relay.event(event).subscribe(inspector);
+    expect(await expectSent(socket, "EVENT")).toEqual(["EVENT", event]);
+    socket.message(["OK", "event", true, "saved"]);
 
-    expect(packets).toEqual([
-      {
-        from: "wss://relay.example.com",
-        type: "OK",
-        eventId: "event",
-        ok: true,
-        notice: "saved",
-        message: ["OK", "event", true, "saved"],
-      },
-    ]);
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: "wss://relay.example.com",
+      type: "OK",
+      eventId: "event",
+      ok: true,
+      notice: "saved",
+      message: ["OK", "event", true, "saved"],
+    });
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("authenticates and resends an EVENT once after auth-required", async () => {
@@ -509,48 +517,47 @@ describe("RelayCommunication transport integration", () => {
       authenticator: { authTimeout: 1_000, challenge: async () => authEvent },
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     const event = Faker.event({ id: "event" });
     const authEvent = Faker.authEvent({
       id: "auth-event",
       relay: relay.url,
       challenge: "challenge",
     });
-    const packets: object[] = [];
-    const complete = vi.fn();
-    relay.event(event).subscribe({ next: (packet) => packets.push(packet), complete });
-    await expectSent(server.sockets.latest, "EVENT");
-    server.sockets.latest.message(["AUTH", "challenge"]);
-    server.sockets.latest.message(["OK", "event", false, "auth-required: login"]);
+    const inspector = new SubscriptionInspector<object>();
 
-    expect(await expectSent(server.sockets.latest, "AUTH")).toEqual(["AUTH", authEvent]);
-    server.sockets.latest.message(["OK", "auth-event", true, "authenticated"]);
-    expect(await expectSent(server.sockets.latest, "EVENT", 2)).toEqual(["EVENT", event]);
-    server.sockets.latest.message(["OK", "event", true, "saved"]);
+    relay.event(event).subscribe(inspector);
+    await expectSent(socket, "EVENT");
+    socket.message(["AUTH", "challenge"]);
+    socket.message(["OK", "event", false, "auth-required: login"]);
 
-    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
-    expect(packets).toEqual([
-      {
-        from: relay.url,
-        type: "OK",
-        eventId: "event",
-        ok: false,
-        notice: "auth-required: login",
-        noticeType: "auth-required",
-        message: ["OK", "event", false, "auth-required: login"],
-      },
-      {
-        from: relay.url,
-        type: "OK",
-        eventId: "event",
-        ok: true,
-        notice: "saved",
-        message: ["OK", "event", true, "saved"],
-      },
-    ]);
+    expect(await expectSent(socket, "AUTH")).toEqual(["AUTH", authEvent]);
+    socket.message(["OK", "auth-event", true, "authenticated"]);
+    expect(await expectSent(socket, "EVENT", 2)).toEqual(["EVENT", event]);
+    socket.message(["OK", "event", true, "saved"]);
+
+    await vi.waitFor(() => expect(inspector.completed).toBe(true));
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: relay.url,
+      type: "OK",
+      eventId: "event",
+      ok: false,
+      notice: "auth-required: login",
+      noticeType: "auth-required",
+      message: ["OK", "event", false, "auth-required: login"],
+    });
+    await expect(inspector.waitNext()).resolves.toEqual({
+      from: relay.url,
+      type: "OK",
+      eventId: "event",
+      ok: true,
+      notice: "saved",
+      message: ["OK", "event", true, "saved"],
+    });
     release();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
-    server.sockets.latest.acknowledgeClose();
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
+    socket.acknowledgeClose();
   });
 
   test("coalesces rapid release and reacquire without a socket blink", async () => {
@@ -559,7 +566,8 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const first = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     await Promise.resolve();
 
     first();
@@ -567,14 +575,14 @@ describe("RelayCommunication transport integration", () => {
     await Promise.resolve();
 
     expect(server.connections).toHaveLength(1);
-    expect(server.sockets.latest.closeRequests).toHaveLength(0);
+    expect(socket.closeRequests).toHaveLength(0);
     expect(relay.leaseCount).toBe(1);
 
     second();
     second();
-    await vi.waitFor(() => expect(server.sockets.latest.closeRequests).toHaveLength(1));
+    await vi.waitFor(() => expect(socket.closeRequests).toHaveLength(1));
     expect(relay.leaseCount).toBe(0);
-    server.sockets.latest.acknowledgeClose();
+    socket.acknowledgeClose();
   });
 
   test("dispose invalidates outstanding lease callbacks", async () => {
@@ -583,17 +591,18 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
     });
     const release = relay.hold();
-    server.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
     await Promise.resolve();
 
     relay.dispose();
-    expect(server.sockets.latest.closeRequests).toHaveLength(1);
+    expect(socket.closeRequests).toHaveLength(1);
     release();
     release();
     await Promise.resolve();
 
     expect(relay.leaseCount).toBe(0);
-    expect(server.sockets.latest.closeRequests).toHaveLength(1);
-    server.sockets.latest.acknowledgeClose();
+    expect(socket.closeRequests).toHaveLength(1);
+    socket.acknowledgeClose();
   });
 });

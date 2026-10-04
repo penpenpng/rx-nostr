@@ -1,15 +1,16 @@
-import { EMPTY, filter, Subject, type Observable } from "rxjs";
-import { assert, expect } from "vitest";
+import { EMPTY, filter, Subject, Observable } from "rxjs";
+import { expect } from "vitest";
 
 import type { LazyFilter } from "../../index.ts";
-import { AwaitableQueue, once, u, type RelayUrl } from "../../libs/index.ts";
+import { once, type RelayUrl } from "../../libs/index.ts";
 import type { EventPacket, OkPacket } from "../../packets";
 import type { IRelayCommunication } from "../../rx-nostr/communication/index.ts";
+import { QueueInspector } from "./queue-inspector.ts";
 
 export class RelayCommunicationMock implements IRelayCommunication {
   isHot = false;
-  channels = new AwaitableQueue<Observable<EventPacket>>();
-  queryLog = new AwaitableQueue<LazyFilter[]>();
+  channels = new QueueInspector<Observable<EventPacket>>();
+  queryLog = new QueueInspector<LazyFilter[]>();
   #activeLeaseCount = 0;
   connectionAttemptCount = 0;
 
@@ -33,11 +34,11 @@ export class RelayCommunicationMock implements IRelayCommunication {
   vreq(_strategy: "forward" | "backward", filters: LazyFilter[]): Observable<EventPacket> {
     if (!this.hasActiveLease && !this.isHot) return EMPTY;
     try {
-      this.queryLog.enqueue(filters);
+      this.queryLog.push(filters);
 
       return (
         this.channels
-          .dequeueSync()
+          .takeNext()
           // emulate that closed stream provides no events.
           .pipe(
             filter((packet) => {
@@ -63,26 +64,19 @@ export class RelayCommunicationMock implements IRelayCommunication {
   attachNextStream() {
     const stream = new Subject<EventPacket>();
 
-    const subscribed = this.channels.enqueue(stream, 100);
-
-    return Object.assign(stream, {
-      subscribed: subscribed.catch(() => {
-        throw new Error(`Stream was not subscribed (${this.url})`);
+    const { promise: subscribed, resolve } = Promise.withResolvers<void>();
+    this.channels.push(
+      new Observable<EventPacket>((subscriber) => {
+        resolve();
+        return stream.subscribe(subscriber);
       }),
-    });
+    );
+
+    return Object.assign(stream, { subscribed });
   }
 
   async expectFilters(filters: Partial<LazyFilter>[]): Promise<void> {
-    try {
-      const value = await this.queryLog.dequeue(100);
-      expect(value).toEqual(filters);
-    } catch (err) {
-      if (err instanceof u.Promise.TimeoutError) {
-        assert.fail(`timeout (${this.url})`, JSON.stringify(filters));
-      } else {
-        throw err;
-      }
-    }
+    await expect(this.queryLog.waitNext()).resolves.toEqual(filters);
   }
 
   eventOut = new Subject<OkPacket>();

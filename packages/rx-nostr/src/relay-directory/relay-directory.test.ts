@@ -1,5 +1,7 @@
+import { map, tap } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
+import { SubscriptionInspector } from "../__test__/helper/subscription-inspector.ts";
 import { RelayDirectory, getRelayDirectoryReporter } from "./relay-directory.ts";
 
 describe("RelayDirectory health reporter", () => {
@@ -54,22 +56,29 @@ describe("RelayDirectory health reporter", () => {
     expect(directory.get("wss://relay.example.com")).toBeUndefined();
   });
 
-  test("gives each observer mutable detached snapshots", () => {
+  test("gives each observer mutable detached snapshots", async () => {
     let now = 10;
     const directory = new RelayDirectory({ clock: () => now });
-    const values: number[] = [];
+    const inspector = new SubscriptionInspector<number>();
     const observed = directory.observe("wss://relay.example.com");
-    const mutatingSub = observed.subscribe((entry) => {
-      entry.consecutiveFailures = 100;
-    });
-    const sub = observed.subscribe((entry) => values.push(entry.consecutiveFailures));
+    const mutatingInspector = new SubscriptionInspector<unknown>();
+    const mutatingSub = observed
+      .pipe(
+        tap((entry) => {
+          entry.consecutiveFailures = 100;
+        }),
+      )
+      .subscribe(mutatingInspector);
+    const sub = observed.pipe(map((entry) => entry.consecutiveFailures)).subscribe(inspector);
     const reporter = getRelayDirectoryReporter(directory);
 
     reporter.connectionFailed("wss://relay.example.com");
     now = 11;
     reporter.connectionOpened("wss://relay.example.com");
 
-    expect(values).toEqual([0, 1, 0]);
+    await expect(inspector.waitNext()).resolves.toEqual(0);
+    await expect(inspector.waitNext()).resolves.toEqual(1);
+    await expect(inspector.waitNext()).resolves.toEqual(0);
     mutatingSub.unsubscribe();
     sub.unsubscribe();
   });

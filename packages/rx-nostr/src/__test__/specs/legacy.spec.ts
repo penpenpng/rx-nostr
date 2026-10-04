@@ -2,7 +2,9 @@ import { NoopReconnector, NoopVerifier, RxReq } from "rx-nostr";
 import { describe, expect, test } from "vitest";
 
 import { createLegacyRxNostr } from "../../legacy.ts";
+import type { EventPacket } from "../../packets/packets.interface.ts";
 import { expectSent } from "../helper/index.ts";
+import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 import { ControlledWebSocketServer } from "../support/controlled-websocket.ts";
 
 describe("createLegacyRxNostr", () => {
@@ -24,7 +26,8 @@ describe("createLegacyRxNostr", () => {
     expect([...client.defaultRelays]).toEqual([readableRelay, writeOnlyRelay]);
 
     const request = new RxReq();
-    const subscription = client.use(request).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    const subscription = client.use(request).subscribe(inspector);
     request.emit([{}]);
 
     const socket = server.sockets.latestFor(readableRelay);

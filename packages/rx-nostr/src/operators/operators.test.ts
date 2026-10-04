@@ -5,7 +5,7 @@ import { Faker } from "../__test__/helper/faker.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import { dropExpiredEvents, filterByType, latestEach, tie } from "./index.ts";
 
-describe("operators preserved from v3", () => {
+describe("operators", () => {
   test("latestEach emits only newer events for each key", async () => {
     const packets = [
       Faker.eventPacket({ id: "1", pubkey: "a", created_at: 3 }),

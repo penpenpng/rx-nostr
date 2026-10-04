@@ -2,9 +2,11 @@ import { filter, firstValueFrom } from "rxjs";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer } from "../__test__/helper/index.ts";
+import { SubscriptionInspector } from "../__test__/helper/subscription-inspector.ts";
 import { NoopReconnector } from "../connection-reconnector/index.ts";
 import type { RxNostrDiagnostic } from "../diagnostics/index.ts";
 import { NoopVerifier } from "../event-verifier/index.ts";
+import type { EventPacket } from "../packets/packets.interface.ts";
 import { RxNostr } from "./rx-nostr.ts";
 
 const relay = "wss://diagnostics.example.com";
@@ -45,11 +47,13 @@ describe("RxNostr diagnostics", () => {
           .pipe(filter(({ state }) => state.state === "connected")),
       ),
     ]);
-    server.sockets.latest.open();
-    anotherServer.sockets.latest.open();
+    const socket = server.sockets.latest;
+    socket.open();
+    const socket2 = anotherServer.sockets.latest;
+    socket2.open();
     await connected;
-    server.sockets.latest.rawMessage("not-json");
-    anotherServer.sockets.latest.rawMessage("not-json");
+    socket.rawMessage("not-json");
+    socket2.rawMessage("not-json");
     expect(diagnostics).toContainEqual(
       expect.objectContaining({
         level: "warning",
@@ -66,7 +70,7 @@ describe("RxNostr diagnostics", () => {
       }),
     );
 
-    server.sockets.latest.peerClose(1006, "network lost");
+    socket.peerClose(1006, "network lost");
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
         expect.objectContaining({
@@ -88,10 +92,10 @@ describe("RxNostr diagnostics", () => {
     expect(diagnostics.every((diagnostic) => !("type" in diagnostic))).toBe(true);
     rxNostr.dispose();
     anotherRxNostr.dispose();
-    anotherServer.sockets.latest.acknowledgeClose();
+    socket2.acknowledgeClose();
   });
 
-  test("includes failed initial WebSocket attempts previously exposed as v3 errors", async () => {
+  test("reports failed initial WebSocket attempts", async () => {
     const server = new ControlledWebSocketServer();
     const diagnostics: RxNostrDiagnostic[] = [];
     RxNostr.logSink = (diagnostic) => diagnostics.push(diagnostic);
@@ -103,7 +107,8 @@ describe("RxNostr diagnostics", () => {
     });
 
     rxNostr.setHotRelays(relay);
-    server.sockets.latest.peerClose(1006, "unreachable");
+    const socket = server.sockets.latest;
+    socket.peerClose(1006, "unreachable");
 
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
@@ -123,7 +128,7 @@ describe("RxNostr diagnostics", () => {
     rxNostr.dispose();
   });
 
-  test("includes WebSocket send failures previously exposed as v3 errors", async () => {
+  test("reports WebSocket send failures", async () => {
     const server = new ControlledWebSocketServer();
     const cause = new Error("send failed");
     const diagnostics: RxNostrDiagnostic[] = [];
@@ -136,11 +141,13 @@ describe("RxNostr diagnostics", () => {
     });
 
     rxNostr.setHotRelays(relay);
-    server.sockets.latest.open();
-    server.sockets.latest.send = () => {
+    const socket = server.sockets.latest;
+    socket.open();
+    socket.send = () => {
       throw cause;
     };
-    rxNostr.backward(relay, [{}]).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    rxNostr.backward(relay, [{}]).subscribe(inspector);
 
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
@@ -155,7 +162,7 @@ describe("RxNostr diagnostics", () => {
     );
 
     rxNostr.dispose();
-    server.sockets.latest.acknowledgeClose();
+    socket.acknowledgeClose();
   });
 
   test("includes rx-nostr diagnostics", async () => {
@@ -166,7 +173,8 @@ describe("RxNostr diagnostics", () => {
       skipFetchNip11: true,
     });
 
-    rxNostr.backward([], [{}]).subscribe();
+    const inspector = new SubscriptionInspector<EventPacket>();
+    rxNostr.backward([], [{}]).subscribe(inspector);
 
     await vi.waitFor(() =>
       expect(diagnostics).toContainEqual(
