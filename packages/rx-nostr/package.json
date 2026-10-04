@@ -42,6 +42,11 @@
       "@rx-nostr/development": "./src/utils.ts",
       "import": "./dist/utils.js"
     },
+    "./legacy": {
+      "types": "./dist/legacy.d.ts",
+      "@rx-nostr/development": "./src/legacy.ts",
+      "import": "./dist/legacy.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

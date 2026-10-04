@@ -2,7 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    entry: ["src/index.ts", "src/operators.ts", "src/utils.ts"],
+    entry: ["src/index.ts", "src/operators.ts", "src/utils.ts", "src/legacy.ts"],
     target: "es2022",
     dts: true,
     deps: {
