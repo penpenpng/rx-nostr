@@ -3,10 +3,8 @@ import { BehaviorSubject, Observable, Subject, type Subscription } from "rxjs";
 import {
   Unipls,
   type ConnectionAttemptSnapshot,
-  type ReconnectionContext,
   type StreamFinalization,
   type SubscriptionHandle,
-  type UniplsDropDetector,
   type UniplsDrop,
   type UniplsDropRetryStrategy,
   type UniplsLifecycleSnapshot,
@@ -14,6 +12,8 @@ import {
   type UniplsRetryStrategy,
   type WebSocketConstructor as UniplsWebSocketConstructor,
 } from "unipls";
+import type { UniplsDropDetector } from "unipls/drop-detectors";
+import type { ReconnectionContext } from "unipls/reconnectors";
 
 import type {
   ConnectionDropDetector,
@@ -148,7 +148,7 @@ export class NostrTransport {
 
   listen(options: NostrTransportListenOptions = {}): Observable<MessagePacket> {
     return createStreamObservable(
-      (onMessage) => this.#client.listen({ ...options, onMessage }),
+      (onMatch) => this.#client.listen({ ...options, onMatch }),
       (finalization) => this.#emitStreamFailureDiagnostic(finalization),
     );
   }
@@ -158,7 +158,7 @@ export class NostrTransport {
     // resend here so that recovery cannot bypass the authentication barrier.
     const raw = (retry = options.retry) =>
       createStreamObservable(
-        (onMessage) => this.#client.subscribe({ ...options, retry, onMessage }),
+        (onMatch) => this.#client.subscribe({ ...options, retry, onMatch }),
         (finalization) => this.#emitStreamFailureDiagnostic(finalization),
       );
     if (!this.beforeSend || (typeof options.query !== "function" && options.query[0] === "AUTH")) {

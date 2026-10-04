@@ -231,6 +231,29 @@ describe("NostrTransport", () => {
     await closeTransport(transport, server);
   });
 
+  test("delivers only matching listen messages and completes on the terminator", async () => {
+    const server = new ControlledWebSocketServer();
+    const transport = await openTransport(server);
+    const inspector = new SubscriptionInspector<string>();
+    transport
+      .listen({
+        selector: (packet) => packet.type === "NOTICE",
+        terminator: (packet) => packet.type === "EOSE",
+      })
+      .pipe(map((packet) => packet.type))
+      .subscribe(inspector);
+
+    const socket = server.sockets.latest;
+    socket.message(["AUTH", "ignored"]);
+    socket.message(["NOTICE", "matched"]);
+    socket.message(["EOSE", "sub"]);
+
+    await expect(inspector.waitNext()).resolves.toBe("NOTICE");
+    await expect(inspector.waitComplete()).resolves.toBeUndefined();
+    expect(inspector.values).toEqual(["NOTICE"]);
+    await closeTransport(transport, server);
+  });
+
   test("maps timeout and drop finalizations to transport errors", async () => {
     const timeoutServer = new ControlledWebSocketServer();
     const timeoutTransport = await openTransport(timeoutServer);

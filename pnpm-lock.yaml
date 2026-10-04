@@ -47,7 +47,7 @@ importers:
         version: 6.0.2
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
+        version: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11(@voidzero-dev/vite-plus-core@0.3.3(@types/node@26.6.2)(esbuild@0.28.2)(typescript@6.0.2)(yaml@2.9.1))(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vitest@4.1.11))(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/crypto-wasm:
     dependencies:
@@ -89,8 +89,8 @@ importers:
         specifier: ^7.8.2
         version: 7.8.2
       unipls:
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       '@types/node':
         specifier: ^26.6.2
@@ -109,7 +109,7 @@ importers:
         version: 6.0.2
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
+        version: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11(@voidzero-dev/vite-plus-core@0.3.3(@types/node@26.6.2)(esbuild@0.28.2)(typescript@6.0.2)(yaml@2.9.1))(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vitest@4.1.11))(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
 
 packages:
 
@@ -3203,8 +3203,8 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  unipls@0.1.0:
-    resolution: {integrity: sha512-PXqeFmzkikqUGcQNBfiPPE1jx/CaV3Ed8VB0NMkPxx6fxhmK8nocgEZob2EZZ1oc+bepU0JrL/AyEwnbh7oDWQ==}
+  unipls@0.2.0:
+    resolution: {integrity: sha512-xjDWy+yZFYDzonRwR3sq9uAq6Q6ovoYr1jeMbnbDlSDjqQuqRvKT/vMpgO9pjJk9Q0cmGFKFeNWu8sPZtnc5cw==}
     engines: {bun: '>=1.2.0', deno: '>=2.0.0', node: '>=22.4.0'}
 
   unist-util-is@6.0.1:
@@ -4784,7 +4784,7 @@ snapshots:
       pathe: 2.0.3
       sirv: 3.0.2
       tinyrainbow: 3.1.1
-      vitest: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
+      vitest: 5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11(@voidzero-dev/vite-plus-core@0.3.3(@types/node@26.6.2)(esbuild@0.28.2)(typescript@6.0.2)(yaml@2.9.1))(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vitest@4.1.11))(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
 
   '@vitest/utils@3.2.7':
     dependencies:
@@ -6532,7 +6532,7 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  unipls@0.1.0: {}
+  unipls@0.2.0: {}
 
   unist-util-is@6.0.1:
     dependencies:
@@ -6827,7 +6827,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1)):
+  vitest@5.0.1(@types/node@26.6.2)(@vitest/browser-preview@4.1.11(@voidzero-dev/vite-plus-core@0.3.3(@types/node@26.6.2)(esbuild@0.28.2)(typescript@6.0.2)(yaml@2.9.1))(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vitest@4.1.11))(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.1(msw@2.15.0(@types/node@26.6.2)(typescript@6.0.2))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.1))
