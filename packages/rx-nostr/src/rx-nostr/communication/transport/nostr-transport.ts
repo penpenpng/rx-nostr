@@ -6,11 +6,11 @@ import {
   type ReconnectionContext,
   type StreamFinalization,
   type SubscriptionHandle,
-  type UniplsDiagnostic,
   type UniplsDropDetector,
   type UniplsDrop,
   type UniplsDropRetryStrategy,
   type UniplsLifecycleSnapshot,
+  type UniplsLog,
   type UniplsRetryStrategy,
   type WebSocketConstructor as UniplsWebSocketConstructor,
 } from "unipls";
@@ -115,15 +115,13 @@ export class NostrTransport {
       dropDetectors: options.dropDetectors?.map((detector) =>
         createUniplsDropDetector(options.url, detector),
       ),
+      logSink: (log) => this.#onUniplsLog(log),
     });
 
     this.#removeListeners.push(
       this.#client.on("message", ({ message }) => this.messages$.next(message)),
       this.#client.on("lifecycle", ({ previous, current }) => this.#onLifecycle(previous, current)),
       this.#client.on("dropped", ({ drop }) => this.#emitDiagnostic(diagnosticFromDrop(drop))),
-      this.#client.on("diagnostic", (diagnostic) =>
-        this.#emitDiagnostic(mapDiagnostic(diagnostic)),
-      ),
     );
   }
 
@@ -148,14 +146,14 @@ export class NostrTransport {
 
   listen(options: NostrTransportListenOptions = {}): Observable<MessagePacket> {
     return createStreamObservable(
-      (next) => this.#client.listen({ ...options, next }),
+      (onMessage) => this.#client.listen({ ...options, onMessage }),
       (finalization) => this.#emitStreamFailureDiagnostic(finalization),
     );
   }
 
   subscribe(options: NostrTransportSubscribeOptions): Observable<MessagePacket> {
     return createStreamObservable(
-      (next) => this.#client.subscribe({ ...options, next }),
+      (onMessage) => this.#client.subscribe({ ...options, onMessage }),
       (finalization) => this.#emitStreamFailureDiagnostic(finalization),
     );
   }
@@ -179,15 +177,17 @@ export class NostrTransport {
   #onLifecycle(previous: UniplsLifecycleSnapshot, current: UniplsLifecycleSnapshot): void {
     const attempt = failedAttemptFromTransition(previous, current);
     if (attempt) {
-      const cause = attempt.drop ? attempt.drop.cause : attempt.cause;
+      const droppedError = dropFromCause(attempt.cause);
+      const drop = droppedError ?? attempt.drop;
       this.#emitDiagnostic({
         severity: "warning",
         occurredAt: attempt.endedAt,
         relay: this.options.url,
         message: "A relay connection attempt failed.",
-        ...(cause === undefined ? {} : { cause }),
-        ...(attempt.drop ? { details: detailsFromDrop(attempt.drop) } : {}),
+        cause: attempt.cause,
+        ...(drop ? { details: detailsFromDrop(drop) } : {}),
       });
+      if (droppedError) this.#emitDiagnostic(diagnosticFromDrop(droppedError));
     }
     this.#reportHealth(previous, current);
     const state = stateFromLifecycle(current);
@@ -240,6 +240,32 @@ export class NostrTransport {
       details: { reason: finalization.reason },
     });
   }
+
+  #onUniplsLog(log: UniplsLog): void {
+    if (log.event !== "message/deserialization") return;
+    const input = log.context?.input;
+    this.#emitDiagnostic({
+      severity: "warning",
+      occurredAt: Date.now(),
+      message: "A message received from the relay could not be decoded and was ignored.",
+      ...(log.cause === undefined ? {} : { cause: log.cause }),
+      details: {
+        ...(typeof input === "object" && input !== null && "kind" in input
+          ? { inputKind: input.kind }
+          : {}),
+        ...(typeof input === "object" && input !== null && "size" in input
+          ? { inputSize: input.size }
+          : {}),
+      },
+    });
+  }
+}
+
+function dropFromCause(cause: unknown): UniplsDrop | undefined {
+  if (typeof cause !== "object" || cause === null || !("drop" in cause)) return undefined;
+  const drop = cause.drop;
+  if (typeof drop !== "object" || drop === null || !("source" in drop)) return undefined;
+  return drop as UniplsDrop;
 }
 
 function createStreamObservable(
@@ -528,23 +554,6 @@ function failureFromCause(kind: ConnectionFailure["kind"], cause: unknown): Conn
   });
 }
 
-function mapDiagnostic(diagnostic: UniplsDiagnostic): NostrTransportDiagnostic {
-  return {
-    severity: diagnostic.severity,
-    occurredAt: diagnostic.occurredAt,
-    message: diagnosticMessage(diagnostic),
-    ...(diagnostic.type === "message-deserialization-failed" ||
-    diagnostic.type === "message-predicate-failed" ||
-    diagnostic.type === "stream-callback-failed" ||
-    diagnostic.type === "resource-cleanup-failed" ||
-    diagnostic.type === "drop-detector-failed" ||
-    diagnostic.type === "reconnector-failed"
-      ? { cause: diagnostic.cause }
-      : {}),
-    ...diagnosticDetails(diagnostic),
-  };
-}
-
 function diagnosticFromDrop(drop: UniplsDrop): NostrTransportDiagnostic {
   return {
     severity: "warning",
@@ -553,25 +562,6 @@ function diagnosticFromDrop(drop: UniplsDrop): NostrTransportDiagnostic {
     ...(drop.cause === undefined ? {} : { cause: drop.cause }),
     details: detailsFromDrop(drop),
   };
-}
-
-function diagnosticMessage(diagnostic: UniplsDiagnostic): string {
-  switch (diagnostic.type) {
-    case "message-deserialization-failed":
-      return "A message received from the relay could not be decoded and was ignored.";
-    case "message-predicate-failed":
-      return `A relay message ${diagnostic.predicate} callback failed; the affected operation followed its configured failure policy.`;
-    case "stream-callback-failed":
-      return "A relay stream callback failed; the affected operation followed its configured failure policy.";
-    case "stream-message-dropped":
-      return "A relay message was dropped because the operation's bounded message buffer was full.";
-    case "resource-cleanup-failed":
-      return "A resource cleanup task failed.";
-    case "drop-detector-failed":
-      return "A connection drop detector callback or supervised task failed.";
-    case "reconnector-failed":
-      return "The connection reconnector failed while deciding whether or when to retry.";
-  }
 }
 
 function detailsFromDrop(drop: UniplsDrop): Record<string, unknown> {
@@ -585,47 +575,4 @@ function detailsFromDrop(drop: UniplsDrop): Record<string, unknown> {
           wasClean: drop.close.wasClean,
         }),
   };
-}
-
-function diagnosticDetails(diagnostic: UniplsDiagnostic): { details?: Record<string, unknown> } {
-  switch (diagnostic.type) {
-    case "message-deserialization-failed":
-      return {
-        details: {
-          inputKind: diagnostic.input.kind,
-          ...(diagnostic.input.size === undefined ? {} : { inputSize: diagnostic.input.size }),
-        },
-      };
-    case "message-predicate-failed":
-      return { details: { predicate: diagnostic.predicate, policy: diagnostic.policy } };
-    case "stream-callback-failed":
-      return { details: { policy: diagnostic.policy } };
-    case "stream-message-dropped":
-      return {
-        details: { strategy: diagnostic.strategy, capacity: diagnostic.capacity },
-      };
-    case "resource-cleanup-failed":
-      return {
-        details: {
-          registrationSource: diagnostic.resource.source,
-          ...(diagnostic.resource.name === undefined
-            ? {}
-            : { resourceName: diagnostic.resource.name }),
-        },
-      };
-    case "drop-detector-failed":
-      return {
-        details: {
-          boundary: diagnostic.boundary,
-          detectorIndex: diagnostic.detector.registrationIndex,
-          ...(diagnostic.detector.name === undefined
-            ? {}
-            : { detectorName: diagnostic.detector.name }),
-        },
-      };
-    case "reconnector-failed":
-      return {
-        details: { context: diagnostic.context, failurePoint: diagnostic.failurePoint },
-      };
-  }
 }
