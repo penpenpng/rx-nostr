@@ -4,7 +4,7 @@ import { compareEvents } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**
- * Accumulate latest events in order of new arrival (based on `created_at`).
+ * Accumulate events newest first; smaller IDs lead at the same timestamp.
  */
 export function timeline<P extends EventPacket>(limit?: number): OperatorFunction<P, P[]> {
   return scan<P, P[]>((acc, packet) => {

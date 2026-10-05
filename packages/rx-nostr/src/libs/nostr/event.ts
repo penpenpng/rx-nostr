@@ -41,25 +41,25 @@ export function ensureEventFields(event: Partial<Nostr.Event>): event is Nostr.E
   return true;
 }
 
-/** Return an event that has earlier `created_at`. */
+/** Return the older event; a larger ID loses a same-timestamp tie. */
 export function earlierEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? a : b;
 }
 
-/** Return an event that has later `created_at`. */
+/** Return the newer event; a smaller ID wins a same-timestamp tie. */
 export function laterEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? b : a;
 }
 
-/** Sort key function to sort events based on `created_at`. */
+/** Ascending order: older timestamps first, then larger IDs first. */
 export function compareEvents(a: Nostr.Event, b: Nostr.Event): number {
   if (a.id === b.id) {
     return 0;
   }
 
   return a.created_at < b.created_at ||
-    // https://github.com/nostr-protocol/nips/blob/master/16.md#replaceable-events
-    (a.created_at === b.created_at && a.id < b.id)
+    // NIP-01 retains the lexically smallest ID for replaceable timestamp ties.
+    (a.created_at === b.created_at && a.id > b.id)
     ? -1
     : 1;
 }

@@ -3,9 +3,42 @@ import { describe, expect, test } from "vitest";
 
 import { Faker } from "../__test__/helper/faker.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
-import { dropExpiredEvents, filterByType, latestEach, tie } from "./index.ts";
+import {
+  dropExpiredEvents,
+  filterByType,
+  latest,
+  latestEach,
+  sortEvents,
+  tie,
+  timeline,
+} from "./index.ts";
 
 describe("operators", () => {
+  test.each(["small-first", "large-first"] as const)(
+    "orders same-timestamp events consistently when %s",
+    async (arrival) => {
+      const small = Faker.eventPacket({ id: "a", pubkey: "same", created_at: 2 });
+      const large = Faker.eventPacket({ id: "b", pubkey: "same", created_at: 2 });
+      const older = Faker.eventPacket({ id: "z", pubkey: "other", created_at: 1 });
+      const packets = arrival === "small-first" ? [older, small, large] : [older, large, small];
+
+      const newest = await lastValueFrom(of(...packets).pipe(latest(), toArray()));
+      const byKey = await lastValueFrom(
+        of(...packets).pipe(
+          latestEach((packet) => packet.event.pubkey),
+          toArray(),
+        ),
+      );
+      const timelineResult = await lastValueFrom(of(...packets).pipe(timeline()));
+      const ascending = await lastValueFrom(of(...packets).pipe(sortEvents(0), toArray()));
+
+      expect(newest.at(-1)?.event.id).toBe("a");
+      expect(byKey.filter(({ event }) => event.pubkey === "same").at(-1)?.event.id).toBe("a");
+      expect(timelineResult.map(({ event }) => event.id)).toEqual(["a", "b", "z"]);
+      expect(ascending.map(({ event }) => event.id)).toEqual(["z", "b", "a"]);
+    },
+  );
+
   test("latestEach emits only newer events for each key", async () => {
     const packets = [
       Faker.eventPacket({ id: "1", pubkey: "a", created_at: 3 }),

@@ -27,10 +27,10 @@ rxNostr
 | `createUniq()` | cache を外部操作できる uniq operator を作る |
 | `tie()` | relay ごとの初回観測に `seenOn` と `isNew` を付ける |
 | `createTie()` | memo を外部操作できる tie operator を作る |
-| `latest()` | NIP-01 の順序で最新の EVENT だけを通す |
-| `latestEach(key)` | key ごとに最新の EVENT だけを通す |
-| `sortEvents(ms)` | 一定時間 buffer して EVENT 順に並べる |
-| `timeline(limit?)` | 新しい順の packet 配列を蓄積して通知する |
+| `latest()` | 新しい時刻を優先し、同時刻なら ID の辞書順が小さい EVENT を最新として通す |
+| `latestEach(key)` | key ごとに同じ規則で最新の EVENT だけを通す |
+| `sortEvents(ms)` | 一定時間 buffer して古い時刻順、同時刻なら ID の大きい順に並べる |
+| `timeline(limit?)` | 新しい時刻順、同時刻なら ID の小さい順の packet 配列を蓄積して通知する |
 
 多くの filter operator は `{ not: true }` による反転に対応します。
 
