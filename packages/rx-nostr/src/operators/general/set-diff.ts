@@ -1,21 +1,24 @@
-import { scan, type OperatorFunction } from "rxjs";
+import { defer, map, type OperatorFunction } from "rxjs";
 
 export function setDiff<T>(options?: { seed?: Set<T> }): OperatorFunction<Set<T>, SetDiff<T>> {
-  return scan<Set<T>, SetDiff<T>>(
-    (acc, values) => {
-      const next = values;
-      const prev = acc.current;
+  const seed = new Set(options?.seed);
 
-      return {
-        appended: next.difference(prev),
-        outdated: prev.difference(next),
-        current: next,
-      };
-    },
-    {
-      current: options?.seed ?? new Set(),
-    },
-  );
+  return (source) =>
+    defer(() => {
+      let previous = new Set(seed);
+
+      return source.pipe(
+        map((values) => {
+          const current = new Set(values);
+          const appended = current.difference(previous);
+          const outdated = previous.difference(current);
+
+          previous = current;
+
+          return { appended, outdated, current: new Set(current) };
+        }),
+      );
+    });
 }
 
 export interface SetDiff<T> {

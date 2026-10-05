@@ -46,13 +46,21 @@ function toKey(relays: ReqPacket["relays"]): string | RxRelays {
     return relays;
   }
 
-  return [...RxRelays.set(relays)].toSorted().join(",");
+  return JSON.stringify([...RxRelays.set(relays)].toSorted());
 }
 
 function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
   const groups = new Map<string | RxRelays, ReqPacket[]>();
 
-  for (const packet of packets) {
+  for (const source of packets) {
+    // A generator can only be iterated once. Keep its destinations in the
+    // output packet after deriving the grouping key.
+    const packet =
+      source.relays === undefined ||
+      typeof source.relays === "string" ||
+      source.relays instanceof RxRelays
+        ? source
+        : { ...source, relays: [...source.relays] };
     const key = toKey(packet.relays);
     const group = groups.get(key) ?? [];
 

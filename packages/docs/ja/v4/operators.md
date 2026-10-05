@@ -32,6 +32,8 @@ rxNostr
 | `sortEvents(ms)` | 一定時間 buffer して古い時刻順、同時刻なら ID の大きい順に並べる |
 | `timeline(limit?)` | 新しい時刻順、同時刻なら ID の小さい順の packet 配列を蓄積して通知する |
 
+`timeline(0)` は各入力で空配列を通知し、`timeline(1)` は最新の1件だけを通知します。`limit` は 0 以上の整数に限られ、不正な値は `RangeError` になります。
+
 多くの filter operator は `{ not: true }` による反転に対応します。
 
 ```ts
@@ -70,6 +72,12 @@ rxNostr.forward(relays, batched).subscribe(console.log);
 | `batch(merge?)` | ReqPacket の配列を relay 集合ごとにまとめる |
 | `chunk(predicate, split)` | 大きな filter 集合を複数 ReqPacket に分割する |
 
+`batch()` は正規化した relay URL 集合ごとに filter を結合します。`RxRelays` は同じ内容でも別 instance なら別 group です。group の `relays`、`traceTag`、`linger` などの option は先頭 packet の値を採用し、既定の filter 結合は入力順の連結です。独自の merge 関数は各 filter 配列を順に畳み込みます。空の配列からは packet を出しません。
+
+固定の relay iterable は group 化時に配列へ snapshot するため、generator を使っても出力 packet の宛先は失われません。動的な `RxRelays` は同じ instance を保持します。
+
+`chunk()` は predicate が false なら元 packet を通し、true なら split が返した filter 配列ごとに packet を出します。`relays`、`traceTag`、`linger` は各 packet へ保持され、空の split 結果は packet を出しません。predicate / split が投げた例外は stream の error になります。
+
 ## Packet utility
 
 | operator | 内容 |
@@ -87,4 +95,8 @@ rxNostr.forward(relays, batched).subscribe(console.log);
 | `timeoutWith(value?)` | RxJS `TimeoutError` を complete または指定値へ変換する |
 | `withPrevious()` | `[ひとつ前の値, 現在値]` を通知する |
 
-operator は state を持つ場合があります。同じ operator instance を意図せず複数 stream で共有しないでください。
+`timeoutWith(value)` は `TimeoutError` のとき指定値を1件通知して complete します。`0`、`false`、空文字も指定値として通知します。引数を省略すると値を出さずに complete し、timeout 以外の error はそのまま伝えます。
+
+`setDiff({ seed })` は初期 Set を呼び出し時に snapshot し、subscription ごとに独立した比較状態を持ちます。入力 Set や通知された `current` をあとから変更しても、次の差分や別 subscriber の結果は変わりません。
+
+`uniq()` は subscription ごとに重複判定を持ちます。`createUniq()` と `createTie()` の cache / memo は factory が返した operator instance に属するため、別 stream でその instance を共有すると観測履歴も共有します。`tie()` も呼び出しごとに memo を作ります。同じ operator instance を独立した stream で意図せず共有しないでください。
