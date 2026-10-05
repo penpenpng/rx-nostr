@@ -38,7 +38,7 @@ export class VerificationHost {
       self.postMessage({
         reqId,
         ok: false,
-        error: `${err}`,
+        error: errorMessage(err),
       } satisfies VerificationResponse);
     }
   };
@@ -106,9 +106,15 @@ export class VerificationClient implements EventVerifier {
       return;
     }
 
-    const { reqId, ok } = ev.data;
+    const { reqId, ok, error } = ev.data;
 
-    this.#settle(reqId, { ok });
+    if (typeof error === "string") {
+      this.#settle(reqId, { error: new Error(error) });
+    } else if ("error" in ev.data || typeof ok !== "boolean") {
+      this.#settle(reqId, { error: new Error("Invalid Worker verification response.") });
+    } else {
+      this.#settle(reqId, { ok });
+    }
   };
 
   #onerror = () => {
@@ -222,6 +228,7 @@ export interface VerificationRequest {
 export interface VerificationResponse {
   reqId: number;
   ok: boolean;
+  /** Present only when verification failed to run; the client rejects the request. */
   error?: string;
 }
 
@@ -232,6 +239,14 @@ export interface VerificationClientConfig {
   fallback?: EventVerifier;
   /** Per-request milliseconds; 0 is immediate, Infinity disables timeout. Defaults to 10000. */
   timeout?: number;
+}
+
+function errorMessage(error: unknown): string {
+  try {
+    return String(error);
+  } catch {
+    return "Worker verification failed.";
+  }
 }
 // Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.
 // oxlint-disable unicorn(require-post-message-target-origin)

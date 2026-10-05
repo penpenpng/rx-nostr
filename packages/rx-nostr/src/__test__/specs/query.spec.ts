@@ -3,6 +3,7 @@ import {
   RelayDirectory,
   RxRelays,
   RxReq,
+  VerificationClient,
   type EventPacket,
   type LazyFilter,
   type RxNostrReqInput,
@@ -421,6 +422,58 @@ describe("REQ public contract", () => {
       await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
+    });
+
+    test("surfaces Worker verifier failures as verifier callback errors", async () => {
+      const requestId = createDeferred<number>();
+      let onMessage: ((event: MessageEvent) => void) | undefined;
+      const worker = {
+        addEventListener(type: string, listener: (event: MessageEvent) => void) {
+          if (type === "message") {
+            onMessage = listener;
+          }
+        },
+        removeEventListener(type: string) {
+          if (type === "message") {
+            onMessage = undefined;
+          }
+        },
+        postMessage(message: unknown) {
+          if (typeof message === "object" && message !== null && "reqId" in message) {
+            requestId.resolve(message.reqId as number);
+          }
+        },
+        terminate() {},
+      } as unknown as Worker;
+      const verifier = new VerificationClient({ worker });
+
+      verifier.start();
+      onMessage?.({ data: "pong" } as MessageEvent);
+
+      const { server, rxNostr } = createRxNostrScenario({ verifier });
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward(relay, [{}]).subscribe(inspector);
+      const socket = server.sockets.latest;
+
+      socket.open();
+      const [, subId] = await socket.inbox.waitNext("REQ");
+
+      socket.message(["EVENT", subId, event()]);
+      const reqId = await requestId.promise;
+
+      onMessage?.({ data: { reqId, ok: false, error: "Error: worker failed" } } as MessageEvent);
+      expect(await inspector.waitError()).toMatchObject({
+        name: "RxNostrCallbackError",
+        callback: "verifier",
+        cause: { message: "Error: worker failed" },
+      });
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", subId]);
+
+      await expect(socket.closeRequested).resolves.toBeDefined();
+      socket.acknowledgeClose();
+      rxNostr.dispose();
+      verifier.dispose();
     });
 
     test("honors filter and expiration skips", async () => {

@@ -139,4 +139,6 @@ client.dispose();
 
 Worker の起動中または error 状態では新しい検証に `fallback` が使われます。Worker 実行中の検証は Worker の error や dispose によって reject されるため、呼び出し側で扱ってください。dispose 後の client は再利用できません。
 
+Worker 内の verifier が `false` を返した場合は署名不一致として `verifyEvent()` が `false` で解決します。verifier が例外を投げた場合は Worker がエラーの文字列表現だけを返し、Client は新しい `Error` で reject します。元の Error の identity と stack は Worker 境界を越えません。rx-nostr の query で使う場合は `RxNostrCallbackError`（`callback: "verifier"`）として通知されます。
+
 `timeout` は各 `verifyEvent()` の開始から測る待ち時間で、既定値は 10,000 ms です。`0` は次の timer 実行時に timeout、`Infinity` は timeout 無効です。負数、`NaN`、2,147,483,647 ms を超える値は constructor で `RangeError` になります。応答または dispose で request の timer は解除されます。

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { Faker } from "../__test__/helper/faker.ts";
-import { VerificationClient } from "./worker-verifier.ts";
+import { VerificationClient, VerificationHost } from "./worker-verifier.ts";
 
 function controlledWorker() {
   const listeners = new Map<string, Set<(event: unknown) => void>>();
@@ -30,9 +30,36 @@ function controlledWorker() {
   };
 }
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("VerificationClient pending requests", () => {
+  test("distinguishes a valid false result from a Worker error", async () => {
+    const controlled = controlledWorker();
+    const client = new VerificationClient({ worker: controlled.worker });
+
+    client.start();
+    controlled.emit("message", "pong");
+
+    const invalid = client.verifyEvent(Faker.event({ id: "invalid" }));
+    const failed = client.verifyEvent(Faker.event({ id: "failed" }));
+    const observedFailure = failed.then(
+      () => "resolved",
+      (error: unknown) => error,
+    );
+
+    controlled.emit("message", { reqId: 999, ok: true });
+    controlled.emit("message", { reqId: 1, ok: false });
+    controlled.emit("message", { reqId: 1, ok: true });
+    controlled.emit("message", { reqId: 2, ok: false, error: "Error: verifier crashed" });
+
+    await expect(invalid).resolves.toBe(false);
+    await expect(observedFailure).resolves.toMatchObject({ message: "Error: verifier crashed" });
+    client.dispose();
+  });
+
   test.each([0, 37])("times out exactly 100ms after a request started at +%ims", async (offset) => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
@@ -248,5 +275,55 @@ describe("VerificationClient pending requests", () => {
     await expect(client.verifyEvent(Faker.event())).rejects.toBe(cause);
     await expect(client.verifyEvent(Faker.event())).resolves.toBe(true);
     client.dispose();
+  });
+});
+
+describe("VerificationHost responses", () => {
+  test("sends false as a result and verifier exceptions as error responses", async () => {
+    class WorkerContext {
+      handler?: (event: MessageEvent) => Promise<void>;
+      postMessage = vi.fn();
+      addEventListener(_type: string, listener: (event: MessageEvent) => Promise<void>) {
+        this.handler = listener;
+      }
+      removeEventListener = vi.fn(() => {
+        this.handler = undefined;
+      });
+      async request(reqId: number) {
+        await this.handler?.({ data: { reqId, event: Faker.event() } } as MessageEvent);
+      }
+    }
+
+    const scope = new WorkerContext();
+
+    vi.stubGlobal("WorkerGlobalScope", WorkerContext);
+    vi.stubGlobal("self", scope);
+
+    const verifyEvent = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new Error("broken"))
+      .mockRejectedValueOnce("string failure")
+      .mockRejectedValueOnce({
+        toString() {
+          throw new Error("unsafe stringification");
+        },
+      });
+    const host = new VerificationHost({ verifyEvent });
+
+    host.start();
+    await scope.request(1);
+    await scope.request(2);
+    await scope.request(3);
+    await scope.request(4);
+
+    expect(scope.postMessage.mock.calls.map(([message]) => message)).toEqual([
+      { reqId: 1, ok: false },
+      { reqId: 2, ok: false, error: "Error: broken" },
+      { reqId: 3, ok: false, error: "string failure" },
+      { reqId: 4, ok: false, error: "Worker verification failed." },
+    ]);
+    host.dispose();
+    expect(scope.handler).toBeUndefined();
   });
 });
