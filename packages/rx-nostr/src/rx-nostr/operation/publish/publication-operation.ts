@@ -422,7 +422,7 @@ export class PublicationOperation implements Publication, Disposable {
 }
 
 function snapshotEvent(value: unknown): Readonly<Nostr.Event> {
-  if (typeof value !== "object" || value === null || !ensureEventFields(value)) {
+  if (!ensureEventFields(value)) {
     throw new TypeError("The signer did not return a valid Nostr event.");
   }
 

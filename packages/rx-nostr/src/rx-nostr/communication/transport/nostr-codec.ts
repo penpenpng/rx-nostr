@@ -150,10 +150,9 @@ function invalidTuple(): never {
   );
 }
 
+/** Decode only structural EVENTs; configured EventVerifier owns cryptographic acceptance. */
 function isEvent(value: unknown): value is Nostr.Event {
-  return (
-    typeof value === "object" && value !== null && ensureEventFields(value as Partial<Nostr.Event>)
-  );
+  return ensureEventFields(value);
 }
 
 function isCountResponse(value: unknown): value is Nostr.CountResponse {

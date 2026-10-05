@@ -50,6 +50,15 @@ export function signEvent<K extends number>(
 
 /** Apply the same NIP-01 ID and signature contract as the non-WASM verifier. */
 export function verifyEvent(event: Nostr.Event): boolean {
+  if (
+    !ensureEventFields(event) ||
+    !/^[0-9a-f]{64}$/.test(event.id) ||
+    !/^[0-9a-f]{64}$/.test(event.pubkey) ||
+    !/^[0-9a-f]{128}$/.test(event.sig)
+  ) {
+    return false;
+  }
+
   try {
     return Event.fromJson(JSON.stringify(event)).verify();
   } catch {

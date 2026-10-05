@@ -5,6 +5,24 @@ import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SimpleVerifier } from "./simple-verifier.ts";
 
 test.each([
+  null,
+  {},
+  { ...signedEvent, tags: [["e", 1]] },
+  { ...signedEvent, tags: [["e", true]] },
+  { ...signedEvent, tags: [["e", null]] },
+  { ...signedEvent, tags: [[]] },
+  { ...signedEvent, kind: NaN },
+  { ...signedEvent, kind: 65_536 },
+  { ...signedEvent, created_at: Infinity },
+  { ...signedEvent, id: signedEvent.id.toUpperCase() },
+  { ...signedEvent, pubkey: signedEvent.pubkey.toUpperCase() },
+  { ...signedEvent, sig: signedEvent.sig.toUpperCase() },
+])("rejects malformed or non-canonical NIP-01 EVENTs: %o", async (value) => {
+  expect(verifyEvent(value as never)).toBe(false);
+  await expect(new SimpleVerifier().verifyEvent(value as never)).resolves.toBe(false);
+});
+
+test.each([
   ["id", { id: "0".repeat(64) }],
   ["content", { content: "changed" }],
   ["signature", { sig: "0".repeat(128) }],

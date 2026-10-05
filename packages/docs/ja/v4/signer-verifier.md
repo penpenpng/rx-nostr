@@ -64,6 +64,12 @@ rxNostr.publish(relays, signedEvent, {
 
 ## Verifier
 
+### 構造検査と署名検証
+
+`rx-nostr/utils` の `ensureEventFields(value)` は EVENT の基本構造を調べる type guard です。必須の文字列 field、有限で安全な整数の `created_at`、0〜65,535 の整数 `kind`、1 要素以上の文字列からなる各 tag を確認します。短い `id` や `sig` も文字列として受け入れるため、これだけで [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md#events-and-signatures) の形式や署名の正しさは保証しません。
+
+relay tuple の decoder はこの構造検査を行い、不正な EVENT tuple を破棄します。publish でも signer の戻り値に同じ構造検査を行い、不正なら `RxNostrCallbackError` にします。どちらも本体で暗号ライブラリを読み込みません。通常版と WASM 版の `SimpleVerifier` は、lowercase hex の `id` / `pubkey` / `sig` の長さ、内容から再計算した ID、Schnorr 署名を検証し、不正な EVENT には `false` を返します。実際に受信した EVENT を通すかどうかは設定した `EventVerifier` が決めます。
+
 ```ts
 interface EventVerifier {
   verifyEvent(event: Nostr.Event): Promise<boolean>;

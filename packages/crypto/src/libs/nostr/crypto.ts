@@ -79,6 +79,15 @@ export function getSignature(eventHash: string, seckey: string): string {
 
 /** Verify the advertised ID against NIP-01 serialization and its Schnorr signature. */
 export function verifyEvent(event: Nostr.Event): boolean {
+  if (
+    !ensureEventFields(event) ||
+    !/^[0-9a-f]{64}$/.test(event.id) ||
+    !/^[0-9a-f]{64}$/.test(event.pubkey) ||
+    !/^[0-9a-f]{128}$/.test(event.sig)
+  ) {
+    return false;
+  }
+
   try {
     const hash = getEventHash(event);
 

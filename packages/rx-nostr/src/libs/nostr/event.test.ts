@@ -1,7 +1,35 @@
 import { describe, expect, test } from "vitest";
 
 import { Faker } from "../../__test__/helper/faker.ts";
-import { compareEvents, earlierEvent, laterEvent } from "./event.ts";
+import { compareEvents, earlierEvent, ensureEventFields, laterEvent } from "./event.ts";
+
+describe("EVENT structural guard", () => {
+  const valid = Faker.event({ id: "short-protocol-id", sig: "short-protocol-signature" });
+
+  test("accepts a structural EVENT without promising cryptographic validity", () => {
+    expect(ensureEventFields(valid)).toBe(true);
+    expect(ensureEventFields({ ...valid, tags: [["e", "reference"]] })).toBe(true);
+    expect(ensureEventFields({ ...valid, created_at: -1 })).toBe(true);
+  });
+
+  test.each([
+    null,
+    [],
+    { ...valid, tags: null },
+    { ...valid, tags: [[]] },
+    { ...valid, tags: [["e", 1]] },
+    { ...valid, tags: [["e", true]] },
+    { ...valid, tags: [["e", null]] },
+    { ...valid, kind: NaN },
+    { ...valid, kind: Infinity },
+    { ...valid, kind: 65_536 },
+    { ...valid, created_at: NaN },
+    { ...valid, created_at: Infinity },
+    { ...valid, content: undefined },
+  ])("rejects a malformed EVENT without throwing: %o", (value) => {
+    expect(ensureEventFields(value)).toBe(false);
+  });
+});
 
 describe("event chronological order", () => {
   const older = Faker.event({ id: "d", created_at: 1 });
