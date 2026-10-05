@@ -5,6 +5,7 @@ import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import type { ConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../../../lazy-filter/index.ts";
+import { normalizeFilters } from "../../../lazy-filter/normalize-filters.ts";
 import { RxNostrCallbackError } from "../../../libs/error.ts";
 import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import type { EventMessagePacket, EventPacket, OkPacket } from "../../../packets/index.ts";
@@ -141,9 +142,13 @@ export class NostrOperationExecutor implements Disposable {
       const packets = this.transport.subscribe({
         query: () => {
           try {
-            evaluatedFilters = evalFilters(plan.filters);
+            evaluatedFilters = normalizeFilters(evalFilters(plan.filters)) as Nostr.Filter[];
           } catch (cause) {
             throw new RxNostrCallbackError("filter", cause);
+          }
+
+          if (evaluatedFilters.length === 0) {
+            throw new NoMatchingFilters();
           }
 
           queryEvaluated = true;
@@ -309,6 +314,8 @@ export interface NostrOperationExecutorOptions {
 }
 
 const defaultVreqPlanner: RelayVreqPlanner = (strategy, filters) => [{ strategy, filters }];
+
+class NoMatchingFilters extends Error {}
 
 function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
   if (error instanceof RxNostrCallbackError) {

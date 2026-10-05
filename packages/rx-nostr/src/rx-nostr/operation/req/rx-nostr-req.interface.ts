@@ -2,6 +2,7 @@ import type { EventVerifier } from "../../../event-verifier/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RxReq } from "../../../rx-req/index.ts";
 
+/** Empty filters and unsatisfiable branches match nothing; only `[{}]` matches all. */
 export type RxNostrReqInput = RxReq | readonly LazyFilter[];
 
 export interface RxNostrReqOptions {

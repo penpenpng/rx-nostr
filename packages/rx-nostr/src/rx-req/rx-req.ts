@@ -1,9 +1,9 @@
 import { type Observable, type OperatorFunction, Subject } from "rxjs";
 
 import type { LazyFilter } from "../lazy-filter/index.ts";
+import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { createPipeMethod, type IPipeable, once, RxDisposableStack } from "../libs/index.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
-import { normalizeFilters } from "./normalize-filters.ts";
 
 export class RxReq implements IPipeable<RxReq, ReqPacket> {
   protected stack = new RxDisposableStack();
@@ -15,6 +15,7 @@ export class RxReq implements IPipeable<RxReq, ReqPacket> {
     return this.stream.pipe(...(this.operators as []));
   }
 
+  /** Emit a segment. Empty/invalid branches match nothing without broadening to `{}`. */
   emit(filters: LazyFilter | LazyFilter[], options?: ReqOptions) {
     this.stream.next({
       filters: normalizeFilters(filters),

@@ -1,5 +1,13 @@
 import type * as Nostr from "nostr-typedef";
-import { RelayDirectory, RxRelays, RxReq, type EventPacket } from "rx-nostr";
+import {
+  RelayDirectory,
+  RxRelays,
+  RxReq,
+  type EventPacket,
+  type LazyFilter,
+  type RxNostrReqInput,
+} from "rx-nostr";
+import { map } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import {
@@ -31,6 +39,105 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    describe.each(["forward", "backward"] as const)("%s no-match filters", (strategy) => {
+      test.each(["static", "emitted", "piped"] as const)(
+        "%s authors:[] completes without sending REQ",
+        async (input) => {
+          const { server, rxNostr } = createRxNostrScenario();
+          const inspector = new SubscriptionInspector<EventPacket>();
+          const source = new RxReq();
+          const noMatch: LazyFilter = { authors: [] };
+          let request: RxNostrReqInput = source;
+
+          if (input === "static") {
+            request = [noMatch];
+          } else if (input === "piped") {
+            request = source.pipe(map((packet) => ({ ...packet, filters: [noMatch] })));
+          }
+
+          rxNostr[strategy](relay, request).subscribe(inspector);
+
+          if (input !== "static") {
+            source.emit(input === "piped" ? [{}] : noMatch);
+            source.dispose();
+          }
+
+          await expect(inspector.waitComplete()).resolves.toBeUndefined();
+          expect(server.connections.length).toBe(0);
+          expect(inspector.values).toEqual([]);
+          rxNostr.dispose();
+        },
+      );
+
+      test("does not prewarm on a static invalid filter with defer=false", async () => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr[strategy](relay, [{ kinds: [] }], { defer: false }).subscribe(inspector);
+
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+        expect(server.connections.length).toBe(0);
+        rxNostr.dispose();
+      });
+    });
+
+    test("completes a lazy contradictory range at send time without REQ", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward(relay, [{ since: () => 2, until: () => 1 }]).subscribe(inspector);
+      const socket = server.sockets.latest;
+
+      socket.open();
+      await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      expect(socket.inbox.length).toBe(0);
+      await expect(socket.closeRequested).resolves.toBeDefined();
+      socket.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
+    test.each(["static", "emitted", "piped"] as const)(
+      "%s OR filters keep the valid branch and limit:0",
+      async (input) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const source = new RxReq();
+        const filters: LazyFilter[] = [{ authors: [] }, { kinds: [1], limit: 0 }];
+        let request: RxNostrReqInput = source;
+
+        if (input === "static") {
+          request = filters;
+        } else if (input === "piped") {
+          request = source.pipe(map((packet) => ({ ...packet, filters })));
+        }
+
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(relay, request).subscribe(inspector);
+
+        if (input !== "static") {
+          source.emit(input === "piped" ? [{}] : filters);
+          source.dispose();
+        }
+
+        const socket = server.sockets.latest;
+
+        socket.open();
+        const [, subId, filter] = await socket.inbox.waitNext("REQ");
+
+        expect(filter).toEqual({ kinds: [1], limit: 0 });
+
+        socket.message(["EVENT", subId, event({ id: "valid", kind: 1 })]);
+        socket.message(["EVENT", subId, event({ id: "invalid", kind: 2 })]);
+        socket.message(["EOSE", subId]);
+
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+        expect(inspector.values.map((packet) => packet.event.id)).toEqual(["valid"]);
+        await expect(socket.closeRequested).resolves.toBeDefined();
+        socket.acknowledgeClose();
+        rxNostr.dispose();
+      },
+    );
+
     test.each([0, () => 0])("preserves until: %s on REQ and in local matching", async (until) => {
       const { server, rxNostr } = createRxNostrScenario();
       const inspector = new SubscriptionInspector<EventPacket>();

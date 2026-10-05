@@ -8,6 +8,7 @@ import {
   type RxNostrDiagnosticSink,
 } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
+import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
@@ -121,11 +122,13 @@ export class RxNostr implements IRxNostr {
     let source$: Observable<ReqPacket>;
 
     if (request instanceof RxReq) {
-      source$ = request.asObservable();
-    } else if (request.length === 0) {
-      source$ = EMPTY;
+      source$ = request
+        .asObservable()
+        .pipe(map((packet) => ({ ...packet, filters: normalizeFilters(packet.filters) })));
     } else {
-      source$ = of({ filters: [...request] });
+      const filters = normalizeFilters(request);
+
+      source$ = filters.length === 0 ? EMPTY : of({ filters });
     }
 
     return defer(() => {

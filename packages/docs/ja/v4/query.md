@@ -17,6 +17,10 @@ result$.subscribe(console.log);
 
 空の宛先を指定した query は接続を作らず complete します。空の filter 配列も接続を作りません。
 
+filter は固定配列、`RxReq.emit()`、`RxReq.pipe()` の出力で同じ規則を使います。`[{}]` は全件に一致し、空の filter 配列 `[]` は一致なしです。`authors: []`、`ids: []`、`kinds: []`、`"#e": []` のような空の条件配列を含む filter は一致なしとしてその filter だけを除外します。複数 filter は OR なので、他の有効な filter があればその filter だけを送信します。
+
+未知の field、不正な値、`since > until` の filter も一致なしとして扱います。`since` / `until` の関数は送信時・再送時に評価し、評価後に時刻範囲が逆転した場合は REQ を送らずその segment を終了します。`limit: 0` は有効な値です。固定 filter がすべて一致なしなら Observable は接続せず complete します。`RxReq` の emit が一致なしの場合はその segment だけが終了し、source は次の emit を受け付けます。filter callback の例外は後述の error になります。
+
 ## 継続的に新着イベントを受け取る
 
 `forward()` に固定 filter を渡します。EOSE を受け取っても完了せず、unsubscribe まで REQ を維持します。
