@@ -10,7 +10,7 @@ export function legacyRetryReconnector(retry: LegacyRetryConfig): ConnectionReco
 
   if (retry.strategy === "exponential") {
     const backoff = new ExponentialBackoffReconnector({
-      maxRetries: retry.maxCount,
+      maxRetries: retry.maxCount ?? 5,
       initialDelay: retry.initialDelay,
     });
     return {

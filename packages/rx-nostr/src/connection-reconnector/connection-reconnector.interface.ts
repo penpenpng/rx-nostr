@@ -1,5 +1,10 @@
-import type { ConnectionFailure } from "../connection-state.ts";
+import type {
+  ConnectionFailure,
+  ConnectionWaitInfo,
+  ConnectionSuppressionReason,
+} from "../connection-state.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
+import type { RelayHealth } from "./relay-health-policy.ts";
 
 export interface ConnectionReconnector {
   reconnect(
@@ -14,14 +19,16 @@ export interface ConnectionReconnectorContext {
   attempt: number;
   reason: ConnectionFailure;
   signal: AbortSignal;
-  health: {
-    consecutiveFailures: number;
-    lastConnectedAt?: number;
-    lastFailureAt?: number;
-  };
+  health: RelayHealth;
+  /** Reports an implementation-owned asynchronous wait; does not schedule a retry. */
+  reportWaiting?(waiting: ConnectionWaitInfo): void;
 }
 
 export type ConnectionReconnectorDecision =
-  | Readonly<{ action: "retry"; delay: number }>
+  | Readonly<{
+      action: "retry";
+      delay: number;
+      suppressionReasons?: readonly ConnectionSuppressionReason[];
+    }>
   | Readonly<{ action: "cancel" }>
   | Readonly<{ action: "exhaust"; cause?: unknown }>;

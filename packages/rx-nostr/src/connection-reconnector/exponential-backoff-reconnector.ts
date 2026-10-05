@@ -4,7 +4,7 @@ import type {
 } from "./connection-reconnector.interface.ts";
 
 export interface ExponentialBackoffReconnectorOptions {
-  /** Maximum number of retries after the failed connection attempt. */
+  /** Maximum number of retries after the failed connection attempt. Infinity permits continuous recovery. */
   readonly maxRetries?: number;
   readonly initialDelay?: number;
   readonly maxDelay?: number;
@@ -23,13 +23,13 @@ export class ExponentialBackoffReconnector implements ConnectionReconnector {
   readonly #random: () => number;
 
   constructor(options: ExponentialBackoffReconnectorOptions = {}) {
-    this.#maxRetries = options.maxRetries ?? 5;
+    this.#maxRetries = options.maxRetries ?? Infinity;
     this.#initialDelay = options.initialDelay ?? 1_000;
     this.#maxDelay = options.maxDelay ?? 30_000;
     this.#jitter = options.jitter ?? 0.2;
     this.#random = options.random ?? Math.random;
 
-    assertNonNegativeInteger(this.#maxRetries, "maxRetries");
+    if (this.#maxRetries !== Infinity) assertNonNegativeInteger(this.#maxRetries, "maxRetries");
     assertNonNegativeFinite(this.#initialDelay, "initialDelay");
     assertNonNegativeFinite(this.#maxDelay, "maxDelay");
     if (!Number.isFinite(this.#jitter) || this.#jitter < 0 || this.#jitter > 1) {
@@ -42,11 +42,17 @@ export class ExponentialBackoffReconnector implements ConnectionReconnector {
       return { action: "exhaust" } as const;
     }
 
-    const base = Math.min(this.#initialDelay * 2 ** (context.attempt - 1), this.#maxDelay);
+    const base = Math.min(
+      this.#initialDelay * 2 ** Math.min(1023, context.attempt - 1),
+      this.#maxDelay,
+    );
     const factor = 1 + (this.#random() * 2 - 1) * this.#jitter;
     return {
       action: "retry",
       delay: Math.max(0, Math.round(base * factor)),
+      suppressionReasons: [
+        { category: "retry-backoff", source: "exponential-backoff", kind: "backoff" },
+      ],
     } as const;
   }
 }
