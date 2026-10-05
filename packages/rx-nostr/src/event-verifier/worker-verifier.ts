@@ -5,6 +5,8 @@ import type * as Nostr from "nostr-typedef";
 import { once } from "../libs/index.ts";
 import type { EventVerifier } from "./event-verifier.interface.ts";
 
+const MAX_TIMEOUT = 2_147_483_647;
+
 export class VerificationHost {
   constructor(private verifier: EventVerifier) {}
 
@@ -59,10 +61,21 @@ export class VerificationClient implements EventVerifier {
     number,
     { resolve: (ok: boolean) => void; reject: (error: unknown) => void; cancelTimeout: () => void }
   >();
-  #batch: Batch;
+  readonly #timeout: number;
 
   constructor(private config: VerificationClientConfig) {
-    this.#batch = new Batch(config.timeout ?? 10000);
+    const timeout = config.timeout ?? 10_000;
+
+    if (
+      timeout !== Infinity &&
+      (!Number.isFinite(timeout) || timeout < 0 || timeout > MAX_TIMEOUT)
+    ) {
+      throw new RangeError(
+        "Verification timeout must be between 0 and 2147483647 ms, or Infinity.",
+      );
+    }
+
+    this.#timeout = timeout;
   }
 
   get status() {
@@ -126,9 +139,16 @@ export class VerificationClient implements EventVerifier {
     const reqId = this.#nextReqId++;
 
     const result = new Promise<boolean>((resolve, reject) => {
-      const cancelTimeout = this.#batch.set(() => {
-        this.#settle(reqId, { error: new Error("Verification request was timed out.") });
-      });
+      const timer = Number.isFinite(this.#timeout)
+        ? setTimeout(() => {
+            this.#settle(reqId, { error: new Error("Verification request was timed out.") });
+          }, this.#timeout)
+        : undefined;
+      const cancelTimeout = () => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+      };
 
       this.#pending.set(reqId, { resolve, reject, cancelTimeout });
     });
@@ -187,44 +207,8 @@ export class VerificationClient implements EventVerifier {
     worker.removeEventListener("error", this.#onerror);
     worker.removeEventListener("messageerror", this.#onerror);
     worker.terminate();
-
-    this.#batch.stop();
   });
   dispose = this[Symbol.dispose];
-}
-
-type Callback = () => void;
-
-class Batch {
-  private timer: ReturnType<typeof setInterval>;
-  private fireNext = new Set<Callback>();
-  private takeNext = new Set<Callback>();
-
-  constructor(interval: number) {
-    this.timer = setInterval(() => {
-      for (const f of this.fireNext) {
-        f();
-      }
-
-      this.fireNext = this.takeNext;
-      this.takeNext = new Set();
-    }, interval);
-  }
-
-  set(f: Callback): () => void {
-    this.takeNext.add(f);
-
-    return () => {
-      this.fireNext.delete(f);
-      this.takeNext.delete(f);
-    };
-  }
-
-  stop() {
-    clearInterval(this.timer);
-    this.fireNext.clear();
-    this.takeNext.clear();
-  }
 }
 
 type PingMessage = "ping";
@@ -246,6 +230,7 @@ export type VerificationServiceStatus = "prepared" | "booting" | "active" | "err
 export interface VerificationClientConfig {
   worker: Worker;
   fallback?: EventVerifier;
+  /** Per-request milliseconds; 0 is immediate, Infinity disables timeout. Defaults to 10000. */
   timeout?: number;
 }
 // Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.

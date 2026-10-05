@@ -138,3 +138,5 @@ client.dispose();
 ```
 
 Worker の起動中または error 状態では新しい検証に `fallback` が使われます。Worker 実行中の検証は Worker の error や dispose によって reject されるため、呼び出し側で扱ってください。dispose 後の client は再利用できません。
+
+`timeout` は各 `verifyEvent()` の開始から測る待ち時間で、既定値は 10,000 ms です。`0` は次の timer 実行時に timeout、`Infinity` は timeout 無効です。負数、`NaN`、2,147,483,647 ms を超える値は constructor で `RangeError` になります。応答または dispose で request の timer は解除されます。

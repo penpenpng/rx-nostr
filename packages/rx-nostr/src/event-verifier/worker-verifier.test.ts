@@ -33,6 +33,132 @@ function controlledWorker() {
 afterEach(() => vi.useRealTimers());
 
 describe("VerificationClient pending requests", () => {
+  test.each([0, 37])("times out exactly 100ms after a request started at +%ims", async (offset) => {
+    vi.useFakeTimers();
+    const controlled = controlledWorker();
+    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+
+    client.start();
+    controlled.emit("message", "pong");
+    vi.advanceTimersByTime(offset);
+
+    let settled = false;
+    const result = client.verifyEvent(Faker.event()).then(
+      () => {
+        settled = true;
+
+        return "resolved";
+      },
+      (error: unknown) => {
+        settled = true;
+
+        return error;
+      },
+    );
+
+    vi.advanceTimersByTime(99);
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    vi.advanceTimersByTime(1);
+    await expect(result).resolves.toMatchObject({ message: "Verification request was timed out." });
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  test("independent requests have independent deadlines", async () => {
+    vi.useFakeTimers();
+    const controlled = controlledWorker();
+    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+
+    client.start();
+    controlled.emit("message", "pong");
+
+    const first = client.verifyEvent(Faker.event()).then(
+      () => "resolved",
+      (error: unknown) => error,
+    );
+
+    vi.advanceTimersByTime(50);
+    const second = client.verifyEvent(Faker.event()).then(
+      () => "resolved",
+      (error: unknown) => error,
+    );
+    let secondSettled = false;
+
+    void second.then(() => {
+      secondSettled = true;
+    });
+
+    vi.advanceTimersByTime(50);
+    await expect(first).resolves.toMatchObject({ message: "Verification request was timed out." });
+    expect(secondSettled).toBe(false);
+
+    vi.advanceTimersByTime(50);
+    await expect(second).resolves.toMatchObject({ message: "Verification request was timed out." });
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  test("a response at the deadline settles once and cancels its timer", async () => {
+    vi.useFakeTimers();
+    const controlled = controlledWorker();
+    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+
+    client.start();
+    controlled.emit("message", "pong");
+    const result = client.verifyEvent(Faker.event());
+
+    vi.advanceTimersByTime(99);
+    controlled.emit("message", { reqId: 1, ok: true });
+    vi.advanceTimersByTime(1);
+
+    await expect(result).resolves.toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    client.dispose();
+  });
+
+  test("zero is immediate, Infinity disables deadlines, and invalid durations reject", async () => {
+    vi.useFakeTimers();
+
+    for (const invalid of [-1, NaN, -Infinity, 2_147_483_648]) {
+      expect(
+        () => new VerificationClient({ worker: controlledWorker().worker, timeout: invalid }),
+      ).toThrow(RangeError);
+    }
+
+    const zeroWorker = controlledWorker();
+    const zero = new VerificationClient({ worker: zeroWorker.worker, timeout: 0 });
+
+    zero.start();
+    zeroWorker.emit("message", "pong");
+    const immediate = zero.verifyEvent(Faker.event()).then(
+      () => "resolved",
+      (error: unknown) => error,
+    );
+
+    vi.advanceTimersByTime(0);
+    await expect(immediate).resolves.toMatchObject({
+      message: "Verification request was timed out.",
+    });
+    zero.dispose();
+
+    const infiniteWorker = controlledWorker();
+    const infinite = new VerificationClient({ worker: infiniteWorker.worker, timeout: Infinity });
+
+    infinite.start();
+    infiniteWorker.emit("message", "pong");
+    const pending = infinite.verifyEvent(Faker.event()).then(
+      () => "resolved",
+      (error: unknown) => error,
+    );
+
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(1_000_000);
+    infinite.dispose();
+    await expect(pending).resolves.toMatchObject({ message: "VerificationClient was disposed." });
+  });
+
   test("dispose rejects every request immediately and releases the worker and timer", async () => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
