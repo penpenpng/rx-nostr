@@ -17,7 +17,7 @@ export default defineConfig({
     },
     sourcemap: true,
   },
-  plugins: [dts()],
+  plugins: [dts({ exclude: ["src/__test__/**", "src/**/*.spec.ts", "src/**/*.test.ts"] })],
   test: {
     include: ["src/**/*.{test,spec}.{ts,mts}"],
   },
