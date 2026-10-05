@@ -122,10 +122,12 @@ export class RxNostr implements IRxNostr {
     let source$: Observable<ReqPacket>;
 
     if (request instanceof RxReq) {
+      // Pipe operators can replace packets, so snapshot and normalize their final output.
       source$ = request
         .asObservable()
         .pipe(map((packet) => ({ ...packet, filters: normalizeFilters(packet.filters) })));
     } else {
+      // Static caller-owned arrays are snapshotted when forward/backward is called.
       const filters = normalizeFilters(request);
 
       source$ = filters.length === 0 ? EMPTY : of({ filters });

@@ -1,18 +1,8 @@
 import { expect, test } from "vitest";
 
+import signedEvent from "../../../test-fixtures/signed-event.json";
 import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SimpleVerifier } from "./simple-verifier.ts";
-
-// Fixed NIP-01 vector: changing only the advertised ID must invalidate it.
-const signedEvent = {
-  content: "hello world",
-  created_at: 1744992061,
-  id: "67566ef8eceb6dffae47606fd737425d7bcddaa9338bddc144588e4a0051913e",
-  kind: 1,
-  pubkey: "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-  sig: "19c12bde8a88537261395180601205fb771337ed456a1cb88d851f9c293774cf7140143cfaba72552c6375da3ac3d6a96690eb90647c9e5b1d9c1594b813b22e",
-  tags: [],
-};
 
 test.each([
   ["id", { id: "0".repeat(64) }],

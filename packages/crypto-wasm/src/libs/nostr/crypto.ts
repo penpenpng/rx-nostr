@@ -48,6 +48,7 @@ export function signEvent<K extends number>(
   return signedEvent;
 }
 
+/** Apply the same NIP-01 ID and signature contract as the non-WASM verifier. */
 export function verifyEvent(event: Nostr.Event): boolean {
   try {
     return Event.fromJson(JSON.stringify(event)).verify();

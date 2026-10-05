@@ -18,7 +18,8 @@ const isKindList = (value: unknown): value is number[] =>
 /**
  * Keep only satisfiable REQ branches. An empty list of branches or an empty
  * condition list matches nothing; only an explicit `{}` means match all.
- * Lazy bounds remain functions until the send attempt evaluates them.
+ * The returned branches and condition arrays are snapshots of the caller's
+ * input. Lazy bounds remain functions until the send attempt evaluates them.
  */
 export function normalizeFilters(filters: LazyFilter | readonly LazyFilter[]): LazyFilter[] {
   const branches = Array.isArray(filters) ? filters : [filters];

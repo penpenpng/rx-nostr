@@ -3,7 +3,8 @@ import * as Nostr from "nostr-typedef";
 import type { LazyFilter } from "./lazy-filter.interface.ts";
 
 /**
- * Evaluate one or more `LazyFilter`s and return `Nostr.Filter[]`.
+ * Evaluate lazy bounds for one REQ send attempt, including reconnect resends.
+ * Structural validation of the evaluated filters belongs to the caller.
  */
 export function evalFilters(filters: LazyFilter | LazyFilter[]): Nostr.Filter[] {
   if ("length" in filters) {

@@ -19,6 +19,8 @@ result$.subscribe(console.log);
 
 filter は固定配列、`RxReq.emit()`、`RxReq.pipe()` の出力で同じ規則を使います。`[{}]` は全件に一致し、空の filter 配列 `[]` は一致なしです。`authors: []`、`ids: []`、`kinds: []`、`"#e": []` のような空の条件配列を含む filter は一致なしとしてその filter だけを除外します。複数 filter は OR なので、他の有効な filter があればその filter だけを送信します。
 
+固定 filter は `forward()` / `backward()` の呼び出し時、`RxReq.emit()` の filter は emit 時に構造と条件配列を snapshot します。`pipe()` が packet を作り直す場合は query へ届いた時に再度正規化します。その後に元の配列を書き換えても送信する filter は変わりません。lazy な `since` / `until` の関数だけは参照を保持し、各送信・再送の直前に呼び出します。評価後の不正な範囲も送信せず、全件検索へ拡大しません。
+
 未知の field、不正な値、`since > until` の filter も一致なしとして扱います。`since` / `until` の関数は送信時・再送時に評価し、評価後に時刻範囲が逆転した場合は REQ を送らずその segment を終了します。`limit: 0` は有効な値です。固定 filter がすべて一致なしなら Observable は接続せず complete します。`RxReq` の emit が一致なしの場合はその segment だけが終了し、source は次の emit を受け付けます。filter callback の例外は後述の error になります。
 
 ## 継続的に新着イベントを受け取る
@@ -104,6 +106,8 @@ request.emit([{ kinds: [1] }], {
 ## 受信時の検査
 
 EVENT は REQ filter との一致、`EventVerifier` による署名、NIP-40 の expiration の順で検査されます。
+
+`@rx-nostr/crypto` と `@rx-nostr/crypto-wasm` の verifier はどちらも EVENT の内容から計算した ID と公開された `event.id` を比較し、署名も検証します。本体は暗号実装を選ばず、設定された `EventVerifier` を受信時に呼び出します。検証を意図的に省略する場合に限り `NoopVerifier` を明示してください。
 
 ```ts
 rxNostr.backward(relays, [{}], {

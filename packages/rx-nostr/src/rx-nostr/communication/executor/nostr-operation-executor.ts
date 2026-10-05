@@ -142,6 +142,7 @@ export class NostrOperationExecutor implements Disposable {
       const packets = this.transport.subscribe({
         query: () => {
           try {
+            // Re-evaluate lazy bounds for every send/resend, then reject invalid ranges.
             evaluatedFilters = normalizeFilters(evalFilters(plan.filters)) as Nostr.Filter[];
           } catch (cause) {
             throw new RxNostrCallbackError("filter", cause);

@@ -40,6 +40,46 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    test.each(["static", "emitted", "piped"] as const)(
+      "%s filter snapshots condition arrays before later caller mutation",
+      async (input) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const source = new RxReq();
+        const filter: LazyFilter = { authors: ["first"] };
+        let request: RxNostrReqInput = source;
+
+        if (input === "static") {
+          request = [filter];
+        } else if (input === "piped") {
+          request = source.pipe(map((packet) => ({ ...packet, filters: [filter] })));
+        }
+
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(relay, request).subscribe(inspector);
+
+        if (input !== "static") {
+          source.emit(input === "piped" ? [{}] : filter);
+          source.dispose();
+        }
+
+        filter.authors![0] = "changed";
+
+        const socket = server.sockets.latest;
+
+        socket.open();
+        const [, subId, sent] = await socket.inbox.waitNext("REQ");
+
+        expect(sent).toEqual({ authors: ["first"] });
+
+        socket.message(["EOSE", subId]);
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+        await expect(socket.closeRequested).resolves.toBeDefined();
+        socket.acknowledgeClose();
+        rxNostr.dispose();
+      },
+    );
+
     describe.each(["forward", "backward"] as const)("%s no-match filters", (strategy) => {
       test.each(["static", "emitted", "piped"] as const)(
         "%s authors:[] completes without sending REQ",
