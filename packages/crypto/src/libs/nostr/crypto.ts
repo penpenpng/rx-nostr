@@ -80,7 +80,9 @@ export function getSignature(eventHash: string, seckey: string): string {
 /** Verify the given event and return true if it is valid. */
 export function verifyEvent(event: Nostr.Event): boolean {
   try {
-    return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
+    const hash = getEventHash(event);
+
+    return event.id === hash && schnorr.verify(event.sig, hash, event.pubkey);
   } catch {
     return false;
   }
