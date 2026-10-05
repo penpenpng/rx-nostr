@@ -4,6 +4,13 @@ import type { RelayUrl } from "../libs/relay-urls.ts";
 
 export type ConnectionDropDetectorDisposer = () => void | PromiseLike<void>;
 
+export interface ConnectionDropReport {
+  readonly reason?: string;
+  readonly details?: Readonly<Record<string, string | number | boolean | null>>;
+  /** Set false for a known local environment failure, rather than evidence of relay failure. */
+  readonly affectsRelayHealth?: boolean;
+}
+
 export interface ConnectionDropDetector {
   /** A diagnostic name unique among the detectors installed on one client. */
   readonly name?: string;
@@ -23,10 +30,12 @@ export interface ConnectionDropDetectorContext {
   }>;
   /** Aborted when this physical connection ends. */
   readonly signal: AbortSignal;
+  /** Lifetime of the logical session, including reconnection waits. */
+  readonly sessionSignal?: AbortSignal;
   /** Registers cleanup owned by this physical connection. */
   defer(disposer: ConnectionDropDetectorDisposer, options?: Readonly<{ name?: string }>): void;
   /** Reports the current connection as dropped. */
-  drop(): void;
+  drop(report?: ConnectionDropReport): void;
   /** Sends a Nostr message and waits for the first matching relay response. */
   request(params: ConnectionDropDetectorRequest): Promise<Nostr.ToClientMessage.Any>;
   /** Isolates synchronous throws and asynchronous rejections from a host callback. */

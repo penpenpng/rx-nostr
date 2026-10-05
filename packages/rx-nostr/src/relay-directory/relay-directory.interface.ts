@@ -19,6 +19,8 @@ export interface IRelayDirectory extends Iterable<RelayDirectoryEntry> {
   get(url: string): RelayDirectoryEntry | undefined;
   getOrCreate(url: string): RelayDirectoryEntry;
   forget(url: string): boolean;
+  /** Clears the failure streak and permits an immediate health re-evaluation. */
+  resetHealth(url: string): void;
   values(): IterableIterator<RelayDirectoryEntry>;
   observe(url: string): Observable<RelayDirectoryEntry>;
   fetchNip11(url: string, options?: FetchNip11Options): Promise<Nostr.Nip11.RelayInfo>;

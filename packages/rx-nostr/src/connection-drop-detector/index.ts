@@ -1,4 +1,5 @@
 export type {
+  ConnectionDropReport,
   ConnectionDropDetector,
   ConnectionDropDetectorContext,
   ConnectionDropDetectorDisposer,

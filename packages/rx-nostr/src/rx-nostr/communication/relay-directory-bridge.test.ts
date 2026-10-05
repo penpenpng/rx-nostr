@@ -26,6 +26,8 @@ describe("RelayDirectoryBridge", () => {
     bridge.transportHooks.onConnectionFailed!();
     expect(bridge.transportHooks.getConnectionHealth!()).toEqual({
       consecutiveFailures: 1,
+      firstFailureAt: 2,
+      liveConnections: 1,
       lastConnectedAt: 1,
       lastFailureAt: 2,
     });

@@ -1,9 +1,11 @@
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import {
+  type RelayHealthPolicyInput,
   ExponentialBackoffReconnector,
   type ConnectionReconnector,
 } from "../connection-reconnector/index.ts";
+import { copyRelayHealthPolicy } from "../connection-reconnector/relay-health-policy.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
 import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
 import { GlobalRelayDirectory, type RelayDirectory } from "../relay-directory/index.ts";
@@ -35,9 +37,11 @@ export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze
   verifier: new UnconfiguredVerifier(),
   signer: new Nip07Signer(),
   authenticator: undefined,
-  reconnector: new ExponentialBackoffReconnector(),
+  reconnector: new ExponentialBackoffReconnector({ maxRetries: Infinity }),
   dropDetectors: [],
   relayDirectory: GlobalRelayDirectory,
+  relayHealthPolicy: Object.freeze({}),
+  connectionTimeout: 30_000,
   nip11Timeout: 30_000,
   skipFetchNip11: false,
   WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
@@ -50,6 +54,8 @@ export class FilledRxNostrConfig {
   readonly reconnector: ConnectionReconnector;
   readonly dropDetectors: readonly ConnectionDropDetector[];
   readonly relayDirectory: RelayDirectory;
+  readonly relayHealthPolicy: RelayHealthPolicyInput;
+  readonly connectionTimeout: number;
   readonly nip11Timeout: number;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
@@ -73,6 +79,17 @@ export class FilledRxNostrConfig {
       ...(config.dropDetectors ?? staticDefaultConfig.dropDetectors),
     ]);
     this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
+    const healthPolicy = config.relayHealthPolicy ?? staticDefaultConfig.relayHealthPolicy;
+    this.relayHealthPolicy = copyRelayHealthPolicy(healthPolicy);
+    this.connectionTimeout = config.connectionTimeout ?? staticDefaultConfig.connectionTimeout;
+    if (
+      !Number.isFinite(this.connectionTimeout) ||
+      this.connectionTimeout <= 0 ||
+      this.connectionTimeout > 2_147_483_647
+    )
+      throw new RangeError(
+        "connectionTimeout must be positive and at most 2147483647 milliseconds.",
+      );
     this.nip11Timeout = config.nip11Timeout ?? staticDefaultConfig.nip11Timeout;
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
@@ -83,7 +100,11 @@ export class FilledRxNostrConfig {
 export function cloneStaticDefaultConfig(
   config: RxNostrStaticDefaultConfig,
 ): RxNostrStaticDefaultConfig {
-  return { ...config, dropDetectors: [...config.dropDetectors] };
+  return {
+    ...config,
+    dropDetectors: [...config.dropDetectors],
+    relayHealthPolicy: copyRelayHealthPolicy(config.relayHealthPolicy),
+  };
 }
 
 function freezeDefaultOptions(

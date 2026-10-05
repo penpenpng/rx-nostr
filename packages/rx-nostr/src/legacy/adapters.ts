@@ -28,7 +28,7 @@ export function toLegacyConnectionState(
       return "connecting";
     case "connected":
       return "connected";
-    case "waiting-for-retry":
+    case "waiting-for-connection":
       return "waiting-for-retrying";
     case "retrying":
       return "retrying";

@@ -6,11 +6,21 @@ export {
 } from "./authenticator/index.ts";
 export type {
   ConnectionDropDetector,
+  ConnectionDropReport,
   ConnectionDropDetectorContext,
   ConnectionDropDetectorDisposer,
   ConnectionDropDetectorRequest,
 } from "./connection-drop-detector/index.ts";
 export {
+  ExponentialRelaySuppressionStrategy,
+  type RelaySuppressionStrategy,
+  type RelaySuppressionContext,
+  type RelaySuppression,
+  type RelayHealthPolicyInput,
+  evaluateRelayConnection,
+  type RelayHealth,
+  type RelayHealthPolicy,
+  type RelayConnectionDecision,
   ExponentialBackoffReconnector,
   NoopReconnector,
   type ConnectionReconnectorContext,
@@ -19,6 +29,8 @@ export {
   type ExponentialBackoffReconnectorOptions,
 } from "./connection-reconnector/index.ts";
 export type {
+  ConnectionSuppressionReason,
+  ConnectionWaitInfo,
   ConnectionFailure,
   ConnectionState,
   ConnectionStateSymbol,
