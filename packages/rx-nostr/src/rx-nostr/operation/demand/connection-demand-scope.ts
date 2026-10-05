@@ -67,6 +67,7 @@ export class ConnectionDemandScope {
     return { close: once(close) };
   }
 
+  /** Release every owned lease now; transport close acknowledgement is asynchronous. */
   [Symbol.dispose] = once(() => {
     this.finished = true;
 
@@ -149,13 +150,15 @@ class RelayDemand {
 
     this.nextLeaseId++;
 
-    this.activeLeases.set(id, release);
-
-    return () => {
+    const releaseOnce = once(() => {
       this.activeLeases.delete(id);
       release();
       this.onRelease();
-    };
+    });
+
+    this.activeLeases.set(id, releaseOnce);
+
+    return releaseOnce;
   }
 
   private releaseAfterLinger(release: () => void, linger: number): () => void {

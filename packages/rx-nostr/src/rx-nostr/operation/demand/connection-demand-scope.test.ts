@@ -10,12 +10,15 @@ import { ConnectionDemandScope } from "./connection-demand-scope.ts";
 
 class LeaseRelay implements IRelayCommunication {
   leases = 0;
+  releaseCalls = 0;
   constructor(readonly url: RelayUrl) {}
   hold() {
     this.leases++;
     let released = false;
 
     return () => {
+      this.releaseCalls++;
+
       if (!released) {
         this.leases--;
       }
@@ -67,6 +70,27 @@ describe("ConnectionDemandScope leases", () => {
     demand.dispose();
     window.close();
     expect(relay.leases).toBe(0);
+    expect(relay.releaseCalls).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("releases each lease once when linger, window close, and disposal cross", () => {
+    vi.useFakeTimers();
+    const relay = new LeaseRelay("wss://relay.example.com");
+    const drained = vi.fn();
+    const demand = new ConnectionDemandScope({ defer: true, weak: false }, drained);
+    const lingering = demand.openDemandWindow(relay, 100);
+    const active = demand.openDemandWindow(relay, 100);
+
+    lingering.close();
+    demand.dispose();
+    active.close();
+    lingering.close();
+    vi.runAllTimers();
+
+    expect(relay.leases).toBe(0);
+    expect(relay.releaseCalls).toBe(2);
+    expect(drained).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
 

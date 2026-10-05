@@ -51,6 +51,7 @@ interface SettlementWaiter {
 
 export class PublicationOperation implements Publication, Disposable {
   readonly event: Promise<Nostr.Event>;
+  /** Internal cleanup signal: after linger leases are released, or immediately on cancel. */
   readonly closed: Promise<void>;
 
   readonly #okPackets = new ReplaySubject<OkPacket>();
