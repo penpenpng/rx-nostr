@@ -31,6 +31,31 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    test.each([0, () => 0])("preserves until: %s on REQ and in local matching", async (until) => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward(relay, [{ until }]).subscribe(inspector);
+      const socket = server.sockets.latest;
+
+      socket.open();
+      const [, subId, filter] = await socket.inbox.waitNext("REQ");
+
+      expect(filter).toEqual({ until: 0 });
+
+      socket.message(["EVENT", subId, event({ id: "later", created_at: 1 })]);
+      socket.message(["EVENT", subId, event({ id: "boundary", created_at: 0 })]);
+      socket.message(["EOSE", subId]);
+
+      await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "boundary" } });
+      await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      expect(inspector.values).toHaveLength(1);
+
+      await expect(socket.closeRequested).resolves.toBeDefined();
+      socket.acknowledgeClose();
+      rxNostr.dispose();
+    });
+
     test("completes an empty destination without creating a connection", async () => {
       const { server, rxNostr } = createRxNostrScenario();
       const inspector = new SubscriptionInspector<EventPacket>();

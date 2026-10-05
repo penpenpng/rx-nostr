@@ -44,14 +44,14 @@ function matchesFilter(
     return false;
   }
   if (
-    filter.since &&
+    filter.since !== undefined &&
     ((sinceExclusive && !(filter.since < event.created_at)) ||
       (!sinceExclusive && !(filter.since <= event.created_at)))
   ) {
     return false;
   }
   if (
-    filter.until &&
+    filter.until !== undefined &&
     ((untilExclusive && !(event.created_at < filter.until)) ||
       (!untilExclusive && !(event.created_at <= filter.until)))
   ) {

@@ -16,8 +16,8 @@ export function evalFilters(filters: LazyFilter | LazyFilter[]): Nostr.Filter[] 
 function evalFilter(filter: LazyFilter): Nostr.Filter {
   return {
     ...filter,
-    since: filter.since ? evalLazyNumber(filter.since) : undefined,
-    until: filter.until ? evalLazyNumber(filter.until) : undefined,
+    since: filter.since === undefined ? undefined : evalLazyNumber(filter.since),
+    until: filter.until === undefined ? undefined : evalLazyNumber(filter.until),
   };
 }
 
