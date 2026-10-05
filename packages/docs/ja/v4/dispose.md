@@ -25,7 +25,7 @@ query の購読が不要になったら unsubscribe してください。active 
 
 ```ts
 const subscription = rxNostr
-  .req(relays, { strategy: "forward", filters })
+  .forward(relays, filters)
   .subscribe(onEvent);
 
 subscription.unsubscribe();
@@ -45,14 +45,14 @@ publication.cancel();       // 送信努力を終了
 
 ## `RxReq` と `RxRelays`
 
-`RxForwardReq`、`RxBackwardReq`、`RxRelays` とその派生集合も dispose できます。
+`RxReq`、`RxRelays` とその派生集合も dispose できます。
 
 ```ts
 request.dispose();
 relays.dispose();
 ```
 
-`RxBackwardReq.over()` は「これ以上 ReqPacket を emit しない」という正常完了の通知です。即時に破棄する `dispose()` とは用途が異なります。
+`RxReq.dispose()` は source の完了を通知します。`backward()` の進行中・queue 中の segment は終わるまで継続し、`forward()` の最後の segment は継続します。通信を即時に止めるには query の subscription を unsubscribe してください。
 
 ## Worker verifier
 

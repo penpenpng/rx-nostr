@@ -1,6 +1,6 @@
 # Migration from v3
 
-v4 は operation、connection、metadata の責務を分け直した major release です。v3 API の compatibility alias はありません。
+v4 は operation、connection、metadata の責務を分け直した major release です。v3 API 名の alias はありません。`rx-nostr/legacy` には移行を補助する v3 形式の facade があり、利用可能な範囲はその公開型に従います。
 
 ## Package
 
@@ -45,7 +45,7 @@ const rxNostr = new RxNostr({
 
 ## Default relay を operation の宛先へ移す
 
-v4 は default relay を持ちません。`setDefaultRelays()`、`setAdditionalRelays()`、read/write flag は削除されました。すべての `req()` と `publish()` で宛先を指定します。
+v4 の `RxNostr` は default relay を持ちません。`setDefaultRelays()`、`setAdditionalRelays()`、read/write flag は削除されました。すべての `forward()`、`backward()`、`publish()` で宛先を指定します。
 
 ```ts
 // v3
@@ -53,7 +53,7 @@ rxNostr.setDefaultRelays(["wss://relay.example.com"]);
 rxNostr.use(request);
 
 // v4
-rxNostr.req(["wss://relay.example.com"], request);
+rxNostr.forward(["wss://relay.example.com"], request);
 ```
 
 一時的な relay と default relay の区別もありません。ReqPacket ごとの宛先変更は `emit()` の option で行います。
@@ -64,9 +64,9 @@ request.emit(filters, {
 });
 ```
 
-## `use()` を `req()` へ移す
+## `use()` を `forward()` / `backward()` へ移す
 
-`createRxForwardReq()` と `createRxBackwardReq()` は constructor に変わりました。
+v4 では継続的な問い合わせと過去の取得に共通の `RxReq` を使い、操作側で `forward()` または `backward()` を選びます。
 
 ```ts
 // v3
@@ -74,17 +74,14 @@ const request = createRxForwardReq();
 const events$ = rxNostr.use(request);
 
 // v4
-const request = new RxForwardReq();
-const events$ = rxNostr.req(relays, request);
+const request = new RxReq();
+const events$ = rxNostr.forward(relays, request);
 ```
 
-簡単な backward query では `RxBackwardReq` を作らず、oneshot descriptor を渡せます。
+簡単な backward query では `RxReq` を作らず、filter の配列を渡せます。
 
 ```ts
-rxNostr.req(relays, {
-  strategy: "oneshot",
-  filters: [{ kinds: [1], limit: 20 }],
-});
+rxNostr.backward(relays, [{ kinds: [1], limit: 20 }]);
 ```
 
 forward は新しい ReqPacket が直前の REQ を置き換え、backward は各 REQ を並行して EOSE まで維持する契約を保ちます。
@@ -118,11 +115,11 @@ publication.subscribe(onOk);
 await publication.waitFor("all");
 ```
 
-v3 の `completeOn` / `cast()` に相当する成功条件は `waitFor("all")` または `waitFor("any")` で明示します。
+v3 の `completeOn: "all-ok"` / `"any-ok"` に相当する受理条件は `waitFor("all")` または `waitFor("any")` で明示します。`cast()` の送信完了とは異なります。
 
 - OK observer の unsubscribe は送信を止めない
 - 送信を止める場合は `publication.cancel()`
-- 実際に送った EVENT は `await publication.event`
+- 署名された EVENT は `await publication.event`。この Promise は送信完了の通知ではありません
 - 宛先は `publish()` 呼び出し時の snapshot
 
 ## Connection strategy

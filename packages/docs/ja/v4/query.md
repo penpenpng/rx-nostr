@@ -1,71 +1,60 @@
 # Query
 
-`rxNostr.req()` は Nostr の REQ を複数リレーへ送り、検証済みの `EventPacket` を返す cold Observable です。`req()` を呼ぶだけでは operation は始まらず、subscribe ごとに独立した query が作られます。
+`RxNostr.forward()` と `RxNostr.backward()` は Nostr の REQ を指定したリレーへ送り、検証済みの `EventPacket` を返す cold Observable です。呼び出すだけでは始まらず、subscribe ごとに独立した query を作ります。第1引数は宛先、第2引数は filter の配列または `RxReq`、第3引数は operation の設定です。単一 filter も配列に入れて渡します。
 
-## One-shot query
+## 一度だけ過去イベントを取得する
 
-`strategy: "oneshot"` の descriptor は backward strategy の one-shot query を作ります。`filters` にはひとつの filter または filter の iterable を指定できます。
+`backward()` に filter 配列を渡します。全リレーで EOSE、CLOSED、timeout などによって処理が終わると Observable が complete します。
 
 ```ts
-const result$ = rxNostr.req(
-  ["wss://relay.example.com"],
-  {
-    strategy: "oneshot",
-    filters: [
-      { kinds: [0], authors: [pubkey] },
-      { kinds: [1], authors: [pubkey], limit: 20 },
-    ],
-  },
-);
+const result$ = rxNostr.backward(["wss://relay.example.com"], [
+  { kinds: [0], authors: [pubkey] },
+  { kinds: [1], authors: [pubkey], limit: 20 },
+]);
 
 result$.subscribe(console.log);
 ```
 
-空の宛先を指定した query は接続を作らず complete します。
+空の宛先を指定した query は接続を作らず complete します。空の filter 配列も接続を作りません。
 
-## Forward query
+## 継続的に新着イベントを受け取る
 
-固定した filter でこれから到着するイベントを継続的に購読するには、`strategy: "forward"` の descriptor を使います。EOSE を受信しても完了せず、unsubscribe まで同じ REQ を維持します。
+`forward()` に固定 filter を渡します。EOSE を受け取っても完了せず、unsubscribe まで REQ を維持します。
 
 ```ts
 const subscription = rxNostr
-  .req(["wss://relay.example.com"], {
-    strategy: "forward",
-    filters: { kinds: [1] },
-  })
+  .forward(["wss://relay.example.com"], [{ kinds: [1] }])
   .subscribe(({ event }) => console.log(event));
+
+subscription.unsubscribe();
 ```
 
-実行中に filter を差し替える場合は `RxForwardReq` を使います。`emit()` するたびに直前の REQ が新しい REQ に置き換わり、古い REQ には CLOSE が送られます。
+実行中に filter を差し替える場合は `RxReq` を使います。`forward()` では次の `emit()` が直前の REQ を置き換え、古い REQ には CLOSE が送られます。
 
 ```ts
-import { RxForwardReq } from "rx-nostr";
+import { RxReq } from "rx-nostr";
 
-const request = new RxForwardReq();
+const request = new RxReq();
 const subscription = rxNostr
-  .req(["wss://relay.example.com"], request)
+  .forward(["wss://relay.example.com"], request)
   .subscribe(({ event }) => console.log(event));
 
 request.emit([{ kinds: [1], since: Math.floor(Date.now() / 1000) }]);
-
-// 以前の REQ を閉じ、kind 6 の REQ に置き換えます。
 request.emit([{ kinds: [6] }]);
 
 subscription.unsubscribe();
 request.dispose();
 ```
 
-## Backward query
+## ページごとの backward query
 
-過去へ向かう pagination など、複数の REQ を並行させる場合は `RxBackwardReq` を使います。各 `emit()` は EOSE、CLOSED、timeout などまで独立して継続します。新しい REQ をもう発行しないことを `over()` で通知すると、既存の全 REQ が終わった時点で Observable も complete します。
+`backward()` に `RxReq` を渡すと、各 `emit()` は EOSE、CLOSED、timeout などまで独立して継続します。`request.dispose()` は新しい ReqPacket の供給を終えますが、進行中や queue 中の segment は完了まで残ります。通信をすぐ止める場合は query の subscription を unsubscribe します。
 
 ```ts
-import { RxBackwardReq } from "rx-nostr";
+const request = new RxReq();
 
-const request = new RxBackwardReq();
-
-rxNostr
-  .req(["wss://relay.example.com"], request)
+const subscription = rxNostr
+  .backward(["wss://relay.example.com"], request)
   .subscribe({
     next: console.log,
     complete: () => console.log("all pages completed"),
@@ -73,27 +62,24 @@ rxNostr
 
 request.emit([{ kinds: [1], until: 1_700_000_000, limit: 50 }]);
 request.emit([{ kinds: [1], until: 1_699_000_000, limit: 50 }]);
-request.over();
+request.dispose();
 ```
+
+`forward()` では source が dispose されても最後の segment は継続します。subscription の unsubscribe または `RxNostr.dispose()` で終了します。
 
 ## Lazy filter
 
-`since` と `until` には関数を渡せます。関数は実際に REQ を送る直前に評価され、再接続による再送時にも再評価されます。
+`since` と `until` には関数を渡せます。実際に REQ を送る直前に評価され、再接続による再送時にも再評価されます。
 
 ```ts
-request.emit([
-  {
-    kinds: [1],
-    since: () => Math.floor(Date.now() / 1000),
-  },
-]);
+request.emit([{ kinds: [1], since: () => Math.floor(Date.now() / 1000) }]);
 ```
 
 関数が例外を投げた場合、query は `RxNostrCallbackError` で error になります。
 
 ## `ReqPacket` option
 
-`emit()` の第2引数では、REQ segment 単位の option を指定できます。
+`emit()` の第2引数は REQ segment 単位の設定です。
 
 ```ts
 request.emit([{ kinds: [1] }], {
@@ -103,24 +89,18 @@ request.emit([{ kinds: [1] }], {
 });
 ```
 
-- `relays` — この segment だけ operation の宛先を上書きする
-- `linger` — この segment 終了後に接続需要を保持する時間
-- `traceTag` — 対応するすべての `EventPacket` へコピーされる値
+- `relays` — この segment の宛先を上書き
+- `linger` — segment 終了後の接続需要の保持時間
+- `traceTag` — 対応する `EventPacket` へコピーされる値
 
-物理的な subscription ID は実装詳細です。アプリケーション側で問い合わせを識別する場合は `traceTag` を利用してください。
+物理的な subscription ID は実装詳細です。問い合わせを識別する場合は `traceTag` を使ってください。
 
 ## 受信時の検査
 
-EVENT は次の順序で処理されます。
-
-1. REQ filter との一致を検査
-2. `EventVerifier` で署名を検証
-3. NIP-40 の expiration を検査
-
-各検査は次の option で変更できます。
+EVENT は REQ filter との一致、`EventVerifier` による署名、NIP-40 の expiration の順で検査されます。
 
 ```ts
-rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, {
+rxNostr.backward(relays, [{}], {
   verifier: customVerifier,
   skipValidateFilterMatching: true,
   skipExpirationCheck: true,
@@ -129,8 +109,8 @@ rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, {
 
 filter に一致しないイベント、署名が不正なイベント、期限切れのイベントは既定では通知されません。
 
-## Relay-local failure
+## リレーごとの失敗
 
-ひとつのリレーにおける timeout、切断、CLOSED、retry の枯渇は、そのリレーの segment だけを終了します。別のリレーが結果を返せる間は、merged query 全体を error にしません。
+ひとつのリレーにおける timeout、切断、CLOSED、retry の枯渇は、そのリレーの segment だけを終了します。別のリレーが結果を返せる間は merged query 全体を error にしません。
 
-backward query の `timeout` は REQ が NIP-11 queue から実際に送信された時点で始まります。`0` は即時 timeout、`Infinity` は無期限です。
+`backward()` の `timeout` は REQ が NIP-11 queue から実際に送信された時点で始まります。`0` は即時 timeout、`Infinity` は無期限です。

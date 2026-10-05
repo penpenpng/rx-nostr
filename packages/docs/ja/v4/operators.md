@@ -6,7 +6,7 @@ rx-nostr は `EventPacket`、`ReqPacket`、一般的な RxJS stream のための
 
 ```ts
 rxNostr
-  .req(relays, { strategy: "oneshot", filters: [{}] })
+  .backward(relays, [{}])
   .pipe(
     filterByKinds([1, 6]),
     uniq(),
@@ -52,17 +52,17 @@ source$.pipe(tie()).subscribe((packet) => {
 
 ## ReqPacket operator
 
-`RxForwardReq` と `RxBackwardReq` は `pipe()` で ReqPacket operator を適用できます。
+`RxReq` は `pipe()` で ReqPacket operator を適用できます。
 
 ```ts
 import { bufferTime } from "rxjs";
-import { RxForwardReq } from "rx-nostr";
+import { RxReq } from "rx-nostr";
 import { batch } from "rx-nostr/operators";
 
-const source = new RxForwardReq();
+const source = new RxReq();
 const batched = source.pipe(bufferTime(50), batch());
 
-rxNostr.req(relays, batched).subscribe(console.log);
+rxNostr.forward(relays, batched).subscribe(console.log);
 ```
 
 | operator | 内容 |

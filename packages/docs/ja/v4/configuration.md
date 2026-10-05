@@ -35,7 +35,7 @@ const rxNostr = new RxNostr({
 
 AUTH は `authenticator` を指定した場合だけ有効になります。`signer` から暗黙には作られません。
 
-`defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `req()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
+`defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `forward()` / `backward()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
 
 ## Process-wide constructor defaults
 
@@ -109,10 +109,10 @@ REQ の `timeout` は backward segment が EOSE を待つ時間です。publish 
 
 ## REQ arguments and options
 
-`req(relays, request, options?)` の順です。宛先と request（`RxReq` または `{ strategy, filters }` descriptor）は必須で、operation 固有の設定だけを第3引数へ渡します。
+`forward(relays, request, options?)` / `backward(relays, request, options?)` の順です。宛先と request（`RxReq` または filter の配列）は必須で、operation 固有の設定だけを第3引数へ渡します。
 
 ```ts
-rxNostr.req(relays, { strategy: "oneshot", filters }, {
+rxNostr.backward(relays, filters, {
   verifier,
   defer: true,
   linger: 10_000,
@@ -145,7 +145,7 @@ publish は呼び出し時の relay snapshot を使います。
 最も具体的な、`undefined` ではない値が優先されます。
 
 1. `RxReq.emit()` の packet option (`relays`, `linger`, `traceTag`)
-2. `req()` / `publish()` の config
+2. `forward()` / `backward()` / `publish()` の config
 3. `RxNostrConfig.defaultOptions.req/publish`
 4. `RxNostr.defaultOptions.req/publish`（built-in defaults の初期値を保持）
 
@@ -168,7 +168,7 @@ const rxNostr = new RxNostr({
 });
 
 // この query だけ linger を 0 にします。
-rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, { linger: 0 });
+rxNostr.backward(relays, [{}], { linger: 0 });
 ```
 
 ## Callback error

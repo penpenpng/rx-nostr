@@ -39,28 +39,22 @@ npm install rx-nostr @rx-nostr/crypto
 ```
 
 ```ts
-import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier, seckeySigner } from "@rx-nostr/crypto";
+import { RxNostr } from "rx-nostr";
+import { SimpleVerifier } from "@rx-nostr/crypto";
 
-import WebSocket from "ws";
-
-const rxNostr = createRxNostr({
-  signer: seckeySigner("nsec1..."), // If omitted, rx-nostr uses NIP-07.
-  verifier,
-  websocketCtor: WebSocket, // You need this if `globalThis.WebSocket` doesn't exist (e.g. Node.js runtime).
+const rxNostr = new RxNostr({
+  verifier: new SimpleVerifier(),
 });
 
-rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
+const subscription = rxNostr
+  .forward(["wss://nostr.example.com"], [{ kinds: [1] }])
+  .subscribe(({ event }) => {
+    console.log(event);
+  });
 
-const rxReq = createRxForwardReq();
-
-// Define a listener.
-rxNostr.use(rxReq).subscribe(({ event }) => {
-  console.log(event);
-});
-
-// Emit a filter to start subscription.
-rxReq.emit({ kinds: [1] });
+// When finished:
+subscription.unsubscribe();
+rxNostr.dispose();
 ```
 
 ## For more information

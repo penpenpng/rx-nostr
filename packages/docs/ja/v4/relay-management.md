@@ -10,7 +10,7 @@ hot relay は宛先ではありません。hot に設定しただけでは REQ �
 
 ## RelayInput
 
-`req()`、`publish()`、`setHotRelays()` は次の値を受け取ります。
+`forward()`、`backward()`、`publish()`、`setHotRelays()` は次の値を受け取ります。
 
 ```ts
 type RelayInput = string | Iterable<string> | RxRelays;
@@ -35,10 +35,12 @@ console.log([...relays]); // ["wss://relay.example.com"]
 `RxRelays` を query の宛先に渡すと、集合の変更に追従して relay segment が追加、終了されます。
 
 ```ts
-const relays = new RxRelays(["wss://one.example.com"]);
-const request = new RxForwardReq();
+import { RxReq } from "rx-nostr";
 
-const subscription = rxNostr.req(relays, request).subscribe(console.log);
+const relays = new RxRelays(["wss://one.example.com"]);
+const request = new RxReq();
+
+const subscription = rxNostr.forward(relays, request).subscribe(console.log);
 request.emit([{}]);
 
 relays.append("wss://two.example.com");

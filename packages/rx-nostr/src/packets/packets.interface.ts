@@ -7,10 +7,8 @@ import type { RelayInput } from "../types/index.ts";
 
 /**
  * Packets flowing through the Observable stream sent from RxReq towards RxNostr.
- * When null is sent, the subscription is suspended.
  *
- * **NOTE**: The internal structure of ReqPacket is subject to change.
- * Do NOT create RxPackets directly, but issue RxPackets through RxReq instead.
+ * Emit these packets through RxReq to issue REQ segments.
  */
 export interface ReqPacket extends ReqOptions {
   filters: LazyFilter[];
