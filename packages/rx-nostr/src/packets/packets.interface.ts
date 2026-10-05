@@ -16,6 +16,7 @@ export interface ReqPacket extends ReqOptions {
 
 export interface ReqOptions {
   relays?: RelayInput;
+  /** Per-segment connection-demand retention in ms; 0 releases immediately, Infinity lasts until disposal. */
   linger?: number;
   traceTag?: string | number;
 }

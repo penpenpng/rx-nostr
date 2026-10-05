@@ -54,6 +54,20 @@ test("Extended RxReq emits a filter", async () => {
   await expect(inspector.waitNext()).resolves.toEqual({ filters: [{ kinds: [2] }] });
 });
 
+test.each([NaN, -Infinity, -1, 2_147_483_648])(
+  "rejects invalid packet linger without emitting: %s",
+  (linger) => {
+    const request = new RxReq();
+    const inspector = new SubscriptionInspector<ReqPacket>();
+
+    request.asObservable().subscribe(inspector);
+
+    expect(() => request.emit({ kinds: [1] }, { linger })).toThrow(RangeError);
+    expect(inspector.values).toEqual([]);
+    request.dispose();
+  },
+);
+
 test("disposing one derived RxReq completes only that view", async () => {
   const source = new RxReq();
   const first = source.pipe(map((packet) => packet));

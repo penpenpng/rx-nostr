@@ -140,4 +140,19 @@ describe("ConnectionDemandScope leases", () => {
     expect(relay.leases).toBe(0);
     connectionDemand.dispose();
   });
+
+  test.each([NaN, -Infinity, -1, 2_147_483_648])(
+    "rejects invalid linger before acquiring even a weak lease: %s",
+    (linger) => {
+      const relay = new LeaseRelay("wss://relay.example.com");
+
+      for (const weak of [false, true]) {
+        const demand = new ConnectionDemandScope({ defer: true, weak });
+
+        expect(() => demand.openDemandWindow(relay, linger)).toThrow(RangeError);
+        expect(relay.leases).toBe(0);
+        demand.dispose();
+      }
+    },
+  );
 });

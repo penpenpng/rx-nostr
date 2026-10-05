@@ -384,7 +384,7 @@ export class PublicationOperation implements Publication, Disposable {
     if (this.#cleaned || this.#cancelled) {
       return;
     }
-    if (!Number.isFinite(this.config.linger)) {
+    if (this.config.linger === Infinity) {
       return;
     }
 

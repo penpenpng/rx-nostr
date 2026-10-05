@@ -40,6 +40,29 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    test("rejects invalid operation timeout before opening a connection", () => {
+      const { server, rxNostr } = createRxNostrScenario();
+
+      expect(() => rxNostr.backward(relay, [{}], { timeout: NaN })).toThrow(RangeError);
+      expect(server.connections).toHaveLength(0);
+      rxNostr.dispose();
+    });
+
+    test("rejects invalid linger from a piped packet before opening a connection", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const source = new RxReq();
+      const request = source.pipe(map((packet) => ({ ...packet, linger: NaN })));
+      const inspector = new SubscriptionInspector<EventPacket>();
+
+      rxNostr.backward(relay, request).subscribe(inspector);
+      source.emit([{}]);
+
+      await expect(inspector.waitError()).resolves.toBeInstanceOf(RangeError);
+      expect(server.connections).toHaveLength(0);
+      source.dispose();
+      rxNostr.dispose();
+    });
+
     test.each(["static", "emitted", "piped"] as const)(
       "%s filter snapshots condition arrays before later caller mutation",
       async (input) => {

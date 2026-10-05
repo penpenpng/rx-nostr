@@ -107,6 +107,20 @@ Authenticator の `authTimeout` は省略時 30,000 ms、NIP-11 自動取得は�
 
 REQ の `timeout` は backward segment が EOSE を待つ時間です。publish の `timeout` は relay ごとの OK を待つ時間です。
 
+## 時間値の許容範囲
+
+単位はすべてミリ秒です。timer を使う値は `NaN`、`-Infinity`、負数、2,147,483,647 ms を超える有限値を拒否します。`Infinity` は次の表で許可した場合だけ無期限を意味します。
+
+| option | `0` | 正の有限値 | `Infinity` |
+| --- | --- | --- | --- |
+| `connectionTimeout` | 不可 | 接続試行の期限 | 不可 |
+| `nip11Timeout`、REQ / publish `timeout`、Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
+| REQ / publish / ReqPacket `linger` | 即時解放 | 終了後の保持時間 | dispose まで保持 |
+
+`connectionTimeout`、`nip11Timeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory.fetchNip11()` に不正な `timeout` を渡すと fetch を始めず Promise が reject します。`SimpleAuthenticator` と `VerificationClient` は構築時に検査し、独自 Authenticator の `authTimeout` は AUTH 開始前に検査します。
+
+reconnector の retry `delay` と relay health policy の `suppressedUntil` は有限の非負数を要求します。これらは接続待機の内部処理で、長い deadline は timer 上限ごとに分割して待ちます。
+
 ## REQ arguments and options
 
 `forward(relays, request, options?)` / `backward(relays, request, options?)` の順です。宛先と request（`RxReq` または filter の配列）は必須で、operation 固有の設定だけを第3引数へ渡します。

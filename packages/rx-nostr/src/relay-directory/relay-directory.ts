@@ -4,6 +4,7 @@ import { map, type Observable } from "rxjs";
 import { RelayDirectorySnapshotError } from "../libs/error.ts";
 import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import type {
   FetchNip11Options,
   IRelayDirectory,
@@ -91,6 +92,17 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   fetchNip11(url: string, options: FetchNip11Options = {}): Promise<Nostr.Nip11.RelayInfo> {
+    if (options.timeout !== undefined) {
+      try {
+        assertTimerDuration(options.timeout, "NIP-11 timeout", {
+          allowZero: true,
+          allowInfinity: true,
+        });
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+
     return this.#getOrCreate(url)
       .fetchNip11(options.refresh ?? false, options.timeout)
       .then(copyRelayInfo);

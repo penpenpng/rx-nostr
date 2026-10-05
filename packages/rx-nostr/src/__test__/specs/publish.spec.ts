@@ -349,6 +349,20 @@ describe("Publication public contract", () => {
   });
 
   describe("cancellation and subscriptions", () => {
+    test("rejects invalid timeout before signer or connection work", () => {
+      const { server, rxNostr } = createPublicationScenario();
+      const signEvent = vi.fn();
+      const signer: EventSigner = {
+        signEvent,
+        getPublicKey: async () => "unused",
+      };
+
+      expect(() => rxNostr.publish(relay1, event(), { signer, timeout: NaN })).toThrow(RangeError);
+      expect(signEvent).not.toHaveBeenCalled();
+      expect(server.connections).toHaveLength(0);
+      rxNostr.dispose();
+    });
+
     test("cancel is idempotent and prevents sending after signing completes", async () => {
       const signing = createDeferred<Nostr.Event>();
       const signer: EventSigner = {

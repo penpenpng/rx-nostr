@@ -3,9 +3,8 @@
 import type * as Nostr from "nostr-typedef";
 
 import { once } from "../libs/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import type { EventVerifier } from "./event-verifier.interface.ts";
-
-const MAX_TIMEOUT = 2_147_483_647;
 
 export class VerificationHost {
   constructor(private verifier: EventVerifier) {}
@@ -66,16 +65,10 @@ export class VerificationClient implements EventVerifier {
   constructor(private config: VerificationClientConfig) {
     const timeout = config.timeout ?? 10_000;
 
-    if (
-      timeout !== Infinity &&
-      (!Number.isFinite(timeout) || timeout < 0 || timeout > MAX_TIMEOUT)
-    ) {
-      throw new RangeError(
-        "Verification timeout must be between 0 and 2147483647 ms, or Infinity.",
-      );
-    }
-
-    this.#timeout = timeout;
+    this.#timeout = assertTimerDuration(timeout, "Verification timeout", {
+      allowZero: true,
+      allowInfinity: true,
+    });
   }
 
   get status() {

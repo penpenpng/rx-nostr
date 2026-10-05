@@ -5,6 +5,7 @@ import { DEFAULT_AUTH_TIMEOUT } from "../../../../authenticator/authenticator.de
 import type { Authenticator, AuthenticatorInput } from "../../../../authenticator/index.ts";
 import { RxNostrCallbackError } from "../../../../libs/error.ts";
 import type { RelayUrl } from "../../../../libs/index.ts";
+import { assertTimerDuration } from "../../../../libs/timing.ts";
 import type { OkPacket } from "../../../../packets/index.ts";
 import type { NostrTransport } from "../../transport/index.ts";
 
@@ -174,6 +175,9 @@ export class AuthCoordinator {
     signal: AbortSignal,
   ): Promise<void> {
     const timeout = authenticator.authTimeout ?? DEFAULT_AUTH_TIMEOUT;
+
+    assertTimerDuration(timeout, "authTimeout", { allowZero: true, allowInfinity: true });
+
     let event;
 
     try {

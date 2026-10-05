@@ -8,6 +8,7 @@ import {
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { createPipeMethod, type IPipeable, once, RxDisposableStack } from "../libs/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import type { ReqOptions, ReqPacket } from "../packets/index.ts";
 
 const DERIVED = Symbol("RxReq.derived");
@@ -46,6 +47,13 @@ export class RxReq implements IPipeable<RxReq, ReqPacket> {
   emit(filters: LazyFilter | LazyFilter[], options?: ReqOptions) {
     if (this.stack.disposed) {
       return;
+    }
+
+    if (options?.linger !== undefined) {
+      assertTimerDuration(options.linger, "ReqPacket linger", {
+        allowZero: true,
+        allowInfinity: true,
+      });
     }
 
     this.stream.next({

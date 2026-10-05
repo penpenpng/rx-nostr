@@ -259,6 +259,20 @@ describe("RelayDirectory snapshots", () => {
     ).rejects.toMatchObject({ code: "timeout" });
     expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
   });
+
+  test.each([NaN, -Infinity, -1, 2_147_483_648])(
+    "rejects invalid NIP-11 timeout before starting fetch: %s",
+    async (timeout) => {
+      const fetcher = vi.fn();
+      const directory = new RelayDirectory({ fetcher });
+
+      await expect(directory.fetchNip11("wss://relay.example.com", { timeout })).rejects.toThrow(
+        RangeError,
+      );
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(directory.get("wss://relay.example.com")).toBeUndefined();
+    },
+  );
 });
 
 test("round trips success followed by failure at the same timestamp", () => {

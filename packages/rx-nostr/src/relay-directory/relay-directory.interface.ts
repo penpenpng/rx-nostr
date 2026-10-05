@@ -6,7 +6,7 @@ import type { RelayDirectoryEntry, RelayDirectorySnapshotV1 } from "./relay.inte
 export interface FetchNip11Options {
   /** Ignore cached metadata. Concurrent refreshes are still deduplicated. */
   readonly refresh?: boolean;
-  /** Maximum time to wait for metadata, in milliseconds. Infinity disables the timeout. */
+  /** Maximum metadata wait in ms; 0 is immediate and Infinity disables the timeout. */
   readonly timeout?: number;
 }
 

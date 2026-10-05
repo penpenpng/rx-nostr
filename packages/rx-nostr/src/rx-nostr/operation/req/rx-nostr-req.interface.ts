@@ -7,13 +7,14 @@ export type RxNostrReqInput = RxReq | readonly LazyFilter[];
 
 export interface RxNostrReqOptions {
   defer?: boolean;
+  /** Connection-demand retention in ms; 0 releases immediately, Infinity lasts until disposal. */
   linger?: number;
   weak?: boolean;
   /**
    * Specify how long rx-nostr waits for EOSE messages when following backward strategy (milliseconds).
    *
    * If EOSE doesn't come after waiting for this amount of time,
-   * rx-nostr is considered to get EOSE.
+   * rx-nostr is considered to get EOSE. 0 is immediate; Infinity disables the deadline.
    */
   timeout?: number;
   /**

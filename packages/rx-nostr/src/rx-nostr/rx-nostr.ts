@@ -11,6 +11,7 @@ import type { EventVerifier } from "../event-verifier/index.ts";
 import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
 import type { Publication, PublishEventParameters } from "../publication/index.ts";
@@ -123,9 +124,18 @@ export class RxNostr implements IRxNostr {
 
     if (request instanceof RxReq) {
       // Pipe operators can replace packets, so snapshot and normalize their final output.
-      source$ = request
-        .asObservable()
-        .pipe(map((packet) => ({ ...packet, filters: normalizeFilters(packet.filters) })));
+      source$ = request.asObservable().pipe(
+        map((packet) => {
+          if (packet.linger !== undefined) {
+            assertTimerDuration(packet.linger, "ReqPacket linger", {
+              allowZero: true,
+              allowInfinity: true,
+            });
+          }
+
+          return { ...packet, filters: normalizeFilters(packet.filters) };
+        }),
+      );
     } else {
       // Static caller-owned arrays are snapshotted when forward/backward is called.
       const filters = normalizeFilters(request);
