@@ -6,6 +6,7 @@ AUTH は opt-in です。通常の signer を指定しただけでは有効に�
 
 通常の signer で kind 22242 の EVENT を署名する場合は `SimpleAuthenticator` を使います。
 
+<!-- typecheck-example: auth-basic -->
 ```ts
 import { SimpleAuthenticator, RxNostr } from "rx-nostr";
 import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";

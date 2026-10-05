@@ -4,6 +4,7 @@ Signer は発行する EVENT を完成させ、Verifier は受信した EVENT �
 
 ## Signer
 
+<!-- typecheck-example: signer-interface -->
 ```ts
 interface EventSigner {
   signEvent<K extends number>(
@@ -15,6 +16,7 @@ interface EventSigner {
 
 root signer は instance config で指定し、publication ごとに上書きできます。
 
+<!-- typecheck-example: signer-config -->
 ```ts
 const rxNostr = new RxNostr({
   verifier,
@@ -72,6 +74,7 @@ rxNostr.publish(relays, signedEvent, {
 
 relay tuple の decoder はこの構造検査を行い、不正な EVENT tuple を破棄します。publish でも signer の戻り値に同じ構造検査を行い、不正なら `RxNostrCallbackError` にします。どちらも本体で暗号ライブラリを読み込みません。通常版と WASM 版の `SimpleVerifier` は、lowercase hex の `id` / `pubkey` / `sig` の長さ、内容から再計算した ID、Schnorr 署名を検証し、不正な EVENT には `false` を返します。実際に受信した EVENT を通すかどうかは設定した `EventVerifier` が決めます。
 
+<!-- typecheck-example: verifier-interface -->
 ```ts
 interface EventVerifier {
   verifyEvent(event: Nostr.Event): Promise<boolean>;
@@ -114,6 +117,7 @@ verifier が `false` を返した EVENT は通知されません。verifier が�
 
 Worker 側:
 
+<!-- typecheck-example: worker-host -->
 ```ts
 import { VerificationHost } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
@@ -124,6 +128,7 @@ host.start();
 
 Application 側:
 
+<!-- typecheck-example: worker-client -->
 ```ts
 import { VerificationClient, RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";

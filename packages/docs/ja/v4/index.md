@@ -4,6 +4,7 @@ rx-nostr は、Nostr リレーとの通信を RxJS の Observable として扱�
 
 v4 では「どのリレーへ何を問い合わせるか」と「接続をいつ維持するか」を分離しました。問い合わせと発行では宛先をその都度明示し、接続の先行確立が必要な場合だけ hot relay を設定します。
 
+<!-- typecheck-example: v4-index -->
 ```ts
 import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";

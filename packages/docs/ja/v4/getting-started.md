@@ -6,6 +6,7 @@
 
 query を行う `RxNostr` には実際の verifier が必要です。ここでは constructor で指定します。複数 instance で共有する場合は `RxNostr.defaultConfig.verifier` に設定することもできます。省略時の verifier は EVENT の検証時にエラーとなるため、未検証の EVENT が暗黙に通ることはありません。
 
+<!-- typecheck-example: getting-started-client -->
 ```ts
 import { RxNostr } from "rx-nostr";
 import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
@@ -24,6 +25,7 @@ const rxNostr = new RxNostr({
 
 `backward()` に filter の配列を渡すと、一度だけ過去イベントを取得します。EOSE、CLOSED、timeout などによって全リレーの処理が終わると Observable が complete します。
 
+<!-- typecheck-example: getting-started-query -->
 ```ts
 const events = rxNostr.backward(
   [

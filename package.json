@@ -8,6 +8,7 @@
     "check": "vp check .",
     "fix": "vp check --fix",
     "docs:build": "pnpm --filter @rx-nostr/docs docs:build",
+    "docs:examples": "node scripts/typecheck-docs-examples.mjs",
     "docs:dev": "pnpm --filter @rx-nostr/docs docs:dev",
     "format": "vp fmt . --write",
     "format:check": "vp fmt . --check",

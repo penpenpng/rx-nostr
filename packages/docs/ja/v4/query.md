@@ -6,6 +6,7 @@
 
 `backward()` に filter 配列を渡します。全リレーで EOSE、CLOSED、timeout などによって処理が終わると Observable が complete します。
 
+<!-- typecheck-example: query-backward -->
 ```ts
 const result$ = rxNostr.backward(["wss://relay.example.com"], [
   { kinds: [0], authors: [pubkey] },
