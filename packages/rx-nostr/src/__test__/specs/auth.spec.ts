@@ -1,3 +1,4 @@
+import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
 import type * as Nostr from "nostr-typedef";
 import {
   RxNostrCallbackError,
@@ -42,6 +43,44 @@ function createAuthScenario(overrides: Partial<RxNostrConfig> = {}) {
 
 describe("NIP-42 AUTH public contract", () => {
   describe("handshake", () => {
+    scenarioTest(
+      "signs a real AUTH challenge and resumes a REQ after OK",
+      async ({ createScenario }) => {
+        const signer = new SeckeySigner(
+          "7f3fd51b45881fd8402fea2182f43fd3111a905180ff3a05a90645be6797b4f9",
+        );
+        const verifier = new SimpleVerifier();
+        const { rxNostr, server } = createScenario({
+          verifier,
+          authenticator: new SimpleAuthenticator(signer),
+        });
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(relay, [{}]).subscribe(inspector);
+        const socket = server.sockets.latest;
+
+        socket.open();
+        const [, firstId] = await socket.inbox.waitNext("REQ");
+
+        socket.message(["AUTH", "real-challenge"]);
+        socket.message(["CLOSED", firstId, "auth-required: login"]);
+        const [, signedAuth] = await socket.inbox.waitNext("AUTH");
+
+        expect(signedAuth.kind).toBe(22242);
+        expect(signedAuth.tags).toEqual([
+          ["relay", relay],
+          ["challenge", "real-challenge"],
+        ]);
+        await expect(verifier.verifyEvent(signedAuth)).resolves.toBe(true);
+
+        socket.message(["OK", signedAuth.id, true, "authenticated"]);
+        const [, resumedId] = await socket.inbox.waitNext("REQ");
+
+        socket.message(["EOSE", resumedId]);
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      },
+    );
+
     test("deduplicates a challenge across REQs and resends each REQ only once", async () => {
       const challenge = vi.fn(async (_url: string, value: string) =>
         authEvent("auth-event", value),

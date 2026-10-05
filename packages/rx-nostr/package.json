@@ -63,6 +63,7 @@
     "unipls": "^0.2.0"
   },
   "devDependencies": {
+    "@rx-nostr/crypto": "workspace:*",
     "@types/node": "^26.6.2",
     "@vitest/ui": "^5.0.1",
     "disposablestack": "^1.1.8",

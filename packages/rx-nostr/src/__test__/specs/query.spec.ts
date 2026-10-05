@@ -1,3 +1,4 @@
+import { SimpleVerifier } from "@rx-nostr/crypto";
 import type * as Nostr from "nostr-typedef";
 import {
   RelayDirectory,
@@ -11,6 +12,7 @@ import {
 import { map } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
+import signedEvent from "../../../../test-fixtures/signed-event.json";
 import {
   createDeferred,
   createRxNostrScenario,
@@ -334,6 +336,29 @@ describe("REQ public contract", () => {
   });
 
   describe("backward queries", () => {
+    scenarioTest(
+      "accepts a signed EVENT and drops an ID-altered EVENT with real crypto",
+      async ({ createScenario }) => {
+        const { rxNostr, server } = createScenario({ verifier: new SimpleVerifier() });
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(relay, [{}]).subscribe(inspector);
+        const socket = server.sockets.latest;
+
+        socket.open();
+        const [, subId] = await socket.inbox.waitNext("REQ");
+
+        socket.message(["EVENT", subId, { ...signedEvent, id: "0".repeat(64) }]);
+        socket.message(["EVENT", subId, signedEvent]);
+        await settleProtocol();
+
+        await expect(inspector.waitNext()).resolves.toMatchObject({ event: signedEvent });
+        expect(inspector.values).toHaveLength(1);
+        socket.message(["EOSE", subId]);
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+      },
+    );
+
     test("sends a backward REQ, exposes traceTag, and ends on EOSE", async () => {
       const { server, rxNostr } = createRxNostrScenario();
       const rxReq = new RxReq();

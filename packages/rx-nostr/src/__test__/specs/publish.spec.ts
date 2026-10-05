@@ -1,3 +1,4 @@
+import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
 import type * as Nostr from "nostr-typedef";
 import {
   RxNostrCallbackError,
@@ -23,6 +24,35 @@ import { scenarioTest, settleProtocol } from "../helper/protocol-scenario.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 describe("Publication public contract", () => {
+  scenarioTest(
+    "publishes a real signed EVENT and settles on the relay OK",
+    async ({ createScenario }) => {
+      const verifier = new SimpleVerifier();
+      const { rxNostr, server } = createScenario({
+        verifier,
+        signer: new SeckeySigner(
+          "7f3fd51b45881fd8402fea2182f43fd3111a905180ff3a05a90645be6797b4f9",
+        ),
+      });
+      const publication = rxNostr.publish(
+        relay1,
+        { kind: 1, content: "real publication" },
+        { linger: 0 },
+      );
+      const completion = publication.waitFor("all");
+      const connection = socket(server, relay1);
+
+      connection.open();
+      const [, signed] = await connection.inbox.waitNext("EVENT");
+
+      await expect(verifier.verifyEvent(signed)).resolves.toBe(true);
+      await expect(publication.event).resolves.toEqual(signed);
+
+      connection.message(["OK", signed.id, true, "accepted"]);
+      await expect(completion).resolves.toBeUndefined();
+    },
+  );
+
   describe("public values", () => {
     test.each([true, false])("isolates observer changes from a relay's OK %s", async (accepted) => {
       const { server, rxNostr } = createPublicationScenario();

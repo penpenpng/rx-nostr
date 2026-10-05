@@ -1,6 +1,8 @@
+import { SimpleVerifier } from "@rx-nostr/crypto";
 import {
   RelayDirectory,
   RelayDirectorySnapshotError,
+  RxNostr,
   type IRelayDirectory,
   type RxNostrConfig,
 } from "rx-nostr";
@@ -8,6 +10,7 @@ import { fetchRelayInfo } from "rx-nostr/utils";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 
 import { createDeferred, createRxNostrScenario, expectCallbackCalled } from "../helper/index.ts";
+import { scenarioTest, settleProtocol } from "../helper/protocol-scenario.ts";
 
 const relay = "wss://relay.example.com";
 
@@ -21,6 +24,64 @@ async function expectRelayInfo(
 
 describe("RelayDirectory public contract", () => {
   describe("RxNostr integration", () => {
+    scenarioTest(
+      "shares automatic NIP-11 fetch while the default reconnector resends a REQ",
+      async ({ createScenario }) => {
+        const pendingInfo = createDeferred<{
+          name: string;
+          limitation: { max_subscriptions: number };
+        }>();
+        const fetcher = vi.fn(() => pendingInfo.promise);
+        const directory = new RelayDirectory({ fetcher });
+        const config = {
+          relayDirectory: directory,
+          skipFetchNip11: false,
+          reconnector: RxNostr.defaultConfig.reconnector,
+          verifier: new SimpleVerifier(),
+        };
+        const { rxNostr: first, server: firstServer } = createScenario(config);
+        const { rxNostr: second, server: secondServer } = createScenario(config);
+
+        const query = first.forward(relay, [{ kinds: [1] }]).subscribe();
+
+        second.setHotRelays(relay);
+        await settleProtocol();
+        expect(fetcher).toHaveBeenCalledOnce();
+
+        pendingInfo.resolve({ name: "shared", limitation: { max_subscriptions: 1 } });
+        await settleProtocol();
+        expect(directory.get(relay)?.nip11).toMatchObject({ name: "shared" });
+
+        const firstSocket = firstServer.sockets.latest;
+        const secondSocket = secondServer.sockets.latest;
+
+        firstSocket.open();
+        secondSocket.open();
+        await firstSocket.inbox.waitNext("REQ");
+
+        firstSocket.peerClose(1006, "lost");
+        await vi.advanceTimersByTimeAsync(799);
+        expect(firstServer.connections).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(401);
+        expect(firstServer.connections).toHaveLength(2);
+
+        const recovered = firstServer.sockets.latest;
+
+        recovered.open();
+        await expect(recovered.inbox.waitNext("REQ")).resolves.toMatchObject([
+          "REQ",
+          expect.any(String),
+          { kinds: [1] },
+        ]);
+
+        query.unsubscribe();
+        first.dispose();
+        await settleProtocol();
+        expect(secondSocket.isCloseRequested).toBe(false);
+        second.unsetHotRelays();
+      },
+    );
+
     test("populates metadata on first use", async () => {
       const fetcher = vi.fn().mockResolvedValue({ name: "relay" });
       const directory = new RelayDirectory({ fetcher });
