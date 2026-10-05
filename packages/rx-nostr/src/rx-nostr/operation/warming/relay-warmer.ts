@@ -17,6 +17,7 @@ export class RelayWarmer {
 
   setHotRelays(relays: RelayInput): void {
     this.#sub?.unsubscribe();
+
     this.#sub = RxRelays.observable(relays).subscribe((current) => {
       // Acquire first so replacing aliases or sets cannot introduce a gap.
       for (const url of current) {
@@ -39,7 +40,11 @@ export class RelayWarmer {
 
   [Symbol.dispose] = once(() => {
     this.#sub?.unsubscribe();
-    for (const release of this.#leases.values()) release();
+
+    for (const release of this.#leases.values()) {
+      release();
+    }
+
     this.#leases.clear();
   });
   dispose = this[Symbol.dispose];

@@ -50,6 +50,7 @@ export class NostrOperationExecutor implements Disposable {
     }> = {},
   ): Observable<EventPacket> {
     const reqPlans = this.#planVreq(strategy, filters);
+
     return merge(...reqPlans.map((plan) => this.#executeReqPlan(plan, reqScheduler, options)));
   }
 
@@ -74,6 +75,7 @@ export class NostrOperationExecutor implements Disposable {
       const startReq = () => {
         const subId = `rx-nostr:${this.#nextSubId++}`;
         let terminalAuthRequired = false;
+
         reqSubscription = scheduler
           .schedule(() =>
             this.#req(plan, subId, options, (authRequired) => {
@@ -85,9 +87,12 @@ export class NostrOperationExecutor implements Disposable {
             complete: () => {
               if (terminalAuthRequired && !authRetried) {
                 authRetried = true;
+
                 void this.#auth.authenticate(authAbort.signal).then(
                   () => {
-                    if (!stopped && !subscriber.closed) startReq();
+                    if (!stopped && !subscriber.closed) {
+                      startReq();
+                    }
                   },
                   (error) => finishAfterAuthentication(error, subscriber),
                 );
@@ -97,15 +102,21 @@ export class NostrOperationExecutor implements Disposable {
             },
             error: (error) => {
               const callbackError = callbackErrorFrom(error);
-              if (callbackError) subscriber.error(callbackError);
-              else subscriber.complete();
+
+              if (callbackError) {
+                subscriber.error(callbackError);
+              } else {
+                subscriber.complete();
+              }
             },
           });
       };
 
       startReq();
+
       return () => {
         stopped = true;
+
         authAbort.abort();
         reqSubscription?.unsubscribe();
       };
@@ -134,7 +145,9 @@ export class NostrOperationExecutor implements Disposable {
           } catch (cause) {
             throw new RxNostrCallbackError("filter", cause);
           }
+
           queryEvaluated = true;
+
           return ["REQ", subId, ...evaluatedFilters];
         },
         selector: (packet) => packet.type === "EVENT" && packet.subId === subId,
@@ -142,8 +155,10 @@ export class NostrOperationExecutor implements Disposable {
           const terminal =
             (packet.type === "CLOSED" && packet.subId === subId) ||
             (plan.strategy === "backward" && packet.type === "EOSE" && packet.subId === subId);
+
           terminalAuthRequired =
             terminal && packet.type === "CLOSED" && packet.noticeType === "auth-required";
+
           return terminal;
         },
         ...(plan.strategy === "backward" &&
@@ -153,6 +168,7 @@ export class NostrOperationExecutor implements Disposable {
           : {}),
         retry: "resend",
       });
+
       subscription = packets
         .pipe(
           filter((packet): packet is EventMessagePacket => packet.type === "EVENT"),
@@ -166,6 +182,7 @@ export class NostrOperationExecutor implements Disposable {
           next: (packet) => subscriber.next(packet),
           complete: () => {
             remoteTerminated = true;
+
             onRemoteTerminated(terminalAuthRequired);
             subscriber.complete();
           },
@@ -184,6 +201,7 @@ export class NostrOperationExecutor implements Disposable {
             });
           });
         }
+
         subscription?.unsubscribe();
       };
     });
@@ -209,13 +227,18 @@ export class NostrOperationExecutor implements Disposable {
           .subscribe({
             next: (packet) => {
               const authRequired = !packet.ok && packet.noticeType === "auth-required";
+
               subscriber.next(packet);
               subscription?.unsubscribe();
+
               if (authRequired && !authRetried) {
                 authRetried = true;
+
                 void this.#auth.authenticate(authAbort.signal).then(
                   () => {
-                    if (!stopped && !subscriber.closed) start();
+                    if (!stopped && !subscriber.closed) {
+                      start();
+                    }
                   },
                   (error) => finishAfterAuthentication(error, subscriber),
                 );
@@ -226,9 +249,12 @@ export class NostrOperationExecutor implements Disposable {
             error: (error) => subscriber.error(error),
           });
       };
+
       start();
+
       return () => {
         stopped = true;
+
         authAbort.abort();
         subscription?.unsubscribe();
       };
@@ -261,13 +287,16 @@ export interface NostrOperationExecutorOptions {
 const defaultVreqPlanner: RelayVreqPlanner = (strategy, filters) => [{ strategy, filters }];
 
 function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
-  if (error instanceof RxNostrCallbackError) return error;
+  if (error instanceof RxNostrCallbackError) {
+    return error;
+  }
   if (
     error instanceof NostrTransportOperationError &&
     error.cause instanceof RxNostrCallbackError
   ) {
     return error.cause;
   }
+
   return undefined;
 }
 
@@ -275,8 +304,14 @@ function finishAfterAuthentication(
   error: unknown,
   subscriber: import("rxjs").Subscriber<unknown>,
 ): void {
-  if (subscriber.closed) return;
-  if (error instanceof RxNostrCallbackError) subscriber.error(error);
-  else if (error instanceof AuthenticationFailure) subscriber.complete();
-  else subscriber.complete();
+  if (subscriber.closed) {
+    return;
+  }
+  if (error instanceof RxNostrCallbackError) {
+    subscriber.error(error);
+  } else if (error instanceof AuthenticationFailure) {
+    subscriber.complete();
+  } else {
+    subscriber.complete();
+  }
 }

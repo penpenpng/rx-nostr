@@ -9,11 +9,13 @@ describe("ControlledWebSocketServer", () => {
     const firstRelay = "wss://one.example.com";
     const secondRelay = "wss://two.example.com";
 
-    new server.WebSocket(firstRelay);
+    expect(new server.WebSocket(firstRelay)).toBe(server.sockets.latest);
     const first = server.sockets.latest;
-    new server.WebSocket(secondRelay);
+
+    expect(new server.WebSocket(secondRelay)).toBe(server.sockets.latest);
     const second = server.sockets.latest;
-    new server.WebSocket(firstRelay);
+
+    expect(new server.WebSocket(firstRelay)).toBe(server.sockets.latest);
     const reconnectedFirst = server.sockets.latest;
 
     await expect(server.connections.waitNext()).resolves.toBe(first);
@@ -35,10 +37,13 @@ describe("ControlledWebSocketServer", () => {
 
   test("exposes Nostr tuples instead of transport encoding", async () => {
     const socket = new ControlledWebSocket("wss://relay.example.com");
+
     expectTypeOf(socket.inbox.waitNext).returns.toMatchTypeOf<Promise<Nostr.ToRelayMessage.Any>>();
     expectTypeOf(socket.message).parameter(0).toEqualTypeOf<Nostr.ToClientMessage.Any>();
     const received: unknown[] = [];
+
     socket.onmessage = ({ data }) => received.push(data);
+
     socket.open();
 
     socket.send(JSON.stringify(["REQ", "subscription", {}]));
@@ -51,6 +56,7 @@ describe("ControlledWebSocketServer", () => {
 
   test("rejects an unexpected next message instead of skipping it", async () => {
     const socket = new ControlledWebSocket("wss://relay.example.com");
+
     socket.open();
     socket.send(JSON.stringify(["AUTH", { id: "auth" }]));
     socket.send(JSON.stringify(["REQ", "subscription", {}]));
@@ -64,6 +70,7 @@ describe("ControlledWebSocketServer", () => {
   test("allows waiting before and after the first close request", async () => {
     const socket = new ControlledWebSocket("wss://relay.example.com");
     const requested = socket.closeRequested;
+
     expect(socket.isCloseRequested).toBe(false);
     socket.open();
     socket.close(1000, "done");

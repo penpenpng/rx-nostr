@@ -12,6 +12,7 @@ describe("evaluateRelayConnection", () => {
     initialRetryDelay: 200,
     maxRetryDelay: 500,
   };
+
   test("requires both sustained failures and a failure count, and releases at the deadline", () => {
     expect(
       evaluateRelayConnection(
@@ -28,6 +29,7 @@ describe("evaluateRelayConnection", () => {
       ),
     ).toEqual({ action: "allow" });
     const health = { consecutiveFailures: 3, firstFailureAt: 0, lastFailureAt: 100 };
+
     expect(evaluateRelayConnection(health, 100, policy)).toEqual({
       action: "suppress",
       suppressedUntil: 300,
@@ -84,6 +86,7 @@ describe("evaluateRelayConnection", () => {
         details: { consecutiveFailures: 3, failingSince: 0 },
       },
     };
+
     expect(strategy.getSuppression(context)).toEqual(suppression);
     expect(strategy.getSuppression({ ...context, now: 300 })).toEqual(suppression);
     expect(

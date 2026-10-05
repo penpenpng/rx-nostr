@@ -37,6 +37,7 @@ test("single relay", async () => {
   const sub = observable.subscribe(inspector);
 
   const req1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await relay.expectFilters([{ kinds: [1] }]);
   await req1.subscribed;
@@ -47,6 +48,7 @@ test("single relay", async () => {
   await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "2", traceTag: 1 }));
 
   const req2 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await relay.expectFilters([{ kinds: [2] }]);
   await req2.subscribed;
@@ -65,6 +67,7 @@ test("single relay", async () => {
   assert(!relay.hasActiveLease, "Relay should be released");
 
   const req3 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [3] }], { traceTag: 3 });
   await relay.expectFilters([{ kinds: [3] }]);
   await req3.subscribed;
@@ -106,6 +109,7 @@ test("single relay, defer=true", async () => {
   const sub = observable.subscribe(inspector);
 
   const req1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await relay.expectFilters([{ kinds: [1] }]);
   await req1.subscribed;
@@ -119,6 +123,7 @@ test("single relay, defer=true", async () => {
   await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
 
   const req2 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await relay.expectFilters([{ kinds: [2] }]);
   await req2.subscribed;
@@ -142,6 +147,7 @@ test("single relay, weak=true", async () => {
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
+
   relay.isHot = true;
 
   const observable = reqBackward({
@@ -161,6 +167,7 @@ test("single relay, weak=true", async () => {
   const sub = observable.subscribe(inspector);
 
   const stream1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [0] }]);
   await relay.expectFilters([{ kinds: [0] }]);
   await stream1.subscribed;
@@ -201,6 +208,7 @@ test("dynamic relays", async () => {
 
   // append relay1, and emit a REQ
   const req1relay1 = relay1.attachNextStream();
+
   assert(!relay1.hasActiveLease, "Relay1 should still be offline");
   defaultRelays.append(relayUrl1);
   assert(relay1.hasActiveLease, "Relay1 should be prewarmed");
@@ -215,6 +223,7 @@ test("dynamic relays", async () => {
 
   // append relay2
   const req1relay2 = relay2.attachNextStream();
+
   assert(!relay2.hasActiveLease, "Relay2 should still be offline");
   defaultRelays.append(relayUrl2);
   assert(relay1.hasActiveLease, "Relay1 should keep to be connected");
@@ -232,6 +241,7 @@ test("dynamic relays", async () => {
   // emit a new REQ
   const req2relay1 = relay1.attachNextStream();
   const req2relay2 = relay2.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await relay1.expectFilters([{ kinds: [2] }]);
   await relay2.expectFilters([{ kinds: [2] }]);
@@ -316,6 +326,7 @@ test("dynamic relays - uncompleted REQ should be performed on added relays", asy
   const relay3 = relays.get(relayUrl3);
 
   const req1relay1 = relay1.attachNextStream();
+
   defaultRelays.append(relayUrl1);
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await relay1.expectFilters([{ kinds: [1] }]);
@@ -325,12 +336,14 @@ test("dynamic relays - uncompleted REQ should be performed on added relays", asy
   await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
 
   const req2relay1 = relay1.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await relay1.expectFilters([{ kinds: [2] }]);
   await req2relay1.subscribed;
 
   const stream1 = relay2.attachNextStream();
   const stream2 = relay2.attachNextStream();
+
   defaultRelays.append(relayUrl2);
   await relay2.expectFilters([{ kinds: [1] }]);
   await relay2.expectFilters([{ kinds: [2] }]);
@@ -396,6 +409,7 @@ test("request-specific relays", async () => {
   defaultRelays.append(relayUrl1);
 
   const requestRelays = new RxRelays();
+
   requestRelays.append(relayUrl2);
 
   const stream1 = relay1.attachNextStream();

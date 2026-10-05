@@ -12,8 +12,11 @@ import { AuthCoordinator } from "./auth-coordinator.ts";
 
 const relay = "wss://relay.example.com";
 const cleanups: (() => void)[] = [];
+
 afterEach(() => {
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  for (const cleanup of cleanups.splice(0)) {
+    cleanup();
+  }
 });
 async function setup(authenticator?: AuthenticatorInput) {
   const server = new ControlledWebSocketServer();
@@ -25,18 +28,23 @@ async function setup(authenticator?: AuthenticatorInput) {
   const executor = new NostrOperationExecutor(relay, transport, { authenticator });
   const opened = executor.open();
   const socket = server.sockets.latest;
+
   socket.open();
   await opened;
   cleanups.push(() => {
     executor.dispose();
     const socket = server.sockets.latest;
+
     socket.acknowledgeClose();
   });
+
   return { server, transport, executor };
 }
 const signed = (value: string) => Faker.authEvent({ id: `auth-${value}`, relay, challenge: value });
 const flush = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
+  for (let i = 0; i < 20; i++) {
+    await Promise.resolve();
+  }
 };
 
 describe("connection AUTH lifecycle", () => {
@@ -44,6 +52,7 @@ describe("connection AUTH lifecycle", () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     socket.message(["AUTH", "one"]);
     const event = Faker.event({ id: "event" });
@@ -67,6 +76,7 @@ describe("connection AUTH lifecycle", () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     const inspector = new SubscriptionInspector<OkPacket>();
 
@@ -85,9 +95,11 @@ describe("connection AUTH lifecycle", () => {
   test("old OK cannot release sends waiting on the replacement generation", async () => {
     const { server, executor } = await setup({ challenge: async (_relay, value) => signed(value) });
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
     const inspector = new SubscriptionInspector<OkPacket>();
+
     executor.event(Faker.event({ id: "event" })).subscribe(inspector);
     socket.message(["AUTH", "two"]);
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
@@ -108,16 +120,19 @@ describe("connection AUTH lifecycle", () => {
     );
     const { server, executor } = await setup({ challenge });
     const firstInspector = new SubscriptionInspector<OkPacket>();
+
     executor
       .event(Faker.event({ id: "event" }))
       .subscribe(firstInspector)
       .unsubscribe();
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     const secondInspector = new SubscriptionInspector<OkPacket>();
     const subscription = executor
       .event(Faker.event({ id: "cancelled" }))
       .subscribe(secondInspector);
+
     await vi.waitFor(() => expect(challenge).toHaveBeenCalledOnce());
     subscription.unsubscribe();
     resolve(signed("one"));
@@ -135,6 +150,7 @@ describe("connection AUTH lifecycle", () => {
     const inspector = new SubscriptionInspector<OkPacket>();
     const subscription = executor.event(Faker.event({ id: "event" })).subscribe(inspector);
     const socket = server.sockets.latest;
+
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
     socket.message(["AUTH", "one"]);
     socket.message(["OK", "event", false, "auth-required: login"]);
@@ -150,8 +166,10 @@ describe("connection AUTH lifecycle", () => {
       challenge: async (_relay, value) => signed(value),
     });
     const inspector = new SubscriptionInspector<OkPacket>();
+
     executor.event(Faker.event({ id: "event" })).subscribe(inspector);
     const oldSocket = server.sockets.latest;
+
     await expect(oldSocket.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
     oldSocket.message(["AUTH", "old"]);
     await expect(oldSocket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
@@ -162,10 +180,13 @@ describe("connection AUTH lifecycle", () => {
     const notify = transport.state$
       .pipe(
         tap((state) => {
-          if (state.state === "connected") socket.message(["AUTH", "new"]);
+          if (state.state === "connected") {
+            socket.message(["AUTH", "new"]);
+          }
         }),
       )
       .subscribe(connectionInspector);
+
     socket.open();
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
     notify.unsubscribe();
@@ -182,19 +203,29 @@ describe("connection AUTH lifecycle", () => {
     const challenge = vi.fn(async (_relay, value) => signed(value));
     const { server, executor } = await setup({ challenge });
     const inspectors = [new SubscriptionInspector<unknown>(), new SubscriptionInspector<unknown>()];
+
     executor.event(Faker.event({ id: "first" })).subscribe(inspectors[0]);
     executor.event(Faker.event({ id: "second" })).subscribe(inspectors[1]);
     const socket = server.sockets.latest;
+
     await expect(socket.inbox.waitNext()).resolves.toMatchObject(["EVENT", { id: "first" }]);
     await expect(socket.inbox.waitNext()).resolves.toMatchObject(["EVENT", { id: "second" }]);
     socket.message(["AUTH", "one"]);
-    for (const id of ["first", "second"]) socket.message(["OK", id, false, "auth-required: login"]);
+
+    for (const id of ["first", "second"]) {
+      socket.message(["OK", id, false, "auth-required: login"]);
+    }
+
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
     expect(socket.inbox.length).toBe(3);
     socket.message(["OK", "auth-one", true, ""]);
     await expect(socket.inbox.waitNext()).resolves.toMatchObject(["EVENT", { id: "first" }]);
     await expect(socket.inbox.waitNext()).resolves.toMatchObject(["EVENT", { id: "second" }]);
-    for (const id of ["first", "second"]) socket.message(["OK", id, true, "saved"]);
+
+    for (const id of ["first", "second"]) {
+      socket.message(["OK", id, true, "saved"]);
+    }
+
     await Promise.all(
       inspectors.map((inspector) => expect(inspector.waitComplete()).resolves.toBeUndefined()),
     );
@@ -208,6 +239,7 @@ describe("connection AUTH lifecycle", () => {
     });
     const { server, executor } = await setup(factory);
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     const inspector = new SubscriptionInspector<OkPacket>();
 
@@ -225,6 +257,7 @@ describe("connection AUTH lifecycle", () => {
   test("CLOSE bypasses pending AUTH", async () => {
     const { server, executor, transport } = await setup({ challenge: () => new Promise(() => {}) });
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     await transport.cast(["CLOSE", "subscription"]);
     expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", "subscription"]);
@@ -235,6 +268,7 @@ describe("connection AUTH lifecycle", () => {
     const { server, transport } = await setup();
     const auth = new AuthCoordinator(relay, transport);
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "one"]);
     await expect(auth.authenticate()).rejects.toMatchObject({ reason: "disabled" });
     expect(socket.inbox.length).toBe(0);

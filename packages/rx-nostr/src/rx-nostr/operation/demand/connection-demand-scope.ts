@@ -29,7 +29,11 @@ export class ConnectionDemandScope {
   /** Stop prewarming while allowing already closed windows to finish lingering. */
   finish(): void {
     this.finished = true;
-    for (const relay of this.relays.values()) relay.releasePrewarm();
+
+    for (const relay of this.relays.values()) {
+      relay.releasePrewarm();
+    }
+
     this.checkDrained();
   }
 
@@ -59,14 +63,17 @@ export class ConnectionDemandScope {
     }
 
     const close = this.getRelayDemand(relay).openDemandWindow(linger);
+
     return { close: once(close) };
   }
 
   [Symbol.dispose] = once(() => {
     this.finished = true;
+
     for (const relay of this.relays.values()) {
       relay.dispose();
     }
+
     this.checkDrained();
   });
   dispose = this[Symbol.dispose];
@@ -99,8 +106,12 @@ class RelayDemand {
   }
 
   releasePrewarm(): void {
-    if (this.releasePrewarming) this.warmed = false;
+    if (this.releasePrewarming) {
+      this.warmed = false;
+    }
+
     this.releasePrewarming?.();
+
     this.releasePrewarming = undefined;
   }
 
@@ -111,6 +122,7 @@ class RelayDemand {
 
     this.warmed = true;
     this.releasePrewarming = this.acquireLease();
+
     return true;
   }
 
@@ -119,10 +131,13 @@ class RelayDemand {
 
     if (this.releasePrewarming) {
       const release = this.releasePrewarming;
+
       this.releasePrewarming = undefined;
+
       return this.releaseAfterLinger(release, linger);
     } else {
       const release = this.acquireLease();
+
       return this.releaseAfterLinger(release, linger);
     }
   }
@@ -131,6 +146,7 @@ class RelayDemand {
     const release = this.relay.hold();
 
     const id = this.nextLeaseId;
+
     this.nextLeaseId++;
 
     this.activeLeases.set(id, release);
@@ -154,12 +170,15 @@ class RelayDemand {
     }
 
     return () => {
-      if (!this.disposed) this.deferrer.invoke(release, linger);
+      if (!this.disposed) {
+        this.deferrer.invoke(release, linger);
+      }
     };
   }
 
   [Symbol.dispose] = once(() => {
     this.disposed = true;
+
     this.deferrer.cancelAll();
 
     for (const release of this.activeLeases.values()) {

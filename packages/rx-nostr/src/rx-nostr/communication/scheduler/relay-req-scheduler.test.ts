@@ -8,6 +8,7 @@ import { RelayReqScheduler, type ReqRunner } from "./relay-req-scheduler.ts";
 function req(source: Observable<EventPacket>, run: () => void): ReqRunner {
   return () => {
     run();
+
     return source;
   };
 }
@@ -18,6 +19,7 @@ describe("RelayReqScheduler", () => {
     const run = vi.fn();
 
     const inspector = new SubscriptionInspector<EventPacket>();
+
     scheduler.schedule(req(new Subject<EventPacket>(), run)).subscribe(inspector);
     expect(run).not.toHaveBeenCalled();
 
@@ -28,6 +30,7 @@ describe("RelayReqScheduler", () => {
 
   test("starts REQs in FIFO order after the previous terminal is delivered", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const first = new Subject<EventPacket>();
     const second = new Subject<EventPacket>();
@@ -44,6 +47,7 @@ describe("RelayReqScheduler", () => {
       )
       .subscribe(firstInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler.schedule(req(second, secondRun)).subscribe(secondInspector);
 
     expect(firstRun).toHaveBeenCalledOnce();
@@ -56,16 +60,19 @@ describe("RelayReqScheduler", () => {
 
   test("tears down an errored REQ before starting the next one", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const order: string[] = [];
     let fail!: (error: unknown) => void;
     const first = new Observable<EventPacket>((subscriber) => {
       fail = (error) => subscriber.error(error);
+
       return () => order.push("first teardown");
     });
     const error = new Error("failed");
 
     const firstInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler
       .schedule(req(first, () => order.push("first run")))
       .pipe(
@@ -75,6 +82,7 @@ describe("RelayReqScheduler", () => {
       )
       .subscribe(firstInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler
       .schedule(req(new Subject<EventPacket>(), () => order.push("second run")))
       .subscribe(secondInspector);
@@ -86,22 +94,27 @@ describe("RelayReqScheduler", () => {
 
   test("settles a synchronously completed REQ after its teardown", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const active = new Subject<EventPacket>();
     const order: string[] = [];
     const synchronous = new Observable<EventPacket>((subscriber) => {
       subscriber.complete();
+
       return () => order.push("synchronous teardown");
     });
 
     const firstInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler.schedule(req(active, vi.fn())).subscribe(firstInspector);
     const synchronousInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler
       .schedule(req(synchronous, () => order.push("synchronous run")))
       .pipe(tap({ complete: () => order.push("synchronous complete") }))
       .subscribe(synchronousInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler
       .schedule(req(new Subject<EventPacket>(), () => order.push("next run")))
       .subscribe(secondInspector);
@@ -118,6 +131,7 @@ describe("RelayReqScheduler", () => {
 
   test("releases the slot when req.run throws synchronously", async () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const error = new Error("run failed");
     const firstInspector = new SubscriptionInspector<EventPacket>();
@@ -129,6 +143,7 @@ describe("RelayReqScheduler", () => {
       })
       .subscribe(firstInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler.schedule(req(new Subject<EventPacket>(), nextRun)).subscribe(secondInspector);
     await expect(firstInspector.waitError()).resolves.toEqual(error);
     expect(nextRun).toHaveBeenCalledOnce();
@@ -137,17 +152,20 @@ describe("RelayReqScheduler", () => {
 
   test("cancels a queued REQ without running it", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const active = new Subject<EventPacket>();
     const activeRun = vi.fn();
     const queuedRun = vi.fn();
 
     const firstInspector = new SubscriptionInspector<EventPacket>();
+
     scheduler.schedule(req(active, activeRun)).subscribe(firstInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
     const queued = scheduler
       .schedule(req(new Subject<EventPacket>(), queuedRun))
       .subscribe(secondInspector);
+
     queued.unsubscribe();
     active.complete();
 
@@ -158,6 +176,7 @@ describe("RelayReqScheduler", () => {
 
   test("completes queued REQs when capacity is zero", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(0);
     const run = vi.fn();
     const inspector = new SubscriptionInspector<EventPacket>();
@@ -171,6 +190,7 @@ describe("RelayReqScheduler", () => {
 
   test("dispose completes active and queued work and tears down the active REQ", () => {
     const scheduler = new RelayReqScheduler();
+
     scheduler.setMaxSubscriptions(1);
     const teardown = vi.fn();
     const activeRun = vi.fn();

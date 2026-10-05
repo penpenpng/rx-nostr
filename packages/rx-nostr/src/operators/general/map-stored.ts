@@ -12,7 +12,9 @@ export function mapStored<T, R, S>(
   return pipe(
     map((value, index) => {
       const [result, nextStore] = fn(value, store, index);
+
       store = nextStore;
+
       return result;
     }),
     finalize(() => {

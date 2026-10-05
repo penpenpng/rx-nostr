@@ -68,6 +68,7 @@ export function getEventHash(event: Nostr.UnsignedEvent): string {
     event.tags,
     event.content,
   ]);
+
   return sha256(serialized);
 }
 
@@ -89,5 +90,6 @@ export function verifyEvent(event: Nostr.Event): boolean {
 export function toHex(str: string): string {
   const { words } = bech32.decode(str as `${string}1${string}`);
   const data = new Uint8Array(bech32.fromWords(words));
+
   return bytesToHex(data);
 }

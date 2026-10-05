@@ -3,6 +3,8 @@ import { expect, test } from "vitest";
 import { setDiagnosticSink, type RxNostrDiagnostic } from "../diagnostics/index.ts";
 import { normalizeRelayUrl, RelayMap, RelayMapOperator, RelaySet } from "./relay-urls.ts";
 
+const relaySet = (...urls: string[]) => new RelaySet(urls);
+
 test(normalizeRelayUrl.name, () => {
   const f = normalizeRelayUrl;
 
@@ -112,19 +114,18 @@ test(RelaySet.name, () => {
   expect(set.has(relay)).toBe(false);
   expect(set.has(alias)).toBe(false);
 
-  const s = (...urls: string[]) => new RelaySet(urls);
-
   // Set operation
-  expect(s(relay, another).difference(s(alias)).size).toBe(1);
-  expect(s(relay).intersection(s(alias)).size).toBe(1);
-  expect(s(relay).intersection(s()).size).toBe(0);
-  expect(s(relay).union(s(alias)).size).toBe(1);
+  expect(relaySet(relay, another).difference(relaySet(alias)).size).toBe(1);
+  expect(relaySet(relay).intersection(relaySet(alias)).size).toBe(1);
+  expect(relaySet(relay).intersection(relaySet()).size).toBe(0);
+  expect(relaySet(relay).union(relaySet(alias)).size).toBe(1);
 });
 
 test(`${RelayMapOperator.name} reports swallowed callback failures synchronously`, () => {
   const relay = "wss://example.com";
   const cause = new Error("factory failed");
   const diagnostics: RxNostrDiagnostic[] = [];
+
   setDiagnosticSink((log) => diagnostics.push(log));
   const relays = new RelayMapOperator<never>(() => {
     throw cause;

@@ -3,15 +3,11 @@ import { BehaviorSubject, finalize, Subject, Subscription, take, takeUntil } fro
 import { RxNostrInvalidUsageError } from "../error.ts";
 
 export class RxDisposableStack extends DisposableStack {
-  private _disposed = false;
+  private isDisposed = false;
   private subs = new Subscription();
 
   get disposed(): boolean {
-    return this._disposed;
-  }
-
-  constructor() {
-    super();
+    return this.isDisposed;
   }
 
   move(): DisposableStack {
@@ -24,7 +20,7 @@ export class RxDisposableStack extends DisposableStack {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   add<T extends Subscription | Subject<any> | BehaviorSubject<any>>(resource: T): T {
-    if (this._disposed) {
+    if (this.isDisposed) {
       if (resource instanceof Subscription) {
         resource.unsubscribe();
       } else if (resource instanceof Subject || resource instanceof BehaviorSubject) {
@@ -54,7 +50,7 @@ export class RxDisposableStack extends DisposableStack {
    * and the disposal order among them is not guaranteed.
    */
   temporary<T extends Disposable>(value: T): () => void {
-    if (this._disposed) {
+    if (this.isDisposed) {
       return () => void 0;
     }
 
@@ -70,7 +66,7 @@ export class RxDisposableStack extends DisposableStack {
   private dispose$ = new Subject<void>();
 
   untilDisposed() {
-    if (this._disposed) {
+    if (this.isDisposed) {
       return take(0);
     }
 
@@ -84,10 +80,11 @@ export class RxDisposableStack extends DisposableStack {
   }
 
   [Symbol.dispose]() {
-    if (this._disposed) {
+    if (this.isDisposed) {
       return;
     }
-    this._disposed = true;
+
+    this.isDisposed = true;
 
     // Unsubscribe first,
     this.subs.unsubscribe();
@@ -102,6 +99,7 @@ export class RxDisposableStack extends DisposableStack {
     for (const value of this.memo) {
       value[Symbol.dispose]();
     }
+
     this.memo.clear();
   }
 

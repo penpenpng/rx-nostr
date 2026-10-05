@@ -56,6 +56,7 @@ describe("Nostr relay codec", () => {
 
   test("serializes a to-relay tuple as JSON", () => {
     const message: Nostr.ToRelayMessage.CLOSE = ["CLOSE", "sub"];
+
     expect(serializeNostrMessage(message)).toBe('["CLOSE","sub"]');
   });
 });

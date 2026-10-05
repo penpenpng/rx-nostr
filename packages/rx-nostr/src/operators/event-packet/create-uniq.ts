@@ -24,16 +24,19 @@ export function createUniq<P extends EventPacket, T>(
   return [
     filter((packet) => {
       const key = keyFn(packet);
+
       if (key === null) {
         return true;
       }
 
       if (cache.has(key)) {
         options?.onHit?.(packet, cache);
+
         return false;
       } else {
         cache.add(key);
         options?.onCache?.(packet, cache);
+
         return true;
       }
     }),

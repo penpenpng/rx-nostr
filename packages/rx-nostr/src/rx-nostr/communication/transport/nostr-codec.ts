@@ -29,6 +29,7 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
   }
 
   let value: unknown;
+
   try {
     value = JSON.parse(data);
   } catch (cause) {
@@ -46,7 +47,9 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
       if (value.length !== 3 || typeof value[1] !== "string" || !isEvent(value[2])) {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.EVENT;
+
       return {
         from,
         type: "EVENT",
@@ -59,7 +62,9 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
       if (value.length !== 2 || typeof value[1] !== "string") {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.EOSE;
+
       return { from, type: "EOSE", message, subId: message[1] };
     }
     case "OK": {
@@ -71,7 +76,9 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
       ) {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.OK;
+
       return {
         from,
         type: "OK",
@@ -86,7 +93,9 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
       if (value.length !== 3 || typeof value[1] !== "string" || typeof value[2] !== "string") {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.CLOSED;
+
       return {
         from,
         type: "CLOSED",
@@ -100,21 +109,27 @@ export function decodeRelayMessage(data: WebSocketData, from: RelayUrl): Message
       if (value.length !== 2 || typeof value[1] !== "string") {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.NOTICE;
+
       return { from, type: "NOTICE", message, notice: message[1] };
     }
     case "AUTH": {
       if (value.length !== 2 || typeof value[1] !== "string") {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.AUTH;
+
       return { from, type: "AUTH", message, challenge: message[1] };
     }
     case "COUNT": {
       if (value.length !== 3 || typeof value[1] !== "string" || !isCountResponse(value[2])) {
         return invalidTuple();
       }
+
       const message = value as Nostr.ToClientMessage.COUNT;
+
       return {
         from,
         type: "COUNT",
@@ -162,6 +177,7 @@ const machinePrefixes = new Set<Nostr.MachineReadablePrefix>([
 
 function readMachinePrefix(message: string): Nostr.MachineReadablePrefix | undefined {
   const prefix = message.slice(0, message.indexOf(":"));
+
   return machinePrefixes.has(prefix as Nostr.MachineReadablePrefix)
     ? (prefix as Nostr.MachineReadablePrefix)
     : undefined;

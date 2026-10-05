@@ -12,6 +12,7 @@ export function filterBy<P extends EventPacket>(
   options?: MatchFilterOptions & { not?: boolean },
 ): MonoTypeOperatorFunction<P> {
   const evaledFilter = evalFilters(filters);
+
   return filter(({ event }) => {
     return xor(isFiltered(event, evaledFilter, options), options?.not ?? false);
   });

@@ -25,9 +25,14 @@ class LeaseRelay implements IRelayCommunication {
   hold() {
     this.leases++;
     let released = false;
+
     return () => {
-      if (released) return;
+      if (released) {
+        return;
+      }
+
       released = true;
+
       this.leases--;
     };
   }
@@ -46,15 +51,22 @@ class LeaseRelayCollection implements IRelayCommunicationCollection<LeaseRelay> 
 
   get(url: RelayUrl) {
     let relay = this.entries.get(url);
+
     if (!relay) {
       relay = new LeaseRelay(url);
+
       this.entries.set(url, relay);
     }
+
     return relay;
   }
 
   forEach(relays: Iterable<RelayUrl> | null | undefined, callback: (relay: LeaseRelay) => void) {
-    if (relays) for (const relay of relays) callback(this.get(relay));
+    if (relays) {
+      for (const relay of relays) {
+        callback(this.get(relay));
+      }
+    }
   }
 
   map<R>(relays: Iterable<RelayUrl> | null | undefined, project: (relay: LeaseRelay) => R) {
@@ -93,6 +105,7 @@ describe("RelayWarmer", () => {
 
     warmer.setHotRelays(["wss://RELAY.example.com/"]);
     const relay = collection.get("wss://relay.example.com");
+
     expect(relay.leases).toBe(1);
     warmer.setHotRelays(["wss://relay.example.com"]);
     expect(relay.leases).toBe(1);
@@ -113,11 +126,13 @@ describe("RelayWarmer", () => {
 
     warmer.setHotRelays([relay.url]);
     const demandWindow = connectionDemand.openDemandWindow(relay, 0);
+
     expect(relay.leases).toBe(2);
 
     demandWindow.close();
     expect(relay.leases).toBe(1);
     const activeDemandWindow = connectionDemand.openDemandWindow(relay, 0);
+
     warmer.unsetHotRelays();
     expect(relay.leases).toBe(1);
     activeDemandWindow.close();
@@ -136,12 +151,14 @@ describe("RelayWarmer", () => {
 
     warmer.setHotRelays(["wss://relay.example.com"]);
     const inspector = new SubscriptionInspector<string>();
+
     collection
       .get("wss://relay.example.com")
       .monitorConnectionState()
       .pipe(map((state) => state.state))
       .subscribe(inspector);
     const socket = server.sockets.latest;
+
     socket.open();
     await inspector.ignoreNexts(1);
     await expect(inspector.waitNext()).resolves.toBe("connected");

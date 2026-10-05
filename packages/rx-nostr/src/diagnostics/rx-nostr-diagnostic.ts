@@ -23,7 +23,11 @@ export function setDiagnosticSink(sink: RxNostrDiagnosticSink | undefined): void
 
 export function emitDiagnostic(diagnostic: Readonly<RxNostrDiagnostic>): void {
   const sink = diagnosticSink;
-  if (!sink) return;
+
+  if (!sink) {
+    return;
+  }
+
   try {
     sink(copyDiagnostic(diagnostic));
   } catch {

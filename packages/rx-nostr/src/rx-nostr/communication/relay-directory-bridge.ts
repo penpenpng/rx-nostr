@@ -34,19 +34,29 @@ export class RelayDirectoryBridge implements Disposable {
     this.#directory = directory;
     this.#onMaxSubscriptions = onMaxSubscriptions;
     this.#onMaxSubscriptionsPending = onMaxSubscriptionsPending;
+
     if (!directory) {
       this.transportHooks = {};
+
       onMaxSubscriptions(undefined);
+
       return;
     }
+
     const reporter = getRelayDirectoryReporter(directory);
+
     this.transportHooks = {
       retainConnectionHealth: () => {
         const release = reporter.retain(url);
+
         this.#subscription?.unsubscribe();
+
         this.#subscription = directory.observe(url).subscribe((entry) => {
-          if (entry.nip11 !== undefined) onMaxSubscriptions(entry.maxSubscriptions);
+          if (entry.nip11 !== undefined) {
+            onMaxSubscriptions(entry.maxSubscriptions);
+          }
         });
+
         return release;
       },
       onConnectionOpened: () => reporter.connectionOpened(url),
@@ -54,10 +64,12 @@ export class RelayDirectoryBridge implements Disposable {
       acquireConnectionProbe: () => reporter.acquireProbe(url),
       observeConnectionHealth: (listener) => {
         const subscription = directory.observe(url).subscribe(listener);
+
         return () => subscription.unsubscribe();
       },
       getConnectionHealth: () => {
         const entry = directory.getOrCreate(url);
+
         return Object.freeze({
           consecutiveFailures: entry.consecutiveFailures,
           liveConnections: entry.liveConnections,
@@ -71,7 +83,9 @@ export class RelayDirectoryBridge implements Disposable {
     };
     this.#subscription = directory.observe(url).subscribe({
       next: (entry) => {
-        if (entry.nip11 !== undefined) onMaxSubscriptions(entry.maxSubscriptions);
+        if (entry.nip11 !== undefined) {
+          onMaxSubscriptions(entry.maxSubscriptions);
+        }
       },
       complete: () => onMaxSubscriptions(undefined),
     });
@@ -83,10 +97,16 @@ export class RelayDirectoryBridge implements Disposable {
 
   async acquireNip11(timeout: number): Promise<void> {
     const directory = this.#directory;
-    if (!directory) return;
+
+    if (!directory) {
+      return;
+    }
+
     const cached = directory.get(this.#url);
+
     if (cached?.nip11 !== undefined) {
       this.#onMaxSubscriptions(cached.maxSubscriptions);
+
       return;
     }
 

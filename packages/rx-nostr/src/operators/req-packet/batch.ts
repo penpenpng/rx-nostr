@@ -15,6 +15,7 @@ export function batch(
 ): OperatorFunction<ReqPacket[], ReqPacket> {
   return mergeMap((packets) => {
     const batched: ReqPacket[] = [];
+
     for (const packetGroup of groupByRelays(packets)) {
       if (!packetGroup[0]) {
         continue;
@@ -37,21 +38,24 @@ function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
 }
 
+function toKey(relays: ReqPacket["relays"]): string | RxRelays {
+  if (relays === undefined) {
+    return "*";
+  }
+  if (relays instanceof RxRelays) {
+    return relays;
+  }
+
+  return [...RxRelays.set(relays)].toSorted().join(",");
+}
+
 function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
   const groups = new Map<string | RxRelays, ReqPacket[]>();
-  const toKey = (relays: ReqPacket["relays"]): string | RxRelays => {
-    if (relays === undefined) {
-      return "*";
-    }
-    if (relays instanceof RxRelays) {
-      return relays;
-    }
-    return [...RxRelays.set(relays)].sort().join(",");
-  };
 
   for (const packet of packets) {
     const key = toKey(packet.relays);
     const group = groups.get(key) ?? [];
+
     group.push(packet);
     groups.set(key, group);
   }

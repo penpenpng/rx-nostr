@@ -37,6 +37,7 @@ test("single relay", async () => {
   const sub = observable.subscribe(inspector);
 
   const req1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
   await req1.subscribed;
   await relay.expectFilters([{ kinds: [1] }]);
@@ -47,6 +48,7 @@ test("single relay", async () => {
   await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "2", traceTag: 1 }));
 
   const req2 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
   await req2.subscribed;
   await relay.expectFilters([{ kinds: [2] }]);
@@ -90,6 +92,7 @@ test("single relay, defer=true", async () => {
   const sub = observable.subscribe(inspector);
 
   const req1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
   await relay.expectFilters([{ kinds: [1] }]);
@@ -115,6 +118,7 @@ test("single relay, weak=true", async () => {
   const relayUrl = "wss://relay1.example.com";
   const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
   const relay = relays.get(relayUrl);
+
   relay.isHot = true;
 
   const observable = reqForward({
@@ -134,6 +138,7 @@ test("single relay, weak=true", async () => {
   const sub = observable.subscribe(inspector);
 
   const req1 = relay.attachNextStream();
+
   rxReq.emit([{ kinds: [1] }]);
   await req1.subscribed;
   await relay.expectFilters([{ kinds: [1] }]);
@@ -173,6 +178,7 @@ test("dynamic relays", async () => {
   const relay2 = relays.get(relayUrl2);
 
   const req1relay1 = relay1.attachNextStream();
+
   assert(!relay1.hasActiveLease, "Relay1 should be disconnected before being added");
   defaultRelays.append(relayUrl1);
   assert(relay1.hasActiveLease, "Relay1 should be connected after being added");
@@ -185,6 +191,7 @@ test("dynamic relays", async () => {
   await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
 
   const req1relay2 = relay2.attachNextStream();
+
   assert(!relay2.hasActiveLease, "Relay2 should be disconnected before being added");
   defaultRelays.append(relayUrl2);
   assert(relay1.hasActiveLease, "Relay1 should still be connected");
@@ -199,6 +206,7 @@ test("dynamic relays", async () => {
 
   const req2relay1 = relay1.attachNextStream();
   const req2relay2 = relay2.attachNextStream();
+
   rxReq.emit([{ kinds: [2] }]);
   await req2relay1.subscribed;
   await req2relay2.subscribed;
@@ -253,6 +261,7 @@ test("request-specific relays", async () => {
   defaultRelays.append(relayUrl1);
 
   const requestRelays = new RxRelays();
+
   requestRelays.append(relayUrl2);
 
   const stream1 = relay1.attachNextStream();

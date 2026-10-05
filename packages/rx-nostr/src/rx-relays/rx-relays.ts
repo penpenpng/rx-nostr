@@ -21,6 +21,7 @@ export class RxRelays {
 
   set(...urls: string[]) {
     this.relays = new RelaySet(urls);
+
     this.emit();
   }
 
@@ -32,6 +33,7 @@ export class RxRelays {
     for (const url of urls) {
       this.relays.add(url);
     }
+
     this.emit();
   }
 
@@ -39,6 +41,7 @@ export class RxRelays {
     for (const url of urls) {
       this.relays.delete(url);
     }
+
     this.emit();
   }
 
@@ -137,6 +140,7 @@ export class RxRelays {
 
   static empty(): RxRelays {
     const rxr = new RxRelays();
+
     rxr.dispose();
 
     return rxr;

@@ -72,7 +72,7 @@ describe("operators", () => {
     expect(
       actual.map(({ event, seenOn, isNew }) => ({
         id: event.id,
-        seenOn: [...seenOn].sort(),
+        seenOn: [...seenOn].toSorted(),
         isNew,
       })),
     ).toEqual([

@@ -1,3 +1,5 @@
+// Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.
+/* eslint-disable unicorn/require-post-message-target-origin */
 import type * as Nostr from "nostr-typedef";
 
 import { once } from "../libs/index.ts";
@@ -17,6 +19,7 @@ export class VerificationHost {
   #handler = async (ev: MessageEvent<VerificationRequest | PingMessage>) => {
     if (ev.data === "ping") {
       self.postMessage("pong" satisfies PongMessage);
+
       return;
     }
 
@@ -67,6 +70,7 @@ export class VerificationClient implements EventVerifier {
       this.#status = "booting";
 
       const worker = this.config.worker;
+
       worker.addEventListener("message", this.#onmessage);
       worker.addEventListener("error", this.#onerror);
       worker.addEventListener("messageerror", this.#onerror);
@@ -81,6 +85,7 @@ export class VerificationClient implements EventVerifier {
 
     if (ev.data === "pong") {
       this.#status = "active";
+
       return;
     }
 
@@ -126,6 +131,7 @@ export class VerificationClient implements EventVerifier {
     });
 
     const worker = this.config.worker;
+
     worker.postMessage({
       reqId,
       event,
@@ -136,6 +142,7 @@ export class VerificationClient implements EventVerifier {
 
   #verifyByFallback(event: Nostr.Event): Promise<boolean> {
     const verifier = this.config.fallback;
+
     if (!verifier) {
       throw new Error("VerificationHost is not working but no fallback verifier is provided.");
     }
@@ -147,6 +154,7 @@ export class VerificationClient implements EventVerifier {
     this.#status = "terminated";
 
     const worker = this.config.worker;
+
     worker.removeEventListener("message", this.#onmessage);
     worker.removeEventListener("error", this.#onerror);
     worker.removeEventListener("messageerror", this.#onerror);
@@ -169,6 +177,7 @@ class Batch {
       for (const f of this.fireNext) {
         f();
       }
+
       this.fireNext = this.takeNext;
       this.takeNext = [];
     }, interval);
@@ -204,3 +213,5 @@ export interface VerificationClientConfig {
   fallback?: EventVerifier;
   timeout?: number;
 }
+// Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.
+// oxlint-disable unicorn(require-post-message-target-origin)

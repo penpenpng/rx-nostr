@@ -63,11 +63,13 @@ describe("NIP-42 AUTH public contract", () => {
       const requests = [await socket.inbox.waitNext("REQ"), await socket.inbox.waitNext("REQ")];
 
       socket.message(["AUTH", "challenge-1"]);
+
       for (const request of requests) {
         socket.message(["CLOSED", request[1], "auth-required: authenticate first"]);
       }
 
       const auth = await socket.inbox.waitNext("AUTH");
+
       expect(challenge).toHaveBeenCalledOnce();
       expect(challenge).toHaveBeenCalledWith(relay, "challenge-1");
       expect(auth).toEqual(["AUTH", authEvent("auth-event", "challenge-1")]);
@@ -77,6 +79,7 @@ describe("NIP-42 AUTH public contract", () => {
         await socket.inbox.waitNext("REQ"),
         await socket.inbox.waitNext("REQ"),
       ];
+
       for (const request of retriedRequests) {
         socket.message(["CLOSED", request[1], "auth-required: still rejected"]);
       }
@@ -110,9 +113,11 @@ describe("NIP-42 AUTH public contract", () => {
 
         socket.open();
         const [, subId] = await socket.inbox.waitNext("REQ");
+
         socket.message(["AUTH", "challenge"]);
         socket.message(["CLOSED", subId, "auth-required: login"]);
         await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "AUTH");
+
         if (outcome === "rejected") {
           socket.message(["OK", "auth-failure", false, "denied"]);
         }
@@ -148,6 +153,7 @@ describe("NIP-42 AUTH public contract", () => {
 
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
 
@@ -172,6 +178,7 @@ describe("NIP-42 AUTH public contract", () => {
 
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
 
@@ -188,6 +195,7 @@ describe("NIP-42 AUTH public contract", () => {
       const signer: EventSigner = {
         async signEvent<K extends number>(params: Nostr.EventParameters<K>) {
           signEvent(params);
+
           return {
             id: "signed-id",
             pubkey: "signer-pubkey",
@@ -238,8 +246,10 @@ describe("NIP-42 AUTH public contract", () => {
       rxNostr.backward(relay, [{}]).subscribe(inspector);
 
       const firstConnection = server.sockets.latest;
+
       firstConnection.open();
       const [, subId] = await firstConnection.inbox.waitNext("REQ");
+
       firstConnection.message(["AUTH", "old-challenge"]);
       firstConnection.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
@@ -247,6 +257,7 @@ describe("NIP-42 AUTH public contract", () => {
       firstConnection.peerClose(1006, "offline");
       await expect(server.connections.wait(1)).resolves.toBeDefined();
       const secondConnection = server.sockets.latest;
+
       auth.resolve(authEvent("stale-auth", "old-challenge"));
 
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
@@ -269,6 +280,7 @@ describe("NIP-42 AUTH public contract", () => {
 
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expect(inspector.waitError()).resolves.toEqual(expect.any(RxNostrCallbackError));
@@ -288,8 +300,10 @@ describe("NIP-42 AUTH public contract", () => {
 
       rxNostr.backward(relay, [{}]).subscribe(inspector);
       const socket = server.sockets.latest;
+
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["AUTH", "old"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
@@ -301,6 +315,7 @@ describe("NIP-42 AUTH public contract", () => {
       expect(inspector.completed).toBe(false);
       socket.message(["OK", "new-auth", true, "authenticated"]);
       const [, retryId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["EOSE", retryId]);
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
       expect(socket.inbox.length).toBe(3);
@@ -323,6 +338,7 @@ describe("NIP-42 AUTH public contract", () => {
 
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
+
       socket.message(["AUTH", "challenge"]);
       socket.message(["CLOSED", subId, "auth-required: login"]);
       await expectCallbackCalled(challenge);
@@ -351,22 +367,31 @@ describe("NIP-42 AUTH public contract", () => {
 
         rxNostr.backward(a, [{ kinds: [2] }]).subscribe(secondInspector);
         const socket = server.sockets.latest;
+
         socket.open();
         await settleProtocol();
         socket.message(["AUTH", "challenge"]);
-        for (const req of [await socket.inbox.waitNext("REQ"), await socket.inbox.waitNext("REQ")])
+
+        for (const req of [
+          await socket.inbox.waitNext("REQ"),
+          await socket.inbox.waitNext("REQ"),
+        ]) {
           socket.message(["CLOSED", req[1], "auth-required: login"]);
+        }
+
         await settleProtocol();
         expect(challenge).toHaveBeenCalledOnce();
 
         first.unsubscribe();
         const signed = Faker.authEvent({ id: "shared-auth" });
+
         auth.resolve(signed);
         await settleProtocol();
         await expect(socket.inbox.waitNext()).resolves.toEqual(["AUTH", signed]);
         socket.message(["OK", signed.id, true, "authenticated"]);
         await settleProtocol();
         const retried = await socket.inbox.waitNext("REQ");
+
         expect(retried[2]).toEqual({ kinds: [2] });
         expect(socket.inbox.length).toBe(4);
         socket.message(["EOSE", retried[1]]);

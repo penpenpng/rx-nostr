@@ -2,7 +2,7 @@ export function tryOrDefault<T, U>(f: () => T, g: U | ((err: unknown) => U)): T 
   try {
     return f();
   } catch (err) {
-    if (g instanceof Function) {
+    if (typeof g === "function") {
       return g(err);
     } else {
       return g;

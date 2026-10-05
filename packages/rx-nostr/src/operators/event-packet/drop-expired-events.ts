@@ -8,6 +8,7 @@ import type { EventPacket } from "../../packets/index.ts";
  */
 export function dropExpiredEvents<P extends EventPacket>(now?: Date): MonoTypeOperatorFunction<P> {
   let refTime: number | undefined = undefined;
+
   if (now) {
     refTime = Math.floor(now?.getTime() / 1000);
   }

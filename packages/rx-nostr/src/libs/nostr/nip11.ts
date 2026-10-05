@@ -12,11 +12,14 @@ export async function fetchRelayInfo(
   options: FetchRelayInfoOptions = {},
 ): Promise<Nostr.Nip11.RelayInfo> {
   let endpoint: URL;
+
   try {
     endpoint = new URL(url);
+
     if (endpoint.protocol !== "ws:" && endpoint.protocol !== "wss:") {
       throw new TypeError("Relay URLs must use ws: or wss:.");
     }
+
     endpoint.protocol = endpoint.protocol === "wss:" ? "https:" : "http:";
   } catch (cause) {
     throw new RxNostrNip11Error("invalid-url", `Invalid relay URL: ${url}`, undefined, {
@@ -26,6 +29,7 @@ export async function fetchRelayInfo(
 
   const fetcher = options.fetch ?? globalThis.fetch;
   let response: Response;
+
   try {
     response = await fetcher(endpoint.toString(), {
       headers: { Accept: "application/nostr+json" },
@@ -48,6 +52,7 @@ export async function fetchRelayInfo(
   }
 
   let value: unknown;
+
   try {
     value = await response.json();
   } catch (cause) {
@@ -63,6 +68,7 @@ export async function fetchRelayInfo(
       response.status,
     );
   }
+
   return value as Nostr.Nip11.RelayInfo;
 }
 

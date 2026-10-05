@@ -3,8 +3,8 @@ import * as Nostr from "nostr-typedef";
 import type { RelayUrl } from "../../libs";
 import type { EventPacket } from "../../packets";
 
-export class Faker {
-  static event<K extends number = number>(event: Partial<Nostr.Event<K>> = {}): Nostr.Event<K> {
+export const Faker = {
+  event<K extends number = number>(event: Partial<Nostr.Event<K>> = {}): Nostr.Event<K> {
     return {
       id: "",
       pubkey: "",
@@ -15,9 +15,9 @@ export class Faker {
       sig: "",
       ...event,
     };
-  }
+  },
 
-  static authEvent({
+  authEvent({
     relay = "wss://faker.example.com",
     challenge = "",
     ...event
@@ -33,9 +33,9 @@ export class Faker {
         ["challenge", challenge],
       ],
     });
-  }
+  },
 
-  static eventPacket({
+  eventPacket({
     from,
     traceTag,
     ...event
@@ -49,5 +49,5 @@ export class Faker {
       event: Faker.event(event),
       ...(traceTag === undefined ? {} : { traceTag }),
     };
-  }
-}
+  },
+};

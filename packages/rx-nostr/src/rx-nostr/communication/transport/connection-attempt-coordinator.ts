@@ -14,6 +14,8 @@ import {
 } from "../../../connection-state.ts";
 import type { RelayUrl } from "../../../libs/relay-urls.ts";
 
+function noop() {}
+
 export interface ConnectionAttemptCoordinatorOptions {
   url: RelayUrl;
   relayHealthPolicy?: RelayHealthPolicyInput;
@@ -39,7 +41,9 @@ export class ConnectionAttemptCoordinator {
 
   releaseProbe(): void {
     const release = this.#releaseProbe;
+
     this.#releaseProbe = undefined;
+
     release?.();
   }
 
@@ -50,38 +54,56 @@ export class ConnectionAttemptCoordinator {
     decide?: Decide,
     fallbackHealth?: () => RelayHealth,
   ): Decision | Promise<Decision> {
-    if (signal.aborted) return { action: "cancel" };
+    if (signal.aborted) {
+      return { action: "cancel" };
+    }
+
     let decision: Decision | undefined;
     let retryUntil: number | undefined;
     let reported: ConnectionWaitInfo = {};
     let settled = false;
-    let update = () => {};
+    let update = noop;
     const report = (waiting: ConnectionWaitInfo) => {
-      if (settled || signal.aborted || decision) return;
+      if (settled || signal.aborted || decision) {
+        return;
+      }
+
       reported = {
         ...waiting,
         ...(waiting.suppressionReasons
           ? { suppressionReasons: copySuppressionReasons(waiting.suppressionReasons) }
           : {}),
       };
+
       update();
     };
     const select = (value: Decision) => {
       if (value.action === "retry") {
-        if (!Number.isFinite(value.delay) || value.delay < 0)
+        if (!Number.isFinite(value.delay) || value.delay < 0) {
           throw new RangeError("A retry delay must be finite and non-negative.");
+        }
+
         retryUntil = Date.now() + value.delay;
         reported = { suppressionReasons: copySuppressionReasons(value.suppressionReasons ?? []) };
       }
+
       decision = value;
     };
     const pending = decide?.(report) ?? ({ action: "retry", delay: 0 } as const);
     const asynchronous = "then" in pending;
-    if (!asynchronous) select(pending);
+
+    if (!asynchronous) {
+      select(pending);
+    }
 
     const evaluate = (): Decision | undefined => {
-      if (signal.aborted) return { action: "cancel" };
-      if (decision && decision.action !== "retry") return decision;
+      if (signal.aborted) {
+        return { action: "cancel" };
+      }
+      if (decision && decision.action !== "retry") {
+        return decision;
+      }
+
       const now = Date.now();
       const health = this.options.getConnectionHealth?.() ??
         fallbackHealth?.() ?? { consecutiveFailures: 0 };
@@ -93,32 +115,42 @@ export class ConnectionAttemptCoordinator {
       const reasons: ConnectionSuppressionReason[] = [];
       const deadlines: number[] = [];
       let blocked = !decision;
+
       if (suppression) {
-        if (!Number.isFinite(suppression.suppressedUntil) || suppression.suppressedUntil < 0)
+        if (!Number.isFinite(suppression.suppressedUntil) || suppression.suppressedUntil < 0) {
           throw new RangeError("A suppression deadline must be finite and non-negative.");
+        }
+
         const future = suppression.suppressedUntil > now;
+
         reasons.push({
           source: "relay-health-policy",
           kind: "relay-health",
           ...suppression.suppressionReason,
           category: "relay-health",
         });
+
         if (future) {
           blocked = true;
+
           deadlines.push(suppression.suppressedUntil);
         }
       }
       if (!decision || (retryUntil !== undefined && retryUntil > now)) {
         reasons.push(...(reported.suppressionReasons ?? []));
+
         if (decision && retryUntil !== undefined) {
           blocked = true;
+
           deadlines.push(retryUntil);
         }
       }
       if (!blocked && suppression && this.options.acquireConnectionProbe && !this.#releaseProbe) {
         this.#releaseProbe = this.options.acquireConnectionProbe();
+
         if (!this.#releaseProbe) {
           blocked = true;
+
           reasons.push({
             category: "coordination",
             source: "relay-directory",
@@ -126,7 +158,10 @@ export class ConnectionAttemptCoordinator {
           });
         }
       }
-      if (!blocked && !reason) return decision;
+      if (!blocked && !reason) {
+        return decision;
+      }
+
       this.emitState(
         Object.freeze({
           state: "waiting-for-connection",
@@ -146,43 +181,66 @@ export class ConnectionAttemptCoordinator {
             : {}),
         }),
       );
-      if (!blocked) return decision;
-      if (settled || signal.aborted) return undefined;
-      if (deadlines.length)
+
+      if (!blocked) {
+        return decision;
+      }
+      if (settled || signal.aborted) {
+        return undefined;
+      }
+      if (deadlines.length) {
         timer = setTimeout(
           update,
           Math.min(2_147_483_647, Math.max(1, Math.min(...deadlines) - Date.now())),
         );
+      }
+
       return undefined;
     };
 
     let timer: ReturnType<typeof setTimeout> | undefined;
+
     // Preserve synchronous initial admission when no policy is waiting.
     if (!asynchronous) {
       const result = evaluate();
-      if (result) return result;
+
+      if (result) {
+        return result;
+      }
+
       clearTimeout(timer);
     }
+
     return new Promise<Decision>((resolve, reject) => {
-      let unsubscribe = () => {};
+      let unsubscribe = noop;
       const cleanup = () => {
         clearTimeout(timer);
         unsubscribe();
         signal.removeEventListener("abort", update);
       };
       const fail = (error: unknown) => {
-        if (settled) return;
+        if (settled) {
+          return;
+        }
+
         settled = true;
+
         cleanup();
         reject(error);
       };
+
       update = () => {
-        if (settled) return;
+        if (settled) {
+          return;
+        }
+
         try {
           clearTimeout(timer);
           const result = evaluate();
+
           if (result) {
             settled = true;
+
             cleanup();
             resolve(result);
           }
@@ -190,9 +248,13 @@ export class ConnectionAttemptCoordinator {
           fail(error);
         }
       };
-      if (asynchronous)
+
+      if (asynchronous) {
         void Promise.resolve(pending).then((value) => {
-          if (settled) return;
+          if (settled) {
+            return;
+          }
+
           try {
             select(value);
             update();
@@ -200,11 +262,17 @@ export class ConnectionAttemptCoordinator {
             fail(error);
           }
         }, fail);
+      }
+
       signal.addEventListener("abort", update, { once: true });
       try {
         unsubscribe = this.options.observeConnectionHealth?.(update) ?? (() => {});
-        if (settled) cleanup();
-        else update();
+
+        if (settled) {
+          cleanup();
+        } else {
+          update();
+        }
       } catch (error) {
         fail(error);
       }

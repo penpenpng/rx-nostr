@@ -14,8 +14,12 @@ class LeaseRelay implements IRelayCommunication {
   hold() {
     this.leases++;
     let released = false;
+
     return () => {
-      if (!released) this.leases--;
+      if (!released) {
+        this.leases--;
+      }
+
       released = true;
     };
   }
@@ -35,6 +39,7 @@ describe("ConnectionDemandScope leases", () => {
     const relay = new LeaseRelay("wss://relay.example.com");
     const drained = vi.fn();
     const demand = new ConnectionDemandScope({ defer: true, weak: false }, drained);
+
     demand.openDemandWindow(relay, 100).close();
     demand.openDemandWindow(relay, 200).close();
     demand.finish();
@@ -55,6 +60,7 @@ describe("ConnectionDemandScope leases", () => {
     const relay = new LeaseRelay("wss://relay.example.com");
     const demand = new ConnectionDemandScope({ defer: true, weak: false });
     const window = demand.openDemandWindow(relay, 100);
+
     demand.dispose();
     window.close();
     expect(relay.leases).toBe(0);
@@ -86,6 +92,7 @@ describe("ConnectionDemandScope leases", () => {
       defer: true,
       weak: false,
     });
+
     connectionDemand.openDemandWindow(relay, 100).close();
 
     connectionDemand.dispose();

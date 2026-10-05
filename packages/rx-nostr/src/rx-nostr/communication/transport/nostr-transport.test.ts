@@ -29,14 +29,17 @@ async function openTransport(
   });
   const opened = transport.open();
   const socket = server.sockets.latest;
+
   socket.open();
   await opened;
+
   return transport;
 }
 
 async function closeTransport(transport: NostrTransport, server: ControlledWebSocketServer) {
   const closed = transport.close();
   const socket = server.sockets.latest;
+
   socket.acknowledgeClose();
   await closed;
 }
@@ -51,6 +54,7 @@ describe("NostrTransport", () => {
         getSuppression: () => ({ suppressedUntil: NaN }),
       },
     });
+
     await expect(transport.open()).rejects.toBeInstanceOf(RangeError);
     expect(server.connections.length).toBe(0);
     await transport.dispose();
@@ -64,13 +68,16 @@ describe("NostrTransport", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const inspector = new SubscriptionInspector<ConnectionState>();
+
     transport.state$.subscribe(inspector);
 
     await expect(inspector.waitNext()).resolves.toEqual({ state: "dormant" });
     const opened = transport.open();
+
     await expect(inspector.waitNext()).resolves.toEqual({ state: "connecting", attempt: 1 });
 
     const firstSocket = server.sockets.latest;
+
     firstSocket.peerClose(1006, "offline");
     await expect(inspector.waitNext()).resolves.toEqual({
       state: "waiting-for-connection",
@@ -79,6 +86,7 @@ describe("NostrTransport", () => {
     });
     await expect(inspector.waitNext()).resolves.toEqual({ state: "retrying", attempt: 1 });
     const secondSocket = server.sockets.latest;
+
     secondSocket.open();
     await opened;
     await expect(inspector.waitNext()).resolves.toEqual({ state: "connected" });
@@ -96,10 +104,12 @@ describe("NostrTransport", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
     const firstInspector = new SubscriptionInspector<ConnectionState>();
+
     transport.state$.subscribe(firstInspector);
 
     const opened = transport.open();
     const socket = server.sockets.latest;
+
     socket.peerClose(1000, "try later", true);
     await firstInspector.ignoreNexts(2);
     await expect(firstInspector.waitNext()).resolves.toMatchObject({
@@ -111,6 +121,7 @@ describe("NostrTransport", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(server.connections).toHaveLength(2);
     const socket2 = server.sockets.latest;
+
     socket2.open();
     await opened;
     await closeTransport(transport, server);
@@ -122,9 +133,11 @@ describe("NostrTransport", () => {
       reconnector: { reconnect: () => ({ action: "exhaust" }) },
     });
     const secondInspector = new SubscriptionInspector<ConnectionState>();
+
     terminal.state$.subscribe(secondInspector);
     const terminalOpen = terminal.open();
     const terminalSocket = terminalServer.sockets.latest;
+
     terminalSocket.peerClose(1000, "maintenance", true);
     await expect(terminalOpen).rejects.toMatchObject({
       name: "UniplsOpenError",
@@ -152,10 +165,12 @@ describe("NostrTransport", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
     const inspector = new SubscriptionInspector<string>();
+
     transport.state$.pipe(map((state) => state.state)).subscribe(inspector);
 
     const opened = transport.open();
     const socket = server.sockets.latest;
+
     socket.peerClose(1006, "offline");
     void opened.catch(() => {});
     await inspector.ignoreNexts(2);
@@ -185,11 +200,13 @@ describe("NostrTransport", () => {
     const transport = await openTransport(server, {
       reconnect(context) {
         context.reportWaiting?.({ suppressionReasons: [explanation] });
+
         return new Promise((resolve) => {
           decide = resolve;
         });
       },
     });
+
     server.sockets.latest.peerClose(1006, "maintenance");
     await vi.advanceTimersByTimeAsync(0);
     expect(transport.state$.value).toMatchObject({
@@ -203,7 +220,9 @@ describe("NostrTransport", () => {
         },
       ],
     });
+
     explanation.details.description = "changed";
+
     expect(transport.state$.value).toMatchObject({
       suppressionReasons: [{ details: { description: "planned" } }],
     });
@@ -232,6 +251,7 @@ describe("NostrTransport", () => {
     const transport = await openTransport(server);
     const firstInspector = new SubscriptionInspector<string>();
     const secondInspector = new SubscriptionInspector<string>();
+
     transport.messages$.pipe(map((packet) => packet.type)).subscribe(firstInspector);
     transport.state$.pipe(map((state) => state.state)).subscribe(secondInspector);
 
@@ -257,6 +277,7 @@ describe("NostrTransport", () => {
         diagnostics.push(diagnostic);
       });
       const inspector = new SubscriptionInspector<string>();
+
       transport.messages$.pipe(map((value) => value.type)).subscribe(inspector);
 
       const socket = server.sockets.latest;
@@ -289,6 +310,7 @@ describe("NostrTransport", () => {
       .subscribe(inspector);
 
     const socket = server.sockets.latest;
+
     await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", "sub", {}]);
     await Promise.resolve();
     socket.message(["EVENT", "sub", event]);
@@ -307,6 +329,7 @@ describe("NostrTransport", () => {
     const server = new ControlledWebSocketServer();
     const transport = await openTransport(server);
     const inspector = new SubscriptionInspector<string>();
+
     transport
       .listen({
         selector: (packet) => packet.type === "NOTICE",
@@ -316,6 +339,7 @@ describe("NostrTransport", () => {
       .subscribe(inspector);
 
     const socket = server.sockets.latest;
+
     socket.message(["AUTH", "ignored"]);
     socket.message(["NOTICE", "matched"]);
     socket.message(["EOSE", "sub"]);
@@ -329,6 +353,7 @@ describe("NostrTransport", () => {
   test("maps timeout and drop finalizations to transport errors", async () => {
     const timeoutServer = new ControlledWebSocketServer();
     const timeoutTransport = await openTransport(timeoutServer);
+
     await expect(
       firstValueFrom(timeoutTransport.listen({ timeout: 5 }).pipe(toArray())),
     ).rejects.toMatchObject({
@@ -341,6 +366,7 @@ describe("NostrTransport", () => {
     const dropTransport = await openTransport(dropServer);
     const dropped = firstValueFrom(dropTransport.listen({ retry: "fail" }).pipe(toArray()));
     const socket = dropServer.sockets.latest;
+
     socket.peerClose(1006, "network lost");
     await expect(dropped).rejects.toMatchObject({
       name: "NostrTransportOperationError",
@@ -357,12 +383,14 @@ describe("NostrTransport", () => {
     const oldSocket = server.sockets.latest;
     const firstInspector = new SubscriptionInspector<string>();
     const secondInspector = new SubscriptionInspector<string>();
+
     transport.messages$.pipe(map((packet) => packet.type)).subscribe(firstInspector);
     transport.state$.pipe(map((state) => state.state)).subscribe(secondInspector);
 
     oldSocket.peerClose(1006, "network lost");
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const newSocket = server.sockets.latest;
+
     newSocket.open();
     await vi.waitFor(() => expect(reconnector.reconnect).toHaveBeenCalledOnce());
     expect(reconnector.reconnect).toHaveBeenCalledWith(
@@ -402,6 +430,7 @@ describe("NostrTransport", () => {
           setup(context) {
             contexts.push(context);
             context.defer(deferredCleanup, { name: "deferred-health-check-cleanup" });
+
             return returnedCleanup;
           },
         },
@@ -410,6 +439,7 @@ describe("NostrTransport", () => {
 
     const opened = transport.open();
     const socket = server.sockets.latest;
+
     socket.open();
     await opened;
     expect(contexts).toHaveLength(1);
@@ -422,6 +452,7 @@ describe("NostrTransport", () => {
       query: ["REQ", "health", {}],
       selector: (message) => message[0] === "EOSE" && message[1] === "health",
     });
+
     await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", "health", {}]);
     socket.message(["EOSE", "health"]);
     await expect(response).resolves.toEqual(["EOSE", "health"]);
@@ -440,6 +471,7 @@ describe("NostrTransport", () => {
     expect(deferredCleanup).toHaveBeenCalledOnce();
     expect(returnedCleanup).toHaveBeenCalledOnce();
     const socket2 = server.sockets.latest;
+
     socket2.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
 
@@ -447,6 +479,7 @@ describe("NostrTransport", () => {
     await expect(server.connections.wait(2)).resolves.toBeDefined();
     expect(reconnect.mock.calls.map(([context]) => context.attempt)).toEqual([1, 1]);
     const thirdSocket = server.sockets.latest;
+
     thirdSocket.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(3));
 
@@ -468,9 +501,11 @@ describe("NostrTransport", () => {
 
     const opened = transport.open();
     const socket = server.sockets.latest;
+
     socket.peerClose(1006, "initial failure");
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
+
     socket2.open();
     await opened;
 
@@ -497,6 +532,7 @@ describe("NostrTransport", () => {
 
       const opened = transport.open();
       const socket = server.sockets.latest;
+
       socket.peerClose(1006, "initial failure");
 
       await expect(opened).rejects.toMatchObject({ name: "UniplsOpenError" });
@@ -508,6 +544,7 @@ describe("NostrTransport", () => {
     const server = new ControlledWebSocketServer();
     const transport = await openTransport(server);
     const inspector = new SubscriptionInspector<string>();
+
     transport.state$.pipe(map((state) => state.state)).subscribe(inspector);
     const result = firstValueFrom(transport.listen({ retry: "fail" }).pipe(toArray()));
 
@@ -529,8 +566,10 @@ describe("NostrTransport", () => {
 
     const first = transport.dispose();
     const second = transport.dispose();
+
     expect(second).toBe(first);
     const socket = server.sockets.latest;
+
     socket.acknowledgeClose();
     await first;
 

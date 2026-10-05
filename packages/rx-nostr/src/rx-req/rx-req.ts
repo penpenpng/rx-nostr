@@ -18,14 +18,16 @@ export class RxReq implements IPipeable<RxReq, ReqPacket> {
   emit(filters: LazyFilter | LazyFilter[], options?: ReqOptions) {
     this.stream.next({
       filters: normalizeFilters(filters),
-      ...(options ?? {}),
+      ...options,
     });
   }
 
   pipe = createPipeMethod<RxReq, ReqPacket>((...operators) => {
     const rxq = new RxReq();
+
     rxq.stream = this.stream;
     rxq.operators = [...this.operators, ...operators];
+
     return rxq;
   });
 

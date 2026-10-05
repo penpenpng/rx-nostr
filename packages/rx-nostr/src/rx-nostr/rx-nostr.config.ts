@@ -79,17 +79,22 @@ export class FilledRxNostrConfig {
       ...(config.dropDetectors ?? staticDefaultConfig.dropDetectors),
     ]);
     this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
+
     const healthPolicy = config.relayHealthPolicy ?? staticDefaultConfig.relayHealthPolicy;
+
     this.relayHealthPolicy = copyRelayHealthPolicy(healthPolicy);
     this.connectionTimeout = config.connectionTimeout ?? staticDefaultConfig.connectionTimeout;
+
     if (
       !Number.isFinite(this.connectionTimeout) ||
       this.connectionTimeout <= 0 ||
       this.connectionTimeout > 2_147_483_647
-    )
+    ) {
       throw new RangeError(
         "connectionTimeout must be positive and at most 2147483647 milliseconds.",
       );
+    }
+
     this.nip11Timeout = config.nip11Timeout ?? staticDefaultConfig.nip11Timeout;
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
@@ -129,6 +134,7 @@ function freezeStaticDefaultOptions(
   options: RxNostrStaticDefaultOptions,
 ): Readonly<RxNostrStaticDefaultOptions> {
   const clone = cloneStaticDefaultOptions(options);
+
   return Object.freeze({
     req: Object.freeze(clone.req),
     publish: Object.freeze(clone.publish),

@@ -24,6 +24,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
     if (!this.hasActiveLease) {
       this.connectionAttemptCount++;
     }
+
     this.#activeLeaseCount++;
 
     return once(() => {
@@ -32,7 +33,10 @@ export class RelayCommunicationMock implements IRelayCommunication {
   }
 
   vreq(_strategy: "forward" | "backward", filters: LazyFilter[]): Observable<EventPacket> {
-    if (!this.hasActiveLease && !this.isHot) return EMPTY;
+    if (!this.hasActiveLease && !this.isHot) {
+      return EMPTY;
+    }
+
     try {
       this.queryLog.push(filters);
 
@@ -43,6 +47,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
           .pipe(
             filter((packet) => {
               const flag = this.hasActiveLease || this.isHot;
+
               if (!flag) {
                 console.warn(
                   `An EventPacket was attempted to be sent from relay, but was not sent:\n`,
@@ -52,6 +57,7 @@ export class RelayCommunicationMock implements IRelayCommunication {
                   },
                 );
               }
+
               return flag;
             }),
           )
@@ -65,9 +71,11 @@ export class RelayCommunicationMock implements IRelayCommunication {
     const stream = new Subject<EventPacket>();
 
     const { promise: subscribed, resolve } = Promise.withResolvers<void>();
+
     this.channels.push(
       new Observable<EventPacket>((subscriber) => {
         resolve();
+
         return stream.subscribe(subscriber);
       }),
     );

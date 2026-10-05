@@ -10,6 +10,7 @@ export function finalizeWithLast<T>(
       const subscription = source.subscribe({
         next(value) {
           lastValue = value;
+
           subscriber.next(value);
         },
         error(err) {
@@ -20,6 +21,7 @@ export function finalizeWithLast<T>(
             callback(lastValue);
           } catch (err) {
             subscriber.error(err);
+
             return;
           }
           subscriber.complete();

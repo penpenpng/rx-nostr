@@ -105,29 +105,35 @@ function req({
     .subscribe(({ current, appended, outdated }) => {
       if (!defaultRelays.disposed) {
         let nomore = false;
+
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           const message = "A REQ was issued without any destination relays.";
+
           emitDiagnostic({
             level: "warning",
             event: "req/no-destination-relays",
             message,
             context: { operation: "backward" },
           });
+
           nomore = true;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
           const message = "The last relay was removed; no destination relays remain.";
+
           emitDiagnostic({
             level: "warning",
             event: "req/no-destination-relays",
             message,
             context: { operation: "backward" },
           });
+
           nomore = true;
         }
         if (nomore) {
           // Backward: If no relays are set, complete the stream.
           stream.complete();
+
           return;
         }
       }
@@ -139,6 +145,7 @@ function req({
         if (started.has(relay.url)) {
           return;
         }
+
         started.add(relay.url);
 
         const demandWindow = connectionDemand.openDemandWindow(relay, linger);
@@ -155,10 +162,13 @@ function req({
             // Backward: When a REQ on a relay is done or times out...
             finalize(() => {
               finalized = true;
+
               const currentQuery = ongoings.get(relay.url);
+
               if (currentQuery?.sub === queryRef.sub) {
                 ongoings.delete(relay.url);
               }
+
               demandWindow.close();
               finished.add(relay.url);
 
@@ -169,12 +179,17 @@ function req({
             next: (packet) => stream.next(packet),
             error: (error) => stream.error(error),
           });
+
         queryRef.sub = sub;
-        if (!finalized) ongoings.set(relay.url, { demandWindow, sub });
+
+        if (!finalized) {
+          ongoings.set(relay.url, { demandWindow, sub });
+        }
       });
 
       relays.forEach(outdated, (relay) => {
         const query = ongoings.get(relay.url);
+
         ongoings.delete(relay.url);
 
         // Backward: End a demand window here because we don't know when the next REQ will come.
@@ -193,6 +208,7 @@ function req({
         query.sub.unsubscribe();
         query.demandWindow.close();
       }
+
       ongoings.clear();
 
       sub.unsubscribe();

@@ -27,6 +27,7 @@ export function watchChanges<
     ),
     filter((output): output is [keyof S, { [K in keyof S]: ObservedValueOf<S[K]> }] => {
       const [key, values] = output;
+
       return key !== null && Object.keys(sources).every((k) => k in values);
     }),
   );

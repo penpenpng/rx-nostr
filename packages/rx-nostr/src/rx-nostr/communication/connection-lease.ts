@@ -24,25 +24,37 @@ export class ConnectionLeaseController {
   }
 
   hold(): () => void {
-    if (this.#disposed) return () => {};
+    if (this.#disposed) {
+      return () => {};
+    }
 
     this.#count++;
+
     if (this.#count === 1) {
       // Invalidate a close queued by the preceding release. The underlying
       // session is still active until that queued callback actually runs.
       this.#closeGeneration++;
+
       if (!this.#active) {
         this.#active = true;
+
         this.handlers.onFirstLease();
       }
     }
 
     return once(() => {
-      if (this.#disposed) return;
+      if (this.#disposed) {
+        return;
+      }
+
       this.#count--;
-      if (this.#count !== 0) return;
+
+      if (this.#count !== 0) {
+        return;
+      }
 
       const generation = ++this.#closeGeneration;
+
       queueMicrotask(() => {
         if (
           this.#disposed ||
@@ -52,7 +64,9 @@ export class ConnectionLeaseController {
         ) {
           return;
         }
+
         this.#active = false;
+
         this.handlers.onLastRelease();
       });
     });
@@ -61,8 +75,11 @@ export class ConnectionLeaseController {
   [Symbol.dispose] = once(() => {
     this.#disposed = true;
     this.#count = 0;
+
     this.#closeGeneration++;
+
     this.#active = false;
+
     this.handlers.onDispose();
   });
   dispose = this[Symbol.dispose];

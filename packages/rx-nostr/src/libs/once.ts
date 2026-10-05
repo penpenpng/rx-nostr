@@ -7,6 +7,7 @@ export function once(f: () => void) {
     }
 
     done = true;
+
     f();
   };
 }

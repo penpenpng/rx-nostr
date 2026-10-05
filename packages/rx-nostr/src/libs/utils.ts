@@ -45,9 +45,11 @@ export namespace u {
           while (true) {
             const na = ia.next();
             const nb = ib.next();
+
             if (na.done || nb.done) {
               break;
             }
+
             yield [na.value, nb.value];
           }
         },

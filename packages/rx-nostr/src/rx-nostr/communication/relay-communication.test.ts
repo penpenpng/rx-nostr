@@ -22,22 +22,28 @@ describe("RelayCommunication transport integration", () => {
 
     expect(fetcher).not.toHaveBeenCalled();
     const release = relay.hold();
+
     expect(fetcher).toHaveBeenCalledOnce();
     const socket = server.sockets.latest;
+
     socket.open();
     const firstInspector = new SubscriptionInspector<EventPacket>();
+
     relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
     const secondInspector = new SubscriptionInspector<EventPacket>();
+
     relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
     await Promise.resolve();
     expect(socket.inbox.length).toBe(0);
 
     response.resolve({ limitation: { max_subscriptions: 1 } });
     const first = await socket.inbox.waitNext("REQ");
+
     expect(first[2]).toMatchObject({ kinds: [1] });
     expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
     const second = await socket.inbox.waitNext("REQ");
+
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
 
@@ -58,11 +64,14 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const inspector = new SubscriptionInspector<EventPacket>();
+
     relay.vreq("backward", [{}]).subscribe(inspector);
 
     const req = await socket.inbox.waitNext("REQ");
+
     expect(directory.get(relay.url)?.nip11FailedAt).toBeTypeOf("number");
     expect(diagnostic).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Automatic NIP-11 relay information retrieval failed." }),
@@ -85,6 +94,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     await vi.waitFor(() =>
       expect(directory.get(relay.url)).toMatchObject({
@@ -94,6 +104,7 @@ describe("RelayCommunication transport integration", () => {
     );
 
     now = 2;
+
     socket.peerClose(1000, "restart", true);
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     expect(directory.get(relay.url)).toMatchObject({
@@ -114,7 +125,9 @@ describe("RelayCommunication transport integration", () => {
     );
 
     now = 3;
+
     const socket2 = server.sockets.latest;
+
     socket2.open();
     await vi.waitFor(() =>
       expect(directory.get(relay.url)).toMatchObject({
@@ -153,6 +166,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const inspector = new SubscriptionInspector<string>();
 
@@ -161,6 +175,7 @@ describe("RelayCommunication transport integration", () => {
       .pipe(map((packet) => packet.event.id))
       .subscribe(inspector);
     const req = await socket.inbox.waitNext("REQ");
+
     expect(req[0]).toBe("REQ");
     expect(req[2]).toEqual({ kinds: [1], since: 10 });
 
@@ -183,11 +198,13 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const inspector = new SubscriptionInspector<object>();
 
     relay.vreq("backward", [{}]).subscribe(inspector);
     const [, subId] = await socket.inbox.waitNext("REQ");
+
     socket.message(["EVENT", subId, Faker.event({ id: "event" })]);
     socket.message(["EOSE", subId]);
 
@@ -211,21 +228,27 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     let since = 1;
     const inspector = new SubscriptionInspector<EventPacket>();
     const subscription = relay.vreq("forward", [{ since: () => since }]).subscribe(inspector);
     const first = await socket.inbox.waitNext("REQ");
+
     expect(first[2]).toMatchObject({
       since: 1,
     });
 
     socket.peerClose(1006, "offline");
+
     since = 2;
+
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
+
     socket2.open();
     const resent = await socket2.inbox.waitNext("REQ");
+
     expect(resent[2]).toMatchObject({
       since: 2,
     });
@@ -244,6 +267,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const inspector = new SubscriptionInspector<string>();
 
@@ -274,6 +298,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const inspector = new SubscriptionInspector<EventPacket>();
 
@@ -283,6 +308,7 @@ describe("RelayCommunication transport integration", () => {
     expect(inspector.errored).toBe(false);
     const req = await socket.inbox.waitNext("REQ");
     const close = await socket.inbox.waitNext("CLOSE");
+
     expect(close).toEqual(["CLOSE", req[1]]);
 
     release();
@@ -293,6 +319,7 @@ describe("RelayCommunication transport integration", () => {
   test("queues REQs at the NIP-11 max_subscriptions limit", async () => {
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory();
+
     directory.setNip11("wss://relay.example.com", {
       limitation: { max_subscriptions: 1 },
     });
@@ -302,6 +329,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const firstInspector = new SubscriptionInspector<EventPacket>();
     const secondInspector = new SubscriptionInspector<EventPacket>();
@@ -311,11 +339,14 @@ describe("RelayCommunication transport integration", () => {
     relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
     const thirdInspector = new SubscriptionInspector<EventPacket>();
     const cancelled = relay.vreq("backward", [{ kinds: [3] }]).subscribe(thirdInspector);
+
     cancelled.unsubscribe();
     const first = await socket.inbox.waitNext("REQ");
+
     socket.message(["EOSE", first[1]]);
 
     const second = await socket.inbox.waitNext("REQ");
+
     expect(firstInspector.completed).toBe(true);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
@@ -330,6 +361,7 @@ describe("RelayCommunication transport integration", () => {
   test("starts a backward timeout only after its REQ leaves the queue", async () => {
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory();
+
     directory.setNip11("wss://relay.example.com", {
       limitation: { max_subscriptions: 1 },
     });
@@ -339,10 +371,12 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const firstInspector = new SubscriptionInspector<EventPacket>();
     const secondInspector = new SubscriptionInspector<EventPacket>();
     const thirdInspector = new SubscriptionInspector<EventPacket>();
+
     relay.vreq("backward", [{ kinds: [1] }]).subscribe(thirdInspector);
 
     relay.vreq("backward", [{ kinds: [2] }], { timeout: 10 }).subscribe(firstInspector);
@@ -350,16 +384,19 @@ describe("RelayCommunication transport integration", () => {
     relay.vreq("backward", [{ kinds: [3] }]).subscribe(secondInspector);
 
     const first = await socket.inbox.waitNext("REQ");
+
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(firstInspector.completed).toBe(false);
     expect(socket.inbox.length).toBe(1);
 
     socket.message(["EOSE", first[1]]);
     const second = await socket.inbox.waitNext("REQ");
+
     expect(second[2]).toMatchObject({ kinds: [2] });
     await vi.waitFor(() => expect(firstInspector.completed).toBe(true));
     expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", second[1]]);
     const third = await socket.inbox.waitNext("REQ");
+
     expect(third[2]).toMatchObject({ kinds: [3] });
     expect(socket.inbox.length).toBe(4);
     socket.message(["EOSE", third[1]]);
@@ -373,6 +410,7 @@ describe("RelayCommunication transport integration", () => {
   test("keeps a REQ slot reserved while unipls reconnects and resends it", async () => {
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory();
+
     directory.setNip11("wss://relay.example.com", {
       limitation: { max_subscriptions: 1 },
     });
@@ -383,6 +421,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const firstInspector = new SubscriptionInspector<EventPacket>();
     const secondInspector = new SubscriptionInspector<EventPacket>();
@@ -392,18 +431,22 @@ describe("RelayCommunication transport integration", () => {
     relay.vreq("backward", [{ kinds: [2] }]).subscribe(secondInspector);
 
     const initial = await socket.inbox.waitNext("REQ");
+
     socket.peerClose(1006, "offline");
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
+
     socket2.open();
 
     const resent = await socket2.inbox.waitNext("REQ");
+
     expect(resent[1]).toBe(initial[1]);
     expect(resent[2]).toMatchObject({ kinds: [1] });
     expect(socket2.inbox.length).toBe(1);
     socket2.message(["EOSE", resent[1]]);
 
     const second = await socket2.inbox.waitNext("REQ");
+
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket2.message(["EOSE", second[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
@@ -417,6 +460,7 @@ describe("RelayCommunication transport integration", () => {
   test("dispose completes queued REQs without starting them", async () => {
     const server = new ControlledWebSocketServer();
     const directory = new RelayDirectory();
+
     directory.setNip11("wss://relay.example.com", {
       limitation: { max_subscriptions: 1 },
     });
@@ -424,8 +468,10 @@ describe("RelayCommunication transport integration", () => {
       WebSocket: server.WebSocket,
       relayDirectory: directory,
     });
+
     relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const firstInspector = new SubscriptionInspector<EventPacket>();
     const secondInspector = new SubscriptionInspector<EventPacket>();
@@ -433,6 +479,7 @@ describe("RelayCommunication transport integration", () => {
     relay.vreq("backward", [{ kinds: [1] }]).subscribe(firstInspector);
     const queued = relay.vreq("backward", [{ kinds: [2] }]);
     const thirdInspector = new SubscriptionInspector<EventPacket>();
+
     queued.subscribe(thirdInspector);
     const active = await socket.inbox.waitNext("REQ");
 
@@ -454,9 +501,11 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const cause = new Error("filter failed");
     const inspector = new SubscriptionInspector<EventPacket>();
+
     relay
       .vreq("backward", [
         {
@@ -486,6 +535,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const event = Faker.event({ id: "event" });
     const inspector = new SubscriptionInspector<object>();
@@ -515,6 +565,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     const event = Faker.event({ id: "event" });
     const authEvent = Faker.authEvent({
@@ -564,11 +615,13 @@ describe("RelayCommunication transport integration", () => {
     });
     const first = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     await Promise.resolve();
 
     first();
     const second = relay.hold();
+
     await Promise.resolve();
 
     expect(server.connections).toHaveLength(1);
@@ -589,6 +642,7 @@ describe("RelayCommunication transport integration", () => {
     });
     const release = relay.hold();
     const socket = server.sockets.latest;
+
     socket.open();
     await Promise.resolve();
 

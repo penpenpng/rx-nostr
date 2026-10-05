@@ -17,9 +17,12 @@ function setup(options: NostrOperationExecutorOptions = {}) {
   const transport = new NostrTransport({ url, WebSocket: server.WebSocket });
   const session = new NostrOperationExecutor(url, transport, options);
   const scheduler = new RelayReqScheduler();
+
   void session.open();
   const socket = server.sockets.latest;
+
   socket.open();
+
   return { server, session, scheduler };
 }
 
@@ -27,6 +30,7 @@ function dispose({ server, session, scheduler }: ReturnType<typeof setup>): void
   scheduler.dispose();
   session.dispose();
   const socket = server.sockets.latest;
+
   socket.acknowledgeClose();
 }
 
@@ -36,6 +40,7 @@ describe("NostrOperationExecutor", () => {
       vreqPlanner: (strategy, filters) =>
         filters.map((filter) => ({ strategy, filters: [filter] })),
     });
+
     harness.scheduler.setMaxSubscriptions(1);
     const inspector = new SubscriptionInspector<EventPacket>();
 
@@ -45,11 +50,13 @@ describe("NostrOperationExecutor", () => {
 
     const socket = harness.server.sockets.latest;
     const first = await socket.inbox.waitNext("REQ");
+
     expect(first[2]).toMatchObject({ kinds: [1] });
     expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
 
     const second = await socket.inbox.waitNext("REQ");
+
     expect(second[1]).not.toBe(first[1]);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
@@ -60,6 +67,7 @@ describe("NostrOperationExecutor", () => {
 
   test("releases an auth-required REQ slot and schedules its retry with a new subId", async () => {
     const harness = setup({ authenticator: { challenge: () => pendingAuthEvent } });
+
     harness.scheduler.setMaxSubscriptions(1);
     const authEvent = Faker.authEvent({
       id: "auth-event",
@@ -81,6 +89,7 @@ describe("NostrOperationExecutor", () => {
 
     const socket = harness.server.sockets.latest;
     const first = await socket.inbox.waitNext("REQ");
+
     socket.message(["AUTH", "challenge"]);
     socket.message(["CLOSED", first[1], "auth-required: login"]);
 
@@ -91,10 +100,12 @@ describe("NostrOperationExecutor", () => {
     expect(await socket.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
     socket.message(["OK", "auth-event", true, "authenticated"]);
     const second = await socket.inbox.waitNext("REQ");
+
     expect(second[2]).toMatchObject({ kinds: [2] });
 
     socket.message(["EOSE", second[1]]);
     const retried = await socket.inbox.waitNext("REQ");
+
     expect(retried[1]).not.toBe(first[1]);
     expect(retried[2]).toMatchObject({ kinds: [1] });
     socket.message(["EOSE", retried[1]]);
@@ -109,6 +120,7 @@ describe("NostrOperationExecutor", () => {
       vreqPlanner: (strategy, filters) =>
         filters.map((filter) => ({ strategy, filters: [filter] })),
     });
+
     harness.scheduler.setMaxSubscriptions(1);
     const cause = new Error("first plan failed");
     const inspector = new SubscriptionInspector<EventPacket>();
@@ -134,6 +146,7 @@ describe("NostrOperationExecutor", () => {
       cause,
     });
     const socket = harness.server.sockets.latest;
+
     expect(socket.inbox.length).toBe(0);
     dispose(harness);
   });

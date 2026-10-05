@@ -24,6 +24,7 @@ describe("connection state public contract", () => {
       WebSocket: server.WebSocket,
     });
     const inspector = new SubscriptionInspector<string>();
+
     rxNostr
       .monitorConnectionState()
       .pipe(map((packet) => packet.state.state))
@@ -31,6 +32,7 @@ describe("connection state public contract", () => {
 
     rxNostr.setHotRelays(relay);
     const socket = server.sockets.latest;
+
     socket.open();
     await inspector.ignoreNexts(2);
     await expect(inspector.waitNext()).resolves.toBe("connected");
@@ -38,6 +40,7 @@ describe("connection state public contract", () => {
     contexts[0]!.drop();
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket2 = server.sockets.latest;
+
     socket2.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
 
@@ -61,10 +64,13 @@ describe("connection state public contract", () => {
     const inspector = new SubscriptionInspector<ConnectionStatePacket>();
     const states = rxNostr.monitorConnectionState();
     const mutatingInspector = new SubscriptionInspector<ConnectionStatePacket>();
+
     states
       .pipe(
         tap((packet) => {
-          if (packet.state.state === "connecting") packet.state.attempt = 100;
+          if (packet.state.state === "connecting") {
+            packet.state.attempt = 100;
+          }
         }),
       )
       .subscribe(mutatingInspector);
@@ -92,6 +98,7 @@ describe("connection state public contract", () => {
 
     const first = server.sockets.latestFor(firstRelay);
     const second = server.sockets.latestFor(secondRelay);
+
     first.open();
     second.open();
     await expect(inspector.waitNext()).resolves.toMatchObject({

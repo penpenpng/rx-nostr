@@ -23,7 +23,10 @@ class Target {
   visibilityState = "visible";
   listeners = new Map<string, Set<(event: { type: string }) => void>>();
   addEventListener(type: string, listener: (event: { type: string }) => void) {
-    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, new Set());
+    }
+
     this.listeners.get(type)!.add(listener);
   }
   removeEventListener(type: string, listener: (event: { type: string }) => void) {
@@ -31,7 +34,10 @@ class Target {
   }
   emit(type: string) {
     const listeners = [...(this.listeners.get(type) ?? [])];
-    for (const listener of listeners) listener({ type });
+
+    for (const listener of listeners) {
+      listener({ type });
+    }
   }
   get size() {
     return [...this.listeners.values()].reduce((sum, listeners) => sum + listeners.size, 0);
@@ -40,12 +46,14 @@ class Target {
 
 function downDirectory() {
   const directory = new RelayDirectory();
+
   directory.importSnapshot(
     JSON.stringify({
       version: 1,
       relays: [{ url: relay, firstFailureAt: 0, lastFailureAt: 100, consecutiveFailures: 2 }],
     }),
   );
+
   return directory;
 }
 
@@ -72,6 +80,7 @@ describe("relay health recovery public contract", () => {
         reconnector: { reconnect },
       });
       const states: ConnectionState[] = [];
+
       rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
       rxNostr.setHotRelays(relay);
       await vi.advanceTimersByTimeAsync(100);
@@ -90,12 +99,17 @@ describe("relay health recovery public contract", () => {
     vi.useFakeTimers();
     vi.setSystemTime(100);
     const contexts: RelaySuppressionContext[] = [];
+
     class FixedSuppression implements RelaySuppressionStrategy {
       #delay = 200;
       getSuppression(context: RelaySuppressionContext) {
         contexts.push(context);
         const { health } = context;
-        if (health.consecutiveFailures < 2 || health.lastFailureAt === undefined) return;
+
+        if (health.consecutiveFailures < 2 || health.lastFailureAt === undefined) {
+          return;
+        }
+
         return {
           suppressedUntil: health.lastFailureAt + this.#delay,
         };
@@ -113,6 +127,7 @@ describe("relay health recovery public contract", () => {
     const first = new RxNostr(config);
     const second = new RxNostr(config);
     const states: ConnectionState[] = [];
+
     first.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     first.setHotRelays(relay);
     second.setHotRelays(relay);
@@ -140,7 +155,11 @@ describe("relay health recovery public contract", () => {
     ).toBe(true);
     first.dispose();
     second.dispose();
-    for (const socket of server.connections) socket.acknowledgeClose();
+
+    for (const socket of server.connections) {
+      socket.acknowledgeClose();
+    }
+
     await vi.advanceTimersByTimeAsync(0);
   });
 
@@ -158,11 +177,13 @@ describe("relay health recovery public contract", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const states: ConnectionState[] = [];
+
     rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     const events: string[] = [];
     const subscription = rxNostr
       .forward(relay, [{ kinds: [1] }], { timeout: Infinity, linger: 0 })
       .subscribe((packet) => events.push(packet.event.id));
+
     expect(server.connections.length).toBe(0);
     expect(states.at(-1)).toMatchObject({
       state: "waiting-for-connection",
@@ -180,9 +201,11 @@ describe("relay health recovery public contract", () => {
     expect(server.connections.length).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
     const socket = server.sockets.latest;
+
     socket.open();
     await vi.advanceTimersByTimeAsync(0);
     const req = await socket.inbox.waitNext("REQ");
+
     socket.message(["EVENT", req[1], Faker.event({ id: "recovered", kind: 1 })]);
     await vi.advanceTimersByTimeAsync(0);
     expect(events).toEqual(["recovered"]);
@@ -208,6 +231,7 @@ describe("relay health recovery public contract", () => {
     };
     const waiting = new RxNostr({ ...base, relayHealthPolicy: policy });
     const probe = new RxNostr({ ...base, relayHealthPolicy: false });
+
     waiting.setHotRelays(relay);
     expect(server.connections.length).toBe(0);
     probe.setHotRelays(relay);
@@ -218,7 +242,11 @@ describe("relay health recovery public contract", () => {
     await vi.advanceTimersByTimeAsync(0);
     waiting.dispose();
     probe.dispose();
-    for (const socket of server.connections) socket.acknowledgeClose();
+
+    for (const socket of server.connections) {
+      socket.acknowledgeClose();
+    }
+
     await vi.advanceTimersByTimeAsync(0);
   });
 
@@ -227,6 +255,7 @@ describe("relay health recovery public contract", () => {
     vi.setSystemTime(100);
     const directory = downDirectory();
     const restored = new RelayDirectory();
+
     restored.importSnapshot(directory.exportSnapshot());
     expect(restored.get(relay)?.firstFailureAt).toBe(0);
     const server = new ControlledWebSocketServer();
@@ -241,6 +270,7 @@ describe("relay health recovery public contract", () => {
     const first = new RxNostr(config);
     const second = new RxNostr(config);
     const states: ConnectionState[] = [];
+
     second.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     first.setHotRelays(relay);
     second.setHotRelays(relay);
@@ -259,11 +289,21 @@ describe("relay health recovery public contract", () => {
     restored.resetHealth(relay);
     await vi.advanceTimersByTimeAsync(0);
     expect(server.connections.length).toBe(3);
-    for (const socket of server.connections) if (socket.readyState === 0) socket.open();
+
+    for (const socket of server.connections) {
+      if (socket.readyState === 0) {
+        socket.open();
+      }
+    }
+
     await vi.advanceTimersByTimeAsync(0);
     first.dispose();
     second.dispose();
-    for (const socket of server.connections) socket.acknowledgeClose();
+
+    for (const socket of server.connections) {
+      socket.acknowledgeClose();
+    }
+
     await vi.advanceTimersByTimeAsync(0);
   });
 
@@ -280,6 +320,7 @@ describe("relay health recovery public contract", () => {
       skipFetchNip11: true,
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
+
     rxNostr.setHotRelays(relay);
     await vi.advanceTimersByTimeAsync(100);
     server.sockets.latest.peerClose(1006, "still down");
@@ -298,6 +339,7 @@ describe("relay health recovery public contract", () => {
       document: new Target(),
       navigator: { onLine: false },
     };
+
     vi.stubGlobal("window", environment.window);
     vi.stubGlobal("document", environment.document);
     vi.stubGlobal("navigator", environment.navigator);
@@ -310,6 +352,7 @@ describe("relay health recovery public contract", () => {
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
     const states: ConnectionState[] = [];
+
     rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     rxNostr.setHotRelays(relay);
     expect(server.connections.length).toBe(1);
@@ -343,6 +386,7 @@ describe("suppression ownership and asynchronous decisions", () => {
       relayHealthPolicy: policy,
       skipFetchNip11: true,
     });
+
     client.setHotRelays(relay);
     expect(directory.forget(relay)).toBe(false);
     directory.resetHealth(relay);
@@ -369,11 +413,15 @@ describe("suppression ownership and asynchronous decisions", () => {
         skipFetchNip11: true,
         relayHealthPolicy: {
           getSuppression() {
-            if (mode === "throw") throw new Error("invalid application policy");
+            if (mode === "throw") {
+              throw new Error("invalid application policy");
+            }
+
             return { suppressedUntil: NaN };
           },
         },
       });
+
       client.monitorConnectionState().subscribe((p) => states.push(p.state));
       client.setHotRelays(relay);
       await vi.advanceTimersByTimeAsync(0);
@@ -404,12 +452,14 @@ describe("suppression ownership and asynchronous decisions", () => {
           context.reportWaiting?.({
             suppressionReasons: [{ category: "environment", source: "custom", kind: "offline" }],
           });
+
           return new Promise((r) => {
             resolve = r;
           });
         },
       },
     });
+
     client.monitorConnectionState().subscribe((p) => states.push(p.state));
     client.setHotRelays(relay);
     await vi.advanceTimersByTimeAsync(100);
@@ -417,10 +467,7 @@ describe("suppression ownership and asynchronous decisions", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(states.at(-1)).toMatchObject({
       state: "waiting-for-connection",
-      suppressionReasons: [
-        { category: "relay-health" },
-        { category: "environment" },
-      ],
+      suppressionReasons: [{ category: "relay-health" }, { category: "environment" }],
     });
     expect(states.at(-1)).not.toHaveProperty("nextAttemptAt");
     resolve({ action: "retry", delay: 50 });
@@ -459,6 +506,7 @@ describe("suppression ownership and asynchronous decisions", () => {
             }),
         },
       });
+
       client.setHotRelays(relay);
       await vi.advanceTimersByTimeAsync(100);
       server.sockets.latest.peerClose(1006, "still down");
@@ -490,11 +538,13 @@ describe("suppression ownership and asynchronous decisions", () => {
     };
     const first = new RxNostr(config),
       second = new RxNostr(config);
+
     first.setHotRelays(relay);
     second.setHotRelays(relay);
     await vi.advanceTimersByTimeAsync(100);
     expect(server.connections).toHaveLength(1);
     const stalled = server.sockets.latest;
+
     await vi.advanceTimersByTimeAsync(10);
     expect(stalled.readyState).not.toBe(0);
     expect(directory.get(relay)?.consecutiveFailures).toBe(3);
@@ -507,7 +557,11 @@ describe("suppression ownership and asynchronous decisions", () => {
     await vi.advanceTimersByTimeAsync(0);
     first.dispose();
     second.dispose();
-    for (const socket of server.connections) socket.acknowledgeClose();
+
+    for (const socket of server.connections) {
+      socket.acknowledgeClose();
+    }
+
     await vi.advanceTimersByTimeAsync(0);
     expect(directory.forget(relay)).toBe(true);
   });
@@ -528,12 +582,14 @@ describe("suppression ownership and asynchronous decisions", () => {
       reconnector: {
         reconnect(context) {
           signal = context.signal;
+
           return new Promise((r) => {
             resolve = r;
           });
         },
       },
     });
+
     client.setHotRelays(relay);
     await vi.advanceTimersByTimeAsync(100);
     server.sockets.latest.peerClose(1006, "still down");
@@ -565,16 +621,22 @@ test("a failing recovery strategy terminates with policy-error, not relay failur
     reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     relayHealthPolicy: {
       getSuppression() {
-        if (broken) throw new Error("broken strategy");
+        if (broken) {
+          throw new Error("broken strategy");
+        }
+
         return undefined;
       },
     },
   });
+
   client.monitorConnectionState().subscribe((p) => states.push(p.state));
   client.setHotRelays(relay);
   server.sockets.latest.open();
   await vi.advanceTimersByTimeAsync(0);
+
   broken = true;
+
   server.sockets.latest.peerClose(1006, "lost connection");
   await vi.advanceTimersByTimeAsync(0);
   expect(states.at(-1)).toMatchObject({ state: "failed", reason: { kind: "policy-error" } });
@@ -608,6 +670,7 @@ test("preserves detector reports without attributing known local failures to rel
       },
     ],
   });
+
   client.setHotRelays(relay);
   server.sockets.latest.open();
   await vi.advanceTimersByTimeAsync(0);
@@ -643,12 +706,14 @@ test("a reported wait remains pending until the reconnector decides", async () =
         context.reportWaiting?.({
           suppressionReasons: [{ category: "environment", source: "custom", kind: "resume" }],
         });
+
         return new Promise((r) => {
           resolve = r;
         });
       },
     },
   });
+
   client.monitorConnectionState().subscribe((p) => states.push(p.state));
   client.setHotRelays(relay);
   server.sockets.latest.peerClose(1006, "failed");
@@ -677,9 +742,11 @@ test("a state observer can reset health without leaving a stale wait timer", asy
     skipFetchNip11: true,
   });
   let reset = false;
+
   client.monitorConnectionState().subscribe(({ state }) => {
     if (state.state === "waiting-for-connection" && !reset) {
       reset = true;
+
       directory.resetHealth(relay);
     }
   });

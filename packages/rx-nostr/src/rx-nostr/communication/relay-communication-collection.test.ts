@@ -64,6 +64,7 @@ describe("RelayCommunicationCollection", () => {
     expect(collection.size).toBe(1);
 
     const second = collection.get("wss://two.example.com");
+
     await expect(inspector.waitNext()).resolves.toEqual(second);
     collection.dispose();
     expect(inspector.completed).toBe(true);

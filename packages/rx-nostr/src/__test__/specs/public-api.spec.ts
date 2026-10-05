@@ -27,6 +27,9 @@ import * as publicApi from "rx-nostr";
 import type { Observable } from "rxjs";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
+const disposeNoop = () => {};
+const acceptClient = (client: IRxNostr) => client;
+
 describe("public entry point", () => {
   describe("runtime exports", () => {
     test("can be imported by contract tests", () => {
@@ -162,7 +165,6 @@ describe("public entry point", () => {
 
   describe("structural API", () => {
     test("keeps IRxNostr independent from the concrete class", () => {
-      const dispose = () => {};
       const structuralClient = {
         forward: undefined as unknown as IRxNostr["forward"],
         backward: undefined as unknown as IRxNostr["backward"],
@@ -170,10 +172,9 @@ describe("public entry point", () => {
         setHotRelays: undefined as unknown as IRxNostr["setHotRelays"],
         unsetHotRelays: undefined as unknown as IRxNostr["unsetHotRelays"],
         monitorConnectionState: undefined as unknown as IRxNostr["monitorConnectionState"],
-        dispose,
-        [Symbol.dispose]: dispose,
+        dispose: disposeNoop,
+        [Symbol.dispose]: disposeNoop,
       } satisfies IRxNostr;
-      const acceptClient = (client: IRxNostr) => client;
 
       expect(acceptClient(structuralClient)).toBe(structuralClient);
       expect(structuralClient).not.toBeInstanceOf(publicApi.RxNostr);

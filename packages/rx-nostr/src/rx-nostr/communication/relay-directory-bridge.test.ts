@@ -17,12 +17,14 @@ describe("RelayDirectoryBridge", () => {
     expect(onMaxSubscriptions).toHaveBeenLastCalledWith(2);
 
     const connectionClosed = bridge.transportHooks.onConnectionOpened!();
+
     expect(directory.get(url)).toMatchObject({
       lastConnectedAt: 1,
       liveConnections: 1,
     });
 
     now = 2;
+
     bridge.transportHooks.onConnectionFailed!();
     expect(bridge.transportHooks.getConnectionHealth!()).toEqual({
       consecutiveFailures: 1,
@@ -35,6 +37,7 @@ describe("RelayDirectoryBridge", () => {
     connectionClosed();
     expect(directory.get(url)?.liveConnections).toBe(0);
     const callsBeforeDispose = onMaxSubscriptions.mock.calls.length;
+
     bridge.dispose();
 
     directory.setNip11(url, { limitation: { max_subscriptions: 3 } });

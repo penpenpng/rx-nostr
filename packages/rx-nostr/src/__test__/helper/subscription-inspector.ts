@@ -3,6 +3,7 @@ import type { Observer } from "rxjs";
 import { QueueInspector } from "./queue-inspector";
 
 const ObservableComplete = Symbol("complete");
+
 type ObservableComplete = typeof ObservableComplete;
 
 class ObservableError {
@@ -29,6 +30,7 @@ export class SubscriptionInspector<T> implements Observer<T> {
     }
 
     this.#errored = true;
+
     this.#error.resolve(err);
     this.#events.push(new ObservableError(err));
   }
@@ -38,6 +40,7 @@ export class SubscriptionInspector<T> implements Observer<T> {
     }
 
     this.#completed = true;
+
     this.#complete.resolve();
     this.#events.push(ObservableComplete);
   }
@@ -83,8 +86,4 @@ export class SubscriptionInspector<T> implements Observer<T> {
 
 class SubscriptionInspectorError extends Error {
   name = "SubscriptionInspectorError";
-
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
-  }
 }

@@ -52,12 +52,17 @@ export class ExponentialRelaySuppressionStrategy implements RelaySuppressionStra
 
   constructor(policy: RelayHealthPolicy = {}) {
     this.#policy = Object.freeze({ ...policy });
+
     evaluateRelayConnection({ consecutiveFailures: 0 }, 0, this.#policy);
   }
 
   getSuppression({ health, now }: RelaySuppressionContext): RelaySuppression | undefined {
     const decision = evaluateRelayConnection(health, now, this.#policy);
-    if (decision.action === "allow") return;
+
+    if (decision.action === "allow") {
+      return;
+    }
+
     return {
       suppressedUntil: decision.suppressedUntil,
       suppressionReason: {
@@ -74,13 +79,19 @@ export class ExponentialRelaySuppressionStrategy implements RelaySuppressionStra
 
 /** @internal Preserve strategy instances and their method receiver when copying config. */
 export function copyRelayHealthPolicy(input: RelayHealthPolicyInput): RelayHealthPolicyInput {
-  if (input === false) return false;
+  if (input === false) {
+    return false;
+  }
   if ("getSuppression" in input) {
-    if (typeof input.getSuppression !== "function")
+    if (typeof input.getSuppression !== "function") {
       throw new TypeError("getSuppression must be a function.");
+    }
+
     return input;
   }
-  new ExponentialRelaySuppressionStrategy(input);
+
+  void new ExponentialRelaySuppressionStrategy(input);
+
   return Object.freeze({ ...input });
 }
 
@@ -89,7 +100,11 @@ export function resolveRelaySuppressionStrategy(
   input: RelayHealthPolicyInput = {},
 ): RelaySuppressionStrategy | undefined {
   const copied = copyRelayHealthPolicy(input);
-  if (copied === false) return;
+
+  if (copied === false) {
+    return;
+  }
+
   return "getSuppression" in copied ? copied : new ExponentialRelaySuppressionStrategy(copied);
 }
 
@@ -107,23 +122,31 @@ export function evaluateRelayConnection(
   const duration = policy.minFailureDuration ?? 300_000;
   const initialDelay = policy.initialRetryDelay ?? 300_000;
   const maxDelay = policy.maxRetryDelay ?? 3_600_000;
+
   for (const [name, value] of Object.entries({ minFailures, duration, initialDelay, maxDelay })) {
-    if (!Number.isFinite(value) || value <= 0)
+    if (!Number.isFinite(value) || value <= 0) {
       throw new RangeError(`${name} must be positive and finite.`);
+    }
   }
-  if (!Number.isInteger(minFailures)) throw new RangeError("minFailures must be an integer.");
+
+  if (!Number.isInteger(minFailures)) {
+    throw new RangeError("minFailures must be an integer.");
+  }
   if (
     (health.liveConnections ?? 0) > 0 ||
     health.consecutiveFailures < minFailures ||
     health.firstFailureAt === undefined ||
     health.lastFailureAt === undefined ||
     health.lastFailureAt - health.firstFailureAt < duration
-  )
+  ) {
     return { action: "allow" };
+  }
+
   const exponent = Math.min(
     52,
     Math.max(0, Math.floor((health.lastFailureAt - health.firstFailureAt) / duration) - 1),
   );
   const suppressedUntil = health.lastFailureAt + Math.min(initialDelay * 2 ** exponent, maxDelay);
+
   return { action: suppressedUntil > now ? "suppress" : "probe", suppressedUntil };
 }

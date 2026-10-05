@@ -72,15 +72,18 @@ export class PublicationOperation implements Publication, Disposable {
   ) {
     let resolveEvent!: (event: Nostr.Event) => void;
     let rejectEvent!: (error: unknown) => void;
+
     this.event = new Promise((resolve, reject) => {
       resolveEvent = resolve;
       rejectEvent = reject;
     });
     this.#resolveEvent = resolveEvent;
     this.#rejectEvent = rejectEvent;
+
     void this.event.catch(() => {});
 
     let resolveClosed!: () => void;
+
     this.closed = new Promise((resolve) => {
       resolveClosed = resolve;
     });
@@ -90,24 +93,29 @@ export class PublicationOperation implements Publication, Disposable {
       defer: false,
       weak: config.weak,
     });
+
     for (const relay of destinations) {
       this.#deliveries.set(relay, { relay, state: "pending" });
     }
 
     if (destinations.length === 0) {
       const error = new RxNostrPublicationError("no-relays");
+
       this.#rejectEvent(error);
       this.#failOperation(error, false);
+
       return;
     }
 
     this.relays.forEach(destinations, (relay) => this.#connectionDemand.prewarm(relay));
 
     let signed: Promise<Nostr.Event>;
+
     try {
       signed = config.signer.signEvent(params);
     } catch (cause) {
       this.#signingFailed(cause);
+
       return;
     }
     void Promise.resolve(signed).then(
@@ -130,37 +138,54 @@ export class PublicationOperation implements Publication, Disposable {
     if (typeof observerOrNext === "function" || observerOrNext == null) {
       return this.#okPackets.subscribe(observerOrNext, error, complete);
     }
+
     return this.#okPackets.subscribe(observerOrNext);
   }
 
   waitFor(policy: PublicationSettlePolicy): Promise<void> {
     return new Promise((resolve, reject) => {
       const waiter = { policy, resolve, reject } satisfies SettlementWaiter;
-      if (!this.#settle(waiter)) this.#waiters.add(waiter);
+
+      if (!this.#settle(waiter)) {
+        this.#waiters.add(waiter);
+      }
     });
   }
 
   cancel(): void {
-    if (this.#cancelled || this.#cleaned) return;
+    if (this.#cancelled || this.#cleaned) {
+      return;
+    }
+
     this.#cancelled = true;
+
     const failures: PublicationFailure[] = [];
+
     for (const delivery of this.#deliveries.values()) {
-      if (delivery.state !== "pending") continue;
+      if (delivery.state !== "pending") {
+        continue;
+      }
+
       delivery.subscription?.unsubscribe();
       delivery.demandWindow?.close();
       const failure = Object.freeze({
         relay: delivery.relay,
         kind: "cancelled" as const,
       });
+
       delivery.failure = failure;
       delivery.state = "failed";
+
       failures.push(failure);
     }
+
     if (failures.length > 0) {
       this.#operationError = new RxNostrPublicationError("cancelled", failures);
+
       this.#settleWaiters();
       this.#finishPacketStream();
     }
+
     this.#cleanupNow();
   }
 
@@ -168,18 +193,27 @@ export class PublicationOperation implements Publication, Disposable {
 
   #signed(event: unknown): void {
     let snapshot: Readonly<Nostr.Event>;
+
     try {
       snapshot = snapshotEvent(event);
     } catch (cause) {
       this.#signingFailed(cause);
+
       return;
     }
     this.#resolveEvent(cloneEvent(snapshot));
-    if (this.#cancelled || this.#cleaned) return;
+
+    if (this.#cancelled || this.#cleaned) {
+      return;
+    }
 
     for (const delivery of this.#deliveries.values()) {
-      if (delivery.state !== "pending") continue;
+      if (delivery.state !== "pending") {
+        continue;
+      }
+
       const relay = this.relays.get(delivery.relay);
+
       delivery.demandWindow = this.#connectionDemand.openDemandWindow(relay, this.config.linger);
       delivery.subscription = relay
         .event(snapshot as Nostr.Event, {
@@ -188,6 +222,7 @@ export class PublicationOperation implements Publication, Disposable {
         .subscribe({
           next: (packet) => {
             delivery.lastOk = packet;
+
             this.#okPackets.next(packet);
           },
           complete: () => this.#completeRelay(delivery),
@@ -201,17 +236,23 @@ export class PublicationOperation implements Publication, Disposable {
       cause instanceof RxNostrCallbackError && cause.callback === "signer"
         ? cause
         : new RxNostrCallbackError("signer", cause);
+
     this.#rejectEvent(error);
     this.#failOperation(error, true);
   }
 
   #completeRelay(delivery: RelayDelivery): void {
-    if (delivery.state !== "pending") return;
-    if (delivery.lastOk?.ok) {
-      delivery.state = "accepted";
-      this.#finishRelay(delivery);
+    if (delivery.state !== "pending") {
       return;
     }
+    if (delivery.lastOk?.ok) {
+      delivery.state = "accepted";
+
+      this.#finishRelay(delivery);
+
+      return;
+    }
+
     this.#failRelay(
       delivery,
       Object.freeze({
@@ -223,9 +264,13 @@ export class PublicationOperation implements Publication, Disposable {
   }
 
   #failRelay(delivery: RelayDelivery, failure: PublicationFailure): void {
-    if (delivery.state !== "pending") return;
+    if (delivery.state !== "pending") {
+      return;
+    }
+
     delivery.failure = failure;
     delivery.state = "failed";
+
     this.#finishRelay(delivery);
   }
 
@@ -233,6 +278,7 @@ export class PublicationOperation implements Publication, Disposable {
     delivery.subscription?.unsubscribe();
     delivery.demandWindow?.close();
     this.#settleWaiters();
+
     if ([...this.#deliveries.values()].every((item) => item.state !== "pending")) {
       this.#finishPacketStream();
       this.#scheduleNaturalCleanup();
@@ -240,78 +286,121 @@ export class PublicationOperation implements Publication, Disposable {
   }
 
   #failOperation(error: unknown, emitError: boolean): void {
-    if (this.#terminal) return;
+    if (this.#terminal) {
+      return;
+    }
+
     this.#operationError = error;
+
     for (const delivery of this.#deliveries.values()) {
       delivery.subscription?.unsubscribe();
       delivery.demandWindow?.close();
     }
+
     this.#settleWaiters();
+
     this.#terminal = true;
-    if (emitError) this.#okPackets.error(error);
-    else this.#okPackets.complete();
+
+    if (emitError) {
+      this.#okPackets.error(error);
+    } else {
+      this.#okPackets.complete();
+    }
+
     this.#cleanupNow();
   }
 
   #finishPacketStream(): void {
-    if (this.#terminal) return;
+    if (this.#terminal) {
+      return;
+    }
+
     this.#terminal = true;
+
     this.#okPackets.complete();
   }
 
   #settleWaiters(): void {
     for (const waiter of this.#waiters) {
-      if (this.#settle(waiter)) this.#waiters.delete(waiter);
+      if (this.#settle(waiter)) {
+        this.#waiters.delete(waiter);
+      }
     }
   }
 
   #settle(waiter: SettlementWaiter): boolean {
     if (this.#operationError !== undefined) {
       waiter.reject(this.#operationError);
+
       return true;
     }
+
     const deliveries = [...this.#deliveries.values()];
+
     if (waiter.policy === "all") {
       if (deliveries.some((delivery) => delivery.state === "failed")) {
         waiter.reject(new RxNostrPublicationError("not-all-accepted", failures(deliveries)));
+
         return true;
       }
       if (deliveries.every((delivery) => delivery.state === "accepted")) {
         waiter.resolve();
+
         return true;
       }
+
       return false;
     }
     if (deliveries.some((delivery) => delivery.state === "accepted")) {
       waiter.resolve();
+
       return true;
     }
     if (deliveries.every((delivery) => delivery.state === "failed")) {
       waiter.reject(new RxNostrPublicationError("all-failed", failures(deliveries)));
+
       return true;
     }
+
     return false;
   }
 
   #scheduleNaturalCleanup(): void {
-    if (this.#cleaned || this.#cancelled) return;
-    if (!Number.isFinite(this.config.linger)) return;
-    const delay = Math.max(0, this.config.linger);
-    if (delay === 0) {
-      this.#cleanupNow();
+    if (this.#cleaned || this.#cancelled) {
       return;
     }
+    if (!Number.isFinite(this.config.linger)) {
+      return;
+    }
+
+    const delay = Math.max(0, this.config.linger);
+
+    if (delay === 0) {
+      this.#cleanupNow();
+
+      return;
+    }
+
     this.#cleanupTimer = setTimeout(() => this.#cleanupNow(), delay);
   }
 
   #cleanupNow(): void {
-    if (this.#cleaned) return;
+    if (this.#cleaned) {
+      return;
+    }
+
     this.#cleaned = true;
-    if (this.#cleanupTimer !== undefined) clearTimeout(this.#cleanupTimer);
+
+    if (this.#cleanupTimer !== undefined) {
+      clearTimeout(this.#cleanupTimer);
+    }
+
     this.#cleanupTimer = undefined;
+
     for (const delivery of this.#deliveries.values()) {
       delivery.subscription?.unsubscribe();
     }
+
     this.#connectionDemand.dispose();
     this.#resolveClosed();
   }
@@ -321,9 +410,12 @@ function snapshotEvent(value: unknown): Readonly<Nostr.Event> {
   if (typeof value !== "object" || value === null || !ensureEventFields(value)) {
     throw new TypeError("The signer did not return a valid Nostr event.");
   }
+
   const event = value as Nostr.Event;
   const tags = event.tags.map((tag) => Object.freeze([...tag])) as Nostr.Tag.Any[];
+
   Object.freeze(tags);
+
   return Object.freeze({ ...event, tags });
 }
 
@@ -344,14 +436,24 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
     });
   }
   if (error instanceof RelayCommunicationError) {
-    const kind =
-      error.reason === "timeout"
-        ? "timeout"
-        : error.reason === "open-error"
-          ? "retry-exhausted"
-          : "dropped";
+    let kind: PublicationFailure["kind"];
+
+    switch (error.reason) {
+      case "timeout":
+        kind = "timeout";
+
+        break;
+      case "open-error":
+        kind = "retry-exhausted";
+
+        break;
+      default:
+        kind = "dropped";
+    }
+
     return Object.freeze({ relay: delivery.relay, kind, cause: error });
   }
+
   return Object.freeze({
     relay: delivery.relay,
     kind: "failed" as const,

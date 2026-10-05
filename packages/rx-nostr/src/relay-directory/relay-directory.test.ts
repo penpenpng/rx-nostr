@@ -11,7 +11,9 @@ describe("RelayDirectory health reporter", () => {
     const reporter = getRelayDirectoryReporter(directory);
 
     reporter.connectionFailed("wss://relay.example.com");
+
     now = 2;
+
     reporter.connectionFailed("wss://relay.example.com");
     expect(directory.get("wss://relay.example.com")).toMatchObject({
       lastFailureAt: 2,
@@ -20,8 +22,10 @@ describe("RelayDirectory health reporter", () => {
     });
 
     now = 3;
+
     const closeFirst = reporter.connectionOpened("wss://relay.example.com");
     const closeSecond = reporter.connectionOpened("wss://RELAY.example.com/");
+
     expect(directory.get("wss://relay.example.com")).toMatchObject({
       lastConnectedAt: 3,
       consecutiveFailures: 0,
@@ -49,6 +53,7 @@ describe("RelayDirectory health reporter", () => {
     expect(directory.forget("wss://relay.example.com")).toBe(false);
     close();
     const fetching = directory.fetchNip11("wss://relay.example.com");
+
     expect(directory.forget("wss://relay.example.com")).toBe(false);
     finish({ name: "relay" });
     await fetching;
@@ -73,7 +78,9 @@ describe("RelayDirectory health reporter", () => {
     const reporter = getRelayDirectoryReporter(directory);
 
     reporter.connectionFailed("wss://relay.example.com");
+
     now = 11;
+
     reporter.connectionOpened("wss://relay.example.com");
 
     await expect(inspector.waitNext()).resolves.toEqual(0);
@@ -91,6 +98,7 @@ describe("RelayDirectory snapshots", () => {
       directory.importSnapshot(
         JSON.stringify({ version: 1, relays: [{ url: "wss://relay.example.com", ...entry }] }),
       );
+
     merge({ firstFailureAt: 0, lastFailureAt: 50, consecutiveFailures: 2 });
     merge({ firstFailureAt: 20, lastFailureAt: 100, consecutiveFailures: 3 });
     expect(directory.get("wss://relay.example.com")?.firstFailureAt).toBe(0);
@@ -101,13 +109,16 @@ describe("RelayDirectory snapshots", () => {
 
   test("round trips a manually cleared failure streak and rejects inconsistent firstFailureAt", () => {
     const source = new RelayDirectory({ clock: () => 100 });
+
     getRelayDirectoryReporter(source).connectionFailed("wss://relay.example.com");
     source.resetHealth("wss://relay.example.com");
     const restored = new RelayDirectory();
+
     restored.importSnapshot(source.exportSnapshot());
     expect(restored.get("wss://relay.example.com")?.firstFailureAt).toBeUndefined();
     expect(() => source.importSnapshot(restored.exportSnapshot())).not.toThrow();
     const before = restored.exportSnapshot();
+
     expect(() =>
       restored.importSnapshot(
         JSON.stringify({
@@ -130,18 +141,24 @@ describe("RelayDirectory snapshots", () => {
     let now = 10;
     const source = new RelayDirectory({ clock: () => now });
     const sourceReporter = getRelayDirectoryReporter(source);
+
     source.setNip11("wss://relay.example.com", {
       name: "relay",
       limitation: { max_subscriptions: 5 },
     });
+
     now = 20;
+
     sourceReporter.connectionFailed("wss://relay.example.com");
+
     now = 30;
+
     const close = sourceReporter.connectionOpened("wss://relay.example.com");
     const serialized = source.exportSnapshot();
 
     expect(serialized).not.toContain("liveConnections");
     const target = new RelayDirectory();
+
     target.importSnapshot(serialized);
     expect(target.get("wss://relay.example.com")).toMatchObject({
       nip11: { name: "relay", limitation: { max_subscriptions: 5 } },
@@ -160,6 +177,7 @@ describe("RelayDirectory snapshots", () => {
     const directory = new RelayDirectory({ clock: () => now });
     const reporter = getRelayDirectoryReporter(directory);
     const close = reporter.connectionOpened("wss://relay.example.com");
+
     directory.setNip11("wss://relay.example.com", { name: "new" });
 
     directory.importSnapshot(
@@ -191,7 +209,9 @@ describe("RelayDirectory snapshots", () => {
     let now = 1;
     const fetcher = vi.fn().mockRejectedValue(new Error("offline"));
     const directory = new RelayDirectory({ clock: () => now, fetcher });
+
     directory.setNip11("wss://relay.example.com", { name: "cached" });
+
     now = 2;
 
     await expect(
@@ -220,9 +240,11 @@ describe("RelayDirectory snapshots", () => {
 test("round trips success followed by failure at the same timestamp", () => {
   const directory = new RelayDirectory({ clock: () => 100 });
   const reporter = getRelayDirectoryReporter(directory);
+
   reporter.connectionOpened("wss://relay.example.com")();
   reporter.connectionFailed("wss://relay.example.com");
   const restored = new RelayDirectory();
+
   restored.importSnapshot(directory.exportSnapshot());
   expect(restored.get("wss://relay.example.com")).toMatchObject({
     consecutiveFailures: 1,

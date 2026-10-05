@@ -32,6 +32,7 @@ export class RelayRecord {
 
   snapshot(): RelayDirectoryEntry {
     const maxSubscriptions = readMaxSubscriptions(this.#nip11);
+
     return Object.freeze({
       url: this.url,
       ...(this.#nip11 === undefined ? {} : { nip11: this.#nip11 }),
@@ -64,10 +65,15 @@ export class RelayRecord {
   }
 
   fetchNip11(refresh: boolean, timeout?: number): Promise<Readonly<Nostr.Nip11.RelayInfo>> {
-    if (!refresh && this.#nip11) return Promise.resolve(this.#nip11);
-    if (this.#inflight) return this.#inflight;
+    if (!refresh && this.#nip11) {
+      return Promise.resolve(this.#nip11);
+    }
+    if (this.#inflight) {
+      return this.#inflight;
+    }
 
     let fetched: Promise<Nostr.Nip11.RelayInfo>;
+
     try {
       fetched = this.fetcher(this.url);
     } catch (error) {
@@ -77,37 +83,47 @@ export class RelayRecord {
       (info) => {
         this.#nip11 = cloneRelayInfo(info);
         this.#nip11FetchedAt = this.clock();
+
         this.#emit();
+
         return this.#nip11;
       },
       (error) => {
         this.#nip11FailedAt = this.clock();
+
         this.#emit();
         throw error;
       },
     );
+
     this.#inflight = request.finally(() => {
       this.#inflight = undefined;
     });
+
     return this.#inflight;
   }
 
   setNip11(info: Nostr.Nip11.RelayInfo): Readonly<Nostr.Nip11.RelayInfo> {
     this.#nip11 = cloneRelayInfo(info);
     this.#nip11FetchedAt = this.clock();
+
     this.#emit();
+
     return this.#nip11;
   }
 
   connectionOpened(): () => void {
     this.#liveConnections++;
+
     this.#lastConnectedAt = this.clock();
     this.#consecutiveFailures = 0;
     this.#firstFailureAt = undefined;
+
     this.#emit();
 
     return once(() => {
       this.#liveConnections = Math.max(0, this.#liveConnections - 1);
+
       this.#emit();
     });
   }
@@ -115,6 +131,7 @@ export class RelayRecord {
   connectionFailed(): void {
     this.#lastFailureAt = this.clock();
     this.#firstFailureAt ??= this.#lastFailureAt;
+
     this.#consecutiveFailures++;
     this.#emit();
   }
@@ -122,14 +139,20 @@ export class RelayRecord {
   resetHealth(): void {
     this.#firstFailureAt = undefined;
     this.#consecutiveFailures = 0;
+
     this.#emit();
   }
 
   acquireProbe(): (() => void) | undefined {
-    if (this.#probeHeld) return;
+    if (this.#probeHeld) {
+      return;
+    }
+
     this.#probeHeld = true;
+
     return once(() => {
       this.#probeHeld = false;
+
       this.#emit();
     });
   }
@@ -143,18 +166,22 @@ export class RelayRecord {
       this.#nip11 = cloneRelayInfo(entry.nip11);
       this.#nip11FetchedAt = entry.nip11FetchedAt;
     }
+
     this.#nip11FailedAt = maxDefined(this.#nip11FailedAt, entry.nip11FailedAt);
 
     const currentFailureAt = this.#lastFailureAt;
     const importedFailureAt = entry.lastFailureAt;
+
     this.#lastConnectedAt = maxDefined(this.#lastConnectedAt, entry.lastConnectedAt);
     this.#lastFailureAt = maxDefined(currentFailureAt, importedFailureAt);
+
     if (
       this.#lastFailureAt !== undefined &&
       (this.#lastConnectedAt === undefined || this.#lastFailureAt >= this.#lastConnectedAt)
     ) {
       if (importedFailureAt === this.#lastFailureAt) {
         const importedFirst = entry.firstFailureAt ?? importedFailureAt;
+
         this.#firstFailureAt =
           this.#firstFailureAt !== undefined &&
           (this.#lastConnectedAt === undefined || this.#firstFailureAt >= this.#lastConnectedAt)
@@ -169,12 +196,15 @@ export class RelayRecord {
       this.#firstFailureAt = undefined;
       this.#consecutiveFailures = 0;
     }
-    if (this.#consecutiveFailures === 0) this.#firstFailureAt = undefined;
-    else if (
+    if (this.#consecutiveFailures === 0) {
+      this.#firstFailureAt = undefined;
+    } else if (
       this.#firstFailureAt === undefined ||
       (this.#lastConnectedAt !== undefined && this.#firstFailureAt < this.#lastConnectedAt)
-    )
+    ) {
       this.#firstFailureAt = this.#lastFailureAt;
+    }
+
     this.#emit();
   }
 
@@ -189,6 +219,7 @@ export class RelayRecord {
 
   retain(): () => void {
     this.#retainers++;
+
     return once(() => {
       this.#retainers--;
     });
@@ -208,7 +239,9 @@ function withTimeout<T>(
   timeout: number | undefined,
   url: RelayUrl,
 ): Promise<T> {
-  if (timeout === undefined || timeout === Number.POSITIVE_INFINITY) return promise;
+  if (timeout === undefined || timeout === Number.POSITIVE_INFINITY) {
+    return promise;
+  }
   if (!Number.isFinite(timeout) || timeout < 0) {
     return Promise.reject(
       new RangeError("NIP-11 timeout must be a non-negative finite number or Infinity."),
@@ -226,6 +259,7 @@ function withTimeout<T>(
         ),
       timeout,
     );
+
     void promise.then(
       (value) => {
         clearTimeout(timer);
@@ -249,6 +283,7 @@ export function copyRelayInfo(
   info: Nostr.Nip11.RelayInfo | Readonly<Nostr.Nip11.RelayInfo>,
 ): Nostr.Nip11.RelayInfo {
   let clone: unknown;
+
   try {
     clone = JSON.parse(JSON.stringify(info));
   } catch (cause) {
@@ -256,9 +291,11 @@ export function copyRelayInfo(
       cause,
     });
   }
+
   if (typeof clone !== "object" || clone === null || Array.isArray(clone)) {
     throw new TypeError("NIP-11 metadata must be a JSON object.");
   }
+
   return clone as Nostr.Nip11.RelayInfo;
 }
 
@@ -266,7 +303,11 @@ function deepFreeze(value: unknown): unknown {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) {
     return value;
   }
-  for (const child of Object.values(value)) deepFreeze(child);
+
+  for (const child of Object.values(value)) {
+    deepFreeze(child);
+  }
+
   return Object.freeze(value);
 }
 
@@ -274,11 +315,17 @@ function readMaxSubscriptions(
   info: Readonly<Nostr.Nip11.RelayInfo> | undefined,
 ): number | undefined {
   const value = info?.limitation?.max_subscriptions;
+
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
 }
 
 function maxDefined(left: number | undefined, right: number | undefined): number | undefined {
-  if (left === undefined) return right;
-  if (right === undefined) return left;
+  if (left === undefined) {
+    return right;
+  }
+  if (right === undefined) {
+    return left;
+  }
+
   return Math.max(left, right);
 }

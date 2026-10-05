@@ -22,6 +22,7 @@ export class RelayMap<T> {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return undefined;
     }
@@ -32,6 +33,7 @@ export class RelayMap<T> {
   getMany(urls: Iterable<string>, options?: TrustOption): T[] {
     if (typeof urls === "string") {
       const v = this.get(urls, options);
+
       return v ? [v] : [];
     }
 
@@ -49,15 +51,18 @@ export class RelayMap<T> {
   set(url: string, v: T, options?: TrustOption): this {
     if (options?.trusted) {
       this.#map.set(url as RelayUrl, v);
+
       return this;
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return this;
     }
 
     this.#map.set(u, v);
+
     return this;
   }
 
@@ -67,7 +72,9 @@ export class RelayMap<T> {
     }
 
     const value = v();
+
     this.set(url, value, options);
+
     return value;
   }
 
@@ -77,6 +84,7 @@ export class RelayMap<T> {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return false;
     }
@@ -90,6 +98,7 @@ export class RelayMap<T> {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return false;
     }
@@ -163,6 +172,7 @@ export class RelaySet {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return this;
     }
@@ -176,6 +186,7 @@ export class RelaySet {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return false;
     }
@@ -189,6 +200,7 @@ export class RelaySet {
     }
 
     const u = normalizeRelayUrl(url);
+
     if (u === null) {
       return false;
     }
@@ -285,6 +297,7 @@ export class RelayMapOperator<T> {
 
     if (!value) {
       value = this.factory(relay);
+
       this.#map.set(relay, value);
     }
 
@@ -327,6 +340,7 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
   }
 
   let u: URL;
+
   try {
     u = new URL(url.trim());
   } catch {
@@ -337,7 +351,9 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
   u.pathname = tryOrDefault(() => decodeURI(u.pathname), u.pathname);
   u.pathname = u.pathname.replace(/\/$/, "");
   u.hostname = u.hostname.replace(/\.$/, "");
+
   u.searchParams.sort();
+
   u.search = tryOrDefault(() => decodeURIComponent(u.search), u.search);
 
   if (!u.hostname) {
@@ -347,6 +363,7 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
   if (!/^wss?:$/.test(u.protocol)) {
     return null;
   }
+
   let s = u.toString() as RelayUrl;
 
   if (!u.search) {

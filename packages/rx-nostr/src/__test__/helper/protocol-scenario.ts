@@ -15,17 +15,24 @@ export const scenarioTest = test.extend<{
   createScenario: async ({}, use) => {
     vi.useFakeTimers();
     const scenarios: RxNostrScenario[] = [];
+
     try {
       await use((config) => {
         const scenario = createRxNostrScenario(config);
+
         scenarios.push(scenario);
+
         return scenario;
       });
     } finally {
       for (const { rxNostr, server } of scenarios) {
         rxNostr.dispose();
-        for (const socket of server.connections) socket.acknowledgeClose();
+
+        for (const socket of server.connections) {
+          socket.acknowledgeClose();
+        }
       }
+
       await settleProtocol();
       vi.useRealTimers();
     }

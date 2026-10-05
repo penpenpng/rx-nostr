@@ -7,10 +7,12 @@ afterEach(() => vi.useRealTimers());
 test("reports the awaited position and the receive count at timeout", async () => {
   vi.useFakeTimers();
   const queue = new QueueInspector<number>("WebSocket inbox (wss://relay.example.com)", 100);
+
   queue.push(1);
   queue.ignoreNexts(2);
   const pending = queue.waitNext();
   const error = pending.catch((error: unknown) => error);
+
   queue.push(2);
   await vi.advanceTimersByTimeAsync(100);
 
@@ -35,6 +37,7 @@ test("uses a default name when none is supplied", async () => {
     index: 0,
     receivedCount: 0,
   });
+
   await vi.advanceTimersByTimeAsync(100);
   await failure;
 });
@@ -44,6 +47,7 @@ test("settles shared waits and clears their timeout when a value arrives", async
   const queue = new QueueInspector<string>("messages");
   const first = queue.waitNext();
   const samePosition = queue.wait(0);
+
   expect(samePosition).toBe(first);
   queue.push("first");
   await expect(first).resolves.toBe("first");
@@ -57,6 +61,7 @@ test("can inspect a late value after an earlier wait timed out", async () => {
   vi.useFakeTimers();
   const queue = new QueueInspector<string>("messages");
   const failure = expect(queue.wait(0)).rejects.toBeInstanceOf(QueueInspectorTimeoutError);
+
   await vi.advanceTimersByTimeAsync(100);
   await failure;
   queue.push("late");

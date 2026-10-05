@@ -25,11 +25,13 @@ function validatePow(
   requireTargetDifficulty: boolean,
 ): boolean {
   const nonce = event.tags.find((tag) => tag[0] === "nonce");
+
   if (!nonce) {
     return false;
   }
 
   const targetDifficulty = Number(nonce[2]);
+
   if (requireTargetDifficulty && targetDifficulty < difficulty) {
     return false;
   }
@@ -43,10 +45,12 @@ function countLeadingZeroes(hex: string) {
 
   for (let i = 0; i < hex.length; i++) {
     const nibble = parseInt(hex[i], 16);
+
     if (nibble === 0) {
       count += 4;
     } else {
       count += Math.clz32(nibble) - 28;
+
       break;
     }
   }

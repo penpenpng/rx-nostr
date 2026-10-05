@@ -19,6 +19,7 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   setMaxSubscriptions(maxSubscriptions: number | undefined): void {
     this.#maxSubscriptions = maxSubscriptions;
     this.#capacityReady = true;
+
     this.#drain();
   }
 
@@ -30,18 +31,26 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
     return new Observable((subscriber) => {
       if (this.#disposed) {
         subscriber.complete();
+
         return;
       }
+
       const task: ReqTask = { subscriber, run, started: false, finished: false };
+
       this.#pending.add(task);
       this.#drain();
+
       return () => this.#finish(task);
     });
   }
 
   [Symbol.dispose] = once(() => {
     this.#disposed = true;
-    for (const task of [...this.#pending, ...this.#active]) task.subscriber.complete();
+
+    for (const task of [...this.#pending, ...this.#active]) {
+      task.subscriber.complete();
+    }
+
     this.#pending.clear();
     this.#active.clear();
   });
@@ -53,34 +62,50 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
       this.#drainScheduled ||
       this.#drainSuppression > 0 ||
       !this.#capacityReady
-    )
-      return;
-    const limit = this.#maxSubscriptions ?? Number.POSITIVE_INFINITY;
-    if (limit === 0) {
-      for (const task of this.#pending) task.subscriber.complete();
+    ) {
       return;
     }
+
+    const limit = this.#maxSubscriptions ?? Number.POSITIVE_INFINITY;
+
+    if (limit === 0) {
+      for (const task of this.#pending) {
+        task.subscriber.complete();
+      }
+
+      return;
+    }
+
     while (this.#pending.size > 0 && this.#active.size < limit) {
       const task = this.#pending.values().next().value as ReqTask;
+
       if (task.finished) {
         this.#pending.delete(task);
         continue;
       }
+
       this.#pending.delete(task);
+
       task.started = true;
+
       this.#active.add(task);
       let terminal: ReqTerminal | undefined;
+
       try {
         const subscription = task.run().subscribe({
           next: (packet) => task.subscriber.next(packet),
           error: (error) => (terminal = { type: "error", error }),
           complete: () => (terminal = { type: "complete" }),
         });
+
         task.subscription = subscription;
+
         // RxJS runs added finalizers after the source teardown. Releasing the slot here
         // ensures a queued REQ cannot start before the old REQ has sent its CLOSE.
         subscription.add(() => {
-          if (terminal) this.#terminate(task, terminal);
+          if (terminal) {
+            this.#terminate(task, terminal);
+          }
         });
       } catch (error) {
         this.#terminate(task, { type: "error", error });
@@ -89,9 +114,14 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
   }
 
   #finish(task: ReqTask): void {
-    if (task.finished) return;
+    if (task.finished) {
+      return;
+    }
+
     task.finished = true;
+
     this.#pending.delete(task);
+
     if (task.started) {
       this.#active.delete(task);
       task.subscription?.unsubscribe();
@@ -100,23 +130,32 @@ export class RelayReqScheduler implements ReqScheduler, Disposable {
     // Let that teardown remove all siblings before admitting another REQ.
     if (!this.#disposed && !this.#drainScheduled) {
       this.#drainScheduled = true;
+
       queueMicrotask(() => {
         this.#drainScheduled = false;
+
         this.#drain();
       });
     }
   }
 
   #terminate(task: ReqTask, terminal: ReqTerminal): void {
-    if (task.finished) return;
+    if (task.finished) {
+      return;
+    }
+
     task.finished = true;
+
     this.#active.delete(task);
     // Keep draining suspended while downstream handles the terminal. In particular,
     // merge() must be able to cancel queued sibling plans before another one starts.
     this.#drainSuppression++;
     try {
-      if (terminal.type === "error") task.subscriber.error(terminal.error);
-      else task.subscriber.complete();
+      if (terminal.type === "error") {
+        task.subscriber.error(terminal.error);
+      } else {
+        task.subscriber.complete();
+      }
     } finally {
       this.#drainSuppression--;
       this.#drain();

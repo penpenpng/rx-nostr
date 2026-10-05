@@ -17,13 +17,13 @@ export function isFiltered(
   },
 ): boolean {
   if (Array.isArray(filters)) {
-    return filters.some((filter) => _isFiltered(event, filter, options));
+    return filters.some((filter) => matchesFilter(event, filter, options));
   } else {
-    return _isFiltered(event, filters, options);
+    return matchesFilter(event, filters, options);
   }
 }
 
-function _isFiltered(
+function matchesFilter(
   event: Nostr.Event,
   filter: Nostr.Filter,
   options?: {
@@ -62,6 +62,7 @@ function _isFiltered(
     if (!key.startsWith("#") || !Array.isArray(needleValues)) {
       continue;
     }
+
     const needleTagName = key.slice(1);
 
     if (

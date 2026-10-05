@@ -29,9 +29,13 @@ export class ExponentialBackoffReconnector implements ConnectionReconnector {
     this.#jitter = options.jitter ?? 0.2;
     this.#random = options.random ?? Math.random;
 
-    if (this.#maxRetries !== Infinity) assertNonNegativeInteger(this.#maxRetries, "maxRetries");
+    if (this.#maxRetries !== Infinity) {
+      assertNonNegativeInteger(this.#maxRetries, "maxRetries");
+    }
+
     assertNonNegativeFinite(this.#initialDelay, "initialDelay");
     assertNonNegativeFinite(this.#maxDelay, "maxDelay");
+
     if (!Number.isFinite(this.#jitter) || this.#jitter < 0 || this.#jitter > 1) {
       throw new RangeError("jitter must be a finite number from 0 through 1.");
     }
@@ -47,6 +51,7 @@ export class ExponentialBackoffReconnector implements ConnectionReconnector {
       this.#maxDelay,
     );
     const factor = 1 + (this.#random() * 2 - 1) * this.#jitter;
+
     return {
       action: "retry",
       delay: Math.max(0, Math.round(base * factor)),

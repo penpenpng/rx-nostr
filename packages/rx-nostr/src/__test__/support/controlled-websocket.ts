@@ -10,11 +10,13 @@ class MessageInspector extends QueueInspector<Nostr.ToRelayMessage.Any> {
   ): Promise<Nostr.ToRelayMessage.Message<T>>;
   override async waitNext(type?: Nostr.ToRelayMessage.Type): Promise<Nostr.ToRelayMessage.Any> {
     const message = await super.waitNext();
+
     if (type !== undefined && message[0] !== type) {
       throw new Error(
         `${this.name}: expected ${type} as the next message, received ${JSON.stringify(message)}`,
       );
     }
+
     return message;
   }
 }
@@ -45,27 +47,35 @@ export class ControlledWebSocket implements WebSocketLike {
   }
 
   send(data: WebSocketData): void {
-    if (this.readyState !== 1) throw new Error("The controlled socket is not open.");
+    if (this.readyState !== 1) {
+      throw new Error("The controlled socket is not open.");
+    }
     if (typeof data !== "string") {
       throw new TypeError("Expected a Nostr JSON text message from the client.");
     }
+
     const message: unknown = JSON.parse(data);
+
     if (!Array.isArray(message)) {
       throw new TypeError("Expected a Nostr message tuple from the client.");
     }
+
     this.inbox.push(message as Nostr.ToRelayMessage.Any);
   }
 
   close(code?: number, reason?: string): void {
     if (!this.#isCloseRequested) {
       this.#isCloseRequested = true;
+
       this.#closeRequested.resolve(Object.freeze({ code, reason }));
     }
+
     this.readyState = 2;
   }
 
   open(): void {
     this.readyState = 1;
+
     this.onopen?.({ type: "open" });
   }
 
@@ -84,11 +94,13 @@ export class ControlledWebSocket implements WebSocketLike {
 
   peerClose(code = 1006, reason = "peer closed", wasClean = false): void {
     this.readyState = 3;
+
     this.onclose?.({ code, reason, wasClean });
   }
 
   acknowledgeClose(code = 1000, reason = ""): void {
     this.readyState = 3;
+
     this.onclose?.({ code, reason, wasClean: true });
   }
 }
@@ -103,24 +115,33 @@ export class ControlledWebSocketServer {
 
   constructor() {
     const connections = this.connections;
+
     this.sockets = Object.freeze({
       get latest(): ControlledWebSocket {
         const socket = [...connections].at(-1);
-        if (!socket) throw new Error("No controlled connection has been created.");
+
+        if (!socket) {
+          throw new Error("No controlled connection has been created.");
+        }
+
         return socket;
       },
       latestFor(url: string): ControlledWebSocket {
         const socket = [...connections].findLast((connection) => connection.url === url);
-        if (!socket) throw new Error(`No controlled connection has been created for ${url}.`);
+
+        if (!socket) {
+          throw new Error(`No controlled connection has been created for ${url}.`);
+        }
+
         return socket;
       },
     });
-    this.WebSocket = class {
-      constructor(url: string) {
-        const socket = new ControlledWebSocket(url);
-        connections.push(socket);
-        return socket;
-      }
+    this.WebSocket = function ControlledWebSocketConstructor(url: string) {
+      const socket = new ControlledWebSocket(url);
+
+      connections.push(socket);
+
+      return socket;
     } as unknown as WebSocketConstructor;
   }
 }

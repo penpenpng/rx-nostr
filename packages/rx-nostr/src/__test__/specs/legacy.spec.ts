@@ -17,6 +17,7 @@ describe("createLegacyRxNostr", () => {
     });
     const readableRelay = "wss://read.example.com";
     const writeOnlyRelay = "wss://write.example.com";
+
     client.setDefaultRelays([
       { url: readableRelay, read: true, write: false },
       { url: writeOnlyRelay, read: false, write: true },
@@ -27,9 +28,11 @@ describe("createLegacyRxNostr", () => {
     const request = new RxReq();
     const inspector = new SubscriptionInspector<EventPacket>();
     const subscription = client.use(request).subscribe(inspector);
+
     request.emit([{}]);
 
     const socket = server.sockets.latestFor(readableRelay);
+
     socket.open();
     await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
     expect([...server.connections].map(({ url }) => url)).toContain(readableRelay);
@@ -38,6 +41,9 @@ describe("createLegacyRxNostr", () => {
     subscription.unsubscribe();
     client.dispose();
     request.dispose();
-    for (const connection of server.connections) connection.acknowledgeClose();
+
+    for (const connection of server.connections) {
+      connection.acknowledgeClose();
+    }
   });
 });

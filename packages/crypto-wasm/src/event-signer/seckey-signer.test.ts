@@ -17,6 +17,7 @@ describe(SeckeySigner.name, () => {
       created_at: 1744991602,
       kind: 1,
     });
+
     expect(verifyEvent(signedEvent)).toBe(true);
   });
 
@@ -33,6 +34,7 @@ describe(SeckeySigner.name, () => {
       created_at: 1744991602,
       kind: 1,
     });
+
     expect(verifyEvent(signedEvent)).toBe(true);
   });
 });

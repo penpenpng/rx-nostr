@@ -12,8 +12,8 @@ export async function expectCallbackCalled(callback: MockCallback, count = 1): P
   await vi.waitFor(() => expect(callback.mock.calls).toHaveLength(count));
 }
 
-export class Expect {
-  static eventPacket({
+export const Expect = {
+  eventPacket({
     from,
     traceTag,
     ...event
@@ -26,5 +26,5 @@ export class Expect {
       ...(traceTag === undefined ? {} : { traceTag }),
       event: expect.objectContaining(event),
     });
-  }
-}
+  },
+};

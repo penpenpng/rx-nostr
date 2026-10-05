@@ -56,7 +56,11 @@ export class RelayCommunication implements IRelayCommunication {
       (maxSubscriptions) => this.#reqScheduler.setMaxSubscriptions(maxSubscriptions),
       () => this.#reqScheduler.waitForMaxSubscriptions(),
     );
-    if (options.nip11Timeout === undefined) this.#directory.useAvailableNip11();
+
+    if (options.nip11Timeout === undefined) {
+      this.#directory.useAvailableNip11();
+    }
+
     const transport = new NostrTransport({
       url,
       relayHealthPolicy: options.relayHealthPolicy,
@@ -67,6 +71,7 @@ export class RelayCommunication implements IRelayCommunication {
       onDiagnostic: options.onDiagnostic,
       ...this.#directory.transportHooks,
     });
+
     this.#executor = new NostrOperationExecutor(url, transport, {
       onDiagnostic: options.onDiagnostic,
       vreqPlanner: options.vreqPlanner,
@@ -85,6 +90,7 @@ export class RelayCommunication implements IRelayCommunication {
             });
           });
         }
+
         void this.#executor.open().catch(() => {});
       },
       onLastRelease: () => void this.#executor.close().catch(() => {}),
@@ -104,14 +110,20 @@ export class RelayCommunication implements IRelayCommunication {
       validateFilterMatching?: boolean;
     }> = {},
   ): Observable<EventPacket> {
-    if (this.#leases.count === 0) return EMPTY;
+    if (this.#leases.count === 0) {
+      return EMPTY;
+    }
+
     return this.#executor
       .vreq(strategy, filters, this.#reqScheduler, options)
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
   }
 
   event(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<OkPacket> {
-    if (this.#leases.count === 0) return EMPTY;
+    if (this.#leases.count === 0) {
+      return EMPTY;
+    }
+
     return this.#executor
       .event(event, options)
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
@@ -138,5 +150,6 @@ function communicationErrorFrom(error: unknown): unknown {
   if (error instanceof NostrTransportOperationError) {
     return new RelayCommunicationError(error.reason);
   }
+
   return error;
 }

@@ -33,6 +33,7 @@ export class RelayDirectory implements IRelayDirectory {
   constructor(options: RelayDirectoryOptions = {}) {
     this.#clock = options.clock ?? Date.now;
     this.#fetcher = options.fetcher ?? fetchRelayInfo;
+
     reporters.set(
       this,
       Object.freeze({
@@ -46,6 +47,7 @@ export class RelayDirectory implements IRelayDirectory {
 
   get(url: string): RelayDirectoryEntry | undefined {
     const entry = this.#relays.get(url)?.snapshot();
+
     return entry && copyEntry(entry);
   }
 
@@ -59,14 +61,24 @@ export class RelayDirectory implements IRelayDirectory {
 
   forget(url: string): boolean {
     const record = this.#relays.get(url);
-    if (!record || !record.forgettable) return false;
+
+    if (!record || !record.forgettable) {
+      return false;
+    }
+
     const deleted = this.#relays.delete(record.url, { trusted: true });
-    if (deleted) record.dispose();
+
+    if (deleted) {
+      record.dispose();
+    }
+
     return deleted;
   }
 
   *values(): IterableIterator<RelayDirectoryEntry> {
-    for (const relay of this.#relays.values()) yield copyEntry(relay.snapshot());
+    for (const relay of this.#relays.values()) {
+      yield copyEntry(relay.snapshot());
+    }
   }
 
   [Symbol.iterator](): IterableIterator<RelayDirectoryEntry> {
@@ -92,20 +104,28 @@ export class RelayDirectory implements IRelayDirectory {
       version: 1,
       relays: [...this.#relays.values()]
         .map((relay) => relay.persisted())
-        .sort((left, right) => left.url.localeCompare(right.url)),
+        .toSorted((left, right) => left.url.localeCompare(right.url)),
     };
+
     return JSON.stringify(snapshot);
   }
 
   importSnapshot(data: string): void {
     const entries = parseSnapshot(data);
+
     // Validation above is deliberately complete before the first mutation.
-    for (const entry of entries) this.#getOrCreate(entry.url).merge(entry);
+    for (const entry of entries) {
+      this.#getOrCreate(entry.url).merge(entry);
+    }
   }
 
   #getOrCreate(url: string): RelayRecord {
     const normalized = normalizeRelayUrl(url);
-    if (!normalized) throw new TypeError(`Invalid relay URL: ${url}`);
+
+    if (!normalized) {
+      throw new TypeError(`Invalid relay URL: ${url}`);
+    }
+
     return this.#relays.setDefault(
       normalized,
       () => new RelayRecord(normalized, this.#clock, this.#fetcher),
@@ -124,7 +144,11 @@ function copyEntry(entry: RelayDirectoryEntry): RelayDirectoryEntry {
 /** @internal Used by RelayCommunication integration without widening public API. */
 export function getRelayDirectoryReporter(directory: RelayDirectory): RelayDirectoryReporter {
   const reporter = reporters.get(directory);
-  if (!reporter) throw new TypeError("Unknown RelayDirectory implementation.");
+
+  if (!reporter) {
+    throw new TypeError("Unknown RelayDirectory implementation.");
+  }
+
   return reporter;
 }
 
@@ -132,13 +156,19 @@ export const GlobalRelayDirectory = new RelayDirectory();
 
 function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
   let value: unknown;
+
   try {
     value = JSON.parse(data);
   } catch (cause) {
     throw new RelayDirectorySnapshotError("invalid-json", "Snapshot is not valid JSON.", { cause });
   }
-  if (!isObject(value)) return invalidSchema("Snapshot must be an object.");
+
+  if (!isObject(value)) {
+    return invalidSchema("Snapshot must be an object.");
+  }
+
   assertOnlyKeys(value, ["version", "relays"]);
+
   if (value.version !== 1) {
     if (typeof value.version === "number") {
       throw new RelayDirectorySnapshotError(
@@ -146,6 +176,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
         `Unsupported snapshot version: ${value.version}.`,
       );
     }
+
     return invalidSchema("Snapshot version is missing or invalid.");
   }
   if (!Array.isArray(value.relays)) {
@@ -154,8 +185,12 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
 
   const entries: RelayDirectorySnapshotEntry[] = [];
   const urls = new Set<RelayUrl>();
+
   for (const candidate of value.relays) {
-    if (!isObject(candidate)) return invalidSchema("Relay entry must be an object.");
+    if (!isObject(candidate)) {
+      return invalidSchema("Relay entry must be an object.");
+    }
+
     assertOnlyKeys(candidate, [
       "url",
       "nip11",
@@ -166,23 +201,36 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
       "firstFailureAt",
       "consecutiveFailures",
     ]);
+
     if (typeof candidate.url !== "string") {
       return invalidSchema("Relay entry URL must be a string.");
     }
+
     const url = normalizeRelayUrl(candidate.url);
-    if (!url) return invalidSchema(`Invalid relay URL: ${candidate.url}.`);
-    if (urls.has(url)) return invalidSchema(`Duplicate relay URL: ${url}.`);
+
+    if (!url) {
+      return invalidSchema(`Invalid relay URL: ${candidate.url}.`);
+    }
+    if (urls.has(url)) {
+      return invalidSchema(`Duplicate relay URL: ${url}.`);
+    }
+
     urls.add(url);
 
     const nip11 = candidate.nip11;
+
     if (nip11 !== undefined && !isObject(nip11)) {
       return invalidSchema("nip11 must be a JSON object.");
     }
+
     const nip11FetchedAt = optionalTimestamp(candidate.nip11FetchedAt, "nip11FetchedAt");
+
     if ((nip11 === undefined) !== (nip11FetchedAt === undefined)) {
       return invalidSchema("nip11 and nip11FetchedAt must be present together.");
     }
+
     const consecutiveFailures = candidate.consecutiveFailures;
+
     if (
       typeof consecutiveFailures !== "number" ||
       !Number.isInteger(consecutiveFailures) ||
@@ -190,9 +238,11 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
     ) {
       return invalidSchema("consecutiveFailures must be a non-negative integer.");
     }
+
     const lastConnectedAt = optionalTimestamp(candidate.lastConnectedAt, "lastConnectedAt");
     const lastFailureAt = optionalTimestamp(candidate.lastFailureAt, "lastFailureAt");
     const firstFailureAt = optionalTimestamp(candidate.firstFailureAt, "firstFailureAt");
+
     if (
       firstFailureAt !== undefined &&
       (consecutiveFailures === 0 ||
@@ -226,6 +276,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
       }),
     );
   }
+
   return entries;
 }
 
@@ -234,21 +285,28 @@ function optionalTimestampProperty<K extends "nip11FailedAt" | "lastConnectedAt"
   key: K,
 ): Partial<Record<K, number>> {
   const value = optionalTimestamp(object[key], key);
+
   return value === undefined ? {} : ({ [key]: value } as Record<K, number>);
 }
 
 function optionalTimestamp(value: unknown, name: string): number | undefined {
-  if (value === undefined) return undefined;
+  if (value === undefined) {
+    return undefined;
+  }
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     return invalidSchema(`${name} must be a non-negative finite number.`);
   }
+
   return value;
 }
 
 function assertOnlyKeys(object: Record<string, unknown>, allowed: readonly string[]): void {
   const allowedSet = new Set(allowed);
+
   for (const key of Object.keys(object)) {
-    if (!allowedSet.has(key)) invalidSchema(`Unknown relay entry field: ${key}.`);
+    if (!allowedSet.has(key)) {
+      invalidSchema(`Unknown relay entry field: ${key}.`);
+    }
   }
 }
 

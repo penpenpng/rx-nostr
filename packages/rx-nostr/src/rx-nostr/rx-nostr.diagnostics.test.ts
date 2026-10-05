@@ -21,7 +21,9 @@ describe("RxNostr diagnostics", () => {
     const anotherServer = new ControlledWebSocketServer();
     const anotherRelay = "wss://another-diagnostics.example.com";
     const diagnostics: RxNostrDiagnostic[] = [];
+
     RxNostr.logSink = (diagnostic) => diagnostics.push(diagnostic);
+
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       reconnector: new NoopReconnector(),
@@ -48,8 +50,10 @@ describe("RxNostr diagnostics", () => {
       ),
     ]);
     const socket = server.sockets.latest;
+
     socket.open();
     const socket2 = anotherServer.sockets.latest;
+
     socket2.open();
     await connected;
     socket.rawMessage("not-json");
@@ -98,7 +102,9 @@ describe("RxNostr diagnostics", () => {
   test("reports failed initial WebSocket attempts", async () => {
     const server = new ControlledWebSocketServer();
     const diagnostics: RxNostrDiagnostic[] = [];
+
     RxNostr.logSink = (diagnostic) => diagnostics.push(diagnostic);
+
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       reconnector: new NoopReconnector(),
@@ -108,6 +114,7 @@ describe("RxNostr diagnostics", () => {
 
     rxNostr.setHotRelays(relay);
     const socket = server.sockets.latest;
+
     socket.peerClose(1006, "unreachable");
 
     await vi.waitFor(() =>
@@ -132,7 +139,9 @@ describe("RxNostr diagnostics", () => {
     const server = new ControlledWebSocketServer();
     const cause = new Error("send failed");
     const diagnostics: RxNostrDiagnostic[] = [];
+
     RxNostr.logSink = (diagnostic) => diagnostics.push(diagnostic);
+
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       reconnector: new NoopReconnector(),
@@ -142,11 +151,15 @@ describe("RxNostr diagnostics", () => {
 
     rxNostr.setHotRelays(relay);
     const socket = server.sockets.latest;
+
     socket.open();
+
     socket.send = () => {
       throw cause;
     };
+
     const inspector = new SubscriptionInspector<EventPacket>();
+
     rxNostr.backward(relay, [{}]).subscribe(inspector);
 
     await vi.waitFor(() =>
@@ -167,13 +180,16 @@ describe("RxNostr diagnostics", () => {
 
   test("includes rx-nostr diagnostics", async () => {
     const diagnostics: RxNostrDiagnostic[] = [];
+
     RxNostr.logSink = (diagnostic) => diagnostics.push(diagnostic);
+
     const rxNostr = new RxNostr({
       verifier: new NoopVerifier(),
       skipFetchNip11: true,
     });
 
     const inspector = new SubscriptionInspector<EventPacket>();
+
     rxNostr.backward([], [{}]).subscribe(inspector);
 
     await vi.waitFor(() =>

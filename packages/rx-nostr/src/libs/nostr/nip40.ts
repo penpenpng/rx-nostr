@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 
 export function isExpired(event: Nostr.Event, now?: number): boolean {
-  const tag = event.tags.find((tag) => tag[0] === "expiration");
+  const tag = event.tags.find((entry) => entry[0] === "expiration");
 
   if (!tag) {
     return false;

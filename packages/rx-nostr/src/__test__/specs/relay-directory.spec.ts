@@ -36,6 +36,7 @@ describe("RelayDirectory public contract", () => {
 
       rxNostr.unsetHotRelays();
       const socket = server.sockets.latest;
+
       await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
@@ -56,6 +57,7 @@ describe("RelayDirectory public contract", () => {
 
       rxNostr.unsetHotRelays();
       const socket = server.sockets.latest;
+
       await expect(socket.closeRequested).resolves.toBeDefined();
       socket.acknowledgeClose();
       rxNostr.dispose();
@@ -82,6 +84,7 @@ describe("RelayDirectory public contract", () => {
 
     test("rejects malformed snapshots atomically with typed errors", () => {
       const directory = new RelayDirectory();
+
       directory.setNip11("wss://existing.example.com", { name: "existing" });
       const before = directory.exportSnapshot();
 
@@ -144,6 +147,7 @@ describe("RelayDirectory public contract", () => {
         .mockResolvedValueOnce({ name: "initial" })
         .mockResolvedValueOnce({ name: "refreshed", limitation: { max_subscriptions: 4 } });
       const directory = new RelayDirectory({ fetcher });
+
       await directory.fetchNip11(relay);
 
       await expect(directory.fetchNip11(relay, { refresh: true })).resolves.toMatchObject({
@@ -152,7 +156,9 @@ describe("RelayDirectory public contract", () => {
       expect(fetcher).toHaveBeenCalledTimes(2);
 
       const installed = directory.setNip11(relay, { name: "manual" });
+
       installed.name = "consumer change";
+
       expect(directory.get(relay)?.nip11).toEqual({ name: "manual" });
     });
   });

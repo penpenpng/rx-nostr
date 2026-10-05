@@ -9,10 +9,12 @@ test("RxRelays emits a relay URL", async () => {
   const rxr = new RxRelays();
 
   const relay1 = "wss://relay1.example.com";
+
   rxr.append(relay1);
 
   const observable = rxr.asObservable();
   const inspector = new SubscriptionInspector<Set<RelayUrl>>();
+
   observable.subscribe(inspector);
 
   await expect(inspector.waitNext()).resolves.toEqual(new Set([relay1]));
@@ -25,16 +27,19 @@ test(RxRelays.union.name, async () => {
 
   const relay1 = "wss://relay1.example.com";
   const relay2 = "wss://relay2.example.com";
+
   rxr1.append(relay1);
   rxr2.append(relay2);
 
   const observable = rxr.asObservable();
   const inspector = new SubscriptionInspector<Set<RelayUrl>>();
+
   observable.subscribe(inspector);
 
   await expect(inspector.waitNext()).resolves.toEqual(new Set([relay1, relay2]));
 
   const relay3 = "wss://relay3.example.com";
+
   rxr1.append(relay3);
   await expect(inspector.waitNext()).resolves.toEqual(new Set([relay1, relay2, relay3]));
 

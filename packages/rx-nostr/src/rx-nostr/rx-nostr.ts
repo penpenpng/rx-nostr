@@ -84,9 +84,11 @@ export class RxNostr implements IRxNostr {
         onDiagnostic: emitDiagnostic,
       });
     });
+
     this.#stack.use(this.#relays);
 
     this.#warmer = new RelayWarmer(this.#relays);
+
     this.#stack.use(this.#warmer);
   }
 
@@ -113,22 +115,36 @@ export class RxNostr implements IRxNostr {
     options: RxNostrReqConfig,
   ): Observable<EventPacket> {
     const config = new FilledRxNostrReqOptions(options, this.#config);
-    const source$: Observable<ReqPacket> =
-      request instanceof RxReq
-        ? request.asObservable()
-        : request.length === 0
-          ? EMPTY
-          : of({ filters: [...request] });
+    let source$: Observable<ReqPacket>;
+
+    if (request instanceof RxReq) {
+      source$ = request.asObservable();
+    } else if (request.length === 0) {
+      source$ = EMPTY;
+    } else {
+      source$ = of({ filters: [...request] });
+    }
 
     return defer(() => {
       this.#assertActive();
+
       // An empty static request has no demand, even when prewarming is enabled.
-      if (source$ === EMPTY) return EMPTY;
-      const connectionDemand =
-        req === reqBackward
-          ? new ConnectionDemandScope(config, () => this.#queryDemands.delete(connectionDemand!))
-          : undefined;
-      if (connectionDemand) this.#queryDemands.add(connectionDemand);
+      if (source$ === EMPTY) {
+        return EMPTY;
+      }
+
+      let connectionDemand: ConnectionDemandScope | undefined;
+
+      if (req === reqBackward) {
+        connectionDemand = new ConnectionDemandScope(config, () =>
+          this.#queryDemands.delete(connectionDemand!),
+        );
+      }
+
+      if (connectionDemand) {
+        this.#queryDemands.add(connectionDemand);
+      }
+
       return req({
         connectionDemand,
         source$,
@@ -156,8 +172,10 @@ export class RxNostr implements IRxNostr {
       relayInput: relays,
       relays: this.#relays,
     });
+
     this.#publications.add(publication);
     void publication.closed.then(() => this.#publications.delete(publication));
+
     return publication;
   }
 
@@ -174,6 +192,7 @@ export class RxNostr implements IRxNostr {
   monitorConnectionState(): Observable<ConnectionStatePacket> {
     return defer(() => {
       this.#assertActive();
+
       return this.#relays
         .observeEntries()
         .pipe(
@@ -188,25 +207,36 @@ export class RxNostr implements IRxNostr {
 
   [Symbol.dispose] = once(() => {
     this.#disposed = true;
+
     this.#dispose$.next();
     this.#dispose$.complete();
-    for (const publication of this.#publications) publication.cancel();
+
+    for (const publication of this.#publications) {
+      publication.cancel();
+    }
+
     this.#publications.clear();
-    for (const demand of this.#queryDemands) demand.dispose();
+
+    for (const demand of this.#queryDemands) {
+      demand.dispose();
+    }
+
     this.#queryDemands.clear();
     this.#stack.dispose();
   });
   dispose = this[Symbol.dispose];
 
   #assertActive(): void {
-    if (this.#disposed) throw new RxNostrAlreadyDisposedError();
+    if (this.#disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
   }
 }
 
 function copyConnectionState(
   state: ConnectionStatePacket["state"],
 ): ConnectionStatePacket["state"] {
-  if (state.state === "failed")
+  if (state.state === "failed") {
     return {
       ...state,
       reason: {
@@ -214,6 +244,7 @@ function copyConnectionState(
         ...(state.reason.detector ? { detector: { ...state.reason.detector } } : {}),
       },
     };
+  }
   if (state.state === "waiting-for-connection") {
     return {
       ...state,
@@ -230,6 +261,7 @@ function copyConnectionState(
         : {}),
     };
   }
+
   return { ...state };
 }
 

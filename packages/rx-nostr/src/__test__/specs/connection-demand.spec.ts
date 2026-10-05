@@ -23,36 +23,50 @@ describe("connection demand public contract", () => {
       "shares one socket across hot, query, publish and weak work when ending %s",
       async (order, { createScenario }) => {
         const { rxNostr, server } = createScenario({ signer: new NoopSigner() });
+
         rxNostr.setHotRelays(b);
         const firstInspector = new SubscriptionInspector<EventPacket>();
         const owner = rxNostr.forward(b, [{}]).subscribe(firstInspector);
         const publication = rxNostr.publish(b, Faker.event({ id: "published" }), { linger: 0 });
         const socket = server.sockets.latest;
+
         socket.open();
         await settleProtocol();
         const secondInspector = new SubscriptionInspector<EventPacket>();
         const weak = rxNostr.forward(b, [{}], { weak: true }).subscribe(secondInspector);
+
         await settleProtocol();
         const endHot = () => rxNostr.unsetHotRelays();
         const endQuery = () => owner.unsubscribe();
         const endPublish = () => socket.message(["OK", "published", true, "saved"]);
-        const endings =
-          order === "hot-first"
-            ? [endHot, endQuery, endPublish]
-            : order === "query-first"
-              ? [endQuery, endPublish, endHot]
-              : [endPublish, endHot, endQuery];
+        let endings: Array<() => void>;
+
+        switch (order) {
+          case "hot-first":
+            endings = [endHot, endQuery, endPublish];
+
+            break;
+          case "query-first":
+            endings = [endQuery, endPublish, endHot];
+
+            break;
+          default:
+            endings = [endPublish, endHot, endQuery];
+        }
+
         for (const end of endings.slice(0, 2)) {
           end();
           await settleProtocol();
           expect(socket.isCloseRequested).toBe(false);
         }
+
         endings[2]!();
         await settleProtocol();
         await expect(publication.waitFor("all")).resolves.toBeUndefined();
         expect(socket.isCloseRequested).toBe(true);
         expect(server.connections).toHaveLength(1);
         const sent = socket.inbox.length;
+
         weak.unsubscribe();
         await settleProtocol();
         expect(socket.inbox.length).toBe(sent);
@@ -61,6 +75,7 @@ describe("connection demand public contract", () => {
 
     test("keeps a hot relay connected while releasing a cold publish relay", async () => {
       const { server, rxNostr } = createPublicationScenario();
+
       rxNostr.setHotRelays([relay1]);
       const hot = socket(server, relay1);
 
@@ -97,8 +112,10 @@ describe("connection demand public contract", () => {
         async ({ createScenario }) => {
           const { rxNostr, server } = createScenario();
           const firstInspector = new SubscriptionInspector<EventPacket>();
+
           rxNostr.backward(b, [{}], { linger: 100 }).subscribe(firstInspector);
           const socket = server.sockets.latest;
+
           socket.open();
           await settleProtocol();
           socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
@@ -107,6 +124,7 @@ describe("connection demand public contract", () => {
           const weak = rxNostr[strategy](b, [{}], { weak: true, linger: Infinity }).subscribe(
             secondInspector,
           );
+
           await settleProtocol();
           await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
           expect(socket.inbox.length).toBe(2);
@@ -125,11 +143,13 @@ describe("connection demand public contract", () => {
         `${strategy} uses an existing %s lease without opening other destinations`,
         async (state, { createScenario }) => {
           const { rxNostr, server } = createScenario();
+
           using source = new RxReq();
           const firstInspector = new SubscriptionInspector<EventPacket>();
           const secondInspector = new SubscriptionInspector<EventPacket>();
           const owner = rxNostr.backward(b, [{}], { linger: 100 }).subscribe(secondInspector);
           const socket = server.sockets.latest;
+
           if (state !== "opening") {
             socket.open();
             await settleProtocol();
@@ -138,6 +158,7 @@ describe("connection demand public contract", () => {
             socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
             await settleProtocol();
           }
+
           const weak = rxNostr[strategy](a, source, { weak: true, defer: false }).subscribe(
             firstInspector,
           );
@@ -146,6 +167,7 @@ describe("connection demand public contract", () => {
           source.emit([{}], { relays: [c, b], traceTag: "temporary" });
           await settleProtocol();
           expect([...server.connections].map((connection) => connection.url)).toEqual([b]);
+
           if (state === "opening") {
             expect(socket.inbox.length).toBe(0);
             socket.open();
@@ -154,7 +176,9 @@ describe("connection demand public contract", () => {
           if (state !== "lingering") {
             await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
           }
+
           const [, id] = await socket.inbox.waitNext("REQ");
+
           expect(socket.inbox.length).toBe(2);
           socket.message(["EVENT", id, Faker.event({ id: "weak-result" })]);
           await settleProtocol();
@@ -176,15 +200,18 @@ describe("connection demand public contract", () => {
         `${strategy} does not resurrect an unleased packet after another operation connects`,
         async ({ createScenario }) => {
           const { rxNostr, server } = createScenario();
+
           using source = new RxReq();
           const inspector = new SubscriptionInspector<EventPacket>();
           const weak = rxNostr[strategy](a, source, { weak: true }).subscribe(inspector);
+
           source.emit([{}], { relays: c });
           await settleProtocol();
           expect(server.connections).toHaveLength(0);
 
           rxNostr.setHotRelays(c);
           const socket = server.sockets.latest;
+
           socket.open();
           await settleProtocol();
           expect(socket.inbox.length).toBe(0);
@@ -203,13 +230,18 @@ describe("connection demand public contract", () => {
         `${strategy} releases a removed prewarm relay before any emit`,
         async ({ createScenario }) => {
           const { rxNostr, server } = createScenario();
+
           using destinations = new RxRelays([a, b]);
           using source = new RxReq();
           const inspector = new SubscriptionInspector<EventPacket>();
           const query = rxNostr[strategy](destinations, source, { defer: false }).subscribe(
             inspector,
           );
-          for (const socket of server.connections) socket.open();
+
+          for (const socket of server.connections) {
+            socket.open();
+          }
+
           await settleProtocol();
           destinations.remove(a);
           await settleProtocol();
@@ -235,6 +267,7 @@ describe("connection demand public contract", () => {
       "preserves linger after %s and closes exactly at its deadline",
       async (ending, { createScenario }) => {
         const { rxNostr, server } = createScenario();
+
         using request = new RxReq();
         using destinations = new RxRelays([relay]);
         const inspector = new SubscriptionInspector<EventPacket>();
@@ -245,22 +278,42 @@ describe("connection demand public contract", () => {
             timeout: ending === "timeout" ? 10 : Infinity,
           })
           .subscribe(inspector);
-        if (ending === "source-dispose") request.emit([{}]);
+
+        if (ending === "source-dispose") {
+          request.emit([{}]);
+        }
+
         const socket = server.sockets.latest;
-        if (ending === "error")
+
+        if (ending === "error") {
           socket.send = () => {
             throw new Error("send failed");
           };
+        }
+
         socket.open();
         await settleProtocol();
         const id = ending === "error" ? undefined : (await socket.inbox.waitNext("REQ"))[1];
 
-        if (ending === "eose" || ending === "source-dispose") socket.message(["EOSE", id!]);
-        if (ending === "closed") socket.message(["CLOSED", id!, "blocked"]);
-        if (ending === "timeout") await vi.advanceTimersByTimeAsync(10);
-        if (ending === "unsubscribe") subscription.unsubscribe();
-        if (ending === "remove") destinations.clear();
-        if (ending === "source-dispose") request.dispose();
+        if (ending === "eose" || ending === "source-dispose") {
+          socket.message(["EOSE", id!]);
+        }
+        if (ending === "closed") {
+          socket.message(["CLOSED", id!, "blocked"]);
+        }
+        if (ending === "timeout") {
+          await vi.advanceTimersByTimeAsync(10);
+        }
+        if (ending === "unsubscribe") {
+          subscription.unsubscribe();
+        }
+        if (ending === "remove") {
+          destinations.clear();
+        }
+        if (ending === "source-dispose") {
+          request.dispose();
+        }
+
         await settleProtocol();
 
         expect(subscription.closed).toBe(true);
@@ -269,6 +322,7 @@ describe("connection demand public contract", () => {
         expect(socket.isCloseRequested).toBe(false);
         await vi.advanceTimersByTimeAsync(1);
         expect(socket.isCloseRequested).toBe(true);
+
         if (["unsubscribe", "remove", "timeout"].includes(ending)) {
           await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", id]);
           expect(socket.inbox.length).toBe(2);
@@ -283,17 +337,21 @@ describe("connection demand public contract", () => {
       async ({ createScenario }) => {
         const { rxNostr, server } = createScenario();
         const firstInspector = new SubscriptionInspector<EventPacket>();
+
         rxNostr.backward(relay, [{}], { linger: 100 }).subscribe(firstInspector);
         const socket = server.sockets.latest;
+
         socket.open();
         await settleProtocol();
         socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
         await vi.advanceTimersByTimeAsync(50);
 
         const secondInspector = new SubscriptionInspector<EventPacket>();
+
         rxNostr.backward(relay, [{}], { linger: 200 }).subscribe(secondInspector);
         await settleProtocol();
         const second = await socket.inbox.waitNext("REQ");
+
         await vi.advanceTimersByTimeAsync(50);
         expect(server.connections).toHaveLength(1);
         expect(socket.isCloseRequested).toBe(false);
@@ -309,6 +367,7 @@ describe("connection demand public contract", () => {
       "keeps independent packet linger deadlines after the source and query finish",
       async ({ createScenario }) => {
         const { rxNostr, server } = createScenario();
+
         using source = new RxReq();
         const inspector = new SubscriptionInspector<EventPacket>();
 
@@ -317,12 +376,16 @@ describe("connection demand public contract", () => {
         source.emit([{}], { linger: 200 });
         source.dispose();
         const socket = server.sockets.latest;
+
         socket.open();
         await settleProtocol();
+
         for (let index = 0; index < 2; index++) {
           const req = await socket.inbox.waitNext("REQ");
+
           socket.message(["EOSE", req[1]]);
         }
+
         await settleProtocol();
         expect(inspector.completed).toBe(true);
         await vi.advanceTimersByTimeAsync(100);

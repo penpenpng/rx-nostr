@@ -135,6 +135,7 @@ describe("rx-nostr config", () => {
 
   test("accepts an injected relay directory", () => {
     const relayDirectory = new RelayDirectory();
+
     expect(createRoot({ relayDirectory }).relayDirectory).toBe(relayDirectory);
   });
 

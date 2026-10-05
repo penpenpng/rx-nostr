@@ -9,6 +9,7 @@ export class RxNostrCallbackError extends RxNostrError {
     cause: unknown,
   ) {
     super(`RxNostrCallbackError: ${callback} callback failed.`, { cause });
+
     this.name = "RxNostrCallbackError";
   }
 }
@@ -28,6 +29,7 @@ export class RxNostrPublicationError extends RxNostrError {
     failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
   ) {
     super(`RxNostrPublicationError: publication failed (${code}).`);
+
     this.name = "RxNostrPublicationError";
     this.failures = failures.map(({ ok, ...failure }) => ({
       ...failure,
@@ -52,6 +54,7 @@ export class RxNostrPublicationError extends RxNostrError {
 export class RxNostrInvalidUsageError extends RxNostrError {
   constructor(message: string) {
     super(`RxNostrInvalidUsageError: ${message}`);
+
     this.name = "RxNostrInvalidUsageError";
   }
 }
@@ -63,6 +66,7 @@ export class RxNostrInvalidUsageError extends RxNostrError {
 export class RxNostrEnvironmentError extends RxNostrError {
   constructor(message: string) {
     super(`RxNostrEnvironmentError: ${message}`);
+
     this.name = "RxNostrEnvironmentError";
   }
 }
@@ -117,6 +121,7 @@ export class RxNostrLogicError extends RxNostrError {
     super(
       "RxNostrLogicError: This is rx-nostr's internal bug. Please report to the author of the library.",
     );
+
     this.name = "RxNostrLogicError";
   }
 }
@@ -129,6 +134,7 @@ export class RxNostrLogicError extends RxNostrError {
 export class RxNostrAlreadyDisposedError extends RxNostrError {
   constructor() {
     super("RxNostrAlreadyDisposedError: Attempted to access a disposed resource.");
+
     this.name = "RxNostrAlreadyDisposedError";
   }
 }

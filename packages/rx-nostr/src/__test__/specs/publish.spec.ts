@@ -47,6 +47,7 @@ describe("Publication public contract", () => {
 
       source[0]!.kind = "cancelled";
       source[0]!.ok!.ok = true;
+
       source.push({ relay: relay2, kind: "timeout" });
       expect(error.failures).toMatchObject([
         { relay: relay1, kind: "rejected", ok: { ok: false } },
@@ -54,6 +55,7 @@ describe("Publication public contract", () => {
 
       error.failures[0]!.kind = "failed";
       error.failures[0]!.ok!.message[3] = "consumer change";
+
       error.failures.push({ relay: relay2, kind: "timeout" });
       expect(error.failures).toHaveLength(2);
       expect(source[0]!.ok!.message[3]).toBe("blocked");
@@ -68,6 +70,7 @@ describe("Publication public contract", () => {
       const sendB = rxNostr.publish([relay2], signed);
       const firstInspector = new SubscriptionInspector<OkPacket>();
       const secondInspector = new SubscriptionInspector<OkPacket>();
+
       sendA.subscribe(firstInspector);
       sendB.subscribe(secondInspector);
       let settledA = false;
@@ -108,6 +111,7 @@ describe("Publication public contract", () => {
       const all = publication.waitFor("all");
       const any = publication.waitFor("any");
       let allSettled = false;
+
       void all.finally(() => (allSettled = true));
 
       const first = socket(server, relay1);
@@ -141,6 +145,7 @@ describe("Publication public contract", () => {
       expect(secondInspector.completed).toBe(true);
 
       const snapshot = await publication.event;
+
       signed.content = "after";
       signed.tags[0]![1] = "after";
 
@@ -149,6 +154,7 @@ describe("Publication public contract", () => {
       expect(Object.isFrozen(snapshot)).toBe(false);
       expect(Object.isFrozen(snapshot.tags)).toBe(false);
       expect(Object.isFrozen(snapshot.tags[0])).toBe(false);
+
       snapshot.content = "consumer change";
       snapshot.tags[0]![1] = "consumer change";
 
@@ -306,6 +312,7 @@ describe("Publication public contract", () => {
       });
       await Promise.resolve();
       const socket = server.sockets.latest;
+
       expect(socket.inbox.length).toBe(0);
 
       rxNostr.dispose();
@@ -328,6 +335,7 @@ describe("Publication public contract", () => {
       await publication.event;
 
       const connection = socket(server, relay1);
+
       connection.open();
       await expect(connection.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       connection.message(["OK", "event", true, "saved"]);
@@ -385,6 +393,7 @@ describe("Publication public contract", () => {
       await expect(server.connections.wait(1)).resolves.toBeDefined();
 
       const second = server.sockets.latest;
+
       second.open();
       await expect(second.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
       second.message(["OK", "event", true, "saved"]);
@@ -410,6 +419,7 @@ describe("Publication public contract", () => {
       publication.subscribe(inspector);
       const all = publication.waitFor("all");
       let settled = false;
+
       void all.finally(() => (settled = true));
       const connection = socket(server, relay1);
 

@@ -8,6 +8,7 @@ const setup = () => {
     onLastRelease: vi.fn(),
     onDispose: vi.fn(),
   };
+
   return { controller: new ConnectionLeaseController(handlers), handlers };
 };
 
@@ -31,6 +32,7 @@ describe("ConnectionLeaseController", () => {
   test("lease disposer is idempotent", async () => {
     const { controller, handlers } = setup();
     const release = controller.hold();
+
     release();
     release();
     await Promise.resolve();
@@ -42,8 +44,10 @@ describe("ConnectionLeaseController", () => {
   test("a same-turn reacquire cancels stale close without reopening", async () => {
     const { controller, handlers } = setup();
     const releaseFirst = controller.hold();
+
     releaseFirst();
     const releaseSecond = controller.hold();
+
     await Promise.resolve();
 
     expect(handlers.onFirstLease).toHaveBeenCalledOnce();
@@ -57,6 +61,7 @@ describe("ConnectionLeaseController", () => {
   test("dispose invalidates queued close and later lease releases", async () => {
     const { controller, handlers } = setup();
     const release = controller.hold();
+
     release();
     controller.dispose();
     release();

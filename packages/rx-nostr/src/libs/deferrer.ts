@@ -7,10 +7,12 @@ export class Deferrer {
   invoke(callback: () => void, delay: number) {
     if (delay <= 0) {
       callback();
+
       return;
     }
 
     const f = once(callback);
+
     this.#callbacks.add(f);
 
     const timer = setTimeout(() => {

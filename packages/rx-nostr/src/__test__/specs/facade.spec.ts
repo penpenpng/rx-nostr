@@ -38,8 +38,10 @@ async function withDefaultConfig(
   run: () => Promise<void>,
 ): Promise<void> {
   const previous = RxNostr.defaultConfig;
+
   try {
     RxNostr.defaultConfig = value;
+
     await run();
   } finally {
     RxNostr.defaultConfig = previous;
@@ -51,8 +53,10 @@ async function withDefaultOptions(
   run: () => Promise<void>,
 ): Promise<void> {
   const previous = RxNostr.defaultOptions;
+
   try {
     RxNostr.defaultOptions = value;
+
     await run();
   } finally {
     RxNostr.defaultOptions = previous;
@@ -85,6 +89,7 @@ describe("RxNostr public contract", () => {
 
           request.emit([{}]);
           const socket = server.sockets.latest;
+
           socket.open();
           await expect(socket.inbox.waitNext()).resolves.toHaveProperty("0", "REQ");
 
@@ -120,6 +125,7 @@ describe("RxNostr public contract", () => {
 
           socket.open();
           const [, subId] = await socket.inbox.waitNext("REQ");
+
           socket.message(["EOSE", subId]);
 
           await expect(inspector.waitComplete()).resolves.toBeUndefined();
@@ -149,6 +155,7 @@ describe("RxNostr public contract", () => {
 
       rxNostr.setHotRelays(relay);
       const connection = server.sockets.latest;
+
       connection.open();
       await firstInspector.ignoreNexts(2);
       await expect(firstInspector.waitNext()).resolves.toMatchObject({
@@ -221,11 +228,13 @@ describe("RxNostr public contract", () => {
           const opening = "wss://opening.example.com";
           const retrying = "wss://retrying.example.com";
           const directory = new RelayDirectory();
+
           directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
           const { rxNostr, server } = createScenario({
             relayDirectory: directory,
             reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
           });
+
           using source = new RxReq();
           const firstInspector = new SubscriptionInspector<EventPacket>();
 
@@ -233,11 +242,19 @@ describe("RxNostr public contract", () => {
           source.emit([{}]);
           source.emit([{}]);
           const secondInspector = new SubscriptionInspector<EventPacket>();
+
           rxNostr.backward(b, [{}], { linger: Infinity }).subscribe(secondInspector);
           rxNostr.setHotRelays([opening, retrying]);
-          for (const socket of server.connections) if (socket.url !== opening) socket.open();
+
+          for (const socket of server.connections) {
+            if (socket.url !== opening) {
+              socket.open();
+            }
+          }
+
           await settleProtocol();
           const socketB = server.sockets.latestFor(b);
+
           socketB.message(["EOSE", (await socketB.inbox.waitNext("REQ"))[1]]);
           server.sockets.latestFor(retrying).peerClose(1006, "offline");
           await settleProtocol();
@@ -246,11 +263,14 @@ describe("RxNostr public contract", () => {
           rxNostr.dispose();
           await settleProtocol();
           expect(firstInspector.completed).toBe(true);
+
           for (const url of [a, b, opening]) {
             const socket = server.sockets.latestFor(url);
+
             expect(socket.isCloseRequested).toBe(true);
             socket.acknowledgeClose();
           }
+
           await vi.advanceTimersByTimeAsync(1_000);
           expect(server.connections).toHaveLength(4);
           expect(server.sockets.latestFor(a).inbox.length).toBe(2);
@@ -267,8 +287,10 @@ describe("RxNostr public contract", () => {
         async (linger, { createScenario }) => {
           const { rxNostr, server } = createScenario();
           const inspector = new SubscriptionInspector<EventPacket>();
+
           rxNostr.backward(relay, [{}], { linger }).subscribe(inspector);
           const socket = server.sockets.latest;
+
           socket.open();
           await settleProtocol();
           socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
@@ -299,6 +321,7 @@ describe("RxNostr public contract", () => {
               challenge: () => (phase === "auth-ok" ? Promise.resolve(signed) : signing.promise),
             },
           });
+
           if (phase === "event-signing") {
             rxNostr.publish(
               a,
@@ -313,11 +336,15 @@ describe("RxNostr public contract", () => {
             );
           } else {
             const inspector = new SubscriptionInspector<EventPacket>();
+
             rxNostr.backward(a, [{}]).subscribe(inspector);
           }
+
           const socket = server.sockets.latest;
+
           socket.open();
           await settleProtocol();
+
           if (phase !== "event-signing") {
             socket.message(["AUTH", "challenge"]);
             socket.message([
@@ -327,7 +354,9 @@ describe("RxNostr public contract", () => {
             ]);
             await settleProtocol();
           }
+
           const receivedCount = socket.inbox.length;
+
           rxNostr.dispose();
           signing.resolve(signed);
           socket.message(["OK", signed.id, true, "late"]);
@@ -370,6 +399,7 @@ describe("RxNostr public contract", () => {
       expect(secondServer.connections).toHaveLength(1);
       const socket2 = secondServer.sockets.latest;
       const socket = firstServer.sockets.latest;
+
       expect(socket).not.toBe(socket2);
 
       socket.open();
@@ -425,11 +455,13 @@ describe("RxNostr public contract", () => {
 
       expect(server.connections).toHaveLength(1);
       const socket = server.sockets.latest;
+
       expect(socket.url).toBe("wss://packet.example.com");
 
       socket.open();
       const [, subId] = await socket.inbox.waitNext("REQ");
       const now = Math.floor(Date.now() / 1_000);
+
       socket.message(["EVENT", subId, { ...signedEvent, id: "mismatch", kind: 2 }]);
       socket.message([
         "EVENT",

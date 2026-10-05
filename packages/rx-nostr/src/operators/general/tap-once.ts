@@ -16,10 +16,13 @@ export function tapOnce<T>(callback: (value: T) => void): MonoTypeOperatorFuncti
               callback(value);
             } catch (err) {
               subscriber.error(err);
+
               return;
             }
+
             hasExecuted = true;
           }
+
           subscriber.next(value);
         },
         error(err) {

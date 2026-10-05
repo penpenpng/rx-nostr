@@ -19,5 +19,6 @@ export function createRxNostrScenario(
     WebSocket: server.WebSocket,
     ...overrides,
   });
+
   return { server, rxNostr };
 }

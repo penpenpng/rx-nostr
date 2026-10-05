@@ -11,6 +11,8 @@ import type { IRelayCommunicationCollection } from "../../communication/index.ts
 import { ConnectionDemandScope, type RelayDemandWindow } from "../demand/index.ts";
 import { FilledRxNostrReqOptions } from "./options.ts";
 
+function noop() {}
+
 export function reqForward({
   relays,
   source$,
@@ -34,7 +36,7 @@ export function reqForward({
       });
       relays.forEach(outdated, (relay) => connectionDemand.releasePrewarm(relay));
     });
-  let cleanupLast = () => {};
+  let cleanupLast: () => void = noop;
 
   return source$.pipe(
     map((packet) =>
@@ -53,11 +55,14 @@ export function reqForward({
     map((obs) => {
       const stream = new Subject<EventPacket>();
       const sub = obs.subscribe(stream);
+
       cleanupLast();
+
       cleanupLast = once(() => {
         sub.unsubscribe();
         stream.complete();
       });
+
       return stream;
     }),
     // Forward: New coming req unsubscribes the previous one.
@@ -109,6 +114,7 @@ function req({
       if (!defaultRelays.disposed) {
         if ((outdated?.size ?? 0) === 0 && current.size <= 0) {
           const message = "A REQ was issued without any destination relays.";
+
           emitDiagnostic({
             level: "warning",
             event: "req/no-destination-relays",
@@ -116,10 +122,12 @@ function req({
             context: { operation: "forward" },
           });
           stream.complete();
+
           return;
         }
         if (outdated && outdated.size > 0 && current.size <= 0) {
           const message = "The last relay was removed; no destination relays remain.";
+
           emitDiagnostic({
             level: "warning",
             event: "req/no-destination-relays",
@@ -144,10 +152,13 @@ function req({
             map((packet) => (traceTag === undefined ? packet : { ...packet, traceTag })),
             finalize(() => {
               finalized = true;
+
               const currentQuery = ongoings.get(relay.url);
+
               if (currentQuery?.sub === queryRef.sub) {
                 ongoings.delete(relay.url);
               }
+
               demandWindow.close();
             }),
           )
@@ -155,12 +166,17 @@ function req({
             next: (packet) => stream.next(packet),
             error: (error) => stream.error(error),
           });
+
         queryRef.sub = sub;
-        if (!finalized) ongoings.set(relay.url, { demandWindow, sub });
+
+        if (!finalized) {
+          ongoings.set(relay.url, { demandWindow, sub });
+        }
       });
 
       relays.forEach(outdated, (relay) => {
         const query = ongoings.get(relay.url);
+
         ongoings.delete(relay.url);
 
         query?.sub.unsubscribe();

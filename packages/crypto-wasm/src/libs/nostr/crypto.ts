@@ -22,6 +22,7 @@ export function signEvent<K extends number>(
     tags: params.tags ?? [],
     created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
+
   if (ensureEventFields(filledParams)) {
     return filledParams;
   }

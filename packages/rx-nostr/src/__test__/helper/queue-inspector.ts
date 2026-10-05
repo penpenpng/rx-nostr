@@ -10,7 +10,11 @@ export class QueueInspector<T> implements Iterable<T> {
 
   push(value: T): void {
     const maybeWaiting = this.#array[this.#writeIndex];
-    if (maybeWaiting instanceof Waiting) maybeWaiting.resolve(value);
+
+    if (maybeWaiting instanceof Waiting) {
+      maybeWaiting.resolve(value);
+    }
+
     this.#array[this.#writeIndex++] = value;
   }
 
@@ -21,12 +25,17 @@ export class QueueInspector<T> implements Iterable<T> {
       const waiting = new Waiting<T>(this.timeout, () => {
         error.receivedCount = this.length;
         error.message = `${this.name}: timed out after ${this.timeout}ms waiting for item ${index + 1} (${this.length} received).`;
+
         return error;
       });
+
       this.#array[index] = waiting;
+
       return waiting.promise;
     }
+
     const value = this.#array[index];
+
     return value instanceof Waiting ? value.promise : Promise.resolve(value);
   }
 
@@ -36,10 +45,13 @@ export class QueueInspector<T> implements Iterable<T> {
 
   takeNext(): T {
     const value = this.#array[this.#readIndex];
+
     if (this.#readIndex >= this.#writeIndex || value instanceof Waiting) {
       throw new Error(`${this.name}: no queued value available`);
     }
+
     this.#readIndex++;
+
     return value;
   }
 
@@ -79,11 +91,16 @@ class Waiting<T> {
 
   constructor(timeout: number, onTimeout: () => Error) {
     const { promise, resolve, reject } = Promise.withResolvers<T>();
+
     this.#promise = promise;
     this.#resolve = resolve;
     this.#timer = setTimeout(() => {
-      if (this.#settled) return;
+      if (this.#settled) {
+        return;
+      }
+
       this.#settled = true;
+
       reject(onTimeout());
     }, timeout);
   }
@@ -93,8 +110,12 @@ class Waiting<T> {
   }
 
   resolve(value: T) {
-    if (this.#settled) return;
+    if (this.#settled) {
+      return;
+    }
+
     this.#settled = true;
+
     clearTimeout(this.#timer);
     this.#resolve(value);
   }

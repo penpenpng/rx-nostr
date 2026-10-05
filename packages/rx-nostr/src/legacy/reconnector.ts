@@ -3,7 +3,9 @@ import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
 import type { LegacyRetryConfig } from "./types.ts";
 
 export function legacyRetryReconnector(retry: LegacyRetryConfig): ConnectionReconnector {
-  if (retry.strategy === "off") return new NoopReconnector();
+  if (retry.strategy === "off") {
+    return new NoopReconnector();
+  }
 
   const shouldSkipInitialAttempt = (context: Parameters<ConnectionReconnector["reconnect"]>[0]) =>
     retry.polite && context.phase === "initial" && context.health.lastConnectedAt === undefined;
@@ -13,9 +15,13 @@ export function legacyRetryReconnector(retry: LegacyRetryConfig): ConnectionReco
       maxRetries: retry.maxCount ?? 5,
       initialDelay: retry.initialDelay,
     });
+
     return {
       reconnect(context) {
-        if (shouldSkipInitialAttempt(context)) return { action: "cancel" };
+        if (shouldSkipInitialAttempt(context)) {
+          return { action: "cancel" };
+        }
+
         return backoff.reconnect(context);
       },
     };
@@ -23,8 +29,13 @@ export function legacyRetryReconnector(retry: LegacyRetryConfig): ConnectionReco
 
   return {
     reconnect(context) {
-      if (shouldSkipInitialAttempt(context)) return { action: "cancel" };
-      if (context.attempt > (retry.maxCount ?? 5)) return { action: "exhaust" };
+      if (shouldSkipInitialAttempt(context)) {
+        return { action: "cancel" };
+      }
+      if (context.attempt > (retry.maxCount ?? 5)) {
+        return { action: "exhaust" };
+      }
+
       return {
         action: "retry",
         delay: retry.strategy === "immediately" ? 0 : (retry.interval ?? 1_000),

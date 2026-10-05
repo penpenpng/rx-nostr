@@ -11,9 +11,13 @@ export function withLegacyAuthTimeout(
     authTimeout: authenticator.authTimeout ?? authTimeout,
   });
 
-  if (typeof input !== "function") return withTimeout(input);
+  if (typeof input !== "function") {
+    return withTimeout(input);
+  }
+
   return (relay) => {
     const authenticator = input(relay);
+
     return authenticator ? withTimeout(authenticator) : undefined;
   };
 }
