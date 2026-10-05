@@ -32,6 +32,54 @@ test(normalizeRelayUrl.name, () => {
   expect(f(0 as any)).toBe(null);
 });
 
+test("normalization preserves query values and repeated-key order", () => {
+  const cases = [
+    ["token=a%26b%3Dc", "a&b=c"],
+    ["token=a%2Bb", "a+b"],
+    ["token=a+b", "a b"],
+    ["token=%25", "%"],
+    ["token=%E3%81%82", "あ"],
+    ["token=", ""],
+    ["token=%2526", "%26"],
+  ] as const;
+
+  for (const [query, expected] of cases) {
+    const normalized = normalizeRelayUrl(`wss://relay.example.com?${query}`);
+
+    expect(normalized).not.toBeNull();
+    expect(new URL(normalized!).searchParams.get("token")).toBe(expected);
+    expect(normalizeRelayUrl(normalized!)).toBe(normalized);
+  }
+
+  const repeated = normalizeRelayUrl("wss://relay.example.com?z=1&token=first&token=second&a=2");
+
+  expect(new URL(repeated!).searchParams.getAll("token")).toEqual(["first", "second"]);
+  expect(repeated).toBe("wss://relay.example.com?a=2&token=first&token=second&z=1");
+  expect(normalizeRelayUrl("wss://relay.example.com?token=%ZZ")).toBe(
+    "wss://relay.example.com?token=%25ZZ",
+  );
+});
+
+test("RelayMap and RelaySet keep distinct query credentials separate", () => {
+  const encoded = "wss://relay.example.com?token=a%26b%3Dc";
+  const split = "wss://relay.example.com?token=a&b=c";
+  const plus = "wss://relay.example.com?token=a%2Bb";
+  const space = "wss://relay.example.com?token=a+b";
+  const map = new RelayMap<number>();
+  const set = new RelaySet([encoded, split, plus, space]);
+
+  for (const [index, url] of [encoded, split, plus, space].entries()) {
+    map.set(url, index);
+  }
+
+  expect(map.size).toBe(4);
+  expect(set.size).toBe(4);
+  expect(map.get(encoded)).toBe(0);
+  expect(map.get(split)).toBe(1);
+  expect(map.get(plus)).toBe(2);
+  expect(map.get(space)).toBe(3);
+});
+
 test(RelayMap.name, () => {
   const relay = "wss://example.com";
   const alias = "wss://example.com/";
