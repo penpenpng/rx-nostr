@@ -4,6 +4,8 @@
 
 既定では `GlobalRelayDirectory` が使われます。アプリケーションまたはテストで分離したい場合は専用の instance を注入します。
 
+`RxNostr` の `relayDirectory` option に渡せるのは `RelayDirectory` instance です。独立した instance を使えば health / NIP-11 cache を分離でき、複数の `RxNostr` へ同じ instance を渡せば health / metadata と接続確認の調整を共有します。`IRelayDirectory` はアプリケーションが Directory の公開データを読むための interface であり、任意の構造的実装をこの option へ注入するための port ではありません。
+
 ```ts
 import { RelayDirectory, RxNostr } from "rx-nostr";
 
@@ -13,6 +15,8 @@ const rxNostr = new RxNostr({
   relayDirectory: directory,
 });
 ```
+
+`new RelayDirectory({ clock, fetcher })` では時刻と NIP-11 取得処理を差し替えられます。subclass は `super()` を呼ぶ場合に限り利用できますが、`observe()` や health に関わるメソッドの override は接続状態との整合性を保証しません。内部 reporter は接続・失敗・probe の競合調整を担当し、公開 interface から変更できません。独自 Directory 実装の注入にはこの reporter と所有権を含む新しい契約が必要なため、現行 API には含めていません。
 
 ## Entry を読む
 

@@ -25,6 +25,7 @@ export interface RelayDirectoryReporter {
 
 const reporters = new WeakMap<RelayDirectory, RelayDirectoryReporter>();
 
+/** Owns NIP-11 cache and shared health/probe state for one or more RxNostr instances. */
 export class RelayDirectory implements IRelayDirectory {
   readonly #relays = new RelayMap<RelayRecord>();
   readonly #clock: () => number;
@@ -141,7 +142,7 @@ function copyEntry(entry: RelayDirectoryEntry): RelayDirectoryEntry {
   };
 }
 
-/** @internal Used by RelayCommunication integration without widening public API. */
+/** @internal Only RelayDirectory instances register a health/probe reporter. */
 export function getRelayDirectoryReporter(directory: RelayDirectory): RelayDirectoryReporter {
   const reporter = reporters.get(directory);
 

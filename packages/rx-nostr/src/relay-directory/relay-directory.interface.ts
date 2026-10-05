@@ -15,6 +15,12 @@ export interface RelayDirectoryOptions {
   readonly fetcher?: (url: string) => Promise<Nostr.Nip11.RelayInfo>;
 }
 
+/**
+ * Public read/cache contract for consumers of directory data. RxNostr's
+ * relayDirectory option accepts RelayDirectory instances, not arbitrary
+ * implementations of this interface: connection health and probe coordination
+ * use an internal reporter registered by that class's constructor.
+ */
 export interface IRelayDirectory extends Iterable<RelayDirectoryEntry> {
   get(url: string): RelayDirectoryEntry | undefined;
   getOrCreate(url: string): RelayDirectoryEntry;
