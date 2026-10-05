@@ -34,6 +34,8 @@ console.log([...relays]); // ["wss://relay.example.com"]
 
 `RxRelays` を query の宛先に渡すと、集合の変更に追従して relay segment が追加、終了されます。
 
+`get()` は呼び出しごと、`subscribe()` / `asObservable()` と `RxRelays.observable()` は購読者ごとに変更可能な独立した `Set` を返します。受け取った Set を変更しても元の集合や別の購読者には影響しません。集合を変更するには `set()`、`append()`、`remove()`、`clear()` を使います。
+
 ```ts
 import { RxReq } from "rx-nostr";
 

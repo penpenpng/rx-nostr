@@ -183,3 +183,16 @@ if (error instanceof RxNostrCallbackError) {
   console.error(error.cause);
 }
 ```
+
+## 公開値の所有権
+
+内部状態を判断に使う値と利用者へ渡す値は分離します。公開された変更可能な copy を編集しても、内部の成否・接続状態や別の observer の値は変わりません。
+
+| 出力 | copy の単位 |
+| --- | --- |
+| `RxRelays.get()`、`RelayDirectory.get()` / `getOrCreate()` / `values()` | 呼び出し・反復ごと。Directory の NIP-11 metadata もネストした配列・object ごと copy |
+| `RxRelays`、`RelayDirectory.observe()`、`monitorConnectionState()`、`Publication.subscribe()` | observer ごと。replay の値も新しい copy |
+| `Publication.event` | Promise が解決する時に 1 回。複数回 `await` しても同じ event object |
+| `RxNostrPublicationError.failures` | Error 作成時に内部結果から分離。各 failure の OK tuple も copy |
+
+`RxNostrCallbackError.cause`、publication failure の `cause`、diagnostic の `cause` は任意のユーザー値や `Error` を含む不透明な参照で、identity を保ちます。diagnostic の `context` は浅い copy を freeze して渡し、その中の任意 object は不透明な参照として扱います。注入した verifier、reconnector、directory などの class instance も所有者側で管理してください。reconnector と relay health policy に渡す health は個別の snapshot です。

@@ -89,6 +89,30 @@ describe("RelayDirectory health reporter", () => {
     mutatingSub.unsubscribe();
     sub.unsubscribe();
   });
+
+  test("detaches nested NIP-11 data for each observer and read", () => {
+    const url = "wss://relay.example.com";
+    const directory = new RelayDirectory();
+
+    directory.setNip11(url, { name: "relay", limitation: { max_subscriptions: 3 } });
+
+    const seen: number[] = [];
+    const stream = directory.observe(url);
+    const first = stream.subscribe((entry) => {
+      if (entry.nip11?.limitation) {
+        entry.nip11.limitation.max_subscriptions = 100;
+      }
+    });
+    const second = stream.subscribe((entry) => {
+      seen.push(entry.nip11?.limitation?.max_subscriptions ?? -1);
+    });
+
+    expect(seen).toEqual([3]);
+    expect(directory.get(url)?.nip11?.limitation?.max_subscriptions).toBe(3);
+
+    first.unsubscribe();
+    second.unsubscribe();
+  });
 });
 
 describe("RelayDirectory snapshots", () => {

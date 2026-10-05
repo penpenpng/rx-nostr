@@ -22,6 +22,7 @@ export type RxNostrPublicationErrorCode =
 
 /** A publication's requested all/any success condition cannot be met. */
 export class RxNostrPublicationError extends RxNostrError {
+  /** Detached from internal settlement state; opaque causes retain their original identity. */
   public readonly failures: import("../publication/index.ts").PublicationFailure[];
 
   constructor(

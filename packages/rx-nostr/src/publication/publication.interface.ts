@@ -20,7 +20,7 @@ export type PublicationFailure = {
 
 /** A publish operation that starts when `RxNostr.publish()` is called. */
 export interface Publication {
-  /** A detached copy of the signed event that the operation attempted to send. */
+  /** One detached copy of the signed event, shared by every await of this Promise. */
   readonly event: Promise<Nostr.Event>;
 
   /** Observe unaggregated OK packets as independent mutable copies, including replay. */

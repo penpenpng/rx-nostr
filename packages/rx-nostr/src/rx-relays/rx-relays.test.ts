@@ -20,6 +20,51 @@ test("RxRelays emits a relay URL", async () => {
   await expect(inspector.waitNext()).resolves.toEqual(new Set([relay1]));
 });
 
+test("RxRelays gives direct and observable subscribers independent Sets", () => {
+  const first = "wss://first.example.com";
+  const second = "wss://second.example.com";
+  const injected = "wss://injected.example.com";
+  const relays = new RxRelays([first]);
+  const direct: Set<RelayUrl>[] = [];
+  const observable: Set<RelayUrl>[] = [];
+
+  relays.subscribe((value) => {
+    direct.push(value);
+    value.clear();
+    value.add(injected);
+  });
+  relays.asObservable().subscribe((value) => observable.push(value));
+
+  expect(observable).toEqual([new Set([first])]);
+  expect(relays.get()).toEqual(new Set([first]));
+
+  relays.append(second);
+
+  expect(observable).toEqual([new Set([first]), new Set([first, second])]);
+  expect(relays.get()).toEqual(new Set([first, second]));
+
+  const replayed: Set<RelayUrl>[] = [];
+
+  relays.asObservable().subscribe((value) => replayed.push(value));
+  expect(replayed).toEqual([new Set([first, second])]);
+  expect(direct).toHaveLength(2);
+  relays.dispose();
+});
+
+test("RxRelays.observable gives iterable subscribers independent Sets", () => {
+  const relay = "wss://relay.example.com";
+  const source = RxRelays.observable([relay]);
+
+  source.subscribe((value) => value.clear());
+
+  let second: Set<RelayUrl> | undefined;
+
+  source.subscribe((value) => {
+    second = value;
+  });
+  expect(second).toEqual(new Set([relay]));
+});
+
 test(RxRelays.union.name, async () => {
   const rxr1 = new RxRelays();
   const rxr2 = new RxRelays();
