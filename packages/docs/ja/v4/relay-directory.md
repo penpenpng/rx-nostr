@@ -35,6 +35,7 @@ console.log(entry?.liveConnections);
 | `maxSubscriptions` | 有効な `limitation.max_subscriptions` |
 | `lastConnectedAt` | 最後に接続した時刻 |
 | `lastFailureAt` | 最後に接続失敗を記録した時刻 |
+| `firstFailureAt` | 現在の連続失敗が始まった時刻。成功・手動解除で消える |
 | `consecutiveFailures` | 最新の成功以降の連続失敗数 |
 | `liveConnections` | Directory を共有する instance の接続数 |
 
@@ -96,7 +97,7 @@ if (saved !== null) {
 }
 ```
 
-snapshot は version 1 の JSON です。NIP-11 と health の時刻、失敗数を保存しますが、live connection は保存しません。
+snapshot は version 1 の JSON です。NIP-11 と health の時刻、連続失敗の開始時刻、失敗数を保存しますが、live connection と確認接続の実行権は保存しません。抑止期限は保存した health と設定から再計算します。`firstFailureAt` がない旧 snapshot も読み込めます。その場合、最後の失敗時刻から失敗期間を測り始めます。
 
 `importSnapshot()` は入力全体を検証してから既存値と merge します。不正な JSON、未知の version、不正な schema は `RelayDirectorySnapshotError` になり、途中まで適用されることはありません。
 
@@ -106,7 +107,15 @@ snapshot は version 1 の JSON です。NIP-11 と health の時刻、失敗数
 directory.forget("wss://relay.example.com");
 ```
 
-進行中の NIP-11 fetch や live connection がある entry は削除されず、`false` を返します。
+進行中の NIP-11 fetch、live connection、確認接続の実行権がある entry は削除されず、`false` を返します。
+
+## Health の手動解除
+
+```ts
+directory.resetHealth("wss://relay.example.com");
+```
+
+連続失敗数と `firstFailureAt` を解除し、待機中の接続を再評価します。metadata と最後の成功・失敗時刻は保持します。reconnector の判断待ちや通常の backoffは引き続き適用されます。
 
 ## NIP-11 だけを取得する
 
@@ -119,3 +128,5 @@ const info = await fetchRelayInfo("wss://relay.example.com");
 ```
 
 WebSocket URL は対応する HTTP/HTTPS URL へ変換され、`Accept: application/nostr+json` で取得されます。
+
+接続需要が残っている間は、接続前・抑止中・再接続中も内部記録を保持します。この間の `forget(url)` は `false` です。`resetHealth(url)` は保持中にも利用できます。
