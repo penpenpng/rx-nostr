@@ -116,7 +116,7 @@ describe("relay health recovery public contract", () => {
     first.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     first.setHotRelays(relay);
     second.setHotRelays(relay);
-    expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection", nextAttemptAt: 300 });
+    expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection" });
     expect(states.at(-1)).toMatchObject({ suppressionReasons: [{ category: "relay-health" }] });
     await vi.advanceTimersByTimeAsync(199);
     expect(server.connections.length).toBe(0);
@@ -124,7 +124,7 @@ describe("relay health recovery public contract", () => {
     expect(server.connections.length).toBe(1);
     server.sockets.latest.peerClose(1006, "still down");
     await vi.advanceTimersByTimeAsync(0);
-    expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection", nextAttemptAt: 500 });
+    expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection" });
     await vi.advanceTimersByTimeAsync(200);
     expect(server.connections.length).toBe(2);
     server.sockets.latest.open();
@@ -166,7 +166,6 @@ describe("relay health recovery public contract", () => {
     expect(server.connections.length).toBe(0);
     expect(states.at(-1)).toMatchObject({
       state: "waiting-for-connection",
-      nextAttemptAt: 200,
       suppressionReasons: [{ category: "relay-health", kind: "relay-health" }],
     });
     await vi.advanceTimersByTimeAsync(100);
@@ -175,7 +174,6 @@ describe("relay health recovery public contract", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(states.at(-1)).toMatchObject({
       state: "waiting-for-connection",
-      nextAttemptAt: 400,
       suppressionReasons: [{ category: "relay-health", kind: "relay-health" }],
     });
     await vi.advanceTimersByTimeAsync(199);
@@ -420,7 +418,7 @@ describe("suppression ownership and asynchronous decisions", () => {
     expect(states.at(-1)).toMatchObject({
       state: "waiting-for-connection",
       suppressionReasons: [
-        { category: "relay-health", nextAttemptAt: 400 },
+        { category: "relay-health" },
         { category: "environment" },
       ],
     });
@@ -429,7 +427,6 @@ describe("suppression ownership and asynchronous decisions", () => {
     await vi.advanceTimersByTimeAsync(50);
     expect(server.connections).toHaveLength(1);
     expect(states.at(-1)).toMatchObject({
-      nextAttemptAt: 400,
       suppressionReasons: [{ category: "relay-health" }],
     });
     await vi.advanceTimersByTimeAsync(150);
@@ -630,7 +627,7 @@ test("preserves detector reports without attributing known local failures to rel
   expect(sessionSignal.aborted).toBe(true);
 });
 
-test("a reported attempt estimate expires without authorizing a connection", async () => {
+test("a reported wait remains pending until the reconnector decides", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(100);
   const server = new ControlledWebSocketServer(),
@@ -644,7 +641,6 @@ test("a reported attempt estimate expires without authorizing a connection", asy
     reconnector: {
       reconnect(context) {
         context.reportWaiting?.({
-          nextAttemptAt: 200,
           suppressionReasons: [{ category: "environment", source: "custom", kind: "resume" }],
         });
         return new Promise((r) => {
@@ -657,7 +653,7 @@ test("a reported attempt estimate expires without authorizing a connection", asy
   client.setHotRelays(relay);
   server.sockets.latest.peerClose(1006, "failed");
   await vi.advanceTimersByTimeAsync(0);
-  expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection", nextAttemptAt: 200 });
+  expect(states.at(-1)).toMatchObject({ state: "waiting-for-connection" });
   await vi.advanceTimersByTimeAsync(100);
   expect(server.connections).toHaveLength(1);
   expect(states.at(-1)).not.toHaveProperty("nextAttemptAt");

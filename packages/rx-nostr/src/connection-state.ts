@@ -18,14 +18,10 @@ export interface ConnectionSuppressionReason {
   source: string;
   /** Implementation-defined code, interpreted together with source. */
   kind: string;
-  /** Scheduled next connection attempt, as Unix milliseconds; other conditions can postpone it. */
-  nextAttemptAt?: number;
   details?: Readonly<Record<string, string | number | boolean | null>>;
 }
 
 export interface ConnectionWaitInfo {
-  /** Scheduled next connection attempt, as Unix milliseconds; omitted when unknown. */
-  nextAttemptAt?: number;
   suppressionReasons?: readonly ConnectionSuppressionReason[];
 }
 
@@ -46,9 +42,6 @@ export type ConnectionState =
       state: "waiting-for-connection";
       /** Retry attempt counter; zero before the first connection attempt. */
       attempt: number;
-      delay: number;
-      /** Scheduled next connection attempt, as Unix milliseconds; other conditions can postpone it. */
-      nextAttemptAt?: number;
       suppressionReasons?: readonly ConnectionSuppressionReason[];
       /** Most recent failure or drop, if any. */
       reason?: ConnectionFailure;

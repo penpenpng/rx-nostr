@@ -28,7 +28,7 @@ const subscription = rxNostr.monitorConnectionState().subscribe((packet) => {
 rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
   switch (state.state) {
     case "waiting-for-connection":
-      console.log(from, "接続待機中", state.nextAttemptAt, state.suppressionReasons);
+      console.log(from, "接続待機中", state.suppressionReasons);
       break;
     case "failed":
       console.error(`${from}:`, state.reason);
@@ -86,7 +86,7 @@ const rxNostr = new RxNostr({ verifier, reconnector });
 
 `retry` の `suppressionReasons` は任意です。reconnector が通知した理由をそのまま connection state に伝え、理由がなければ通常の「再接続待機中」として扱います。任意の delay を transport が `backoff` と解釈することはありません。既定の `ExponentialBackoffReconnector` は自分の待機に `category: "retry-backoff", source: "exponential-backoff"`、`kind: "backoff"` を付けます。
 
-Promise を返す reconnector は、`context.reportWaiting?.({ nextAttemptAt?, suppressionReasons? })` で非同期処理中の待機情報を通知できます。この通知は接続試行を予約する操作ではありません。実際の待機処理は reconnector が所有し、最終的に decision を返します。ヘルスによる抑止理由とは独立して集約されます。通知がなくても非同期の判断中は待機状態を公開します。未来の `nextAttemptAt` を通知した場合は予定として表示しますが、その時刻に達するだけで retry を実行することはありません。
+Promise を返す reconnector は、`context.reportWaiting?.({ suppressionReasons? })` で非同期処理中の待機情報を通知できます。この通知は接続試行を予約する操作ではありません。実際の待機処理は reconnector が所有し、最終的に decision を返します。ヘルスによる抑止理由とは独立して集約されます。通知がなくても非同期の判断中は待機状態を公開します。
 
 独自 reconnector の判断は通常の再試行を許可するもので、接続がさらにヘルス方針で遅れる場合があります。非同期の判断待ちは `context.signal` で中断できるようにしてください。
 
@@ -162,7 +162,7 @@ const rxNostr = new RxNostr({
 
 ### 待機理由の表示
 
-`waiting-for-connection` の `suppressionReasons` は複数の理由を同時に持てます。`ConnectionSuppressionReason` は共通の `category`、通知元の `source`、実装固有の `kind`、任意の `nextAttemptAt` と `details` を持ちます。`details` の値は文字列、数値、boolean、null です。
+`waiting-for-connection` の `suppressionReasons` は複数の理由を同時に持てます。`ConnectionSuppressionReason` は共通の `category`、通知元の `source`、実装固有の `kind`、任意の `details` を持ちます。`details` の値は文字列、数値、boolean、null です。
 
 | `category` | 意味 |
 | --- | --- |
@@ -179,18 +179,15 @@ const rxNostr = new RxNostr({
 | `retry-backoff` | `exponential-backoff` | `backoff` |
 | `coordination` | `relay-directory` | `relay-probe` |
 
-状態の `nextAttemptAt` は、次の接続試行を予定する未来の時刻（Unix milliseconds）です。時刻が判明している各条件の最大値を通知します。非同期判断や共有確認の終了など、時刻不明の条件があれば省略します。予定は後の情報によって変更されることがあり、接続実行を保証するものではありません。
+接続状態には待機理由を公開します。複数の待機条件や終了時刻の不明な条件があるため、次の接続試行時刻や残り待ち時間は公開しません。
 
-`delay` は通知時点から予定までの時間で、予定が不明なら0です。`attempt` は初回試行前の待機では0、再試行では reconnector に渡す試行番号です。直前の失敗や切断がある場合だけ `reason` を付けます。
+`attempt` は初回試行前の待機では0、再試行では reconnector に渡す試行番号です。直前の失敗や切断がある場合だけ `reason` を付けます。
 
 ```ts
 rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
   if (state.state !== "waiting-for-connection") return;
   if (state.suppressionReasons?.some((reason) => reason.category === "relay-health")) {
     console.log(from, "接続失敗が続いているため回復を待っています");
-  }
-  if (state.nextAttemptAt !== undefined) {
-    console.log("次の試行予定", new Date(state.nextAttemptAt));
   }
 });
 ```

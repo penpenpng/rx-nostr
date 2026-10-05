@@ -98,9 +98,7 @@ describe("public entry point", () => {
         | {
             state: "waiting-for-connection";
             attempt: number;
-            delay: number;
             reason?: ConnectionFailure;
-            nextAttemptAt?: number;
             suppressionReasons?: readonly ConnectionSuppressionReason[];
           }
         | { state: "connecting"; attempt: number }

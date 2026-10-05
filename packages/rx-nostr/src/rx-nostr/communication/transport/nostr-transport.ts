@@ -685,8 +685,6 @@ function sameConnectionState(left: ConnectionState, right: ConnectionState): boo
       left.state === "waiting-for-connection" &&
       right.state === "waiting-for-connection" &&
       left.attempt === right.attempt &&
-      left.delay === right.delay &&
-      left.nextAttemptAt === right.nextAttemptAt &&
       JSON.stringify(left.suppressionReasons) === JSON.stringify(right.suppressionReasons) &&
       (left.reason === undefined || right.reason === undefined
         ? left.reason === right.reason

@@ -58,11 +58,6 @@ export class ConnectionAttemptCoordinator {
     let update = () => {};
     const report = (waiting: ConnectionWaitInfo) => {
       if (settled || signal.aborted || decision) return;
-      if (
-        waiting.nextAttemptAt !== undefined &&
-        (!Number.isFinite(waiting.nextAttemptAt) || waiting.nextAttemptAt < 0)
-      )
-        throw new RangeError("A reported next attempt time must be finite and non-negative.");
       reported = {
         ...waiting,
         ...(waiting.suppressionReasons
@@ -98,13 +93,6 @@ export class ConnectionAttemptCoordinator {
       const reasons: ConnectionSuppressionReason[] = [];
       const deadlines: number[] = [];
       let blocked = !decision;
-      // A provider may report a future estimate; it never grants permission to connect.
-      const reportedDeadline =
-        !decision && reported.nextAttemptAt !== undefined && reported.nextAttemptAt > now
-          ? reported.nextAttemptAt
-          : undefined;
-      let unknownDeadline = !decision && reportedDeadline === undefined;
-      if (reportedDeadline !== undefined) deadlines.push(reportedDeadline);
       if (suppression) {
         if (!Number.isFinite(suppression.suppressedUntil) || suppression.suppressedUntil < 0)
           throw new RangeError("A suppression deadline must be finite and non-negative.");
@@ -114,7 +102,6 @@ export class ConnectionAttemptCoordinator {
           kind: "relay-health",
           ...suppression.suppressionReason,
           category: "relay-health",
-          ...(future ? { nextAttemptAt: suppression.suppressedUntil } : {}),
         });
         if (future) {
           blocked = true;
@@ -132,7 +119,6 @@ export class ConnectionAttemptCoordinator {
         this.#releaseProbe = this.options.acquireConnectionProbe();
         if (!this.#releaseProbe) {
           blocked = true;
-          unknownDeadline = true;
           reasons.push({
             category: "coordination",
             source: "relay-directory",
@@ -141,15 +127,11 @@ export class ConnectionAttemptCoordinator {
         }
       }
       if (!blocked && !reason) return decision;
-      const nextAttemptAt =
-        !unknownDeadline && deadlines.length ? Math.max(...deadlines) : undefined;
       this.emitState(
         Object.freeze({
           state: "waiting-for-connection",
           attempt,
           ...(reason ? { reason } : {}),
-          delay: nextAttemptAt === undefined ? 0 : Math.max(0, nextAttemptAt - now),
-          ...(nextAttemptAt === undefined ? {} : { nextAttemptAt }),
           ...(reasons.length
             ? {
                 suppressionReasons: Object.freeze(

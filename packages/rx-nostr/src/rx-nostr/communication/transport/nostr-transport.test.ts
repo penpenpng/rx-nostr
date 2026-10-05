@@ -75,7 +75,6 @@ describe("NostrTransport", () => {
     await expect(inspector.waitNext()).resolves.toEqual({
       state: "waiting-for-connection",
       attempt: 1,
-      delay: 0,
       reason: { kind: "connection-dropped", code: 1006, message: "offline" },
     });
     await expect(inspector.waitNext()).resolves.toEqual({ state: "retrying", attempt: 1 });
@@ -88,7 +87,7 @@ describe("NostrTransport", () => {
     await expect(inspector.waitNext()).resolves.toEqual({ state: "dormant" });
   });
 
-  test("exposes an exact retry delay and a typed terminal failure", async () => {
+  test("waits for the retry delay and exposes a typed terminal failure", async () => {
     vi.useFakeTimers();
     const server = new ControlledWebSocketServer();
     const transport = new NostrTransport({
@@ -106,7 +105,6 @@ describe("NostrTransport", () => {
     await expect(firstInspector.waitNext()).resolves.toMatchObject({
       state: "waiting-for-connection",
       attempt: 1,
-      delay: 100,
     });
     expect(transport.state$.value).not.toHaveProperty("suppressionReasons");
     expect(server.connections).toHaveLength(1);
@@ -213,7 +211,6 @@ describe("NostrTransport", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(transport.state$.value).toMatchObject({
       state: "waiting-for-connection",
-      delay: 100,
       suppressionReasons: [
         {
           category: "relay-health",
