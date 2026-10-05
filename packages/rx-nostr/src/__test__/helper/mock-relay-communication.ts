@@ -93,5 +93,9 @@ export class RelayCommunicationMock implements IRelayCommunication {
     return this.eventOut.asObservable();
   }
 
+  castEvent(): Observable<void> {
+    return EMPTY;
+  }
+
   sendProgress(): void {}
 }

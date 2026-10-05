@@ -3,6 +3,7 @@ import { finalize, Subject, TimeoutError, type Subscription } from "rxjs";
 import { NoopVerifier } from "../event-verifier/index.ts";
 import type { EventVerifier } from "../index.ts";
 import { RxNostr } from "../rx-nostr/index.ts";
+import { legacyPublishSent } from "../rx-nostr/rx-nostr.ts";
 import { RxRelays } from "../rx-relays/index.ts";
 import { toLegacyConnectionState, withLegacyAuthTimeout } from "./adapters.ts";
 import { legacyRetryReconnector } from "./reconnector.ts";
@@ -247,10 +248,15 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         options.on?.defaultWriteRelays === false ? new RxRelays() : combine(writable, additional);
       const explicitRelays = options.on?.relays ?? options.relays;
       const relays = explicitRelays ? combine(base, RxRelays.from(explicitRelays)) : base;
-      const publication = client.publish(relays, event, {
+      const completeOn = options.completeOn ?? "all-ok";
+      const publishOptions = {
         ...(options.signer ? { signer: options.signer } : {}),
         ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
-      });
+      };
+      const publication =
+        completeOn === "sent"
+          ? client[legacyPublishSent](relays, event, publishOptions)
+          : client.publish(relays, event, publishOptions);
       const packets = new Subject<LegacyOkPacket>();
       let finished = false;
       let okSubscription: Subscription | undefined;
@@ -276,7 +282,6 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
           relays.dispose();
         }
       };
-      const completeOn = options.completeOn ?? "all-ok";
 
       okSubscription = publication.subscribe({
         next(packet) {
@@ -288,6 +293,9 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         },
         error: (error) => finish(error),
         complete() {
+          if (completeOn === "sent") {
+            return;
+          }
           if (options.errorOnTimeout) {
             void publication.waitFor("all").then(
               () => finish(),
@@ -309,10 +317,12 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       });
 
       if (completeOn === "sent") {
-        void publication.event.then(
+        void publication.waitFor("any").then(
           () => finish(),
           (error) => finish(error),
         );
+
+        void publication.event.catch(() => {});
       } else {
         // Keep a rejection handler attached even when no consumer subscribes.
         void publication.event.catch(() => {});

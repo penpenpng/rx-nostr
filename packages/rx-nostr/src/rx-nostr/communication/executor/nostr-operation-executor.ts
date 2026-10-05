@@ -261,6 +261,30 @@ export class NostrOperationExecutor implements Disposable {
     });
   }
 
+  /** Complete only after the EVENT frame has actually been sent. */
+  castEvent(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<void> {
+    return new Observable((subscriber) => {
+      const controller = new AbortController();
+
+      void this.transport
+        .castAfterAuth(["EVENT", event], { ...options, signal: controller.signal })
+        .then(
+          () => {
+            if (!subscriber.closed) {
+              subscriber.complete();
+            }
+          },
+          (error: unknown) => {
+            if (!subscriber.closed) {
+              subscriber.error(error);
+            }
+          },
+        );
+
+      return () => controller.abort();
+    });
+  }
+
   [Symbol.dispose] = once(() => {
     this.#auth.dispose();
     void this.transport.dispose().catch(() => {});

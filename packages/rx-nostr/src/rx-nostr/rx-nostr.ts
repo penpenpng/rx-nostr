@@ -42,6 +42,9 @@ import type {
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
 
+/** @internal Bridge for the legacy adapter; absent from the package entry point. */
+export const legacyPublishSent = Symbol("rx-nostr.legacy-publish-sent");
+
 export class RxNostr implements IRxNostr {
   /** Process-wide synchronous log callback for every RxNostr instance. */
   static get logSink(): RxNostrDiagnosticSink | undefined {
@@ -163,6 +166,24 @@ export class RxNostr implements IRxNostr {
     params: PublishEventParameters,
     options: RxNostrPublishConfig = {},
   ): Publication {
+    return this.#publish(relays, params, options, "acknowledged");
+  }
+
+  /** @internal Legacy completion after every destination has sent its EVENT frame. */
+  [legacyPublishSent](
+    relays: RelayInput,
+    params: PublishEventParameters,
+    options: RxNostrPublishConfig = {},
+  ): Publication {
+    return this.#publish(relays, params, options, "sent");
+  }
+
+  #publish(
+    relays: RelayInput,
+    params: PublishEventParameters,
+    options: RxNostrPublishConfig,
+    mode: "acknowledged" | "sent",
+  ): Publication {
     this.#assertActive();
     const config = new FilledRxNostrPublishOptions(options, this.#config);
 
@@ -171,6 +192,7 @@ export class RxNostr implements IRxNostr {
       config,
       relayInput: relays,
       relays: this.#relays,
+      mode,
     });
 
     this.#publications.add(publication);

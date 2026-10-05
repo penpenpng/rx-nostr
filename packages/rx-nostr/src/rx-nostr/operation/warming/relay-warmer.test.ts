@@ -44,6 +44,9 @@ class LeaseRelay implements IRelayCommunication {
   event(_event: Nostr.Event) {
     return EMPTY as import("rxjs").Observable<OkPacket>;
   }
+  castEvent(_event: Nostr.Event) {
+    return EMPTY as import("rxjs").Observable<void>;
+  }
 }
 
 class LeaseRelayCollection implements IRelayCommunicationCollection<LeaseRelay> {

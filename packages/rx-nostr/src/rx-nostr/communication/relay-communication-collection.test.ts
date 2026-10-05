@@ -21,6 +21,9 @@ class FakeRelay implements Disposable {
   event(_event: Nostr.Event) {
     return EMPTY as typeof EMPTY & import("rxjs").Observable<OkPacket>;
   }
+  castEvent(_event: Nostr.Event) {
+    return EMPTY as import("rxjs").Observable<void>;
+  }
 }
 
 describe("RelayCommunicationCollection", () => {

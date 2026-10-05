@@ -80,6 +80,7 @@ export interface ILegacyRxNostr {
   setAdditionalRelays(relays: LegacyRelayInput): void;
   use(request: RxReq, options?: LegacyUseOptions): Observable<EventPacket>;
   send(event: PublishEventParameters, options?: LegacySendOptions): Observable<LegacyOkPacket>;
+  /** Resolve once at least one selected relay has sent EVENT, without waiting for OK. */
   cast(
     event: PublishEventParameters,
     options?: Omit<LegacySendOptions, "completeOn">,
@@ -100,6 +101,7 @@ export interface LegacySendOptions {
   relays?: string[];
   on?: { relays?: RelayInput; defaultWriteRelays?: boolean };
   errorOnTimeout?: boolean;
+  /** `sent` completes after an EVENT send succeeds; it errors when no destination can send. */
   completeOn?: "all-ok" | "any-ok" | "sent";
   timeout?: number;
 }
