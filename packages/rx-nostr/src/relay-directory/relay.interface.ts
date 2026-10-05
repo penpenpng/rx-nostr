@@ -10,6 +10,8 @@ export interface RelayDirectoryEntry {
   nip11FailedAt?: number;
   lastConnectedAt?: number;
   lastFailureAt?: number;
+  /** Start of the current consecutive failure streak. */
+  firstFailureAt?: number;
   consecutiveFailures: number;
   liveConnections: number;
   maxSubscriptions?: number;
@@ -22,6 +24,8 @@ export interface RelayDirectorySnapshotEntry {
   nip11FailedAt?: number;
   lastConnectedAt?: number;
   lastFailureAt?: number;
+  /** Start of the current consecutive failure streak. */
+  firstFailureAt?: number;
   consecutiveFailures: number;
 }
 

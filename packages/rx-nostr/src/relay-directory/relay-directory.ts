@@ -19,6 +19,8 @@ import { cloneRelayInfo, copyRelayInfo, RelayRecord } from "./relay.ts";
 export interface RelayDirectoryReporter {
   connectionOpened(url: string): () => void;
   connectionFailed(url: string): void;
+  acquireProbe(url: string): (() => void) | undefined;
+  retain(url: string): () => void;
 }
 
 const reporters = new WeakMap<RelayDirectory, RelayDirectoryReporter>();
@@ -36,6 +38,8 @@ export class RelayDirectory implements IRelayDirectory {
       Object.freeze({
         connectionOpened: (url: string) => this.#getOrCreate(url).connectionOpened(),
         connectionFailed: (url: string) => this.#getOrCreate(url).connectionFailed(),
+        acquireProbe: (url: string) => this.#getOrCreate(url).acquireProbe(),
+        retain: (url: string) => this.#getOrCreate(url).retain(),
       }),
     );
   }
@@ -47,6 +51,10 @@ export class RelayDirectory implements IRelayDirectory {
 
   getOrCreate(url: string): RelayDirectoryEntry {
     return copyEntry(this.#getOrCreate(url).snapshot());
+  }
+
+  resetHealth(url: string): void {
+    this.#getOrCreate(url).resetHealth();
   }
 
   forget(url: string): boolean {
@@ -155,6 +163,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
       "nip11FailedAt",
       "lastConnectedAt",
       "lastFailureAt",
+      "firstFailureAt",
       "consecutiveFailures",
     ]);
     if (typeof candidate.url !== "string") {
@@ -183,13 +192,23 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
     }
     const lastConnectedAt = optionalTimestamp(candidate.lastConnectedAt, "lastConnectedAt");
     const lastFailureAt = optionalTimestamp(candidate.lastFailureAt, "lastFailureAt");
+    const firstFailureAt = optionalTimestamp(candidate.firstFailureAt, "firstFailureAt");
+    if (
+      firstFailureAt !== undefined &&
+      (consecutiveFailures === 0 ||
+        lastFailureAt === undefined ||
+        firstFailureAt > lastFailureAt ||
+        (lastConnectedAt !== undefined && firstFailureAt < lastConnectedAt))
+    ) {
+      return invalidSchema("firstFailureAt must belong to the current failure streak.");
+    }
     if (consecutiveFailures > 0 && lastFailureAt === undefined) {
       return invalidSchema("lastFailureAt is required when consecutiveFailures is non-zero.");
     }
     if (
       consecutiveFailures > 0 &&
       lastConnectedAt !== undefined &&
-      lastConnectedAt >= (lastFailureAt as number)
+      lastConnectedAt > (lastFailureAt as number)
     ) {
       return invalidSchema("consecutiveFailures must be zero after the latest connection success.");
     }
@@ -202,6 +221,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
         ...optionalTimestampProperty(candidate, "nip11FailedAt"),
         ...(lastConnectedAt === undefined ? {} : { lastConnectedAt }),
         ...(lastFailureAt === undefined ? {} : { lastFailureAt }),
+        ...(firstFailureAt === undefined ? {} : { firstFailureAt }),
         consecutiveFailures,
       }),
     );

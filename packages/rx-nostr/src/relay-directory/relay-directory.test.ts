@@ -85,6 +85,47 @@ describe("RelayDirectory health reporter", () => {
 });
 
 describe("RelayDirectory snapshots", () => {
+  test("merges streak starts without including failures before an imported success", () => {
+    const directory = new RelayDirectory();
+    const merge = (entry: object) =>
+      directory.importSnapshot(
+        JSON.stringify({ version: 1, relays: [{ url: "wss://relay.example.com", ...entry }] }),
+      );
+    merge({ firstFailureAt: 0, lastFailureAt: 50, consecutiveFailures: 2 });
+    merge({ firstFailureAt: 20, lastFailureAt: 100, consecutiveFailures: 3 });
+    expect(directory.get("wss://relay.example.com")?.firstFailureAt).toBe(0);
+    merge({ lastConnectedAt: 80, firstFailureAt: 90, lastFailureAt: 100, consecutiveFailures: 1 });
+    expect(directory.get("wss://relay.example.com")?.firstFailureAt).toBe(90);
+    expect(() => new RelayDirectory().importSnapshot(directory.exportSnapshot())).not.toThrow();
+  });
+
+  test("round trips a manually cleared failure streak and rejects inconsistent firstFailureAt", () => {
+    const source = new RelayDirectory({ clock: () => 100 });
+    getRelayDirectoryReporter(source).connectionFailed("wss://relay.example.com");
+    source.resetHealth("wss://relay.example.com");
+    const restored = new RelayDirectory();
+    restored.importSnapshot(source.exportSnapshot());
+    expect(restored.get("wss://relay.example.com")?.firstFailureAt).toBeUndefined();
+    expect(() => source.importSnapshot(restored.exportSnapshot())).not.toThrow();
+    const before = restored.exportSnapshot();
+    expect(() =>
+      restored.importSnapshot(
+        JSON.stringify({
+          version: 1,
+          relays: [
+            {
+              url: "wss://relay.example.com",
+              firstFailureAt: 200,
+              lastFailureAt: 100,
+              consecutiveFailures: 2,
+            },
+          ],
+        }),
+      ),
+    ).toThrow();
+    expect(restored.exportSnapshot()).toBe(before);
+  });
+
   test("round trips persistent data without live connection state", () => {
     let now = 10;
     const source = new RelayDirectory({ clock: () => now });
@@ -173,5 +214,20 @@ describe("RelayDirectory snapshots", () => {
       directory.fetchNip11("wss://relay.example.com", { timeout: 0 }),
     ).rejects.toMatchObject({ code: "timeout" });
     expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
+  });
+});
+
+test("round trips success followed by failure at the same timestamp", () => {
+  const directory = new RelayDirectory({ clock: () => 100 });
+  const reporter = getRelayDirectoryReporter(directory);
+  reporter.connectionOpened("wss://relay.example.com")();
+  reporter.connectionFailed("wss://relay.example.com");
+  const restored = new RelayDirectory();
+  restored.importSnapshot(directory.exportSnapshot());
+  expect(restored.get("wss://relay.example.com")).toMatchObject({
+    consecutiveFailures: 1,
+    firstFailureAt: 100,
+    lastFailureAt: 100,
+    lastConnectedAt: 100,
   });
 });

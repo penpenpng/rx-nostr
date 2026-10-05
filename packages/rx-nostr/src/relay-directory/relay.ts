@@ -15,9 +15,12 @@ export class RelayRecord {
   #nip11FailedAt?: number;
   #lastConnectedAt?: number;
   #lastFailureAt?: number;
+  #firstFailureAt?: number;
   #consecutiveFailures = 0;
   #liveConnections = 0;
   #inflight?: Promise<Readonly<Nostr.Nip11.RelayInfo>>;
+  #probeHeld = false;
+  #retainers = 0;
 
   constructor(
     readonly url: RelayUrl,
@@ -36,6 +39,7 @@ export class RelayRecord {
       ...(this.#nip11FailedAt === undefined ? {} : { nip11FailedAt: this.#nip11FailedAt }),
       ...(this.#lastConnectedAt === undefined ? {} : { lastConnectedAt: this.#lastConnectedAt }),
       ...(this.#lastFailureAt === undefined ? {} : { lastFailureAt: this.#lastFailureAt }),
+      ...(this.#firstFailureAt === undefined ? {} : { firstFailureAt: this.#firstFailureAt }),
       consecutiveFailures: this.#consecutiveFailures,
       liveConnections: this.#liveConnections,
       ...(maxSubscriptions === undefined ? {} : { maxSubscriptions }),
@@ -50,6 +54,7 @@ export class RelayRecord {
       ...(this.#nip11FailedAt === undefined ? {} : { nip11FailedAt: this.#nip11FailedAt }),
       ...(this.#lastConnectedAt === undefined ? {} : { lastConnectedAt: this.#lastConnectedAt }),
       ...(this.#lastFailureAt === undefined ? {} : { lastFailureAt: this.#lastFailureAt }),
+      ...(this.#firstFailureAt === undefined ? {} : { firstFailureAt: this.#firstFailureAt }),
       consecutiveFailures: this.#consecutiveFailures,
     });
   }
@@ -98,6 +103,7 @@ export class RelayRecord {
     this.#liveConnections++;
     this.#lastConnectedAt = this.clock();
     this.#consecutiveFailures = 0;
+    this.#firstFailureAt = undefined;
     this.#emit();
 
     return once(() => {
@@ -108,8 +114,24 @@ export class RelayRecord {
 
   connectionFailed(): void {
     this.#lastFailureAt = this.clock();
+    this.#firstFailureAt ??= this.#lastFailureAt;
     this.#consecutiveFailures++;
     this.#emit();
+  }
+
+  resetHealth(): void {
+    this.#firstFailureAt = undefined;
+    this.#consecutiveFailures = 0;
+    this.#emit();
+  }
+
+  acquireProbe(): (() => void) | undefined {
+    if (this.#probeHeld) return;
+    this.#probeHeld = true;
+    return once(() => {
+      this.#probeHeld = false;
+      this.#emit();
+    });
   }
 
   merge(entry: RelayDirectorySnapshotEntry): void {
@@ -129,22 +151,47 @@ export class RelayRecord {
     this.#lastFailureAt = maxDefined(currentFailureAt, importedFailureAt);
     if (
       this.#lastFailureAt !== undefined &&
-      (this.#lastConnectedAt === undefined || this.#lastFailureAt > this.#lastConnectedAt)
+      (this.#lastConnectedAt === undefined || this.#lastFailureAt >= this.#lastConnectedAt)
     ) {
       if (importedFailureAt === this.#lastFailureAt) {
+        const importedFirst = entry.firstFailureAt ?? importedFailureAt;
+        this.#firstFailureAt =
+          this.#firstFailureAt !== undefined &&
+          (this.#lastConnectedAt === undefined || this.#firstFailureAt >= this.#lastConnectedAt)
+            ? Math.min(this.#firstFailureAt, importedFirst!)
+            : importedFirst;
         this.#consecutiveFailures =
           currentFailureAt === importedFailureAt
             ? Math.max(this.#consecutiveFailures, entry.consecutiveFailures)
             : entry.consecutiveFailures;
       }
     } else {
+      this.#firstFailureAt = undefined;
       this.#consecutiveFailures = 0;
     }
+    if (this.#consecutiveFailures === 0) this.#firstFailureAt = undefined;
+    else if (
+      this.#firstFailureAt === undefined ||
+      (this.#lastConnectedAt !== undefined && this.#firstFailureAt < this.#lastConnectedAt)
+    )
+      this.#firstFailureAt = this.#lastFailureAt;
     this.#emit();
   }
 
   get forgettable(): boolean {
-    return this.#liveConnections === 0 && this.#inflight === undefined;
+    return (
+      this.#retainers === 0 &&
+      this.#liveConnections === 0 &&
+      this.#inflight === undefined &&
+      !this.#probeHeld
+    );
+  }
+
+  retain(): () => void {
+    this.#retainers++;
+    return once(() => {
+      this.#retainers--;
+    });
   }
 
   dispose(): void {
