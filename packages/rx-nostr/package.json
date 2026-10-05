@@ -51,6 +51,7 @@
   },
   "scripts": {
     "build": "pnpm typecheck && vp pack",
+    "prepack": "pnpm build",
     "test": "vitest run",
     "test:contract": "vitest run --project contract",
     "test:dev": "vitest --ui",

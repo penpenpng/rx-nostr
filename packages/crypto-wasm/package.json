@@ -32,6 +32,7 @@
   },
   "scripts": {
     "build": "vite build",
+    "prepack": "pnpm build",
     "test": "vitest --run",
     "test:watch": "vitest"
   },

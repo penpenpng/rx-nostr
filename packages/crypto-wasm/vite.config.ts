@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     lib: {
       name: "rx-nostr-crypto-wasm",
+      fileName: "rx-nostr-crypto-wasm",
       entry: path.resolve(__dirname, "src/index.ts"),
       formats: ["es"],
     },
