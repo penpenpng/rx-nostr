@@ -1,4 +1,4 @@
-import { NoopReconnector, NoopSigner, NoopVerifier, RxReq } from "rx-nostr";
+import { NoopReconnector, NoopSigner, NoopVerifier, RxReq, type Authenticator } from "rx-nostr";
 import { filter, firstValueFrom } from "rxjs";
 import { describe, expect, test } from "vitest";
 
@@ -126,13 +126,20 @@ describe("createLegacyRxNostr", () => {
   test("cast waits for a pending AUTH challenge before sending EVENT", async () => {
     const server = new ControlledWebSocketServer();
     const relay = "wss://auth.example.com";
+
+    class LegacyAuthenticator implements Authenticator {
+      readonly #id = "auth-event";
+
+      async challenge(relayUrl: string, challenge: string) {
+        return Faker.authEvent({ id: this.#id, relay: relayUrl, challenge });
+      }
+    }
+
     const client = createLegacyRxNostr({
       signer: new NoopSigner(),
       connectionStrategy: "aggressive",
-      authenticator: {
-        challenge: async (_relay, challenge) =>
-          Faker.authEvent({ id: "auth-event", relay, challenge }),
-      },
+      authenticator: new LegacyAuthenticator(),
+      authTimeout: 1_000,
       reconnector: new NoopReconnector(),
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
