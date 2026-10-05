@@ -44,6 +44,8 @@ NIP-07 provider が存在しない環境で署名を要求すると、publicatio
 
 `@rx-nostr/crypto` が提供し、nsec または hex の秘密鍵で署名します。
 
+通常版と WASM 版の `SeckeySigner` は、`tags` と `created_at` を省略した場合にそれぞれ空配列と現在時刻を補います。完全に署名済みの EVENT を追加 tags なしで渡した場合は ID と署名を保持します。signer の `tags` option で tags を追加する場合は元の ID・署名を使い回さず、追加後の内容を signer の鍵で再署名します。
+
 ```ts
 import { SeckeySigner } from "@rx-nostr/crypto";
 

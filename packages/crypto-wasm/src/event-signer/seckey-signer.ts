@@ -16,10 +16,13 @@ export class SeckeySigner implements EventSigner {
   }
 
   async signEvent<K extends number>(params: Nostr.EventParameters<K>): Promise<Nostr.Event<K>> {
+    const appendTags = (this.options?.tags?.length ?? 0) > 0;
+
     return signEvent(
       {
         ...params,
-        pubkey: params.pubkey ?? this.#pubhex,
+        ...(appendTags ? { id: undefined, sig: undefined } : {}),
+        pubkey: appendTags ? this.#pubhex : (params.pubkey ?? this.#pubhex),
         tags: [...(params.tags ?? []), ...(this.options?.tags ?? [])],
         created_at: params.created_at ?? Math.floor(Date.now() / 1000),
       },

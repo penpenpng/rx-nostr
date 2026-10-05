@@ -1,74 +1,10 @@
 import { expect, test } from "vitest";
 
-import signedEvent from "../../../test-fixtures/signed-event.json";
+import { verificationVectors } from "../../../test-fixtures/crypto-vectors.ts";
 import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SimpleVerifier } from "./simple-verifier.ts";
 
-test.each([
-  null,
-  {},
-  { ...signedEvent, tags: [["e", 1]] },
-  { ...signedEvent, tags: [["e", true]] },
-  { ...signedEvent, tags: [["e", null]] },
-  { ...signedEvent, tags: [[]] },
-  { ...signedEvent, kind: NaN },
-  { ...signedEvent, kind: 65_536 },
-  { ...signedEvent, created_at: Infinity },
-  { ...signedEvent, id: signedEvent.id.toUpperCase() },
-  { ...signedEvent, pubkey: signedEvent.pubkey.toUpperCase() },
-  { ...signedEvent, sig: signedEvent.sig.toUpperCase() },
-])("rejects malformed or non-canonical NIP-01 EVENTs: %o", async (value) => {
-  expect(verifyEvent(value as never)).toBe(false);
-  await expect(new SimpleVerifier().verifyEvent(value as never)).resolves.toBe(false);
-});
-
-test.each([
-  ["id", { id: "0".repeat(64) }],
-  ["content", { content: "changed" }],
-  ["signature", { sig: "0".repeat(128) }],
-])("rejects an event with a changed %s", async (_, changes) => {
-  const event = { ...signedEvent, ...changes };
-
-  expect(verifyEvent(event)).toBe(false);
-  await expect(new SimpleVerifier().verifyEvent(event)).resolves.toBe(false);
-});
-
-test(SimpleVerifier.name, async () => {
-  const verifier = new SimpleVerifier();
-
-  await expect(
-    verifier.verifyEvent({
-      content: "hello world",
-      created_at: 1744992061,
-      id: "67566ef8eceb6dffae47606fd737425d7bcddaa9338bddc144588e4a0051913e",
-      kind: 1,
-      pubkey: "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-      sig: "19c12bde8a88537261395180601205fb771337ed456a1cb88d851f9c293774cf7140143cfaba72552c6375da3ac3d6a96690eb90647c9e5b1d9c1594b813b22e",
-      tags: [],
-    }),
-  ).resolves.toBe(true);
-
-  await expect(
-    verifier.verifyEvent({
-      content: "hello world",
-      created_at: 1744992061,
-      id: "67566ef8eceb6dffae47606fd737425d7bcddaa9338bddc144588e4a0051913e",
-      kind: 1,
-      pubkey: "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-      // sig: "19c12bde8a88537261395180601205fb771337ed456a1cb88d851f9c293774cf7140143cfaba72552c6375da3ac3d6a96690eb90647c9e5b1d9c1594b813b22e",
-      tags: [],
-    } as any),
-  ).resolves.toBe(false);
-
-  await expect(
-    verifier.verifyEvent({
-      content: "hello world",
-      created_at: 1744992061,
-      id: "67566ef8eceb6dffae47606fd737425d7bcddaa9338bddc144588e4a0051913e",
-      kind: 1,
-      pubkey: "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-      sig: "19c12bde8a88537261395180601205fb771337ed456a1cb88d851f9c293774cf7140143cfaba72552c6375da3ac3d6a96690eb90647c9e5b1d9c1594b813b22e",
-      // tags: [],
-    } as any),
-  ).resolves.toBe(false);
+test.each(verificationVectors)("classifies $name", async ({ event, valid }) => {
+  expect(verifyEvent(event as never)).toBe(valid);
+  await expect(new SimpleVerifier().verifyEvent(event as never)).resolves.toBe(valid);
 });
