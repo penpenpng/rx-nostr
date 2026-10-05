@@ -1,7 +1,9 @@
-import { finalize, Subject, TimeoutError, type Subscription } from "rxjs";
+import { defer, finalize, Subject, throwError, TimeoutError, type Subscription } from "rxjs";
 
 import { NoopVerifier } from "../event-verifier/index.ts";
 import type { EventVerifier } from "../index.ts";
+import { RxNostrPublicationError } from "../libs/error.ts";
+import type { Publication } from "../publication/index.ts";
 import { RxNostr } from "../rx-nostr/index.ts";
 import { legacyPublishSent } from "../rx-nostr/rx-nostr.ts";
 import { RxRelays } from "../rx-relays/index.ts";
@@ -25,6 +27,9 @@ function entriesOf(input: LegacyRelayInput): LegacyRelay[] {
     return [input];
   }
   if (Array.isArray(input)) {
+    return [...input];
+  }
+  if (Symbol.iterator in input) {
     return [...input];
   }
   if ("url" in input) {
@@ -104,6 +109,14 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
   const readable = new RxRelays();
   const writable = new RxRelays();
   const additional = new RxRelays();
+  const additionalReadable = new RxRelays();
+  const additionalWritable = new RxRelays();
+  const retained = new RxRelays();
+
+  if (connectionStrategy === "lazy-keep") {
+    client.setHotRelays(retained);
+  }
+
   const relayStates = new Map<string, LegacyConnectionState>();
   const connectionStates = new Subject<LegacyConnectionStatePacket>();
   const connectionStateSubscription = client
@@ -225,38 +238,100 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       this.setDefaultRelays(current);
     },
     setAdditionalRelays(relays) {
-      set(relays, additional, additional, additional);
+      set(relays, additional, additionalReadable, additionalWritable);
     },
     use(request, options = {}) {
-      const base =
-        options.on?.defaultReadRelays === false ? new RxRelays() : combine(readable, additional);
       const explicitRelays = options.on?.relays ?? options.relays;
-      const relays = explicitRelays ? combine(base, RxRelays.from(explicitRelays)) : base;
+      let stableExplicitRelays: RxRelays | string[] | undefined;
 
-      return client.forward(relays, request, options).pipe(
-        finalize(() => {
-          base.dispose();
+      if (explicitRelays instanceof RxRelays) {
+        stableExplicitRelays = explicitRelays;
+      } else if (explicitRelays) {
+        stableExplicitRelays = RxRelays.array(explicitRelays);
+      }
+
+      return defer(() => {
+        const base =
+          options.on?.defaultReadRelays === false
+            ? new RxRelays()
+            : combine(readable, additionalReadable);
+        const explicit = stableExplicitRelays ? RxRelays.from(stableExplicitRelays) : undefined;
+        const relays = explicit ? combine(base, explicit) : base;
+        let keepSubscription: Subscription | undefined;
+
+        const dispose = () => {
+          keepSubscription?.unsubscribe();
 
           if (relays !== base) {
             relays.dispose();
           }
-        }),
-      );
+
+          explicit?.dispose();
+          base.dispose();
+        };
+
+        try {
+          const query = client.forward(relays, request, options);
+
+          if (connectionStrategy === "lazy-keep") {
+            keepSubscription = relays.asObservable().subscribe((urls) => {
+              retained.append(...urls);
+            });
+          }
+
+          return query.pipe(finalize(dispose));
+        } catch (error) {
+          dispose();
+
+          throw error;
+        }
+      });
     },
     send(event, options = {}) {
       const base =
-        options.on?.defaultWriteRelays === false ? new RxRelays() : combine(writable, additional);
+        options.on?.defaultWriteRelays === false
+          ? new RxRelays()
+          : combine(writable, additionalWritable);
       const explicitRelays = options.on?.relays ?? options.relays;
-      const relays = explicitRelays ? combine(base, RxRelays.from(explicitRelays)) : base;
+      const explicit = explicitRelays ? RxRelays.from(explicitRelays) : undefined;
+      const relays = explicit ? combine(base, explicit) : base;
+      const releaseRelays = () => {
+        if (relays !== base) {
+          relays.dispose();
+        }
+
+        explicit?.dispose();
+        base.dispose();
+      };
+
+      if (RxRelays.array(relays).length === 0) {
+        releaseRelays();
+
+        return throwError(() => new RxNostrPublicationError("no-relays"));
+      }
+
       const completeOn = options.completeOn ?? "all-ok";
       const publishOptions = {
         ...(options.signer ? { signer: options.signer } : {}),
         ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
       };
-      const publication =
-        completeOn === "sent"
-          ? client[legacyPublishSent](relays, event, publishOptions)
-          : client.publish(relays, event, publishOptions);
+      let publication: Publication;
+
+      try {
+        publication =
+          completeOn === "sent"
+            ? client[legacyPublishSent](relays, event, publishOptions)
+            : client.publish(relays, event, publishOptions);
+      } catch (error) {
+        releaseRelays();
+
+        throw error;
+      }
+
+      if (connectionStrategy === "lazy-keep") {
+        retained.append(...RxRelays.array(relays));
+      }
+
       const packets = new Subject<LegacyOkPacket>();
       let finished = false;
       let okSubscription: Subscription | undefined;
@@ -276,11 +351,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         }
 
         publication.cancel();
-        base.dispose();
-
-        if (relays !== base) {
-          relays.dispose();
-        }
+        releaseRelays();
       };
 
       okSubscription = publication.subscribe({
@@ -296,8 +367,9 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
           if (completeOn === "sent") {
             return;
           }
-          if (options.errorOnTimeout) {
-            void publication.waitFor("all").then(
+
+          if (completeOn === "any-ok" || options.errorOnTimeout) {
+            void publication.waitFor(completeOn === "any-ok" ? "any" : "all").then(
               () => finish(),
               (error: unknown) => {
                 const failures =
@@ -305,9 +377,13 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
                     ? (error as { failures?: Array<{ kind?: string }> }).failures
                     : undefined;
 
-                finish(
-                  failures?.some(({ kind }) => kind === "timeout") ? new TimeoutError() : undefined,
-                );
+                if (options.errorOnTimeout && failures?.some(({ kind }) => kind === "timeout")) {
+                  finish(new TimeoutError());
+                } else if (completeOn === "any-ok") {
+                  finish(error);
+                } else {
+                  finish();
+                }
               },
             );
           } else {
@@ -340,6 +416,8 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
     },
     createConnectionStateObservable: () => connectionStates.asObservable(),
     dispose() {
+      connectionStateSubscription.unsubscribe();
+
       for (const [from, state] of relayStates) {
         if (state === "terminated") {
           continue;
@@ -350,12 +428,14 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       }
 
       client.dispose();
-      connectionStateSubscription.unsubscribe();
       connectionStates.complete();
       defaultRelays.dispose();
       readable.dispose();
       writable.dispose();
       additional.dispose();
+      additionalReadable.dispose();
+      additionalWritable.dispose();
+      retained.dispose();
     },
     [Symbol.dispose]() {
       this.dispose();

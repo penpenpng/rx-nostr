@@ -16,6 +16,7 @@ import type { RelayInput } from "../types/index.ts";
 
 /** v3-style relay entry, including the permissions supported by v3. */
 export type LegacyRelay = string | { url: string; read?: boolean; write?: boolean };
+/** Relay entries may be a single item, an iterable (including Set/generator), RxRelays, or a URL-keyed permission map. */
 export type LegacyRelayInput =
   | Iterable<LegacyRelay>
   | LegacyRelay
@@ -78,7 +79,9 @@ export interface ILegacyRxNostr {
   addDefaultRelays(relays: LegacyRelayInput): void;
   removeDefaultRelays(urls: string | string[]): void;
   setAdditionalRelays(relays: LegacyRelayInput): void;
+  /** A cold query: each subscriber owns its own relay view and can unsubscribe independently. */
   use(request: RxReq, options?: LegacyUseOptions): Observable<EventPacket>;
+  /** A hot publication; the returned stream reports relay OK packets. Empty destinations error with `no-relays`. */
   send(event: PublishEventParameters, options?: LegacySendOptions): Observable<LegacyOkPacket>;
   /** Resolve once at least one selected relay has sent EVENT, without waiting for OK. */
   cast(
@@ -101,7 +104,7 @@ export interface LegacySendOptions {
   relays?: string[];
   on?: { relays?: RelayInput; defaultWriteRelays?: boolean };
   errorOnTimeout?: boolean;
-  /** `sent` completes after an EVENT send succeeds; it errors when no destination can send. */
+  /** `sent` completes after an EVENT send succeeds; `any-ok` requires an OK true. Empty destinations error with `no-relays`. */
   completeOn?: "all-ok" | "any-ok" | "sent";
   timeout?: number;
 }
