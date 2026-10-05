@@ -1,6 +1,9 @@
 packages:
   - packages/*
 
+# Resolve unreleased workspace peers during Changesets versioning.
+linkWorkspacePackages: true
+
 catalog:
   typescript: 6.0.2
 

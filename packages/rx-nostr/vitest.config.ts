@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      "@rx-nostr/crypto": path.resolve(import.meta.dirname, "../crypto/src/index.ts"),
       "rx-nostr/operators": path.resolve(import.meta.dirname, "src/operators.ts"),
       "rx-nostr/utils": path.resolve(import.meta.dirname, "src/utils.ts"),
       "rx-nostr": path.resolve(import.meta.dirname, "src/index.ts"),

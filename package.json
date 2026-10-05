@@ -18,12 +18,16 @@
     "test": "pnpm --recursive --if-present test",
     "test:packed": "node scripts/test-packed-consumers.mjs",
     "test:worker-browser": "node scripts/test-worker-browser.mjs",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
+    "@rx-nostr/crypto": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "nostr-typedef": "^0.13.0",
+    "rx-nostr": "workspace:*",
     "typescript": "catalog:",
+    "vite": "^8.3.0",
     "vite-plus": "0.3.3"
   },
   "packageManager": "pnpm@10.33.0"
