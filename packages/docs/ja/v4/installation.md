@@ -84,3 +84,5 @@ rxNostr.dispose();
 ```
 
 ほかの API が不足する場合も、対応する polyfill を先に読み込んでください。rx-nostr はグローバル polyfill を自動導入しません。上の手順は Node 24 で `DisposableStack` を削除した別プロセスで検証しています。ブラウザごとの互換性は、採用するブラウザと polyfill の組み合わせで確認してください。
+
+CI では Node 24.0.0 と現行 Node 24 の両方で配布 tarball を polyfill なしで import し、`DisposableStack` が不足する場合の失敗と先読み後の回復を別プロセスで検査します。Chrome では配布物から module Worker を起動し、署名検証の通信と終了まで確認します。

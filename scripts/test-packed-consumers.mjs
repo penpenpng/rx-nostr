@@ -109,6 +109,7 @@ try {
   );
 
   Object.assign(dependencies, {
+    disposablestack: "^1.1.8",
     "nostr-typedef": "^0.13.0",
     rxjs: "^7.8.2",
     typescript: typescriptVersion,
@@ -138,12 +139,43 @@ try {
     consumerDir,
     "clean install from tarballs",
   );
-  run(
-    "node",
-    ["smoke.mjs"],
-    consumerDir,
-    "ESM runtime: root, operators, utils, legacy, crypto, crypto-wasm",
-  );
+  const runtimeBins = [
+    ...new Set([process.execPath, process.env.CONSUMER_NODE_BIN].filter(Boolean)),
+  ];
+
+  for (const runtime of runtimeBins) {
+    const version = execFileSync(runtime, ["--version"], { encoding: "utf8" }).trim();
+
+    run(
+      runtime,
+      ["smoke.mjs"],
+      consumerDir,
+      `${version} ESM runtime: root, operators, utils, legacy, crypto, crypto-wasm`,
+    );
+
+    const missingNative = spawnSync(
+      runtime,
+      ["--input-type=module", "-e", "delete globalThis.DisposableStack; await import('rx-nostr')"],
+      { cwd: consumerDir, encoding: "utf8" },
+    );
+
+    if (missingNative.status === 0 || !`${missingNative.stderr}`.includes("DisposableStack")) {
+      throw new Error(
+        `${version}: missing native DisposableStack was not detected: ${missingNative.stderr}`,
+      );
+    }
+
+    run(
+      runtime,
+      [
+        "--input-type=module",
+        "-e",
+        "delete globalThis.DisposableStack; await import('disposablestack/auto'); const { RxNostr } = await import('rx-nostr'); new RxNostr().dispose()",
+      ],
+      consumerDir,
+      `${version} documented polyfill must load before packed ESM import`,
+    );
+  }
 
   for (const resolution of ["nodenext", "bundler"]) {
     run(

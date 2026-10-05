@@ -91,3 +91,19 @@ test(RxRelays.union.name, async () => {
   rxr2.dispose();
   await expect(inspector.waitNext()).resolves.toEqual(new Set([relay1, relay3]));
 });
+
+test("RxRelays.intersection follows common relays as sources change", () => {
+  const first = new RxRelays(["wss://shared.example.com", "wss://first.example.com"]);
+  const second = new RxRelays(["wss://shared.example.com", "wss://second.example.com"]);
+  const common = RxRelays.intersection(first, second);
+
+  expect(common.get()).toEqual(new Set(["wss://shared.example.com"]));
+  first.remove("wss://shared.example.com");
+  expect(common.get()).toEqual(new Set());
+  second.append("wss://first.example.com");
+  expect(common.get()).toEqual(new Set(["wss://first.example.com"]));
+
+  common.dispose();
+  first.dispose();
+  second.dispose();
+});

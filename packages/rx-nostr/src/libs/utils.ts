@@ -7,7 +7,11 @@ export namespace u {
     }
 
     export function intersection<T>(...sets: Set<T>[]): Set<T> {
-      return sets.reduce((acc, set) => acc.intersection(set), new Set<T>());
+      const [first, ...rest] = sets;
+
+      return first
+        ? rest.reduce((acc, set) => acc.intersection(set), new Set(first))
+        : new Set<T>();
     }
   }
 

@@ -16,6 +16,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
+          node-version: "24.0.0"
+      - run: echo "CONSUMER_NODE_BIN=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
           node-version: "24"
           cache: pnpm
           registry-url: https://registry.npmjs.org
