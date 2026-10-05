@@ -240,6 +240,36 @@ describe("REQ public contract", () => {
   });
 
   describe("forward queries", () => {
+    test("derived RxReq disposal stops new filters but leaves its final segment active", async () => {
+      const { server, rxNostr } = createRxNostrScenario();
+      const source = new RxReq();
+      const derived = source.pipe(map((packet) => packet));
+      const inspector = new SubscriptionInspector<EventPacket>();
+      const subscription = rxNostr.forward(relay, derived).subscribe(inspector);
+
+      derived.emit([{ kinds: [1] }]);
+      const socket = server.sockets.latest;
+
+      socket.open();
+      const [, subId] = await socket.inbox.waitNext("REQ");
+
+      derived.dispose();
+      source.emit([{ kinds: [2] }]);
+      socket.message(["EVENT", subId, event({ id: "still-active" })]);
+
+      await expect(inspector.waitNext()).resolves.toMatchObject({
+        event: { id: "still-active" },
+      });
+      expect(socket.inbox.length).toBe(1);
+
+      subscription.unsubscribe();
+      expect(await socket.inbox.waitNext("CLOSE")).toEqual(["CLOSE", subId]);
+      await expect(socket.closeRequested).resolves.toBeDefined();
+      socket.acknowledgeClose();
+      source.dispose();
+      rxNostr.dispose();
+    });
+
     test("keeps the latest forward segment active after its hot source is disposed", async () => {
       const { server, rxNostr } = createRxNostrScenario();
       const request = new RxReq();

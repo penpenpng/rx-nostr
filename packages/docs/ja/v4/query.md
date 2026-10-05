@@ -71,6 +71,8 @@ request.dispose();
 
 `forward()` では source が dispose されても最後の segment は継続します。subscription の unsubscribe または `RxNostr.dispose()` で終了します。
 
+`request.pipe(...)` で作った派生 `RxReq` は独立して dispose できます。派生を dispose するとその observer と遅延中の operator は終了しますが、親や兄弟の request は継続します。親を dispose すると子孫の派生も終了します。派生の `emit()` は破棄前には共有 source へ送信し、破棄後は何もしません。すでに終了した request への subscribe は直ちに complete します。派生を query に渡していた場合も、`forward()` の最後の REQ segment は上述のとおり継続するため、通信を止めるには query の subscription を unsubscribe してください。
+
 ## Lazy filter
 
 `since` と `until` には関数を渡せます。実際に REQ を送る直前に評価され、再接続による再送時にも再評価されます。

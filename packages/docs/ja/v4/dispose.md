@@ -54,6 +54,8 @@ relays.dispose();
 
 `RxReq.dispose()` は source の完了を通知します。`backward()` の進行中・queue 中の segment は終わるまで継続し、`forward()` の最後の segment は継続します。通信を即時に止めるには query の subscription を unsubscribe してください。
 
+`RxReq.pipe()` で作った派生 request の dispose は、その派生と子孫の observer・operator だけを終了します。親や兄弟の request は継続します。親の dispose は派生にも伝わります。
+
 ## Worker verifier
 
 `VerificationClient.dispose()` は listener、timer、Worker を終了し、進行中の `verifyEvent()` の Promise を reject します。dispose は冪等で、以後の検証には再利用できません。
