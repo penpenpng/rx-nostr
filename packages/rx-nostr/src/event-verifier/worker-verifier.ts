@@ -51,10 +51,14 @@ export class VerificationHost {
   dispose = this[Symbol.dispose];
 }
 
+/** Worker-backed verifier; pending requests reject when it fails or is disposed. */
 export class VerificationClient implements EventVerifier {
   #status: VerificationServiceStatus = "prepared";
   #nextReqId = 1;
-  #resolvers = new Map<number, (ok: boolean) => void>();
+  #pending = new Map<
+    number,
+    { resolve: (ok: boolean) => void; reject: (error: unknown) => void; cancelTimeout: () => void }
+  >();
   #batch: Batch;
 
   constructor(private config: VerificationClientConfig) {
@@ -91,8 +95,7 @@ export class VerificationClient implements EventVerifier {
 
     const { reqId, ok } = ev.data;
 
-    this.#resolvers.get(reqId)?.(ok);
-    this.#resolvers.delete(reqId);
+    this.#settle(reqId, { ok });
   };
 
   #onerror = () => {
@@ -101,6 +104,8 @@ export class VerificationClient implements EventVerifier {
     }
 
     this.#status = "error";
+
+    this.#rejectPending(new Error("Verification worker failed."));
   };
 
   verifyEvent(event: Nostr.Event): Promise<boolean> {
@@ -120,24 +125,45 @@ export class VerificationClient implements EventVerifier {
   #verifyByWorker(event: Nostr.Event): Promise<boolean> {
     const reqId = this.#nextReqId++;
 
-    const r = new Promise<boolean>((resolve, reject) => {
-      this.#resolvers.set(reqId, resolve);
-      this.#batch.set(() => {
-        if (this.#resolvers.get(reqId)) {
-          reject(new Error("Verification request was timed out."));
-          this.#resolvers.delete(reqId);
-        }
+    const result = new Promise<boolean>((resolve, reject) => {
+      const cancelTimeout = this.#batch.set(() => {
+        this.#settle(reqId, { error: new Error("Verification request was timed out.") });
       });
+
+      this.#pending.set(reqId, { resolve, reject, cancelTimeout });
     });
 
-    const worker = this.config.worker;
+    try {
+      this.config.worker.postMessage({ reqId, event } satisfies VerificationRequest);
+    } catch (error) {
+      this.#settle(reqId, { error });
+      this.#onerror();
+    }
 
-    worker.postMessage({
-      reqId,
-      event,
-    } satisfies VerificationRequest);
+    return result;
+  }
 
-    return r;
+  #settle(reqId: number, result: { ok: boolean } | { error: unknown }): void {
+    const pending = this.#pending.get(reqId);
+
+    if (!pending) {
+      return;
+    }
+
+    this.#pending.delete(reqId);
+    pending.cancelTimeout();
+
+    if ("error" in result) {
+      pending.reject(result.error);
+    } else {
+      pending.resolve(result.ok);
+    }
+  }
+
+  #rejectPending(error: unknown): void {
+    for (const reqId of this.#pending.keys()) {
+      this.#settle(reqId, { error });
+    }
   }
 
   #verifyByFallback(event: Nostr.Event): Promise<boolean> {
@@ -152,6 +178,8 @@ export class VerificationClient implements EventVerifier {
 
   [Symbol.dispose] = once(() => {
     this.#status = "terminated";
+
+    this.#rejectPending(new Error("VerificationClient was disposed."));
 
     const worker = this.config.worker;
 
@@ -169,8 +197,8 @@ type Callback = () => void;
 
 class Batch {
   private timer: ReturnType<typeof setInterval>;
-  private fireNext: Callback[] = [];
-  private takeNext: Callback[] = [];
+  private fireNext = new Set<Callback>();
+  private takeNext = new Set<Callback>();
 
   constructor(interval: number) {
     this.timer = setInterval(() => {
@@ -179,16 +207,23 @@ class Batch {
       }
 
       this.fireNext = this.takeNext;
-      this.takeNext = [];
+      this.takeNext = new Set();
     }, interval);
   }
 
-  set(f: Callback) {
-    this.takeNext.push(f);
+  set(f: Callback): () => void {
+    this.takeNext.add(f);
+
+    return () => {
+      this.fireNext.delete(f);
+      this.takeNext.delete(f);
+    };
   }
 
   stop() {
     clearInterval(this.timer);
+    this.fireNext.clear();
+    this.takeNext.clear();
   }
 }
 

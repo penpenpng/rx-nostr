@@ -56,7 +56,7 @@ relays.dispose();
 
 ## Worker verifier
 
-`VerificationClient.dispose()` は listener、timer、Worker を終了します。
+`VerificationClient.dispose()` は listener、timer、Worker を終了し、進行中の `verifyEvent()` の Promise を reject します。dispose は冪等で、以後の検証には再利用できません。
 
 ```ts
 client.dispose();

@@ -137,4 +137,4 @@ rxNostr.dispose();
 client.dispose();
 ```
 
-Worker の起動中または error 状態では `fallback` が使われます。dispose 後の client は再利用できません。
+Worker の起動中または error 状態では新しい検証に `fallback` が使われます。Worker 実行中の検証は Worker の error や dispose によって reject されるため、呼び出し側で扱ってください。dispose 後の client は再利用できません。
