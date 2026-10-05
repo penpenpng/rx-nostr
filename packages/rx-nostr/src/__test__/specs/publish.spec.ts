@@ -2,6 +2,7 @@ import type * as Nostr from "nostr-typedef";
 import {
   RxNostrCallbackError,
   RxNostrPublicationError,
+  NoopSigner,
   type EventSigner,
   type OkPacket,
   type Publication,
@@ -18,6 +19,7 @@ import {
   publicationRelay2 as relay2,
   publicationSocket as socket,
 } from "../helper/index.ts";
+import { scenarioTest, settleProtocol } from "../helper/protocol-scenario.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 describe("Publication public contract", () => {
@@ -349,6 +351,143 @@ describe("Publication public contract", () => {
   });
 
   describe("cancellation and subscriptions", () => {
+    scenarioTest(
+      "cancels synchronously from an OK observer without settling twice",
+      async ({ createScenario }) => {
+        const { server, rxNostr } = createScenario({
+          signer: new NoopSigner(),
+          defaultOptions: { publish: { timeout: 1_000, linger: 0 } },
+        });
+        const publication = rxNostr.publish([relay1, relay2], event());
+        const first = socket(server, relay1);
+        const second = socket(server, relay2);
+        const seen: OkPacket[] = [];
+
+        publication.subscribe((packet) => {
+          seen.push(packet);
+          publication.cancel();
+          publication.cancel();
+        });
+        const all = expect(publication.waitFor("all")).rejects.toMatchObject({ code: "cancelled" });
+        const any = expect(publication.waitFor("any")).rejects.toMatchObject({ code: "cancelled" });
+
+        first.open();
+        second.open();
+        await Promise.all([first.inbox.waitNext("EVENT"), second.inbox.waitNext("EVENT")]);
+        first.message(["OK", "event", true, "saved"]);
+
+        await Promise.all([all, any]);
+        expect(seen).toHaveLength(1);
+        expect(second.isCloseRequested).toBe(true);
+
+        second.message(["OK", "event", true, "late"]);
+        await settleProtocol();
+        expect(seen).toHaveLength(1);
+        await expect(publication.waitFor("any")).rejects.toMatchObject({ code: "cancelled" });
+      },
+    );
+
+    scenarioTest(
+      "disposes the root synchronously from an OK observer",
+      async ({ createScenario }) => {
+        const { server, rxNostr } = createScenario({
+          signer: new NoopSigner(),
+          defaultOptions: { publish: { timeout: 1_000, linger: 0 } },
+        });
+        const publication = rxNostr.publish([relay1, relay2], event());
+        const first = socket(server, relay1);
+        const second = socket(server, relay2);
+        const inspector = new SubscriptionInspector<OkPacket>();
+
+        publication.subscribe(() => rxNostr.dispose());
+        publication.subscribe(inspector);
+        const all = expect(publication.waitFor("all")).rejects.toMatchObject({ code: "cancelled" });
+
+        first.open();
+        second.open();
+        await Promise.all([first.inbox.waitNext("EVENT"), second.inbox.waitNext("EVENT")]);
+        first.message(["OK", "event", true, "saved"]);
+
+        await all;
+        expect(inspector.completed).toBe(true);
+        expect(second.isCloseRequested).toBe(true);
+      },
+    );
+
+    scenarioTest(
+      "starts another publication and registers waitFor inside an OK observer",
+      async ({ createScenario }) => {
+        const { server, rxNostr } = createScenario({
+          signer: new NoopSigner(),
+          defaultOptions: { publish: { timeout: 1_000, linger: 0 } },
+        });
+        const firstPublication = rxNostr.publish(relay1, event({ id: "first" }));
+        const firstAll = firstPublication.waitFor("all");
+        const connection = socket(server, relay1);
+        let secondPublication: Publication | undefined;
+        let secondAll: Promise<void> | undefined;
+        let reenteredAny: Promise<void> | undefined;
+
+        firstPublication.subscribe(() => {
+          reenteredAny = firstPublication.waitFor("any");
+          secondPublication = rxNostr.publish(relay1, event({ id: "second" }));
+          secondAll = secondPublication.waitFor("all");
+        });
+
+        connection.open();
+        await expect(connection.inbox.waitNext("EVENT")).resolves.toMatchObject([
+          "EVENT",
+          { id: "first" },
+        ]);
+        connection.message(["OK", "first", true, "saved"]);
+
+        await Promise.all([firstAll, reenteredAny]);
+        expect(secondPublication).toBeDefined();
+        await expect(connection.inbox.waitNext("EVENT")).resolves.toMatchObject([
+          "EVENT",
+          { id: "second" },
+        ]);
+        connection.message(["OK", "second", true, "saved"]);
+        await expect(secondAll).resolves.toBeUndefined();
+      },
+    );
+
+    scenarioTest.for(["before", "after"] as const)(
+      "settles the timeout/OK boundary when OK arrives %s the deadline",
+      async (order, { createScenario }) => {
+        const { server, rxNostr } = createScenario({
+          signer: new NoopSigner(),
+          defaultOptions: { publish: { timeout: 100, linger: 0 } },
+        });
+        const publication = rxNostr.publish(relay1, event());
+        const outcome = publication.waitFor("all").then(
+          () => "accepted",
+          (error: unknown) => error,
+        );
+        const connection = socket(server, relay1);
+
+        connection.open();
+        await connection.inbox.waitNext("EVENT");
+        await vi.advanceTimersByTimeAsync(99);
+
+        if (order === "before") {
+          connection.message(["OK", "event", true, "saved"]);
+          await vi.advanceTimersByTimeAsync(1);
+          expect(await outcome).toBe("accepted");
+        } else {
+          await vi.advanceTimersByTimeAsync(1);
+          connection.message(["OK", "event", true, "late"]);
+          expect(await outcome).toMatchObject({
+            code: "not-all-accepted",
+            failures: [{ kind: "timeout" }],
+          });
+        }
+
+        await settleProtocol();
+        expect(server.connections).toHaveLength(1);
+      },
+    );
+
     test("rejects invalid timeout before signer or connection work", () => {
       const { server, rxNostr } = createPublicationScenario();
       const signEvent = vi.fn();
