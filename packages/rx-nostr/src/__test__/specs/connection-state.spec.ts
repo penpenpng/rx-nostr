@@ -41,7 +41,7 @@ describe("connection state public contract", () => {
     socket2.open();
     await vi.waitFor(() => expect(contexts).toHaveLength(2));
 
-    await expect(inspector.waitNext()).resolves.toBe("waiting-for-retry");
+    await expect(inspector.waitNext()).resolves.toBe("waiting-for-connection");
     await expect(inspector.waitNext()).resolves.toBe("retrying");
     await expect(inspector.waitNext()).resolves.toBe("connected");
     rxNostr.dispose();

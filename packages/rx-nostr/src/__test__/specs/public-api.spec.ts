@@ -1,6 +1,7 @@
 import type {
   Authenticator,
   ConnectionFailure,
+  ConnectionSuppressionReason,
   ConnectionState,
   ConnectionStatePacket,
   ConnectionDropDetector,
@@ -94,14 +95,16 @@ describe("public entry point", () => {
 
       expectTypeOf<ConnectionState>().toMatchTypeOf<
         | { state: "dormant" }
-        | { state: "connecting"; attempt: number }
-        | { state: "connected" }
         | {
-            state: "waiting-for-retry";
+            state: "waiting-for-connection";
             attempt: number;
             delay: number;
-            reason: ConnectionFailure;
+            reason?: ConnectionFailure;
+            nextAttemptAt?: number;
+            suppressionReasons?: readonly ConnectionSuppressionReason[];
           }
+        | { state: "connecting"; attempt: number }
+        | { state: "connected" }
         | { state: "retrying"; attempt: number }
         | { state: "failed"; attempt: number; reason: ConnectionFailure }
         | { state: "disposed" }

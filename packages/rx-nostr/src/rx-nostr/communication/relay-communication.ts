@@ -3,7 +3,10 @@ import { EMPTY, Observable, catchError, throwError } from "rxjs";
 
 import type { AuthenticatorInput } from "../../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../../connection-drop-detector/index.ts";
-import type { ConnectionReconnector } from "../../connection-reconnector/index.ts";
+import type {
+  RelayHealthPolicyInput,
+  ConnectionReconnector,
+} from "../../connection-reconnector/index.ts";
 import type { ConnectionState } from "../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../diagnostics/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
@@ -25,6 +28,8 @@ export interface RelayCommunicationOptions {
   readonly reconnector?: ConnectionReconnector;
   readonly dropDetectors?: readonly ConnectionDropDetector[];
   readonly relayDirectory?: RelayDirectory;
+  readonly relayHealthPolicy?: RelayHealthPolicyInput;
+  readonly connectionTimeout?: number;
   readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
   readonly nip11Timeout?: number;
   /** @internal Seam for future REQ planning. */
@@ -54,6 +59,8 @@ export class RelayCommunication implements IRelayCommunication {
     if (options.nip11Timeout === undefined) this.#directory.useAvailableNip11();
     const transport = new NostrTransport({
       url,
+      relayHealthPolicy: options.relayHealthPolicy,
+      timeout: options.connectionTimeout,
       WebSocket: options.WebSocket,
       reconnector: options.reconnector,
       dropDetectors: options.dropDetectors,

@@ -42,6 +42,20 @@ async function closeTransport(transport: NostrTransport, server: ControlledWebSo
 }
 
 describe("NostrTransport", () => {
+  test("rejects an invalid custom suppression deadline before creating a socket", async () => {
+    const server = new ControlledWebSocketServer();
+    const transport = new NostrTransport({
+      url: relay,
+      WebSocket: server.WebSocket,
+      relayHealthPolicy: {
+        getSuppression: () => ({ suppressedUntil: NaN }),
+      },
+    });
+    await expect(transport.open()).rejects.toBeInstanceOf(RangeError);
+    expect(server.connections.length).toBe(0);
+    await transport.dispose();
+  });
+
   test("replays and maps the initial, retry, ready, and idle lifecycle", async () => {
     const server = new ControlledWebSocketServer();
     const transport = new NostrTransport({
@@ -59,7 +73,7 @@ describe("NostrTransport", () => {
     const firstSocket = server.sockets.latest;
     firstSocket.peerClose(1006, "offline");
     await expect(inspector.waitNext()).resolves.toEqual({
-      state: "waiting-for-retry",
+      state: "waiting-for-connection",
       attempt: 1,
       delay: 0,
       reason: { kind: "connection-dropped", code: 1006, message: "offline" },
@@ -90,10 +104,11 @@ describe("NostrTransport", () => {
     socket.peerClose(1000, "try later", true);
     await firstInspector.ignoreNexts(2);
     await expect(firstInspector.waitNext()).resolves.toMatchObject({
-      state: "waiting-for-retry",
+      state: "waiting-for-connection",
       attempt: 1,
       delay: 100,
     });
+    expect(transport.state$.value).not.toHaveProperty("suppressionReasons");
     expect(server.connections).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(server.connections).toHaveLength(2);
@@ -146,13 +161,73 @@ describe("NostrTransport", () => {
     socket.peerClose(1006, "offline");
     void opened.catch(() => {});
     await inspector.ignoreNexts(2);
-    await expect(inspector.waitNext()).resolves.toBe("waiting-for-retry");
+    await expect(inspector.waitNext()).resolves.toBe("waiting-for-connection");
     await transport.dispose();
     await vi.advanceTimersByTimeAsync(100);
 
     expect(server.connections).toHaveLength(1);
     await expect(inspector.waitNext()).resolves.toBe("dormant");
     await expect(inspector.waitNext()).resolves.toBe("disposed");
+  });
+
+  test("passes through implementation-owned reasons for asynchronous and scheduled waits", async () => {
+    vi.useFakeTimers();
+    const server = new ControlledWebSocketServer();
+    const explanation = {
+      category: "relay-health" as const,
+      source: "application",
+      kind: "maintenance",
+      details: { description: "planned" },
+    };
+    let decide!: (decision: {
+      action: "retry";
+      delay: number;
+      suppressionReasons: (typeof explanation)[];
+    }) => void;
+    const transport = await openTransport(server, {
+      reconnect(context) {
+        context.reportWaiting?.({ suppressionReasons: [explanation] });
+        return new Promise((resolve) => {
+          decide = resolve;
+        });
+      },
+    });
+    server.sockets.latest.peerClose(1006, "maintenance");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transport.state$.value).toMatchObject({
+      state: "waiting-for-connection",
+      suppressionReasons: [
+        {
+          category: "relay-health",
+          source: "application",
+          kind: "maintenance",
+          details: { description: "planned" },
+        },
+      ],
+    });
+    explanation.details.description = "changed";
+    expect(transport.state$.value).toMatchObject({
+      suppressionReasons: [{ details: { description: "planned" } }],
+    });
+    decide({ action: "retry", delay: 100, suppressionReasons: [explanation] });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transport.state$.value).toMatchObject({
+      state: "waiting-for-connection",
+      delay: 100,
+      suppressionReasons: [
+        {
+          category: "relay-health",
+          source: "application",
+          kind: "maintenance",
+          details: { description: "changed" },
+        },
+      ],
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(server.connections.length).toBe(2);
+    server.sockets.latest.open();
+    await vi.advanceTimersByTimeAsync(0);
+    await closeTransport(transport, server);
   });
 
   test("opens, decodes messages, casts tuples, and closes by user", async () => {
@@ -301,7 +376,7 @@ describe("NostrTransport", () => {
       }),
     );
     await expect(secondInspector.waitNext()).resolves.toBe("connected");
-    await expect(secondInspector.waitNext()).resolves.toBe("waiting-for-retry");
+    await expect(secondInspector.waitNext()).resolves.toBe("waiting-for-connection");
     await expect(secondInspector.waitNext()).resolves.toBe("retrying");
     await expect(secondInspector.waitNext()).resolves.toBe("connected");
 
@@ -361,7 +436,7 @@ describe("NostrTransport", () => {
         relay,
         phase: "recovery",
         attempt: 1,
-        reason: { kind: "connection-dropped" },
+        reason: expect.objectContaining({ kind: "connection-dropped" }),
       }),
     );
     expect(contexts[0]!.signal.aborted).toBe(true);

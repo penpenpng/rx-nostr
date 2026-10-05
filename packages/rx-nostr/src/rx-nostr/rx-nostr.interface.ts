@@ -2,7 +2,10 @@ import type { Observable } from "rxjs";
 
 import type { AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
-import type { ConnectionReconnector } from "../connection-reconnector/index.ts";
+import type {
+  RelayHealthPolicyInput,
+  ConnectionReconnector,
+} from "../connection-reconnector/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
 import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
@@ -61,6 +64,10 @@ export interface RxNostrConfig {
   dropDetectors?: Iterable<ConnectionDropDetector>;
   /** Shared relay metadata and health directory. */
   relayDirectory?: RelayDirectory;
+  /** Numeric options or a custom suppression strategy. false disables health suppression. */
+  relayHealthPolicy?: RelayHealthPolicyInput;
+  /** Maximum duration of one WebSocket connection attempt in milliseconds. Defaults to 30 seconds. */
+  connectionTimeout?: number;
   /** Maximum time to wait for automatic NIP-11 retrieval. Defaults to 30 seconds. */
   nip11Timeout?: number;
   /**
@@ -91,6 +98,8 @@ export interface RxNostrStaticDefaultConfig {
   reconnector: ConnectionReconnector;
   dropDetectors: ConnectionDropDetector[];
   relayDirectory: RelayDirectory;
+  relayHealthPolicy: RelayHealthPolicyInput;
+  connectionTimeout: number;
   nip11Timeout: number;
   skipFetchNip11: boolean;
   WebSocket: WebSocketConstructor | undefined;

@@ -42,16 +42,19 @@ export function copySuppressionReasons(
 /** A snapshot of one relay connection's rx-nostr lifecycle state. */
 export type ConnectionState =
   | { state: "dormant" }
-  | { state: "connecting"; attempt: number }
-  | { state: "connected" }
   | {
-      state: "waiting-for-retry";
+      state: "waiting-for-connection";
+      /** Retry attempt counter; zero before the first connection attempt. */
       attempt: number;
       delay: number;
+      /** Scheduled next connection attempt, as Unix milliseconds; other conditions can postpone it. */
       nextAttemptAt?: number;
       suppressionReasons?: readonly ConnectionSuppressionReason[];
-      reason: ConnectionFailure;
+      /** Most recent failure or drop, if any. */
+      reason?: ConnectionFailure;
     }
+  | { state: "connecting"; attempt: number }
+  | { state: "connected" }
   | { state: "retrying"; attempt: number }
   | {
       state: "failed";

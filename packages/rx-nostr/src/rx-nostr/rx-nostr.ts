@@ -1,5 +1,6 @@
 import { defer, EMPTY, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
 
+import { copySuppressionReasons } from "../connection-state.ts";
 import {
   emitDiagnostic,
   getDiagnosticSink,
@@ -77,6 +78,8 @@ export class RxNostr implements IRxNostr {
         reconnector: this.#config.reconnector,
         dropDetectors: this.#config.dropDetectors,
         relayDirectory: this.#config.relayDirectory,
+        relayHealthPolicy: this.#config.relayHealthPolicy,
+        connectionTimeout: this.#config.connectionTimeout,
         ...(this.#config.skipFetchNip11 ? {} : { nip11Timeout: this.#config.nip11Timeout }),
         onDiagnostic: emitDiagnostic,
       });
@@ -203,8 +206,29 @@ export class RxNostr implements IRxNostr {
 function copyConnectionState(
   state: ConnectionStatePacket["state"],
 ): ConnectionStatePacket["state"] {
-  if (state.state === "waiting-for-retry" || state.state === "failed") {
-    return { ...state, reason: { ...state.reason } };
+  if (state.state === "failed")
+    return {
+      ...state,
+      reason: {
+        ...state.reason,
+        ...(state.reason.detector ? { detector: { ...state.reason.detector } } : {}),
+      },
+    };
+  if (state.state === "waiting-for-connection") {
+    return {
+      ...state,
+      ...(state.reason === undefined
+        ? {}
+        : {
+            reason: {
+              ...state.reason,
+              ...(state.reason.detector ? { detector: { ...state.reason.detector } } : {}),
+            },
+          }),
+      ...(state.suppressionReasons
+        ? { suppressionReasons: copySuppressionReasons(state.suppressionReasons) }
+        : {}),
+    };
   }
   return { ...state };
 }

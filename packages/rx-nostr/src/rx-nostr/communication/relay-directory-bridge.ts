@@ -11,9 +11,14 @@ import type { NostrTransportOptions } from "./transport/index.ts";
 export class RelayDirectoryBridge implements Disposable {
   readonly transportHooks: Pick<
     NostrTransportOptions,
-    "onConnectionOpened" | "onConnectionFailed" | "getConnectionHealth"
+    | "onConnectionOpened"
+    | "onConnectionFailed"
+    | "getConnectionHealth"
+    | "observeConnectionHealth"
+    | "acquireConnectionProbe"
+    | "retainConnectionHealth"
   >;
-  readonly #subscription?: Subscription;
+  #subscription?: Subscription;
   readonly #directory?: RelayDirectory;
   readonly #url: RelayUrl;
   readonly #onMaxSubscriptions: (value: number | undefined) => void;
@@ -36,12 +41,27 @@ export class RelayDirectoryBridge implements Disposable {
     }
     const reporter = getRelayDirectoryReporter(directory);
     this.transportHooks = {
+      retainConnectionHealth: () => {
+        const release = reporter.retain(url);
+        this.#subscription?.unsubscribe();
+        this.#subscription = directory.observe(url).subscribe((entry) => {
+          if (entry.nip11 !== undefined) onMaxSubscriptions(entry.maxSubscriptions);
+        });
+        return release;
+      },
       onConnectionOpened: () => reporter.connectionOpened(url),
       onConnectionFailed: () => reporter.connectionFailed(url),
+      acquireConnectionProbe: () => reporter.acquireProbe(url),
+      observeConnectionHealth: (listener) => {
+        const subscription = directory.observe(url).subscribe(listener);
+        return () => subscription.unsubscribe();
+      },
       getConnectionHealth: () => {
         const entry = directory.getOrCreate(url);
         return Object.freeze({
           consecutiveFailures: entry.consecutiveFailures,
+          liveConnections: entry.liveConnections,
+          ...(entry.firstFailureAt === undefined ? {} : { firstFailureAt: entry.firstFailureAt }),
           ...(entry.lastConnectedAt === undefined
             ? {}
             : { lastConnectedAt: entry.lastConnectedAt }),

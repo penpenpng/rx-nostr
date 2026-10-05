@@ -105,6 +105,8 @@ describe("RelayCommunication transport integration", () => {
       expect.objectContaining({
         health: {
           consecutiveFailures: 1,
+          firstFailureAt: 2,
+          liveConnections: 0,
           lastConnectedAt: 1,
           lastFailureAt: 2,
         },
