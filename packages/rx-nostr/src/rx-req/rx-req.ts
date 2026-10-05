@@ -43,9 +43,9 @@ export class RxReq implements IPipeable<RxReq, ReqPacket> {
     return source;
   }
 
-  /** Emit a segment. Empty/invalid branches match nothing without broadening to `{}`. */
+  /** Emit a segment unless this request or an ancestor was disposed. Empty/invalid branches match nothing. */
   emit(filters: LazyFilter | LazyFilter[], options?: ReqOptions) {
-    if (this.stack.disposed) {
+    if (this.#lifetimes.some((lifetime) => lifetime.disposed)) {
       return;
     }
 

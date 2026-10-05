@@ -159,3 +159,55 @@ test("parent disposal tears down delayed output in multi-level derived RxReqs", 
     vi.useRealTimers();
   }
 });
+
+test("a middle view ends its descendants but leaves its parent and sibling views live", async () => {
+  const source = new RxReq();
+  const child = source.pipe(map((packet) => packet));
+  const grandchild = child.pipe(map((packet) => packet));
+  const sibling = source.pipe(map((packet) => packet));
+  const parentInspector = new SubscriptionInspector<ReqPacket>();
+  const childInspector = new SubscriptionInspector<ReqPacket>();
+  const grandchildInspector = new SubscriptionInspector<ReqPacket>();
+  const detachedInspector = new SubscriptionInspector<ReqPacket>();
+  const siblingInspector = new SubscriptionInspector<ReqPacket>();
+
+  source.asObservable().subscribe(parentInspector);
+  child.asObservable().subscribe(childInspector);
+  grandchild.asObservable().subscribe(grandchildInspector);
+  const detached = grandchild.asObservable().subscribe(detachedInspector);
+
+  sibling.asObservable().subscribe(siblingInspector);
+  detached.unsubscribe();
+  source.emit({ kinds: [1] });
+
+  expect(detachedInspector.values).toEqual([]);
+  expect(childInspector.values).toEqual([{ filters: [{ kinds: [1] }] }]);
+  expect(grandchildInspector.values).toEqual([{ filters: [{ kinds: [1] }] }]);
+  expect(siblingInspector.values).toEqual([{ filters: [{ kinds: [1] }] }]);
+
+  child.dispose();
+  child.dispose();
+  await expect(childInspector.waitComplete()).resolves.toBeUndefined();
+  await expect(grandchildInspector.waitComplete()).resolves.toBeUndefined();
+  expect(parentInspector.completed).toBe(false);
+  expect(siblingInspector.completed).toBe(false);
+
+  grandchild.emit({ kinds: [2] });
+  source.emit({ kinds: [3] });
+  expect(parentInspector.values).toEqual([
+    { filters: [{ kinds: [1] }] },
+    { filters: [{ kinds: [3] }] },
+  ]);
+  expect(siblingInspector.values).toEqual(parentInspector.values);
+  expect(grandchildInspector.values).toHaveLength(1);
+
+  const lateGrandchild = new SubscriptionInspector<ReqPacket>();
+
+  grandchild.asObservable().subscribe(lateGrandchild);
+  await expect(lateGrandchild.waitComplete()).resolves.toBeUndefined();
+  source.dispose();
+  await expect(parentInspector.waitComplete()).resolves.toBeUndefined();
+  await expect(siblingInspector.waitComplete()).resolves.toBeUndefined();
+  sibling.dispose();
+  grandchild.dispose();
+});
