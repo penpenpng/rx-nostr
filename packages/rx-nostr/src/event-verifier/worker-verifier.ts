@@ -24,6 +24,10 @@ export class VerificationHost {
       return;
     }
 
+    if (typeof ev.data !== "object" || ev.data === null || !Number.isInteger(ev.data.reqId)) {
+      return;
+    }
+
     const { reqId, event } = ev.data;
 
     try {
@@ -84,7 +88,11 @@ export class VerificationClient implements EventVerifier {
       worker.addEventListener("message", this.#onmessage);
       worker.addEventListener("error", this.#onerror);
       worker.addEventListener("messageerror", this.#onerror);
-      worker.postMessage("ping" as PingMessage);
+      try {
+        worker.postMessage("ping" as PingMessage);
+      } catch {
+        this.#onerror();
+      }
     }
   }
 
@@ -94,8 +102,14 @@ export class VerificationClient implements EventVerifier {
     }
 
     if (ev.data === "pong") {
-      this.#status = "active";
+      if (this.#status === "booting") {
+        this.#status = "active";
+      }
 
+      return;
+    }
+
+    if (typeof ev.data !== "object" || ev.data === null || !Number.isInteger(ev.data.reqId)) {
       return;
     }
 

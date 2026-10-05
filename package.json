@@ -17,6 +17,7 @@
     "release": "pnpm exec changeset publish",
     "test": "pnpm --recursive --if-present test",
     "test:packed": "node scripts/test-packed-consumers.mjs",
+    "test:worker-browser": "node scripts/test-worker-browser.mjs",
     "version-packages": "changeset version"
   },
   "devDependencies": {

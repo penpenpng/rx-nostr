@@ -1,7 +1,7 @@
+import { VerificationClient, VerificationHost } from "rx-nostr";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { Faker } from "../__test__/helper/faker.ts";
-import { VerificationClient, VerificationHost } from "./worker-verifier.ts";
 
 function controlledWorker() {
   const listeners = new Map<string, Set<(event: unknown) => void>>();
@@ -36,6 +36,58 @@ afterEach(() => {
 });
 
 describe("VerificationClient pending requests", () => {
+  test("uses fallback during booting and error without reviving after a late pong", async () => {
+    const controlled = controlledWorker();
+    const fallback = { verifyEvent: vi.fn(async () => false) };
+    const client = new VerificationClient({ worker: controlled.worker, fallback });
+
+    expect(client.status).toBe("prepared");
+    expect(() => client.verifyEvent(Faker.event())).toThrow("not started");
+    client.start();
+    expect(client.status).toBe("booting");
+    await expect(client.verifyEvent(Faker.event())).resolves.toBe(false);
+
+    controlled.emit("message", "pong");
+    expect(client.status).toBe("active");
+    controlled.emit("error");
+    expect(client.status).toBe("error");
+    controlled.emit("message", "pong");
+    expect(client.status).toBe("error");
+    await expect(client.verifyEvent(Faker.event())).resolves.toBe(false);
+    client.dispose();
+    expect(client.status).toBe("terminated");
+  });
+
+  test("enters fallback state if the startup ping cannot be posted", async () => {
+    const controlled = controlledWorker();
+    const fallback = { verifyEvent: vi.fn(async () => true) };
+    const client = new VerificationClient({ worker: controlled.worker, fallback });
+
+    controlled.postMessage.mockImplementationOnce(() => {
+      throw new Error("startup post failed");
+    });
+
+    expect(() => client.start()).not.toThrow();
+    expect(client.status).toBe("error");
+    await expect(client.verifyEvent(Faker.event())).resolves.toBe(true);
+    client.dispose();
+  });
+
+  test("ignores malformed messages without disturbing an unrelated pending request", async () => {
+    const controlled = controlledWorker();
+    const client = new VerificationClient({ worker: controlled.worker });
+
+    client.start();
+    controlled.emit("message", "pong");
+    const pending = client.verifyEvent(Faker.event());
+
+    expect(() => controlled.emit("message", null)).not.toThrow();
+    expect(() => controlled.emit("message", 42)).not.toThrow();
+    controlled.emit("message", { reqId: 1, ok: true });
+    await expect(pending).resolves.toBe(true);
+    client.dispose();
+  });
+
   test("distinguishes a valid false result from a Worker error", async () => {
     const controlled = controlledWorker();
     const client = new VerificationClient({ worker: controlled.worker });
@@ -279,6 +331,71 @@ describe("VerificationClient pending requests", () => {
 });
 
 describe("VerificationHost responses", () => {
+  test("connects the public Host and Client protocol for concurrent results and errors", async () => {
+    vi.useFakeTimers();
+    const controlled = controlledWorker();
+
+    class WorkerContext {
+      handlers = new Set<(event: MessageEvent) => void>();
+      addEventListener(_type: string, handler: (event: MessageEvent) => void) {
+        this.handlers.add(handler);
+      }
+      removeEventListener(_type: string, handler: (event: MessageEvent) => void) {
+        this.handlers.delete(handler);
+      }
+      postMessage(data: unknown) {
+        controlled.emit("message", data);
+      }
+      dispatch(data: unknown) {
+        for (const handler of this.handlers) {
+          handler({ data } as MessageEvent);
+        }
+      }
+    }
+
+    const scope = new WorkerContext();
+
+    vi.stubGlobal("WorkerGlobalScope", WorkerContext);
+    vi.stubGlobal("self", scope);
+    controlled.postMessage.mockImplementation((data: unknown) => scope.dispatch(data));
+
+    const verifyEvent = vi.fn(async (event: ReturnType<typeof Faker.event>) => {
+      if (event.id === "crash") {
+        throw new Error("verifier failed");
+      }
+
+      return event.id === "valid";
+    });
+    const host = new VerificationHost({ verifyEvent });
+    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+
+    expect(() => host.start()).not.toThrow();
+    client.start();
+    expect(client.status).toBe("active");
+    const valid = client.verifyEvent(Faker.event({ id: "valid" }));
+    const invalid = client.verifyEvent(Faker.event({ id: "invalid" }));
+    const crashed = client.verifyEvent(Faker.event({ id: "crash" }));
+
+    controlled.emit("message", { reqId: 999, ok: true });
+    await expect(valid).resolves.toBe(true);
+    await expect(invalid).resolves.toBe(false);
+    await expect(crashed).rejects.toThrow("verifier failed");
+    controlled.emit("message", { reqId: 1, ok: false });
+    expect(vi.getTimerCount()).toBe(0);
+
+    host.dispose();
+    client.dispose();
+    expect(scope.handlers.size).toBe(0);
+    expect([...controlled.listeners.values()].every((handlers) => handlers.size === 0)).toBe(true);
+  });
+
+  test("requires a Worker context for start and dispose", () => {
+    const host = new VerificationHost({ verifyEvent: vi.fn(async () => true) });
+
+    expect(() => host.start()).toThrow("Worker context");
+    expect(() => host.dispose()).toThrow("Worker context");
+  });
+
   test("sends false as a result and verifier exceptions as error responses", async () => {
     class WorkerContext {
       handler?: (event: MessageEvent) => Promise<void>;
