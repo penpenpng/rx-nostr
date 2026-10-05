@@ -72,5 +72,8 @@
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

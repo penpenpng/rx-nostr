@@ -34,6 +34,8 @@ Under the hood, rx-nostr makes use of [RxJS](https://rxjs.dev/), but you don't n
 
 ## Quickstart
 
+v4 supports Node.js 24+ and browsers with `DisposableStack`, `Promise.withResolvers`, modern Set methods, and `Array.prototype.toSorted` (or polyfills loaded before importing rx-nostr). See the [runtime requirements](https://penpenpng.github.io/rx-nostr/ja/v4/installation) for the full setup, including WebSocket injection.
+
 ```
 npm install rx-nostr @rx-nostr/crypto
 ```
