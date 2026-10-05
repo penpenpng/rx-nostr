@@ -22,6 +22,69 @@ import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
 describe("Publication public contract", () => {
   describe("public values", () => {
+    test.each([true, false])("isolates observer changes from a relay's OK %s", async (accepted) => {
+      const { server, rxNostr } = createPublicationScenario();
+      const first = rxNostr.publish(relay1, event());
+      const second = rxNostr.publish(relay1, event());
+      const observed: OkPacket[] = [];
+      const replayed: OkPacket[] = [];
+      const outcomes = [first, second].map((publication) =>
+        publication.waitFor("all").then(
+          () => "accepted",
+          (error: unknown) => error,
+        ),
+      );
+
+      first.subscribe((packet) => {
+        packet.ok = !accepted;
+        packet.eventId = "changed";
+        packet.message[2] = !accepted;
+      });
+      first.subscribe((packet) => observed.push(packet));
+      second.subscribe((packet) => observed.push(packet));
+
+      try {
+        const connection = socket(server, relay1);
+
+        connection.open();
+        await connection.inbox.waitNext("EVENT");
+        await connection.inbox.waitNext("EVENT");
+        connection.message(["OK", "event", accepted, "relay result"]);
+
+        const results = await Promise.all(outcomes);
+
+        for (const result of results) {
+          if (accepted) {
+            expect(result).toBe("accepted");
+          } else {
+            expect(result).toMatchObject({
+              code: "not-all-accepted",
+              failures: [{ kind: "rejected", ok: { ok: false, eventId: "event" } }],
+            });
+          }
+        }
+
+        first.subscribe((packet) => replayed.push(packet));
+
+        expect([...observed, ...replayed]).toHaveLength(3);
+
+        for (const packet of [...observed, ...replayed]) {
+          expect(packet).toMatchObject({ ok: accepted, eventId: "event" });
+          expect(packet.message).toEqual(["OK", "event", accepted, "relay result"]);
+        }
+
+        expect(replayed[0]).not.toBe(observed[0]);
+
+        expect(replayed[0]!.message).not.toBe(observed[0]!.message);
+      } finally {
+        rxNostr.dispose();
+
+        for (const connection of server.connections) {
+          connection.acknowledgeClose();
+        }
+      }
+    });
+
     test("exposes the signed event as a mutable event", () => {
       expectTypeOf<Publication["event"]>().toEqualTypeOf<Promise<Nostr.Event>>();
     });

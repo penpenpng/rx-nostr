@@ -1,5 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import { ReplaySubject, type Observer, type Subscription } from "rxjs";
+import { map, ReplaySubject, type Observer, type Subscription } from "rxjs";
 
 import { RxNostrCallbackError, RxNostrPublicationError } from "../../../libs/error.ts";
 import { ensureEventFields, type RelayUrl } from "../../../libs/index.ts";
@@ -135,11 +135,14 @@ export class PublicationOperation implements Publication, Disposable {
     error?: ((error: unknown) => void) | null,
     complete?: (() => void) | null,
   ): Subscription {
+    // Copy on delivery, including replay, so no observer owns internal packets.
+    const packets = this.#okPackets.pipe(map(copyOkPacket));
+
     if (typeof observerOrNext === "function" || observerOrNext == null) {
-      return this.#okPackets.subscribe(observerOrNext, error, complete);
+      return packets.subscribe(observerOrNext, error, complete);
     }
 
-    return this.#okPackets.subscribe(observerOrNext);
+    return packets.subscribe(observerOrNext);
   }
 
   waitFor(policy: PublicationSettlePolicy): Promise<void> {
@@ -221,9 +224,11 @@ export class PublicationOperation implements Publication, Disposable {
         })
         .subscribe({
           next: (packet) => {
-            delivery.lastOk = packet;
+            const snapshot = copyOkPacket(packet);
 
-            this.#okPackets.next(packet);
+            delivery.lastOk = snapshot;
+
+            this.#okPackets.next(snapshot);
           },
           complete: () => this.#completeRelay(delivery),
           error: (error) => this.#failRelay(delivery, failureFrom(error, delivery)),
@@ -463,4 +468,8 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
 
 function failures(deliveries: readonly RelayDelivery[]): PublicationFailure[] {
   return deliveries.flatMap((delivery) => (delivery.failure ? [delivery.failure] : []));
+}
+
+function copyOkPacket(packet: OkPacket): OkPacket {
+  return { ...packet, message: [...packet.message] };
 }

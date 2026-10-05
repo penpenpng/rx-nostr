@@ -23,7 +23,7 @@ export interface Publication {
   /** A detached copy of the signed event that the operation attempted to send. */
   readonly event: Promise<Nostr.Event>;
 
-  /** Observe unaggregated OK packets without controlling the operation. */
+  /** Observe unaggregated OK packets as independent mutable copies, including replay. */
   subscribe(observer?: Partial<Observer<OkPacket>>): Subscription;
   subscribe(
     next?: ((value: OkPacket) => void) | null,
