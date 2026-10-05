@@ -405,40 +405,61 @@ describe("Publication public contract", () => {
   });
 
   describe("authentication and resend", () => {
-    test("keeps auth-required OK pending and settles after authenticated resend", async () => {
-      const authEvent = Faker.authEvent({ id: "auth-event" });
-      const { server, rxNostr } = createPublicationScenario({
-        authenticator: {
-          authTimeout: 1_000,
-          challenge: async () => authEvent,
-        },
-      });
-      const publication = rxNostr.publish(relay1, event());
-      const inspector = new SubscriptionInspector<OkPacket>();
+    test.each(["before", "after"] as const)(
+      "keeps auth-required OK pending and settles when AUTH succeeds %s the refusal (#205)",
+      async (authSuccess) => {
+        const authEvent = Faker.authEvent({ id: "auth-event" });
+        const { server, rxNostr } = createPublicationScenario({
+          authenticator: {
+            authTimeout: 1_000,
+            challenge: async () => authEvent,
+          },
+        });
+        const publication = rxNostr.publish(relay1, event());
+        const inspector = new SubscriptionInspector<OkPacket>();
 
-      publication.subscribe(inspector);
-      const all = publication.waitFor("all");
-      let settled = false;
+        publication.subscribe(inspector);
+        const all = publication.waitFor("all");
+        let settled = false;
 
-      void all.finally(() => (settled = true));
-      const connection = socket(server, relay1);
+        void all.finally(() => (settled = true));
+        const connection = socket(server, relay1);
 
-      connection.open();
-      await expect(connection.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
-      connection.message(["AUTH", "challenge"]);
-      connection.message(["OK", "event", false, "auth-required: login"]);
-      expect(await connection.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
-      expect(settled).toBe(false);
-      await expect(inspector.waitNext()).resolves.toMatchObject({ ok: false });
+        connection.open();
+        await expect(connection.inbox.waitNext()).resolves.toEqual(["EVENT", expect.any(Object)]);
+        connection.message(["AUTH", "challenge"]);
 
-      connection.message(["OK", "auth-event", true, "authenticated"]);
-      await expect(connection.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
-      connection.message(["OK", "event", true, "saved"]);
-      await expect(all).resolves.toBeUndefined();
-      await expect(inspector.waitNext()).resolves.toMatchObject({ ok: true });
+        if (authSuccess === "before") {
+          expect(await connection.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
+          connection.message(["OK", "auth-event", true, "authenticated"]);
+          // Let AUTH's promise chain finish before delivering the delayed EVENT refusal.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          expect(connection.inbox.length).toBe(2);
+        }
 
-      rxNostr.dispose();
-    });
+        connection.message(["OK", "event", false, "auth-required: login"]);
+
+        if (authSuccess === "after") {
+          expect(await connection.inbox.waitNext("AUTH")).toEqual(["AUTH", authEvent]);
+        }
+
+        expect(settled).toBe(false);
+        await expect(inspector.waitNext()).resolves.toMatchObject({ ok: false });
+
+        if (authSuccess === "after") {
+          connection.message(["OK", "auth-event", true, "authenticated"]);
+        }
+
+        await expect(connection.inbox.waitNext()).resolves.toHaveProperty("0", "EVENT");
+        expect(connection.inbox.length).toBe(3);
+        connection.message(["OK", "event", true, "saved"]);
+        await expect(all).resolves.toBeUndefined();
+        await expect(inspector.waitNext()).resolves.toMatchObject({ ok: true });
+        await expect(inspector.waitComplete()).resolves.toBeUndefined();
+
+        rxNostr.dispose();
+      },
+    );
 
     test("resends a later auth-required EVENT after another publication authenticated", async () => {
       const authEvent = Faker.authEvent({ id: "auth-event" });
