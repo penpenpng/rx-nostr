@@ -56,13 +56,18 @@ export class VerificationHost {
   dispose = this[Symbol.dispose];
 }
 
-/** Worker-backed verifier; pending requests reject when it fails or is disposed. */
+/** Worker-backed verifier; all requests have a deadline and reject on client disposal. */
 export class VerificationClient implements EventVerifier {
   #status: VerificationServiceStatus = "prepared";
   #nextReqId = 1;
   #pending = new Map<
     number,
-    { resolve: (ok: boolean) => void; reject: (error: unknown) => void; cancelTimeout: () => void }
+    {
+      backend: "worker" | "fallback";
+      resolve: (ok: boolean) => void;
+      reject: (error: unknown) => void;
+      cancelTimeout: () => void;
+    }
   >();
   readonly #timeout: number;
 
@@ -115,6 +120,10 @@ export class VerificationClient implements EventVerifier {
 
     const { reqId, ok, error } = ev.data;
 
+    if (this.#pending.get(reqId)?.backend !== "worker") {
+      return;
+    }
+
     if (typeof error === "string") {
       this.#settle(reqId, { error: new Error(error) });
     } else if ("error" in ev.data || typeof ok !== "boolean") {
@@ -131,7 +140,7 @@ export class VerificationClient implements EventVerifier {
 
     this.#status = "error";
 
-    this.#rejectPending(new Error("Verification worker failed."));
+    this.#rejectPending(new Error("Verification worker failed."), "worker");
   };
 
   verifyEvent(event: Nostr.Event): Promise<boolean> {
@@ -148,7 +157,7 @@ export class VerificationClient implements EventVerifier {
     }
   }
 
-  #verifyByWorker(event: Nostr.Event): Promise<boolean> {
+  #createRequest(backend: "worker" | "fallback") {
     const reqId = this.#nextReqId++;
 
     const result = new Promise<boolean>((resolve, reject) => {
@@ -163,8 +172,14 @@ export class VerificationClient implements EventVerifier {
         }
       };
 
-      this.#pending.set(reqId, { resolve, reject, cancelTimeout });
+      this.#pending.set(reqId, { backend, resolve, reject, cancelTimeout });
     });
+
+    return { reqId, result };
+  }
+
+  #verifyByWorker(event: Nostr.Event): Promise<boolean> {
+    const { reqId, result } = this.#createRequest("worker");
 
     try {
       this.config.worker.postMessage({ reqId, event } satisfies VerificationRequest);
@@ -193,9 +208,11 @@ export class VerificationClient implements EventVerifier {
     }
   }
 
-  #rejectPending(error: unknown): void {
-    for (const reqId of this.#pending.keys()) {
-      this.#settle(reqId, { error });
+  #rejectPending(error: unknown, backend?: "worker"): void {
+    for (const [reqId, pending] of this.#pending) {
+      if (backend === undefined || pending.backend === backend) {
+        this.#settle(reqId, { error });
+      }
     }
   }
 
@@ -206,7 +223,18 @@ export class VerificationClient implements EventVerifier {
       throw new Error("VerificationHost is not working but no fallback verifier is provided.");
     }
 
-    return verifier.verifyEvent(event);
+    const { reqId, result } = this.#createRequest("fallback");
+
+    try {
+      void Promise.resolve(verifier.verifyEvent(event)).then(
+        (ok) => this.#settle(reqId, { ok }),
+        (error) => this.#settle(reqId, { error }),
+      );
+    } catch (error) {
+      this.#settle(reqId, { error });
+    }
+
+    return result;
   }
 
   [Symbol.dispose] = once(() => {
@@ -244,7 +272,7 @@ export type VerificationServiceStatus = "prepared" | "booting" | "active" | "err
 export interface VerificationClientConfig {
   worker: Worker;
   fallback?: EventVerifier;
-  /** Per-request milliseconds; 0 is immediate, Infinity disables timeout. Defaults to 10000. */
+  /** Worker and fallback deadline in milliseconds; 0 is immediate, Infinity disables it. Defaults to 10000. */
   timeout?: number;
 }
 

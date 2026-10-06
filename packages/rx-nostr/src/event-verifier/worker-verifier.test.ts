@@ -444,3 +444,120 @@ describe("VerificationHost responses", () => {
     expect(scope.handler).toBeUndefined();
   });
 });
+
+describe.each(["booting", "error"] as const)("fallback while %s", (status) => {
+  function setup(timeout = 100) {
+    const controlled = controlledWorker();
+    const deferred = Promise.withResolvers<boolean>();
+    const fallback = { verifyEvent: vi.fn(() => deferred.promise) };
+    const client = new VerificationClient({ worker: controlled.worker, fallback, timeout });
+
+    client.start();
+
+    if (status === "error") {
+      controlled.emit("error");
+    }
+
+    return { controlled, deferred, client };
+  }
+
+  test("times out at the deadline and ignores a late fallback result", async () => {
+    vi.useFakeTimers();
+    const { client, deferred } = setup();
+    const rejected = expect(client.verifyEvent(Faker.event())).rejects.toThrow("timed out");
+
+    try {
+      await vi.advanceTimersByTimeAsync(99);
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await rejected;
+      deferred.resolve(true);
+      await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test.each([100, Infinity])(
+    "dispose rejects pending fallback with timeout %s",
+    async (timeout) => {
+      vi.useFakeTimers();
+      const { client, deferred } = setup(timeout);
+      const rejected = expect(client.verifyEvent(Faker.event())).rejects.toThrow("disposed");
+
+      client.dispose();
+      await rejected;
+      expect(vi.getTimerCount()).toBe(0);
+      deferred.reject(new Error("late fallback failure"));
+      await Promise.resolve();
+    },
+  );
+
+  test.each([true, false])(
+    "settles fallback %s before the deadline and clears its timer",
+    async (ok) => {
+      vi.useFakeTimers();
+      const { client, controlled, deferred } = setup();
+      const pending = client.verifyEvent(Faker.event());
+
+      try {
+        // Worker messages and errors must not settle a fallback request.
+        controlled.emit("message", { reqId: 1, ok: !ok });
+        controlled.emit("error");
+        await vi.advanceTimersByTimeAsync(99);
+        deferred.resolve(ok);
+        await expect(pending).resolves.toBe(ok);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        client.dispose();
+      }
+    },
+  );
+
+  test.each(["throw", "reject"] as const)(
+    "propagates a fallback %s and clears its timer",
+    async (mode) => {
+      vi.useFakeTimers();
+      const controlled = controlledWorker();
+      const error = new Error("fallback failed");
+      const client = new VerificationClient({
+        worker: controlled.worker,
+        fallback: {
+          verifyEvent: () => {
+            if (mode === "throw") {
+              throw error;
+            }
+
+            return Promise.reject(error);
+          },
+        },
+      });
+
+      client.start();
+
+      if (status === "error") {
+        controlled.emit("error");
+      }
+
+      try {
+        await expect(client.verifyEvent(Faker.event())).rejects.toBe(error);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        client.dispose();
+      }
+    },
+  );
+
+  test("zero timeout releases the fallback request", async () => {
+    vi.useFakeTimers();
+    const { client, deferred } = setup(0);
+    const rejected = expect(client.verifyEvent(Faker.event())).rejects.toThrow("timed out");
+
+    await vi.advanceTimersByTimeAsync(0);
+    await rejected;
+    deferred.resolve(false);
+    client.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
