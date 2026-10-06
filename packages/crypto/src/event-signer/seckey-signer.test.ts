@@ -64,3 +64,31 @@ describe(SeckeySigner.name, () => {
     expect(signedEvent.tags).toEqual([]);
   });
 });
+
+test.each([
+  -1,
+  -Number.MAX_SAFE_INTEGER,
+  1.5,
+  Number.MAX_SAFE_INTEGER + 1,
+  NaN,
+  Infinity,
+  -Infinity,
+])("rejects invalid timestamp %s instead of coercing or preserving it", async (created_at) => {
+  const signer = new SeckeySigner(keys[1]!);
+
+  await expect(signer.signEvent({ kind: 1, content: "audit", created_at })).rejects.toBeInstanceOf(
+    RangeError,
+  );
+  await expect(signer.signEvent({ ...signedEvent, created_at })).rejects.toBeInstanceOf(RangeError);
+});
+
+test.each([0, 1, Number.MAX_SAFE_INTEGER])(
+  "preserves and signs boundary timestamp %s",
+  async (created_at) => {
+    const signer = new SeckeySigner(keys[1]!);
+    const event = await signer.signEvent({ kind: 1, content: "audit", created_at });
+
+    expect(event.created_at).toBe(created_at);
+    expect(verifyEvent(event)).toBe(true);
+  },
+);

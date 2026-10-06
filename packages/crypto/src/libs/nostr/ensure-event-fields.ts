@@ -15,6 +15,7 @@ export function ensureEventFields(event: unknown): event is Nostr.Event {
     typeof value.content === "string" &&
     typeof value.created_at === "number" &&
     Number.isSafeInteger(value.created_at) &&
+    value.created_at >= 0 &&
     typeof value.kind === "number" &&
     Number.isInteger(value.kind) &&
     value.kind >= 0 &&

@@ -39,6 +39,10 @@ export function signEvent<K extends number>(
     created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
 
+  if (!Number.isSafeInteger(event.created_at) || event.created_at < 0) {
+    throw new RangeError("created_at must be a non-negative safe integer.");
+  }
+
   if (ensureEventFields(event)) {
     return event;
   }

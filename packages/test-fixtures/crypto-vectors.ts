@@ -1,4 +1,5 @@
 import signedEvent from "./signed-event.json";
+import timestampEvents from "./timestamp-events.json";
 
 /** Fixed NIP-01 signature plus independent mutations; test data only. */
 export const verificationVectors: ReadonlyArray<{
@@ -6,6 +7,8 @@ export const verificationVectors: ReadonlyArray<{
   event: unknown;
   valid: boolean;
 }> = [
+  // Correctly signed boundary inputs; unlike mutations, failures cannot be explained by a stale signature.
+  ...timestampEvents,
   { name: "known valid signature", event: signedEvent, valid: true },
   { name: "changed advertised ID", event: { ...signedEvent, id: "0".repeat(64) }, valid: false },
   { name: "changed content", event: { ...signedEvent, content: "changed" }, valid: false },

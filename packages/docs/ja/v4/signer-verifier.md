@@ -46,7 +46,7 @@ NIP-07 provider が存在しない環境で署名を要求すると、publicatio
 
 `@rx-nostr/crypto` が提供し、nsec または hex の秘密鍵で署名します。
 
-通常版と WASM 版の `SeckeySigner` は、`tags` と `created_at` を省略した場合にそれぞれ空配列と現在時刻を補います。完全に署名済みの EVENT を追加 tags なしで渡した場合は ID と署名を保持します。signer の `tags` option で tags を追加する場合は元の ID・署名を使い回さず、追加後の内容を signer の鍵で再署名します。
+通常版と WASM 版の `SeckeySigner` は、`tags` と `created_at` を省略した場合にそれぞれ空配列と現在時刻を補います。`created_at` は 0 以上の安全な整数である必要があり、負数・小数・非有限値・安全な整数範囲外の値は、署名済み入力でも `RangeError` で拒否します。明示した時刻を別の値に丸めることはありません。完全に署名済みの EVENT を追加 tags なしで渡した場合は ID と署名を保持します。signer の `tags` option で tags を追加する場合は元の ID・署名を使い回さず、追加後の内容を signer の鍵で再署名します。
 
 ```ts
 import { SeckeySigner } from "@rx-nostr/crypto";
@@ -72,7 +72,7 @@ rxNostr.publish(relays, signedEvent, {
 
 `rx-nostr/utils` の `ensureEventFields(value)` は EVENT の基本構造を調べる type guard です。必須の文字列 field、有限で安全な整数の `created_at`、0〜65,535 の整数 `kind`、1 要素以上の文字列からなる各 tag を確認します。短い `id` や `sig` も文字列として受け入れるため、これだけで [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md#events-and-signatures) の形式や署名の正しさは保証しません。
 
-relay tuple の decoder はこの構造検査を行い、不正な EVENT tuple を破棄します。publish でも signer の戻り値に同じ構造検査を行い、不正なら `RxNostrCallbackError` にします。どちらも本体で暗号ライブラリを読み込みません。通常版と WASM 版の `SimpleVerifier` は、lowercase hex の `id` / `pubkey` / `sig` の長さ、内容から再計算した ID、Schnorr 署名を検証し、不正な EVENT には `false` を返します。実際に受信した EVENT を通すかどうかは設定した `EventVerifier` が決めます。
+relay tuple の decoder はこの構造検査を行い、不正な EVENT tuple を破棄します。publish でも signer の戻り値に同じ構造検査を行い、不正なら `RxNostrCallbackError` にします。どちらも本体で暗号ライブラリを読み込みません。通常版と WASM 版の `SimpleVerifier` は、`created_at` が 0 以上の安全な整数であること、lowercase hex の `id` / `pubkey` / `sig` の長さ、内容から再計算した ID、Schnorr 署名を検証し、不正な EVENT には `false` を返します。実際に受信した EVENT を通すかどうかは設定した `EventVerifier` が決めます。
 
 <!-- typecheck-example: verifier-interface -->
 ```ts
