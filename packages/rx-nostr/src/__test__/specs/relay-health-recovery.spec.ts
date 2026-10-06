@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer, Faker } from "../helper/index.ts";
+import { settleProtocol } from "../helper/protocol-scenario.ts";
 
 const relay = "wss://health.example.com";
 const policy: RelayHealthPolicy = {
@@ -63,6 +64,63 @@ afterEach(() => {
 });
 
 describe("relay health recovery public contract", () => {
+  test("default backoff respects a relay health suppression deadline", async () => {
+    vi.useFakeTimers();
+    const server = new ControlledWebSocketServer();
+    const rxNostr = new RxNostr({
+      verifier: new NoopVerifier(),
+      WebSocket: server.WebSocket,
+      skipFetchNip11: true,
+      reconnector: RxNostr.defaultConfig.reconnector,
+      relayHealthPolicy: {
+        minFailures: 2,
+        minFailureDuration: 1,
+        initialRetryDelay: 2_000,
+        maxRetryDelay: 2_000,
+      },
+    });
+    const states: ConnectionState[] = [];
+
+    try {
+      rxNostr.monitorConnectionState().subscribe(({ state }) => states.push(state));
+      rxNostr.setHotRelays(relay);
+      const first = server.sockets.latest;
+
+      first.open();
+      first.peerClose(1006, "offline");
+      await settleProtocol();
+      expect(states.at(-1)).toMatchObject({
+        state: "waiting-for-connection",
+        suppressionReasons: [{ category: "retry-backoff" }],
+      });
+
+      await vi.advanceTimersByTimeAsync(1_200);
+      expect(server.connections).toHaveLength(2);
+      server.sockets.latest.peerClose(1006, "still offline");
+      await settleProtocol();
+      expect(states.at(-1)).toMatchObject({
+        state: "waiting-for-connection",
+        suppressionReasons: expect.arrayContaining([
+          expect.objectContaining({ category: "relay-health" }),
+        ]),
+      });
+
+      await vi.advanceTimersByTimeAsync(799);
+      expect(server.connections).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1_601);
+      expect(server.connections).toHaveLength(3);
+    } finally {
+      rxNostr.dispose();
+
+      for (const socket of server.connections) {
+        socket.acknowledgeClose();
+      }
+
+      await settleProtocol();
+      vi.useRealTimers();
+    }
+  });
+
   test.each(["cancel", "exhaust"] as const)(
     "honors %s before waiting for health suppression",
     async (action) => {

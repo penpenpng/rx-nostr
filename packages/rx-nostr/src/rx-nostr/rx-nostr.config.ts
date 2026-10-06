@@ -8,6 +8,7 @@ import {
 import { copyRelayHealthPolicy } from "../connection-reconnector/relay-health-policy.ts";
 import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
 import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import { GlobalRelayDirectory, type RelayDirectory } from "../relay-directory/index.ts";
 import type { WebSocketConstructor } from "../types/index.ts";
 import type {
@@ -85,17 +86,13 @@ export class FilledRxNostrConfig {
     this.relayHealthPolicy = copyRelayHealthPolicy(healthPolicy);
     this.connectionTimeout = config.connectionTimeout ?? staticDefaultConfig.connectionTimeout;
 
-    if (
-      !Number.isFinite(this.connectionTimeout) ||
-      this.connectionTimeout <= 0 ||
-      this.connectionTimeout > 2_147_483_647
-    ) {
-      throw new RangeError(
-        "connectionTimeout must be positive and at most 2147483647 milliseconds.",
-      );
-    }
+    assertTimerDuration(this.connectionTimeout, "connectionTimeout");
 
-    this.nip11Timeout = config.nip11Timeout ?? staticDefaultConfig.nip11Timeout;
+    this.nip11Timeout = assertTimerDuration(
+      config.nip11Timeout ?? staticDefaultConfig.nip11Timeout,
+      "nip11Timeout",
+      { allowZero: true, allowInfinity: true },
+    );
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
     this.defaultOptions = freezeDefaultOptions(config.defaultOptions);
@@ -115,6 +112,8 @@ export function cloneStaticDefaultConfig(
 function freezeDefaultOptions(
   options: RxNostrDefaultOptions | undefined,
 ): Readonly<RxNostrDefaultOptions> {
+  validateOperationDurations(options);
+
   return Object.freeze({
     req: options?.req ? Object.freeze({ ...options.req }) : undefined,
     publish: options?.publish ? Object.freeze({ ...options.publish }) : undefined,
@@ -135,8 +134,31 @@ function freezeStaticDefaultOptions(
 ): Readonly<RxNostrStaticDefaultOptions> {
   const clone = cloneStaticDefaultOptions(options);
 
+  validateOperationDurations(clone);
+
   return Object.freeze({
     req: Object.freeze(clone.req),
     publish: Object.freeze(clone.publish),
   });
+}
+
+function validateOperationDurations(
+  options: RxNostrDefaultOptions | RxNostrStaticDefaultOptions | undefined,
+) {
+  for (const kind of ["req", "publish"] as const) {
+    const values = options?.[kind];
+
+    if (values?.linger !== undefined) {
+      assertTimerDuration(values.linger, `${kind} linger`, {
+        allowZero: true,
+        allowInfinity: true,
+      });
+    }
+    if (values?.timeout !== undefined) {
+      assertTimerDuration(values.timeout, `${kind} timeout`, {
+        allowZero: true,
+        allowInfinity: true,
+      });
+    }
+  }
 }

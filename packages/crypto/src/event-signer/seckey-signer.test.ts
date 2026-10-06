@@ -1,40 +1,94 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
+import signedEvent from "../../../test-fixtures/signed-event.json";
 import { verifyEvent } from "../libs/nostr/crypto.ts";
 import { SeckeySigner } from "./seckey-signer.ts";
 
+const keys = [
+  "nsec10ula2x693q0assp0agsc9apl6vg34yz3srln5pdfqezmueuhknusfxumgl",
+  "7f3fd51b45881fd8402fea2182f43fd3111a905180ff3a05a90645be6797b4f9",
+];
+
 describe(SeckeySigner.name, () => {
-  test("by nsec1", async () => {
-    const key = "nsec10ula2x693q0assp0agsc9apl6vg34yz3srln5pdfqezmueuhknusfxumgl";
+  test.each(keys)("signs the fixed NIP-01 vector with %s", async (key) => {
     const signer = new SeckeySigner(key);
 
-    await expect(signer.getPublicKey()).resolves.toBe(
-      "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-    );
+    await expect(signer.getPublicKey()).resolves.toBe(signedEvent.pubkey);
 
-    const signedEvent = await signer.signEvent({
-      content: "hello world",
-      created_at: 1744991602,
-      kind: 1,
+    const signed = await signer.signEvent({
+      content: signedEvent.content,
+      created_at: signedEvent.created_at,
+      kind: signedEvent.kind,
     });
 
-    expect(verifyEvent(signedEvent)).toBe(true);
+    expect(signed.id).toBe(signedEvent.id);
+    expect(signed.tags).toEqual([]);
+    expect(verifyEvent(signed)).toBe(true);
   });
 
-  test("by hex", async () => {
-    const key = "7f3fd51b45881fd8402fea2182f43fd3111a905180ff3a05a90645be6797b4f9";
-    const signer = new SeckeySigner(key);
+  test("defaults omitted tags and created_at before signing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(signedEvent.created_at * 1000);
 
-    await expect(signer.getPublicKey()).resolves.toBe(
-      "ac129311ffd0b65155c217d12e68dec3fac1652b310219cd11d4057714d4b98d",
-    );
+    try {
+      const signer = new SeckeySigner(keys[1]!);
+      const signed = await signer.signEvent({
+        content: signedEvent.content,
+        kind: signedEvent.kind,
+      });
 
-    const signedEvent = await signer.signEvent({
-      content: "hello world",
-      created_at: 1744991602,
-      kind: 1,
-    });
+      expect(signed.created_at).toBe(signedEvent.created_at);
+      expect(signed.tags).toEqual([]);
+      expect(signed.id).toBe(signedEvent.id);
+      expect(verifyEvent(signed)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    expect(verifyEvent(signedEvent)).toBe(true);
+  test("preserves a signed input without extra tags and re-signs appended tags", async () => {
+    const passthrough = await new SeckeySigner(keys[1]!).signEvent(signedEvent);
+
+    expect(passthrough.id).toBe(signedEvent.id);
+    expect(passthrough.sig).toBe(signedEvent.sig);
+    expect(verifyEvent(passthrough)).toBe(true);
+
+    const augmented = await new SeckeySigner(keys[1]!, {
+      tags: [["client", "test"]],
+    }).signEvent(signedEvent);
+
+    expect(augmented.tags).toEqual([["client", "test"]]);
+    expect(augmented.id).not.toBe(signedEvent.id);
+    expect(augmented.pubkey).toBe(signedEvent.pubkey);
+    expect(verifyEvent(augmented)).toBe(true);
+    expect(signedEvent.tags).toEqual([]);
   });
 });
+
+test.each([
+  -1,
+  -Number.MAX_SAFE_INTEGER,
+  1.5,
+  Number.MAX_SAFE_INTEGER + 1,
+  NaN,
+  Infinity,
+  -Infinity,
+])("rejects invalid timestamp %s instead of coercing or preserving it", async (created_at) => {
+  const signer = new SeckeySigner(keys[1]!);
+
+  await expect(signer.signEvent({ kind: 1, content: "audit", created_at })).rejects.toBeInstanceOf(
+    RangeError,
+  );
+  await expect(signer.signEvent({ ...signedEvent, created_at })).rejects.toBeInstanceOf(RangeError);
+});
+
+test.each([0, 1, Number.MAX_SAFE_INTEGER])(
+  "preserves and signs boundary timestamp %s",
+  async (created_at) => {
+    const signer = new SeckeySigner(keys[1]!);
+    const event = await signer.signEvent({ kind: 1, content: "audit", created_at });
+
+    expect(event.created_at).toBe(created_at);
+    expect(verifyEvent(event)).toBe(true);
+  },
+);

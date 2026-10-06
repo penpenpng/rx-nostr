@@ -1,65 +1,51 @@
 import type * as Nostr from "nostr-typedef";
 
-export function ensureEventFields(event: Partial<Nostr.Event>): event is Nostr.Event {
-  if (typeof event.id !== "string") {
-    return false;
-  }
-  if (typeof event.sig !== "string") {
-    return false;
-  }
-  if (typeof event.kind !== "number") {
-    return false;
-  }
-  if (typeof event.pubkey !== "string") {
-    return false;
-  }
-  if (typeof event.content !== "string") {
-    return false;
-  }
-  if (typeof event.created_at !== "number") {
+/** Check EVENT field types and basic NIP-01 ranges, without verifying ID or signature. */
+export function ensureEventFields(event: unknown): event is Nostr.Event {
+  if (typeof event !== "object" || event === null || Array.isArray(event)) {
     return false;
   }
 
-  if (!Array.isArray(event.tags)) {
-    return false;
-  }
+  const value = event as Record<string, unknown>;
 
-  for (let i = 0; i < event.tags.length; i++) {
-    const tag = event.tags[i];
-
-    if (!Array.isArray(tag)) {
-      return false;
-    }
-
-    for (let j = 0; j < tag.length; j++) {
-      if (typeof tag[j] === "object") {
-        return false;
-      }
-    }
-  }
-
-  return true;
+  return (
+    typeof value.id === "string" &&
+    typeof value.sig === "string" &&
+    typeof value.pubkey === "string" &&
+    typeof value.content === "string" &&
+    typeof value.created_at === "number" &&
+    Number.isSafeInteger(value.created_at) &&
+    typeof value.kind === "number" &&
+    Number.isInteger(value.kind) &&
+    value.kind >= 0 &&
+    value.kind <= 65_535 &&
+    Array.isArray(value.tags) &&
+    value.tags.every(
+      (tag: unknown) =>
+        Array.isArray(tag) && tag.length > 0 && tag.every((item) => typeof item === "string"),
+    )
+  );
 }
 
-/** Return an event that has earlier `created_at`. */
+/** Return the older event; a larger ID loses a same-timestamp tie. */
 export function earlierEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? a : b;
 }
 
-/** Return an event that has later `created_at`. */
+/** Return the newer event; a smaller ID wins a same-timestamp tie. */
 export function laterEvent(a: Nostr.Event, b: Nostr.Event): Nostr.Event {
   return compareEvents(a, b) < 0 ? b : a;
 }
 
-/** Sort key function to sort events based on `created_at`. */
+/** Ascending order: older timestamps first, then larger IDs first. */
 export function compareEvents(a: Nostr.Event, b: Nostr.Event): number {
   if (a.id === b.id) {
     return 0;
   }
 
   return a.created_at < b.created_at ||
-    // https://github.com/nostr-protocol/nips/blob/master/16.md#replaceable-events
-    (a.created_at === b.created_at && a.id < b.id)
+    // NIP-01 retains the lexically smallest ID for replaceable timestamp ties.
+    (a.created_at === b.created_at && a.id > b.id)
     ? -1
     : 1;
 }

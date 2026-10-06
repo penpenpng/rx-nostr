@@ -20,10 +20,10 @@ export type PublicationFailure = {
 
 /** A publish operation that starts when `RxNostr.publish()` is called. */
 export interface Publication {
-  /** A detached copy of the signed event that the operation attempted to send. */
+  /** One detached copy of the signed event, shared by every await of this Promise. */
   readonly event: Promise<Nostr.Event>;
 
-  /** Observe unaggregated OK packets without controlling the operation. */
+  /** Observe unaggregated OK packets as independent mutable copies, including replay. The stream completes after every relay effort ends or the publication is cancelled. */
   subscribe(observer?: Partial<Observer<OkPacket>>): Subscription;
   subscribe(
     next?: ((value: OkPacket) => void) | null,
@@ -31,12 +31,13 @@ export interface Publication {
     complete?: (() => void) | null,
   ): Subscription;
 
-  /** Idempotently stop every remaining send effort. */
+  /** Idempotently stop every remaining send effort and release owned demand synchronously. A WebSocket close handshake may finish later. */
   cancel(): void;
 
   /**
    * Resolve with `undefined` when the policy succeeds and reject with a typed
-   * rx-nostr error when it can no longer succeed.
+   * rx-nostr error when it can no longer succeed. Settlement does not stop
+   * other relay efforts or wait for linger cleanup.
    */
   waitFor(policy: PublicationSettlePolicy): Promise<void>;
 }

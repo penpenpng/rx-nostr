@@ -280,6 +280,117 @@ export class NostrTransport {
     }
   }
 
+  /** Send an ordinary operation after the connection's AUTH barrier clears. */
+  async castAfterAuth(
+    query: Nostr.ToRelayMessage.Any,
+    options: { readonly timeout?: number; readonly signal?: AbortSignal } = {},
+  ): Promise<void> {
+    if (options.signal?.aborted) {
+      throw new NostrTransportOperationError("aborted");
+    }
+
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+
+    options.signal?.addEventListener("abort", abort, { once: true });
+
+    if (options.signal?.aborted) {
+      abort();
+    }
+
+    const signal = controller.signal;
+    let timedOut = false;
+    const timer =
+      options.timeout !== undefined && Number.isFinite(options.timeout)
+        ? setTimeout(
+            () => {
+              timedOut = true;
+
+              controller.abort();
+            },
+            Math.max(0, options.timeout),
+          )
+        : undefined;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        let stateSubscription: Subscription | undefined;
+        const finish = (error?: unknown) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+
+          stateSubscription?.unsubscribe();
+          signal.removeEventListener("abort", onAbort);
+
+          if (error === undefined) {
+            resolve();
+          } else {
+            reject(error);
+          }
+        };
+        const onAbort = () =>
+          finish(new NostrTransportOperationError(timedOut ? "timeout" : "aborted"));
+
+        signal.addEventListener("abort", onAbort, { once: true });
+
+        stateSubscription = this.state$.subscribe((state) => {
+          if (state.state === "connected") {
+            finish();
+          } else if (state.state === "failed") {
+            finish(new NostrTransportOperationError("open-error", { cause: state.reason }));
+          } else if (state.state === "disposed") {
+            finish(new NostrTransportOperationError("aborted"));
+          }
+        });
+
+        if (settled) {
+          stateSubscription.unsubscribe();
+        }
+        if (signal.aborted) {
+          onAbort();
+        }
+      });
+
+      // Connection listeners install NIP-42 challenges in the same microtask.
+      await Promise.resolve();
+      let barrier = this.beforeSend?.(signal);
+
+      while (barrier) {
+        await barrier;
+
+        if (signal.aborted) {
+          throw new NostrTransportOperationError(timedOut ? "timeout" : "aborted");
+        }
+
+        barrier = this.beforeSend?.(signal);
+      }
+
+      if (signal.aborted) {
+        throw new NostrTransportOperationError(timedOut ? "timeout" : "aborted");
+      }
+
+      try {
+        await this.cast(query, { timeout: options.timeout, signal });
+      } catch (error) {
+        if (timedOut) {
+          throw new NostrTransportOperationError("timeout", { cause: error });
+        }
+
+        throw error;
+      }
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+
+      options.signal?.removeEventListener("abort", abort);
+    }
+  }
+
   listen(options: NostrTransportListenOptions = {}): Observable<MessagePacket> {
     return createStreamObservable(
       (onMatch) => this.#client.listen({ ...options, onMatch }),

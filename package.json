@@ -8,19 +8,26 @@
     "check": "vp check .",
     "fix": "vp check --fix",
     "docs:build": "pnpm --filter @rx-nostr/docs docs:build",
+    "docs:examples": "node scripts/typecheck-docs-examples.mjs",
     "docs:dev": "pnpm --filter @rx-nostr/docs docs:dev",
     "format": "vp fmt . --write",
     "format:check": "vp fmt . --check",
     "lint": "vp lint .",
     "lint:fix": "vp lint . --fix",
-    "release": "pnpm build && changeset publish",
+    "release": "pnpm exec changeset publish",
     "test": "pnpm --recursive --if-present test",
-    "version-packages": "changeset version"
+    "test:packed": "node scripts/test-packed-consumers.mjs",
+    "test:worker-browser": "node scripts/test-worker-browser.mjs",
+    "version-packages": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.3",
+    "@changesets/cli": "^2.29.7",
+    "@rx-nostr/crypto": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "nostr-typedef": "^0.13.0",
+    "rx-nostr": "workspace:*",
     "typescript": "catalog:",
+    "vite": "^8.3.0",
     "vite-plus": "0.3.3"
   },
   "packageManager": "pnpm@10.33.0"

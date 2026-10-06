@@ -1,5 +1,5 @@
 import type * as Nostr from "nostr-typedef";
-import { ReplaySubject, type Observer, type Subscription } from "rxjs";
+import { map, ReplaySubject, type Observable, type Observer, type Subscription } from "rxjs";
 
 import { RxNostrCallbackError, RxNostrPublicationError } from "../../../libs/error.ts";
 import { ensureEventFields, type RelayUrl } from "../../../libs/index.ts";
@@ -23,13 +23,15 @@ export function publish({
   params,
   relayInput,
   config,
+  mode = "acknowledged",
 }: {
   relays: IRelayCommunicationCollection;
   params: Nostr.EventParameters;
   relayInput: RelayInput;
   config: FilledRxNostrPublishOptions;
+  mode?: "acknowledged" | "sent";
 }): PublicationOperation {
-  return new PublicationOperation(relays, params, RxRelays.array(relayInput), config);
+  return new PublicationOperation(relays, params, RxRelays.array(relayInput), config, mode);
 }
 
 interface RelayDelivery {
@@ -49,6 +51,7 @@ interface SettlementWaiter {
 
 export class PublicationOperation implements Publication, Disposable {
   readonly event: Promise<Nostr.Event>;
+  /** Internal cleanup signal: after linger leases are released, or immediately on cancel. */
   readonly closed: Promise<void>;
 
   readonly #okPackets = new ReplaySubject<OkPacket>();
@@ -69,6 +72,7 @@ export class PublicationOperation implements Publication, Disposable {
     params: Nostr.EventParameters,
     destinations: readonly RelayUrl[],
     private readonly config: FilledRxNostrPublishOptions,
+    private readonly mode: "acknowledged" | "sent" = "acknowledged",
   ) {
     let resolveEvent!: (event: Nostr.Event) => void;
     let rejectEvent!: (error: unknown) => void;
@@ -135,11 +139,14 @@ export class PublicationOperation implements Publication, Disposable {
     error?: ((error: unknown) => void) | null,
     complete?: (() => void) | null,
   ): Subscription {
+    // Copy on delivery, including replay, so no observer owns internal packets.
+    const packets = this.#okPackets.pipe(map(copyOkPacket));
+
     if (typeof observerOrNext === "function" || observerOrNext == null) {
-      return this.#okPackets.subscribe(observerOrNext, error, complete);
+      return packets.subscribe(observerOrNext, error, complete);
     }
 
-    return this.#okPackets.subscribe(observerOrNext);
+    return packets.subscribe(observerOrNext);
   }
 
   waitFor(policy: PublicationSettlePolicy): Promise<void> {
@@ -215,19 +222,27 @@ export class PublicationOperation implements Publication, Disposable {
       const relay = this.relays.get(delivery.relay);
 
       delivery.demandWindow = this.#connectionDemand.openDemandWindow(relay, this.config.linger);
-      delivery.subscription = relay
-        .event(snapshot as Nostr.Event, {
-          timeout: this.config.timeout,
-        })
-        .subscribe({
-          next: (packet) => {
-            delivery.lastOk = packet;
 
-            this.#okPackets.next(packet);
-          },
-          complete: () => this.#completeRelay(delivery),
-          error: (error) => this.#failRelay(delivery, failureFrom(error, delivery)),
-        });
+      const stream: Observable<OkPacket | void> =
+        this.mode === "sent"
+          ? relay.castEvent(snapshot as Nostr.Event, { timeout: this.config.timeout })
+          : relay.event(snapshot as Nostr.Event, { timeout: this.config.timeout });
+
+      delivery.subscription = stream.subscribe({
+        next: (packet) => {
+          if (packet === undefined) {
+            return;
+          }
+
+          const snapshot = copyOkPacket(packet);
+
+          delivery.lastOk = snapshot;
+
+          this.#okPackets.next(snapshot);
+        },
+        complete: () => this.#completeRelay(delivery),
+        error: (error) => this.#failRelay(delivery, failureFrom(error, delivery)),
+      });
     }
   }
 
@@ -245,7 +260,7 @@ export class PublicationOperation implements Publication, Disposable {
     if (delivery.state !== "pending") {
       return;
     }
-    if (delivery.lastOk?.ok) {
+    if (this.mode === "sent" || delivery.lastOk?.ok) {
       delivery.state = "accepted";
 
       this.#finishRelay(delivery);
@@ -369,7 +384,7 @@ export class PublicationOperation implements Publication, Disposable {
     if (this.#cleaned || this.#cancelled) {
       return;
     }
-    if (!Number.isFinite(this.config.linger)) {
+    if (this.config.linger === Infinity) {
       return;
     }
 
@@ -407,7 +422,7 @@ export class PublicationOperation implements Publication, Disposable {
 }
 
 function snapshotEvent(value: unknown): Readonly<Nostr.Event> {
-  if (typeof value !== "object" || value === null || !ensureEventFields(value)) {
+  if (!ensureEventFields(value)) {
     throw new TypeError("The signer did not return a valid Nostr event.");
   }
 
@@ -463,4 +478,8 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
 
 function failures(deliveries: readonly RelayDelivery[]): PublicationFailure[] {
   return deliveries.flatMap((delivery) => (delivery.failure ? [delivery.failure] : []));
+}
+
+function copyOkPacket(packet: OkPacket): OkPacket {
+  return { ...packet, message: [...packet.message] };
 }

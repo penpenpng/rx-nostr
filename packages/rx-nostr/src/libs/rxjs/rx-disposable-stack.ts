@@ -1,4 +1,13 @@
-import { BehaviorSubject, finalize, Subject, Subscription, take, takeUntil } from "rxjs";
+import {
+  BehaviorSubject,
+  defer,
+  finalize,
+  type Observable,
+  Subject,
+  Subscription,
+  take,
+  takeUntil,
+} from "rxjs";
 
 import { RxNostrInvalidUsageError } from "../error.ts";
 
@@ -66,11 +75,9 @@ export class RxDisposableStack extends DisposableStack {
   private dispose$ = new Subject<void>();
 
   untilDisposed() {
-    if (this.isDisposed) {
-      return take(0);
-    }
-
-    return takeUntil(this.dispose$);
+    // A saved Observable may be subscribed to after the disposal signal was sent.
+    return <T>(source: Observable<T>): Observable<T> =>
+      defer(() => source.pipe(this.isDisposed ? take(0) : takeUntil(this.dispose$)));
   }
 
   finalize() {

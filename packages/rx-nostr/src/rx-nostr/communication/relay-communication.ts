@@ -129,6 +129,16 @@ export class RelayCommunication implements IRelayCommunication {
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
   }
 
+  castEvent(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<void> {
+    if (this.#leases.count === 0) {
+      return EMPTY;
+    }
+
+    return this.#executor
+      .castEvent(event, options)
+      .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
+  }
+
   monitorConnectionState(): Observable<ConnectionState> {
     return this.#executor.monitorConnectionState();
   }

@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, concat, EMPTY, of, type Observable } from "rxjs";
+import { BehaviorSubject, combineLatest, concat, EMPTY, map, of, type Observable } from "rxjs";
 
 import { once, RelaySet, RxDisposableStack, u, type RelayUrl } from "../libs/index.ts";
 
@@ -6,6 +6,7 @@ export class RxRelays {
   protected stack = new RxDisposableStack();
   protected relays = new RelaySet();
   protected stream: BehaviorSubject<Set<RelayUrl>> = this.stack.add(new BehaviorSubject(new Set()));
+  readonly #publicStream = this.stream.pipe(map((relays) => new Set(relays)));
 
   constructor(relays?: Iterable<string>) {
     if (!relays) {
@@ -25,6 +26,7 @@ export class RxRelays {
     this.emit();
   }
 
+  /** Return a detached, mutable snapshot of the current relays. */
   get() {
     return this.relays.toSet();
   }
@@ -118,7 +120,8 @@ export class RxRelays {
     if (relays instanceof RxRelays) {
       return relays.asObservable();
     } else {
-      return of(new RelaySet(relays).toSet());
+      // A fixed iterable is still copied per subscriber, just like a live RxRelays.
+      return of(new RelaySet(relays).toSet()).pipe(map((snapshot) => new Set(snapshot)));
     }
   }
 
@@ -146,8 +149,9 @@ export class RxRelays {
     return rxr;
   }
 
-  subscribe = this.stream.subscribe.bind(this.stream);
-  asObservable = this.stream.asObservable.bind(this.stream);
+  /** Each subscription receives a detached, mutable Set. */
+  subscribe = this.#publicStream.subscribe.bind(this.#publicStream);
+  asObservable = () => this.#publicStream;
 
   protected emit() {
     this.stream.next(this.relays.toSet());

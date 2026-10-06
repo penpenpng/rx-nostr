@@ -35,7 +35,7 @@ const rxNostr = new RxNostr({
 
 AUTH は `authenticator` を指定した場合だけ有効になります。`signer` から暗黙には作られません。
 
-`defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `req()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
+`defaultOptions.req` と `defaultOptions.publish` に operation option を指定すると、個々の `forward()` / `backward()` / `publish()` で `linger`、`timeout`、`weak` などを繰り返し指定する必要はありません。operation に明示した値は instance default より優先されます。
 
 ## Process-wide constructor defaults
 
@@ -107,12 +107,26 @@ Authenticator の `authTimeout` は省略時 30,000 ms、NIP-11 自動取得は�
 
 REQ の `timeout` は backward segment が EOSE を待つ時間です。publish の `timeout` は relay ごとの OK を待つ時間です。
 
+## 時間値の許容範囲
+
+単位はすべてミリ秒です。timer を使う値は `NaN`、`-Infinity`、負数、2,147,483,647 ms を超える有限値を拒否します。`Infinity` は次の表で許可した場合だけ無期限を意味します。
+
+| option | `0` | 正の有限値 | `Infinity` |
+| --- | --- | --- | --- |
+| `connectionTimeout` | 不可 | 接続試行の期限 | 不可 |
+| `nip11Timeout`、REQ / publish `timeout`、Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
+| REQ / publish / ReqPacket `linger` | 即時解放 | 終了後の保持時間 | dispose まで保持 |
+
+`connectionTimeout`、`nip11Timeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory.fetchNip11()` に不正な `timeout` を渡すと fetch を始めず Promise が reject します。`SimpleAuthenticator` と `VerificationClient` は構築時に検査し、独自 Authenticator の `authTimeout` は AUTH 開始前に検査します。
+
+reconnector の retry `delay` と relay health policy の `suppressedUntil` は有限の非負数を要求します。これらは接続待機の内部処理で、長い deadline は timer 上限ごとに分割して待ちます。
+
 ## REQ arguments and options
 
-`req(relays, request, options?)` の順です。宛先と request（`RxReq` または `{ strategy, filters }` descriptor）は必須で、operation 固有の設定だけを第3引数へ渡します。
+`forward(relays, request, options?)` / `backward(relays, request, options?)` の順です。宛先と request（`RxReq` または filter の配列）は必須で、operation 固有の設定だけを第3引数へ渡します。
 
 ```ts
-rxNostr.req(relays, { strategy: "oneshot", filters }, {
+rxNostr.backward(relays, filters, {
   verifier,
   defer: true,
   linger: 10_000,
@@ -145,7 +159,7 @@ publish は呼び出し時の relay snapshot を使います。
 最も具体的な、`undefined` ではない値が優先されます。
 
 1. `RxReq.emit()` の packet option (`relays`, `linger`, `traceTag`)
-2. `req()` / `publish()` の config
+2. `forward()` / `backward()` / `publish()` の config
 3. `RxNostrConfig.defaultOptions.req/publish`
 4. `RxNostr.defaultOptions.req/publish`（built-in defaults の初期値を保持）
 
@@ -168,7 +182,7 @@ const rxNostr = new RxNostr({
 });
 
 // この query だけ linger を 0 にします。
-rxNostr.req(relays, { strategy: "oneshot", filters: [{}] }, { linger: 0 });
+rxNostr.backward(relays, [{}], { linger: 0 });
 ```
 
 ## Callback error
@@ -183,3 +197,16 @@ if (error instanceof RxNostrCallbackError) {
   console.error(error.cause);
 }
 ```
+
+## 公開値の所有権
+
+内部状態を判断に使う値と利用者へ渡す値は分離します。公開された変更可能な copy を編集しても、内部の成否・接続状態や別の observer の値は変わりません。
+
+| 出力 | copy の単位 |
+| --- | --- |
+| `RxRelays.get()`、`RelayDirectory.get()` / `getOrCreate()` / `values()` | 呼び出し・反復ごと。Directory の NIP-11 metadata もネストした配列・object ごと copy |
+| `RxRelays`、`RelayDirectory.observe()`、`monitorConnectionState()`、`Publication.subscribe()` | observer ごと。replay の値も新しい copy |
+| `Publication.event` | Promise が解決する時に 1 回。複数回 `await` しても同じ event object |
+| `RxNostrPublicationError.failures` | Error 作成時に内部結果から分離。各 failure の OK tuple も copy |
+
+`RxNostrCallbackError.cause`、publication failure の `cause`、diagnostic の `cause` は任意のユーザー値や `Error` を含む不透明な参照で、identity を保ちます。diagnostic の `context` は浅い copy を freeze して渡し、その中の任意 object は不透明な参照として扱います。注入した verifier、reconnector、directory などの class instance も所有者側で管理してください。reconnector と relay health policy に渡す health は個別の snapshot です。

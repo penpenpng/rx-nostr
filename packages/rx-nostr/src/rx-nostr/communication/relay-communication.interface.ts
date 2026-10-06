@@ -17,4 +17,5 @@ export interface IRelayCommunication {
     }>,
   ): Observable<EventPacket>;
   event(event: Nostr.Event, options?: Readonly<{ timeout?: number }>): Observable<OkPacket>;
+  castEvent(event: Nostr.Event, options?: Readonly<{ timeout?: number }>): Observable<void>;
 }

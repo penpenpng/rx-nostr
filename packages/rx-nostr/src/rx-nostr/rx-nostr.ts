@@ -8,8 +8,10 @@ import {
   type RxNostrDiagnosticSink,
 } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
+import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
 import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
 import type { Publication, PublishEventParameters } from "../publication/index.ts";
@@ -41,6 +43,9 @@ import type {
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "./rx-nostr.interface.ts";
+
+/** @internal Bridge for the legacy adapter; absent from the package entry point. */
+export const legacyPublishSent = Symbol("rx-nostr.legacy-publish-sent");
 
 export class RxNostr implements IRxNostr {
   /** Process-wide synchronous log callback for every RxNostr instance. */
@@ -118,11 +123,24 @@ export class RxNostr implements IRxNostr {
     let source$: Observable<ReqPacket>;
 
     if (request instanceof RxReq) {
-      source$ = request.asObservable();
-    } else if (request.length === 0) {
-      source$ = EMPTY;
+      // Pipe operators can replace packets, so snapshot and normalize their final output.
+      source$ = request.asObservable().pipe(
+        map((packet) => {
+          if (packet.linger !== undefined) {
+            assertTimerDuration(packet.linger, "ReqPacket linger", {
+              allowZero: true,
+              allowInfinity: true,
+            });
+          }
+
+          return { ...packet, filters: normalizeFilters(packet.filters) };
+        }),
+      );
     } else {
-      source$ = of({ filters: [...request] });
+      // Static caller-owned arrays are snapshotted when forward/backward is called.
+      const filters = normalizeFilters(request);
+
+      source$ = filters.length === 0 ? EMPTY : of({ filters });
     }
 
     return defer(() => {
@@ -163,6 +181,24 @@ export class RxNostr implements IRxNostr {
     params: PublishEventParameters,
     options: RxNostrPublishConfig = {},
   ): Publication {
+    return this.#publish(relays, params, options, "acknowledged");
+  }
+
+  /** @internal Legacy completion after every destination has sent its EVENT frame. */
+  [legacyPublishSent](
+    relays: RelayInput,
+    params: PublishEventParameters,
+    options: RxNostrPublishConfig = {},
+  ): Publication {
+    return this.#publish(relays, params, options, "sent");
+  }
+
+  #publish(
+    relays: RelayInput,
+    params: PublishEventParameters,
+    options: RxNostrPublishConfig,
+    mode: "acknowledged" | "sent",
+  ): Publication {
     this.#assertActive();
     const config = new FilledRxNostrPublishOptions(options, this.#config);
 
@@ -171,6 +207,7 @@ export class RxNostr implements IRxNostr {
       config,
       relayInput: relays,
       relays: this.#relays,
+      mode,
     });
 
     this.#publications.add(publication);

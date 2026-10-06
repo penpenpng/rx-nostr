@@ -4,6 +4,7 @@ import { map, type Observable } from "rxjs";
 import { RelayDirectorySnapshotError } from "../libs/error.ts";
 import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
 import type {
   FetchNip11Options,
   IRelayDirectory,
@@ -25,6 +26,7 @@ export interface RelayDirectoryReporter {
 
 const reporters = new WeakMap<RelayDirectory, RelayDirectoryReporter>();
 
+/** Owns NIP-11 cache and shared health/probe state for one or more RxNostr instances. */
 export class RelayDirectory implements IRelayDirectory {
   readonly #relays = new RelayMap<RelayRecord>();
   readonly #clock: () => number;
@@ -90,6 +92,17 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   fetchNip11(url: string, options: FetchNip11Options = {}): Promise<Nostr.Nip11.RelayInfo> {
+    if (options.timeout !== undefined) {
+      try {
+        assertTimerDuration(options.timeout, "NIP-11 timeout", {
+          allowZero: true,
+          allowInfinity: true,
+        });
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
+
     return this.#getOrCreate(url)
       .fetchNip11(options.refresh ?? false, options.timeout)
       .then(copyRelayInfo);
@@ -141,7 +154,7 @@ function copyEntry(entry: RelayDirectoryEntry): RelayDirectoryEntry {
   };
 }
 
-/** @internal Used by RelayCommunication integration without widening public API. */
+/** @internal Only RelayDirectory instances register a health/probe reporter. */
 export function getRelayDirectoryReporter(directory: RelayDirectory): RelayDirectoryReporter {
   const reporter = reporters.get(directory);
 

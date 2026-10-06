@@ -63,6 +63,7 @@ export interface RxNostrConfig {
   /** Additional detectors that may report a ready connection as dropped. */
   dropDetectors?: Iterable<ConnectionDropDetector>;
   /** Shared relay metadata and health directory. */
+  /** A RelayDirectory instance (or subclass calling super), shared or isolated. IRelayDirectory alone is not injectable. */
   relayDirectory?: RelayDirectory;
   /** Numeric options or a custom suppression strategy. false disables health suppression. */
   relayHealthPolicy?: RelayHealthPolicyInput;

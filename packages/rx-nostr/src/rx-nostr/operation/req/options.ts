@@ -1,4 +1,5 @@
 import type { EventVerifier } from "../../../event-verifier/index.ts";
+import { assertTimerDuration } from "../../../libs/timing.ts";
 import type { RxNostrReqConfig, RxNostrReqOptions } from "./rx-nostr-req.interface.ts";
 
 export interface RxNostrReqOptionsContext {
@@ -21,9 +22,23 @@ export class FilledRxNostrReqOptions {
     const staticBase = rootConfig.staticDefaultOptions.req;
 
     this.defer = config.defer ?? base?.defer ?? staticBase.defer;
-    this.linger = config.linger ?? base?.linger ?? staticBase.linger;
+    this.linger = assertTimerDuration(
+      config.linger ?? base?.linger ?? staticBase.linger,
+      "REQ linger",
+      {
+        allowZero: true,
+        allowInfinity: true,
+      },
+    );
     this.weak = config.weak ?? base?.weak ?? staticBase.weak;
-    this.timeout = config.timeout ?? base?.timeout ?? staticBase.timeout;
+    this.timeout = assertTimerDuration(
+      config.timeout ?? base?.timeout ?? staticBase.timeout,
+      "REQ timeout",
+      {
+        allowZero: true,
+        allowInfinity: true,
+      },
+    );
     this.skipExpirationCheck =
       config.skipExpirationCheck ?? base?.skipExpirationCheck ?? staticBase.skipExpirationCheck;
     this.skipValidateFilterMatching =

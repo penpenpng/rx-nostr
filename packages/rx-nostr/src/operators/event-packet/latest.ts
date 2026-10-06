@@ -4,7 +4,7 @@ import { compareEvents } from "../../libs/index.ts";
 import type { EventPacket } from "../../packets/index.ts";
 
 /**
- * Only the latest events are allowed to pass.
+ * Pass events that are newer by timestamp, breaking ties in favor of the smaller ID.
  */
 export function latest<P extends EventPacket>(): MonoTypeOperatorFunction<P> {
   return pipe(

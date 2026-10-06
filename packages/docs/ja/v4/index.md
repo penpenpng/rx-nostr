@@ -4,6 +4,7 @@ rx-nostr は、Nostr リレーとの通信を RxJS の Observable として扱�
 
 v4 では「どのリレーへ何を問い合わせるか」と「接続をいつ維持するか」を分離しました。問い合わせと発行では宛先をその都度明示し、接続の先行確立が必要な場合だけ hot relay を設定します。
 
+<!-- typecheck-example: v4-index -->
 ```ts
 import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
@@ -13,10 +14,7 @@ const rxNostr = new RxNostr({
 });
 
 rxNostr
-  .req(["wss://relay.example.com"], {
-    strategy: "oneshot",
-    filters: [{ kinds: [1], limit: 20 }],
-  })
+  .backward(["wss://relay.example.com"], [{ kinds: [1], limit: 20 }])
   .subscribe(({ from, event }) => {
     console.log(from, event);
   });
@@ -30,7 +28,7 @@ rxNostr
 
 公開される主な操作は次のとおりです。
 
-- `req()` — EVENT を問い合わせる
+- `forward()` / `backward()` — 新着 EVENT の購読 / 過去 EVENT の取得
 - `publish()` — EVENT を発行する
 - `setHotRelays()` / `unsetHotRelays()` — 接続だけを維持する
 - `monitorConnectionState()` — リレーごとの接続状態を監視する
@@ -42,7 +40,7 @@ rxNostr
 import type { IRxNostr } from "rx-nostr";
 
 function startTimeline(client: IRxNostr) {
-  return client.req(relays, { strategy: "forward", filters: { kinds: [1] } });
+  return client.forward(relays, [{ kinds: [1] }]);
 }
 ```
 
@@ -55,11 +53,8 @@ v4 では REQ と publish を独立した operation として扱います。oper
 宛先には、ひとつの URL、URL の iterable、または動的な `RxRelays` を渡せます。
 
 ```ts
-rxNostr.req("wss://relay.example.com", { strategy: "oneshot", filters: [{}] });
-rxNostr.req(["wss://one.example.com", "wss://two.example.com"], {
-  strategy: "oneshot",
-  filters: [{}],
-});
+rxNostr.backward("wss://relay.example.com", [{}]);
+rxNostr.backward(["wss://one.example.com", "wss://two.example.com"], [{}]);
 ```
 
 URL は境界で正規化、重複排除されます。query と hot relay に渡した `RxRelays` はその後の変更にも追従します。一方、publish の宛先は呼び出し時に固定されます。
@@ -70,8 +65,8 @@ URL は境界で正規化、重複排除されます。query と hot relay に�
 
 ## v3 からの主な変更
 
-- `setDefaultRelays()` と `setAdditionalRelays()` を廃止し、`req()` / `publish()` ごとに宛先を必須指定
-- `use()` を `req()` に変更
+- `setDefaultRelays()` と `setAdditionalRelays()` を廃止し、`forward()` / `backward()` / `publish()` ごとに宛先を必須指定
+- `use()` を `forward()` / `backward()` に変更
 - `send()` を、明示的な成功条件と取消を持つ `publish()` に変更
 - `Nip11Registry` を injectable な `RelayDirectory` に変更
 - 接続戦略を `defer`、`weak`、`linger`、hot relay に分解
@@ -88,7 +83,7 @@ query と接続状態は RxJS の `Observable` です。標準の RxJS operator 
 import { filterByKinds, timeline } from "rx-nostr/operators";
 
 rxNostr
-  .req(["wss://relay.example.com"], { strategy: "oneshot", filters: [{}] })
+  .backward(["wss://relay.example.com"], [{}])
   .pipe(filterByKinds([1, 6]), timeline(100))
   .subscribe((events) => {
     console.log(events);

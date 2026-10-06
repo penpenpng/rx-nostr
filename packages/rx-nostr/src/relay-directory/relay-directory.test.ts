@@ -89,6 +89,30 @@ describe("RelayDirectory health reporter", () => {
     mutatingSub.unsubscribe();
     sub.unsubscribe();
   });
+
+  test("detaches nested NIP-11 data for each observer and read", () => {
+    const url = "wss://relay.example.com";
+    const directory = new RelayDirectory();
+
+    directory.setNip11(url, { name: "relay", limitation: { max_subscriptions: 3 } });
+
+    const seen: number[] = [];
+    const stream = directory.observe(url);
+    const first = stream.subscribe((entry) => {
+      if (entry.nip11?.limitation) {
+        entry.nip11.limitation.max_subscriptions = 100;
+      }
+    });
+    const second = stream.subscribe((entry) => {
+      seen.push(entry.nip11?.limitation?.max_subscriptions ?? -1);
+    });
+
+    expect(seen).toEqual([3]);
+    expect(directory.get(url)?.nip11?.limitation?.max_subscriptions).toBe(3);
+
+    first.unsubscribe();
+    second.unsubscribe();
+  });
 });
 
 describe("RelayDirectory snapshots", () => {
@@ -235,6 +259,20 @@ describe("RelayDirectory snapshots", () => {
     ).rejects.toMatchObject({ code: "timeout" });
     expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
   });
+
+  test.each([NaN, -Infinity, -1, 2_147_483_648])(
+    "rejects invalid NIP-11 timeout before starting fetch: %s",
+    async (timeout) => {
+      const fetcher = vi.fn();
+      const directory = new RelayDirectory({ fetcher });
+
+      await expect(directory.fetchNip11("wss://relay.example.com", { timeout })).rejects.toThrow(
+        RangeError,
+      );
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(directory.get("wss://relay.example.com")).toBeUndefined();
+    },
+  );
 });
 
 test("round trips success followed by failure at the same timestamp", () => {

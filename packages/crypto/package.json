@@ -36,6 +36,7 @@
   },
   "scripts": {
     "build": "vp pack",
+    "prepack": "pnpm build",
     "test": "vitest --run",
     "test:watch": "vitest"
   },

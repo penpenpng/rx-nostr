@@ -2,6 +2,7 @@
 
 `rxNostr.publish()` は EVENT の署名と複数リレーへの送信を管理し、ひとつの hot operation である `Publication` を返します。
 
+<!-- typecheck-example: publish-basic -->
 ```ts
 const publication = rxNostr.publish(
   ["wss://relay.example.com"],
@@ -31,6 +32,8 @@ const observer = publication.subscribe({
 ```
 
 受信済みの OK は、あとから subscribe した observer にも replay されます。observer の unsubscribe は観測をやめるだけで、送信処理を取り消しません。
+
+各 observer は、replay を含め独立した変更可能な `OkPacket` を受け取ります。packet や `message` tuple を変更しても、送信の成功判定や他の observer には影響しません。
 
 ## 成功条件を待つ
 

@@ -5,6 +5,7 @@ import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import type { ConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../../../lazy-filter/index.ts";
+import { normalizeFilters } from "../../../lazy-filter/normalize-filters.ts";
 import { RxNostrCallbackError } from "../../../libs/error.ts";
 import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import type { EventMessagePacket, EventPacket, OkPacket } from "../../../packets/index.ts";
@@ -141,9 +142,14 @@ export class NostrOperationExecutor implements Disposable {
       const packets = this.transport.subscribe({
         query: () => {
           try {
-            evaluatedFilters = evalFilters(plan.filters);
+            // Re-evaluate lazy bounds for every send/resend, then reject invalid ranges.
+            evaluatedFilters = normalizeFilters(evalFilters(plan.filters)) as Nostr.Filter[];
           } catch (cause) {
             throw new RxNostrCallbackError("filter", cause);
+          }
+
+          if (evaluatedFilters.length === 0) {
+            throw new NoMatchingFilters();
           }
 
           queryEvaluated = true;
@@ -261,6 +267,30 @@ export class NostrOperationExecutor implements Disposable {
     });
   }
 
+  /** Complete only after the EVENT frame has actually been sent. */
+  castEvent(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<void> {
+    return new Observable((subscriber) => {
+      const controller = new AbortController();
+
+      void this.transport
+        .castAfterAuth(["EVENT", event], { ...options, signal: controller.signal })
+        .then(
+          () => {
+            if (!subscriber.closed) {
+              subscriber.complete();
+            }
+          },
+          (error: unknown) => {
+            if (!subscriber.closed) {
+              subscriber.error(error);
+            }
+          },
+        );
+
+      return () => controller.abort();
+    });
+  }
+
   [Symbol.dispose] = once(() => {
     this.#auth.dispose();
     void this.transport.dispose().catch(() => {});
@@ -285,6 +315,8 @@ export interface NostrOperationExecutorOptions {
 }
 
 const defaultVreqPlanner: RelayVreqPlanner = (strategy, filters) => [{ strategy, filters }];
+
+class NoMatchingFilters extends Error {}
 
 function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
   if (error instanceof RxNostrCallbackError) {

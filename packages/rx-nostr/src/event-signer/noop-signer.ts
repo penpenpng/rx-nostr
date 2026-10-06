@@ -9,6 +9,6 @@ export class NoopSigner implements EventSigner {
   }
 
   async getPublicKey(): Promise<string> {
-    throw new RxNostrInvalidUsageError("noopSigner cannot calculate pubkey.");
+    throw new RxNostrInvalidUsageError("NoopSigner cannot calculate a public key.");
   }
 }

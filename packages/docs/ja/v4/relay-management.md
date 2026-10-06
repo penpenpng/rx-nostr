@@ -10,7 +10,7 @@ hot relay は宛先ではありません。hot に設定しただけでは REQ �
 
 ## RelayInput
 
-`req()`、`publish()`、`setHotRelays()` は次の値を受け取ります。
+`forward()`、`backward()`、`publish()`、`setHotRelays()` は次の値を受け取ります。
 
 ```ts
 type RelayInput = string | Iterable<string> | RxRelays;
@@ -34,11 +34,15 @@ console.log([...relays]); // ["wss://relay.example.com"]
 
 `RxRelays` を query の宛先に渡すと、集合の変更に追従して relay segment が追加、終了されます。
 
-```ts
-const relays = new RxRelays(["wss://one.example.com"]);
-const request = new RxForwardReq();
+`get()` は呼び出しごと、`subscribe()` / `asObservable()` と `RxRelays.observable()` は購読者ごとに変更可能な独立した `Set` を返します。受け取った Set を変更しても元の集合や別の購読者には影響しません。集合を変更するには `set()`、`append()`、`remove()`、`clear()` を使います。
 
-const subscription = rxNostr.req(relays, request).subscribe(console.log);
+```ts
+import { RxReq } from "rx-nostr";
+
+const relays = new RxRelays(["wss://one.example.com"]);
+const request = new RxReq();
+
+const subscription = rxNostr.forward(relays, request).subscribe(console.log);
 request.emit([{}]);
 
 relays.append("wss://two.example.com");
@@ -87,6 +91,8 @@ segment 終了後も接続需要を保持する時間です。既定値は 10,00
 - `0` — 終了後すぐ解放
 - 正の有限値 — 指定時間だけ再利用可能な状態を維持
 - `Infinity` — operation/session が dispose されるまで保持
+
+正の有限値は最大 2,147,483,647 ms です。不正な値は [時間値の許容範囲](./configuration.md#時間値の許容範囲) の規則で拒否します。
 
 `RxNostr.dispose()` と `Publication.cancel()` は linger を待たずにリソースを解放します。
 

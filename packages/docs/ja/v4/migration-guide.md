@@ -1,6 +1,6 @@
 # Migration from v3
 
-v4 は operation、connection、metadata の責務を分け直した major release です。v3 API の compatibility alias はありません。
+v4 は operation、connection、metadata の責務を分け直した major release です。v3 API 名の alias はありません。`rx-nostr/legacy` には移行を補助する v3 形式の facade があり、利用可能な範囲はその公開型に従います。
 
 ## Package
 
@@ -45,7 +45,7 @@ const rxNostr = new RxNostr({
 
 ## Default relay を operation の宛先へ移す
 
-v4 は default relay を持ちません。`setDefaultRelays()`、`setAdditionalRelays()`、read/write flag は削除されました。すべての `req()` と `publish()` で宛先を指定します。
+v4 の `RxNostr` は default relay を持ちません。`setDefaultRelays()`、`setAdditionalRelays()`、read/write flag は削除されました。すべての `forward()`、`backward()`、`publish()` で宛先を指定します。
 
 ```ts
 // v3
@@ -53,7 +53,7 @@ rxNostr.setDefaultRelays(["wss://relay.example.com"]);
 rxNostr.use(request);
 
 // v4
-rxNostr.req(["wss://relay.example.com"], request);
+rxNostr.forward(["wss://relay.example.com"], request);
 ```
 
 一時的な relay と default relay の区別もありません。ReqPacket ごとの宛先変更は `emit()` の option で行います。
@@ -64,9 +64,9 @@ request.emit(filters, {
 });
 ```
 
-## `use()` を `req()` へ移す
+## `use()` を `forward()` / `backward()` へ移す
 
-`createRxForwardReq()` と `createRxBackwardReq()` は constructor に変わりました。
+v4 では継続的な問い合わせと過去の取得に共通の `RxReq` を使い、操作側で `forward()` または `backward()` を選びます。
 
 ```ts
 // v3
@@ -74,17 +74,14 @@ const request = createRxForwardReq();
 const events$ = rxNostr.use(request);
 
 // v4
-const request = new RxForwardReq();
-const events$ = rxNostr.req(relays, request);
+const request = new RxReq();
+const events$ = rxNostr.forward(relays, request);
 ```
 
-簡単な backward query では `RxBackwardReq` を作らず、oneshot descriptor を渡せます。
+簡単な backward query では `RxReq` を作らず、filter の配列を渡せます。
 
 ```ts
-rxNostr.req(relays, {
-  strategy: "oneshot",
-  filters: [{ kinds: [1], limit: 20 }],
-});
+rxNostr.backward(relays, [{ kinds: [1], limit: 20 }]);
 ```
 
 forward は新しい ReqPacket が直前の REQ を置き換え、backward は各 REQ を並行して EOSE まで維持する契約を保ちます。
@@ -118,11 +115,15 @@ publication.subscribe(onOk);
 await publication.waitFor("all");
 ```
 
-v3 の `completeOn` / `cast()` に相当する成功条件は `waitFor("all")` または `waitFor("any")` で明示します。
+v3 の `completeOn: "all-ok"` / `"any-ok"` に相当する受理条件は `waitFor("all")` または `waitFor("any")` で明示します。`cast()` の送信完了とは異なります。
+
+移行用の `rx-nostr/legacy` facade では、default / additional relay を URL、`Set`、generator、URL を key とする permission map で指定できます。`read: false` の relay は `use()` の宛先から、`write: false` の relay は `send()` / `cast()` の宛先から除外されます。`use()` は cold Observable で、同じ戻り値を複数回 subscribe しても各 subscription の宛先追従と解除は独立します。`send()` は呼び出し時に始まる hot operation です。`cast()` は少なくともひとつの relay へ EVENT を送信してから resolve し、OK は待ちません。
+
+legacy の `send()` / `cast()` は書き込み先が空なら `no-relays` で失敗します。`completeOn: "any-ok"` はいずれかの `OK true` で完了し、全宛先で受理されなければ `all-failed` で失敗します。`completeOn: "all-ok"` は v3 と同じく全宛先の最終応答を待つ方式で、`OK false` 自体は stream の error に変換しません。各 `LegacyOkPacket.ok` を確認してください。`errorOnTimeout: true` のときは timeout を `TimeoutError` として通知します。
 
 - OK observer の unsubscribe は送信を止めない
 - 送信を止める場合は `publication.cancel()`
-- 実際に送った EVENT は `await publication.event`
+- 署名された EVENT は `await publication.event`。この Promise は送信完了の通知ではありません
 - 宛先は `publish()` 呼び出し時の snapshot
 
 ## Connection strategy
@@ -137,6 +138,8 @@ v3 の `lazy`、`lazy-keep`、`aggressive` と default relay の接続維持は�
 | `setHotRelays()` | operation がなくても接続を維持する |
 
 既定では `defer: true`、`weak: false`、`linger: 10_000` です。
+
+`rx-nostr/legacy` facade の `lazy` は需要終了後に切断し、`lazy-keep` は最初に `use()` を subscribe するか `send()` / `cast()` で選んだ relay を dispose まで維持します。`aggressive` は default relay の設定時に接続を温めます。`disconnectTimeout` は操作終了後の linger を指定します。
 
 hot relay は宛先ではありません。v3 の default relay と同様に使う場合でも、operation の `relays` は別に指定してください。
 

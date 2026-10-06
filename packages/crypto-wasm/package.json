@@ -16,12 +16,16 @@
   },
   "files": [
     "src",
-    "dist"
+    "dist",
+    "!src/__test__",
+    "!src/**/*.spec.ts",
+    "!src/**/*.test.ts"
   ],
   "type": "module",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "@rx-nostr/development": "./src/index.ts",
       "import": "./dist/rx-nostr-crypto-wasm.js"
     },
@@ -32,6 +36,7 @@
   },
   "scripts": {
     "build": "vite build",
+    "prepack": "pnpm build",
     "test": "vitest --run",
     "test:watch": "vitest"
   },
