@@ -211,3 +211,37 @@ test("a middle view ends its descendants but leaves its parent and sibling views
   sibling.dispose();
   grandchild.dispose();
 });
+
+test("saved descendant streams cannot restart after an ancestor is disposed", () => {
+  vi.useFakeTimers();
+  const parent = new RxReq();
+  const child = parent.pipe();
+  const grandchild = child.pipe(delay(100));
+  const sibling = parent.pipe();
+  const saved = grandchild.asObservable();
+  const values: ReqPacket[] = [];
+  const siblingValues: ReqPacket[] = [];
+  const siblingSub = sibling.asObservable().subscribe((packet) => siblingValues.push(packet));
+  const first = saved.subscribe((packet) => values.push(packet));
+
+  try {
+    parent.emit({ kinds: [1] });
+    child.dispose();
+    expect(first.closed).toBe(true);
+    const late = saved.subscribe((packet) => values.push(packet));
+
+    expect(late.closed).toBe(true);
+    parent.emit({ kinds: [2] });
+    vi.advanceTimersByTime(100);
+    expect(values).toEqual([]);
+    expect(siblingValues).toHaveLength(2);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    first.unsubscribe();
+    siblingSub.unsubscribe();
+    parent.dispose();
+    grandchild.dispose();
+    sibling.dispose();
+    vi.useRealTimers();
+  }
+});

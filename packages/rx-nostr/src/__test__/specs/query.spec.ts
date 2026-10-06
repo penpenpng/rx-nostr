@@ -1774,3 +1774,26 @@ describe("REQ public contract", () => {
     );
   });
 });
+
+test.each(["forward", "backward"] as const)(
+  "%s created before request disposal cannot start a new segment afterward",
+  (direction) => {
+    const { server, rxNostr } = createRxNostrScenario();
+    const parent = new RxReq();
+    const child = parent.pipe();
+    const query = rxNostr[direction](relay, child);
+
+    child.dispose();
+    const sub = query.subscribe();
+
+    try {
+      parent.emit({ kinds: [1] });
+      expect(sub.closed).toBe(true);
+      expect(server.connections).toHaveLength(0);
+    } finally {
+      sub.unsubscribe();
+      parent.dispose();
+      rxNostr.dispose();
+    }
+  },
+);
