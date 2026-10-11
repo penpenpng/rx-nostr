@@ -1,12 +1,4 @@
-# Relay Management
-
-v4 では、operation の宛先と WebSocket 接続の寿命を別々に指定します。
-
-- `relays` — REQ または EVENT を実際に送る宛先
-- hot relay — operation がなくても接続を維持する集合
-- `defer` / `weak` / `linger` — operation が接続需要を作る方法
-
-hot relay は宛先ではありません。hot に設定しただけでは REQ や EVENT は送信されません。
+# Relay Input
 
 ## RelayInput
 
@@ -58,45 +50,6 @@ request.dispose();
 backward query では、一度開始して終了した同じ relay segment を集合から除外して再追加しても再実行しません。新しい取得を行う場合は新しい ReqPacket を emit してください。
 
 publish は動的集合に追従しません。`publish()` を呼んだ時点の宛先が operation 全体で使われます。
-
-## Hot relay
-
-頻繁に使うリレーへあらかじめ接続しておくには `setHotRelays()` を使います。
-
-```ts
-const hot = new RxRelays(["wss://relay.example.com"]);
-rxNostr.setHotRelays(hot);
-
-hot.append("wss://another.example.com");
-
-// hot connection をすべて解放します。
-rxNostr.unsetHotRelays();
-hot.dispose();
-```
-
-hot relay は集合に含まれる間、長寿命の接続需要を保持します。query や publish の `linger` が終了しても、hot の需要が残っていれば WebSocket は閉じません。
-
-## 接続需要 option
-
-### `defer`
-
-REQ 専用の option です。既定値は `true` で、最初の ReqPacket が emit されるまで接続しません。`false` にすると query を subscribe した時点で宛先を prewarm します。
-
-### `weak`
-
-既定値は `false` です。`true` の operation は新しい接続需要を作らず、hot relay や別の operation によって既に利用可能な接続だけを使います。切断中の relay に weak operation だけを指定しても接続は開始されません。
-
-### `linger`
-
-segment 終了後も接続需要を保持する時間です。既定値は 10,000 ms です。
-
-- `0` — 終了後すぐ解放
-- 正の有限値 — 指定時間だけ再利用可能な状態を維持
-- `Infinity` — operation/session が dispose されるまで保持
-
-正の有限値は最大 2,147,483,647 ms です。不正な値は [時間値の許容範囲](./configuration.md#時間値の許容範囲) の規則で拒否します。
-
-`RxNostr.dispose()` と `Publication.cancel()` は linger を待たずにリソースを解放します。
 
 ## 集合演算
 

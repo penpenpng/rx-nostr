@@ -1,4 +1,4 @@
-# Query
+# Read Events
 
 `RxNostr.forward()` と `RxNostr.backward()` は Nostr の REQ を指定したリレーへ送り、検証済みの `EventPacket` を返す cold Observable です。呼び出すだけでは始まらず、subscribe ごとに独立した query を作ります。第1引数は宛先、第2引数は filter の配列または `RxReq`、第3引数は operation の設定です。単一 filter も配列に入れて渡します。
 

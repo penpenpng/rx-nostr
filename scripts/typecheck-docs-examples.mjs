@@ -10,6 +10,19 @@ import { SimpleVerifier } from "@rx-nostr/crypto";
 const rxNostr = new RxNostr({ verifier: new SimpleVerifier() });
 `;
 const examples = {
+  "operators-event-cache": { source: "packages/docs/ja/v4/event-packet-operators.md" },
+  "operators-req-batch": {
+    source: "packages/docs/ja/v4/req-packet-operators.md",
+    context: `${client}\nconst relays = ["wss://relay.example.com"];\n`,
+  },
+  "operators-req-chunk": {
+    source: "packages/docs/ja/v4/req-packet-operators.md",
+    context: `${client}\nconst relays = ["wss://relay.example.com"];\n`,
+  },
+  "operators-ok": { source: "packages/docs/ja/v4/ok-packet-operators.md" },
+  "operators-message": { source: "packages/docs/ja/v4/message-packet-operators.md" },
+  "operators-general": { source: "packages/docs/ja/v4/general-operators.md" },
+  "legacy-basic": { source: "packages/docs/ja/v4/legacy-mode.md" },
   "root-readme-quickstart": { source: "README.md" },
   "package-readme-quickstart": { source: "packages/rx-nostr/README.md" },
   "v4-index": { source: "packages/docs/ja/v4/index.md" },
@@ -19,13 +32,13 @@ const examples = {
     context: client,
   },
   "query-backward": {
-    source: "packages/docs/ja/v4/query.md",
+    source: "packages/docs/ja/v4/read-events.md",
     context: `${client}\nconst pubkey = "0".repeat(64);\n`,
   },
-  "publish-basic": { source: "packages/docs/ja/v4/publish.md", context: client },
-  "auth-basic": { source: "packages/docs/ja/v4/auth.md" },
+  "publish-basic": { source: "packages/docs/ja/v4/write-events.md", context: client },
+  "auth-basic": { source: "packages/docs/ja/v4/authenticator.md" },
   "signer-interface": {
-    source: "packages/docs/ja/v4/signer-verifier.md",
+    source: "packages/docs/ja/v4/signer.md",
     context:
       'import type * as Nostr from "nostr-typedef";\nimport type { EventSigner as PublishedEventSigner } from "rx-nostr";\n',
     after: `
@@ -37,7 +50,7 @@ void [publishedShape, documentedShape];
 `,
   },
   "verifier-interface": {
-    source: "packages/docs/ja/v4/signer-verifier.md",
+    source: "packages/docs/ja/v4/verifier.md",
     context:
       'import type * as Nostr from "nostr-typedef";\nimport type { EventVerifier as PublishedEventVerifier } from "rx-nostr";\n',
     after: `
@@ -49,7 +62,7 @@ void [publishedShape, documentedShape];
 `,
   },
   "signer-config": {
-    source: "packages/docs/ja/v4/signer-verifier.md",
+    source: "packages/docs/ja/v4/signer.md",
     context: `
 import { RxNostr } from "rx-nostr";
 import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
@@ -60,8 +73,8 @@ const relays = ["wss://relay.example.com"];
 const params = { kind: 1, content: "example", tags: [] as string[][] };
 `,
   },
-  "worker-host": { source: "packages/docs/ja/v4/signer-verifier.md", environment: "worker" },
-  "worker-client": { source: "packages/docs/ja/v4/signer-verifier.md" },
+  "worker-host": { source: "packages/docs/ja/v4/verifier.md", environment: "worker" },
+  "worker-client": { source: "packages/docs/ja/v4/verifier.md" },
 };
 
 function extract(source) {
@@ -111,7 +124,8 @@ function extract(source) {
   return found;
 }
 
-const cache = join(root, "node_modules/.cache");
+// Resolve RxJS through the client's declared dependency for operator examples.
+const cache = join(root, "packages/rx-nostr/node_modules/.cache");
 
 mkdirSync(cache, { recursive: true });
 const temp = mkdtempSync(join(cache, "rx-nostr-docs-examples-"));
