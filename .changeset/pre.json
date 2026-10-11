@@ -6,5 +6,5 @@
     "@rx-nostr/crypto-wasm": "3.0.0",
     "rx-nostr": "3.7.8"
   },
-  "changesets": ["initial-v4-beta"]
+  "changesets": ["initial-v4-beta", "readonly-rx-relays", "single-lazy-filter"]
 }
