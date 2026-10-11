@@ -5,7 +5,7 @@ import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import { RelaySet, type RelayUrl } from "../../../libs/index.ts";
 import { setDiff } from "../../../operators/index.ts";
 import type { EventPacket, ReqPacket } from "../../../packets/index.ts";
-import { RxRelays } from "../../../rx-relays/index.ts";
+import { RxRelays, type ReadonlyRxRelays } from "../../../rx-relays/index.ts";
 import type { RelayInput } from "../../../types/index.ts";
 import type { IRelayCommunicationCollection } from "../../communication/index.ts";
 import { ConnectionDemandScope, type RelayDemandWindow } from "../demand/index.ts";
@@ -79,8 +79,8 @@ function req({
 }: {
   connectionDemand: ConnectionDemandScope;
   relays: IRelayCommunicationCollection;
-  defaultRelays: RxRelays;
-  requestRelays: RxRelays;
+  defaultRelays: ReadonlyRxRelays;
+  requestRelays: ReadonlyRxRelays;
   filters: LazyFilter[];
   linger: number;
   traceTag?: string | number;

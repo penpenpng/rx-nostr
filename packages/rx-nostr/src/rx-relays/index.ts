@@ -1,1 +1,1 @@
-export { RxRelays } from "./rx-relays.ts";
+export { RxRelays, ReadonlyRxRelays } from "./rx-relays.ts";

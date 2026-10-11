@@ -3,37 +3,68 @@ import { BehaviorSubject, combineLatest, concat, EMPTY, map, of, type Observable
 import { RxNostrAlreadyDisposedError } from "../libs/error.ts";
 import { once, RelaySet, RxDisposableStack, u, type RelayUrl } from "../libs/index.ts";
 import type { RelayInput } from "../types/relay-input.ts";
+import { RelayUrls, assertRelayInput } from "./relay-urls.ts";
 
-export class RxRelays {
+export class ReadonlyRxRelays {
   protected stack = new RxDisposableStack();
   protected relays = new RelaySet();
   protected stream: BehaviorSubject<Set<RelayUrl>> = this.stack.add(new BehaviorSubject(new Set()));
   readonly #publicStream = this.stream.pipe(map((relays) => new Set(relays)));
 
   constructor(relays?: RelayInput) {
-    if (!relays) {
-      return;
-    }
+    this.relays = RelayUrls.toRelaySet(relays);
 
-    if (typeof relays === "string") {
-      this.set(relays);
-    } else {
-      assertRelayInput(relays);
-      this.set(...relays);
-    }
+    this.emit();
   }
 
-  set(...urls: string[]) {
-    this.#assertActive();
-
+  protected update(...urls: string[]) {
     this.relays = new RelaySet(urls);
 
     this.emit();
   }
 
+  protected static derive(source: Observable<Set<string>>): ReadonlyRxRelays {
+    const rxr = new ReadonlyRxRelays();
+
+    rxr.stack.add(source.subscribe((urls) => rxr.update(...urls)));
+
+    return rxr;
+  }
+
   /** Return a detached, mutable snapshot of the current relays. */
-  get() {
-    return this.relays.toSet();
+  toArray(): RelayUrl[] {
+    return [...this.relays];
+  }
+
+  has(url: string): boolean {
+    return this.relays.has(url);
+  }
+
+  get size(): number {
+    return this.relays.size;
+  }
+
+  /** Each subscription receives a detached, mutable Set. */
+  subscribe = this.#publicStream.subscribe.bind(this.#publicStream);
+  asObservable = () => this.#publicStream;
+
+  protected emit() {
+    this.stream.next(this.relays.toSet());
+  }
+
+  get disposed() {
+    return this.stack.disposed;
+  }
+
+  [Symbol.iterator] = () => this.relays[Symbol.iterator]();
+  [Symbol.dispose] = once(() => this.stack.dispose());
+  dispose = this[Symbol.dispose];
+}
+
+export class RxRelays extends ReadonlyRxRelays {
+  replace(...urls: string[]) {
+    this.#assertActive();
+    this.update(...urls);
   }
 
   append(...urls: string[]) {
@@ -56,66 +87,37 @@ export class RxRelays {
     this.emit();
   }
 
-  has(url: string): boolean {
-    return this.relays.has(url);
-  }
-
   clear() {
     this.#assertActive();
     this.relays.clear();
     this.emit();
   }
 
-  get size(): number {
-    return this.relays.size;
-  }
-
-  protected static combine(...rxRelays: RxRelays[]) {
+  protected static combine(...rxRelays: ReadonlyRxRelays[]) {
     return combineLatest(rxRelays.map((rxr) => concat(rxr.asObservable(), of(new Set<string>()))));
   }
 
-  static difference(rxRelaysX: RxRelays, rxRelaysY: RxRelays): RxRelays {
-    const rxr = new RxRelays();
-    const sub = this.combine(rxRelaysX, rxRelaysY).subscribe(([x, y]) => {
-      rxr.set(...x.difference(y));
-    });
-
-    rxr.stack.add(sub);
-
-    return rxr;
+  static difference(rxRelaysX: ReadonlyRxRelays, rxRelaysY: ReadonlyRxRelays): ReadonlyRxRelays {
+    return this.derive(this.combine(rxRelaysX, rxRelaysY).pipe(map(([x, y]) => x.difference(y))));
   }
 
-  static intersection(...rxRelays: RxRelays[]): RxRelays {
-    const rxr = new RxRelays();
-    const sub = this.combine(...rxRelays).subscribe((sets) => {
-      rxr.set(...u.Set.intersection(...sets));
-    });
-
-    rxr.stack.add(sub);
-
-    return rxr;
+  static intersection(...rxRelays: ReadonlyRxRelays[]): ReadonlyRxRelays {
+    return this.derive(this.combine(...rxRelays).pipe(map((sets) => u.Set.intersection(...sets))));
   }
 
-  static union(...rxRelays: RxRelays[]): RxRelays {
-    const rxr = new RxRelays();
-    const sub = this.combine(...rxRelays).subscribe((sets) => {
-      rxr.set(...u.Set.union(...sets));
-    });
-
-    rxr.stack.add(sub);
-
-    return rxr;
+  static union(...rxRelays: ReadonlyRxRelays[]): ReadonlyRxRelays {
+    return this.derive(this.combine(...rxRelays).pipe(map((sets) => u.Set.union(...sets))));
   }
 
-  static from(relays: RelayInput | null | undefined): RxRelays {
+  static from(relays: RelayInput | null | undefined): ReadonlyRxRelays {
     if (!relays) {
       return RxRelays.empty();
     }
 
-    if (relays instanceof RxRelays) {
+    if (relays instanceof ReadonlyRxRelays) {
       return RxRelays.union(relays);
     } else {
-      return new RxRelays(relays);
+      return new ReadonlyRxRelays(relays);
     }
   }
 
@@ -124,7 +126,7 @@ export class RxRelays {
       return EMPTY;
     }
 
-    if (relays instanceof RxRelays) {
+    if (relays instanceof ReadonlyRxRelays) {
       return relays.asObservable();
     } else {
       // A fixed iterable is still copied per subscriber, just like a live RxRelays.
@@ -134,64 +136,17 @@ export class RxRelays {
     }
   }
 
-  static set(relays: RelayInput | null | undefined): Set<RelayUrl> {
-    if (!relays) {
-      return new Set();
-    }
-
-    assertRelayInput(relays);
-
-    return new RelaySet(relays).toSet();
-  }
-
-  static array(relays: RelayInput | null | undefined): RelayUrl[] {
-    if (!relays) {
-      return [];
-    }
-
-    assertRelayInput(relays);
-
-    return [...new RelaySet(relays)];
-  }
-
-  static empty(): RxRelays {
-    const rxr = new RxRelays();
+  static empty(): ReadonlyRxRelays {
+    const rxr = new ReadonlyRxRelays();
 
     rxr.dispose();
 
     return rxr;
   }
 
-  /** Each subscription receives a detached, mutable Set. */
-  subscribe = this.#publicStream.subscribe.bind(this.#publicStream);
-  asObservable = () => this.#publicStream;
-
   #assertActive(): void {
     if (this.disposed) {
       throw new RxNostrAlreadyDisposedError();
     }
-  }
-
-  protected emit() {
-    this.stream.next(this.relays.toSet());
-  }
-
-  get disposed() {
-    return this.stack.disposed;
-  }
-
-  [Symbol.iterator] = () => this.relays[Symbol.iterator]();
-  [Symbol.dispose] = once(() => this.stack.dispose());
-  dispose = this[Symbol.dispose];
-}
-
-function assertRelayInput(relays: RelayInput): void {
-  if (
-    typeof relays !== "string" &&
-    !Array.isArray(relays) &&
-    !(relays instanceof Set) &&
-    !(relays instanceof RxRelays)
-  ) {
-    throw new TypeError("Relay input must be a URL, an array, a Set, or RxRelays.");
   }
 }
