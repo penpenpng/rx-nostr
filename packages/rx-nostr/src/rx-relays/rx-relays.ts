@@ -85,7 +85,6 @@ export class RxRelays {
     return rxr;
   }
 
-  // TODO: { move: boolean } で dispose されたときに親も dispose する
   static intersection(...rxRelays: RxRelays[]): RxRelays {
     const rxr = new RxRelays();
     const sub = this.combine(...rxRelays).subscribe((sets) => {
