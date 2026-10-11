@@ -20,7 +20,6 @@ export {
   timeline,
   uniq,
   verify,
-  withPrevious,
   type MergeFilterFunction,
   type SetDiff,
 } from "./operators/index.ts";
