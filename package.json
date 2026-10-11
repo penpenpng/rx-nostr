@@ -15,6 +15,7 @@
     "lint": "vp lint .",
     "lint:fix": "vp lint . --fix",
     "release": "pnpm exec changeset publish",
+    "release:beta": "node scripts/publish-beta.mjs",
     "test": "pnpm --recursive --if-present test",
     "test:packed": "node scripts/test-packed-consumers.mjs",
     "test:worker-browser": "node scripts/test-worker-browser.mjs",
