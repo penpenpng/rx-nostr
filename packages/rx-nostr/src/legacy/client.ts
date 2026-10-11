@@ -6,7 +6,8 @@ import { RxNostrPublicationError } from "../libs/error.ts";
 import type { Publication } from "../publication/index.ts";
 import { RxNostr } from "../rx-nostr/index.ts";
 import { legacyPublishSent } from "../rx-nostr/rx-nostr.ts";
-import { RxRelays } from "../rx-relays/index.ts";
+import { RxRelays, ReadonlyRxRelays } from "../rx-relays/index.ts";
+import { RelayUrls } from "../rx-relays/relay-urls.ts";
 import { toLegacyConnectionState, withLegacyAuthTimeout } from "./adapters.ts";
 import { legacyRetryReconnector } from "./reconnector.ts";
 import type {
@@ -20,7 +21,7 @@ import type {
 } from "./types.ts";
 
 function entriesOf(input: LegacyRelayInput): LegacyRelay[] {
-  if (input instanceof RxRelays) {
+  if (input instanceof ReadonlyRxRelays) {
     return [...input];
   }
   if (typeof input === "string") {
@@ -39,7 +40,7 @@ function entriesOf(input: LegacyRelayInput): LegacyRelay[] {
   return Object.entries(input).map(([url, permissions]) => ({ url, ...permissions }));
 }
 
-function combine(a: RxRelays, b: RxRelays): RxRelays {
+function combine(a: ReadonlyRxRelays, b: ReadonlyRxRelays): ReadonlyRxRelays {
   return RxRelays.union(a, b);
 }
 
@@ -47,13 +48,13 @@ function setRelayGroups(input: LegacyRelayInput, all: RxRelays, read: RxRelays, 
   const entries = entriesOf(input);
   const urls = entries.map((entry) => (typeof entry === "string" ? entry : entry.url));
 
-  all.set(...urls);
-  read.set(
+  all.replace(...urls);
+  read.replace(
     ...entries
       .filter((entry) => typeof entry === "string" || entry.read !== false)
       .map((entry) => (typeof entry === "string" ? entry : entry.url)),
   );
-  write.set(
+  write.replace(
     ...entries
       .filter((entry) => typeof entry === "string" || entry.write !== false)
       .map((entry) => (typeof entry === "string" ? entry : entry.url)),
@@ -188,7 +189,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
     },
     getDefaultRelay(url) {
       const relays = this.getDefaultRelays();
-      const normalizedUrl = RxRelays.array([url])[0];
+      const normalizedUrl = RelayUrls.toArray([url])[0];
 
       return normalizedUrl ? relays[normalizedUrl] : undefined;
     },
@@ -196,7 +197,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       return Object.fromEntries([...relayStates].map(([url, connection]) => [url, { connection }]));
     },
     getRelayStatus(url) {
-      const normalizedUrl = RxRelays.array([url])[0];
+      const normalizedUrl = RelayUrls.toArray([url])[0];
       const connection = normalizedUrl ? relayStates.get(normalizedUrl) : undefined;
 
       return connection === undefined ? undefined : { connection };
@@ -230,7 +231,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       this.setDefaultRelays(Object.values(current));
     },
     removeDefaultRelays(urls) {
-      const remove = new Set<string>(RxRelays.array(Array.isArray(urls) ? urls : [urls]));
+      const remove = new Set<string>(RelayUrls.toArray(Array.isArray(urls) ? urls : [urls]));
       const current = Object.values(this.getDefaultRelays()).filter(
         (relay) => !remove.has(relay.url),
       );
@@ -242,12 +243,12 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
     },
     use(request, options = {}) {
       const explicitRelays = options.on?.relays ?? options.relays;
-      let stableExplicitRelays: RxRelays | string[] | undefined;
+      let stableExplicitRelays: ReadonlyRxRelays | string[] | undefined;
 
-      if (explicitRelays instanceof RxRelays) {
+      if (explicitRelays instanceof ReadonlyRxRelays) {
         stableExplicitRelays = explicitRelays;
       } else if (explicitRelays) {
-        stableExplicitRelays = RxRelays.array(explicitRelays);
+        stableExplicitRelays = RelayUrls.toArray(explicitRelays);
       }
 
       return defer(() => {
@@ -304,7 +305,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         base.dispose();
       };
 
-      if (RxRelays.array(relays).length === 0) {
+      if (RelayUrls.toArray(relays).length === 0) {
         releaseRelays();
 
         return throwError(() => new RxNostrPublicationError("no-relays"));
@@ -329,7 +330,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       }
 
       if (connectionStrategy === "lazy-keep") {
-        retained.append(...RxRelays.array(relays));
+        retained.append(...RelayUrls.toArray(relays));
       }
 
       const packets = new Subject<LegacyOkPacket>();

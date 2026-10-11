@@ -2,7 +2,8 @@ import { from, mergeMap, type OperatorFunction } from "rxjs";
 
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import type { ReqPacket } from "../../packets/index.ts";
-import { RxRelays } from "../../rx-relays/index.ts";
+import { ReadonlyRxRelays } from "../../rx-relays/index.ts";
+import { RelayUrls } from "../../rx-relays/relay-urls.ts";
 
 /**
  * Map REQ packets into a single REQ packet.
@@ -38,19 +39,19 @@ function defaultMergeFilter(a: LazyFilter[], b: LazyFilter[]): LazyFilter[] {
   return [...a, ...b];
 }
 
-function toKey(relays: ReqPacket["relays"]): string | RxRelays {
+function toKey(relays: ReqPacket["relays"]): string | ReadonlyRxRelays {
   if (relays === undefined) {
     return "*";
   }
-  if (relays instanceof RxRelays) {
+  if (relays instanceof ReadonlyRxRelays) {
     return relays;
   }
 
-  return JSON.stringify([...RxRelays.set(relays)].toSorted());
+  return JSON.stringify([...RelayUrls.toRelaySet(relays)].toSorted());
 }
 
 function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
-  const groups = new Map<string | RxRelays, ReqPacket[]>();
+  const groups = new Map<string | ReadonlyRxRelays, ReqPacket[]>();
 
   for (const source of packets) {
     const key = toKey(source.relays);
@@ -59,7 +60,7 @@ function groupByRelays(packets: ReqPacket[]): ReqPacket[][] {
     const packet =
       source.relays === undefined ||
       typeof source.relays === "string" ||
-      source.relays instanceof RxRelays
+      source.relays instanceof ReadonlyRxRelays
         ? source
         : { ...source, relays: [...source.relays] };
     const group = groups.get(key) ?? [];

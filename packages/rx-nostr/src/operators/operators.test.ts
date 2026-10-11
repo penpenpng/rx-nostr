@@ -6,6 +6,7 @@ import { createDeferred } from "../__test__/helper/index.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import type { ReqPacket } from "../packets/index.ts";
 import { RxRelays } from "../rx-relays/index.ts";
+import { RelayUrls } from "../rx-relays/relay-urls.ts";
 import {
   batch,
   chunk,
@@ -198,7 +199,7 @@ describe("operators", () => {
       const input: ReqPacket = { relays: new Set(oneShotRelay()), filters: [{ kinds: [1] }] };
       const result = await lastValueFrom(of([input]).pipe(batch(), toArray()));
 
-      expect([...RxRelays.set(result[0]?.relays)]).toEqual(["wss://a.example.com"]);
+      expect([...RelayUrls.toRelaySet(result[0]?.relays)]).toEqual(["wss://a.example.com"]);
     });
 
     test("batch keeps separate RxRelays instances separate even with equal URLs", async () => {
@@ -213,6 +214,26 @@ describe("operators", () => {
       expect(result[0]).toMatchObject({ filters: [{ kinds: [1] }, { kinds: [2] }] });
       expect(result[0]?.relays).toBe(firstRelays);
       expect(result[1]?.relays).toBe(secondRelays);
+    });
+
+    test("batch preserves readonly relay identity and live updates", async () => {
+      using source = new RxRelays("wss://a.example.com");
+      using firstRelays = RxRelays.union(source);
+      using secondRelays = RxRelays.from(firstRelays);
+      const first: ReqPacket = { relays: firstRelays, filters: [{ kinds: [1] }] };
+      const repeated: ReqPacket = { relays: firstRelays, filters: [{ kinds: [2] }] };
+      const distinct: ReqPacket = { relays: secondRelays, filters: [{ kinds: [3] }] };
+      const result = await lastValueFrom(of([first, distinct, repeated]).pipe(batch(), toArray()));
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({ filters: [{ kinds: [1] }, { kinds: [2] }] });
+      expect(result[0]?.relays).toBe(firstRelays);
+      expect(result[1]?.relays).toBe(secondRelays);
+      source.append("wss://b.example.com");
+      expect(RelayUrls.toArray(result[0]?.relays)).toEqual([
+        "wss://a.example.com",
+        "wss://b.example.com",
+      ]);
     });
 
     test("batch omits empty input and calls a custom filter merge in input order", async () => {
