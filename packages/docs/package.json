@@ -7,7 +7,6 @@
   },
   "author": "penpenpng",
   "devDependencies": {
-    "typescript": "catalog:",
     "vitepress": "^1.6.4"
   }
 }

@@ -51,12 +51,6 @@
     "vitest": "^5.0.1"
   },
   "peerDependencies": {
-    "nostr-typedef": "^0.13.0",
-    "rx-nostr": "~3"
-  },
-  "peerDependenciesMeta": {
-    "rx-nostr": {
-      "optional": true
-    }
+    "nostr-typedef": "^0.13.0"
   }
 }

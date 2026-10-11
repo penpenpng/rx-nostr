@@ -3,9 +3,6 @@ packages:
 
 engineStrict: true
 
-# crypto peers on rx-nostr, whose tests use crypto as a dev dependency.
-ignoreWorkspaceCycles: true
-
 # Resolve unreleased workspace peers during Changesets versioning.
 linkWorkspacePackages: true
 
