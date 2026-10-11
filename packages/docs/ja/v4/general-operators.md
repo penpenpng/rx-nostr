@@ -22,25 +22,3 @@
 `setDiff(options?)` は `Set<T>` の入力を受け、`SetDiff<T>` を返します。`appended` は追加された値、`outdated` は削除された値、`current` は現在値の Set です。最初の比較対象は空集合、または `options.seed` です。`SetDiff` 型も `rx-nostr/operators` から公開されます。
 
 `setDiff({ seed })` は初期 Set を呼び出し時に snapshot し、その operator instance が比較状態を保持します。入力 Set や通知された `current` をあとから変更しても、内部の比較状態は変わりません。
-
-## withPrevious()
-
-`withPrevious()` は `[ひとつ前の値, 現在値]` を通知します。最初の値に対する通知は `[undefined, 最初の値]` です。
-
-<!-- typecheck-example: operators-general -->
-```ts
-import { of } from "rxjs";
-import {
-  filterAsync, sort, setDiff, withPrevious,
-} from "rx-nostr/operators";
-
-of(3, 1, 2).pipe(
-  filterAsync(async (value) => value > 0),
-  sort(50, (a, b) => a - b),
-  withPrevious(),
-).subscribe(console.log);
-
-of(new Set([1]), new Set([1, 2])).pipe(setDiff()).subscribe(console.log);
-```
-
-状態を持つ operator の共有については [Operator instance の所有権](./operators#operator-instance-の所有権) を参照してください。
