@@ -101,7 +101,7 @@ export {
   type RxNostrStaticDefaultConfig,
   type RxNostrStaticDefaultOptions,
 } from "./rx-nostr/index.ts";
-export { RxRelays } from "./rx-relays/index.ts";
+export { RxRelays, ReadonlyRxRelays } from "./rx-relays/index.ts";
 export { RxReq } from "./rx-req/index.ts";
 export type {
   RelayInput,

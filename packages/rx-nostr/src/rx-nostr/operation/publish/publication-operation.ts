@@ -9,7 +9,7 @@ import type {
   PublicationFailure,
   PublicationSettlePolicy,
 } from "../../../publication/index.ts";
-import { RxRelays } from "../../../rx-relays/index.ts";
+import { RelayUrls } from "../../../rx-relays/relay-urls.ts";
 import type { RelayInput } from "../../../types/index.ts";
 import {
   RelayCommunicationError,
@@ -31,7 +31,7 @@ export function publish({
   config: FilledRxNostrPublishOptions;
   mode?: "acknowledged" | "sent";
 }): PublicationOperation {
-  return new PublicationOperation(relays, params, RxRelays.array(relayInput), config, mode);
+  return new PublicationOperation(relays, params, RelayUrls.toArray(relayInput), config, mode);
 }
 
 interface RelayDelivery {

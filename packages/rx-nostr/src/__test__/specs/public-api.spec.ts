@@ -204,6 +204,10 @@ describe("public entry point", () => {
         "invalid",
       ]);
 
+      using derived = publicApi.RxRelays.from(relays);
+
+      expect(derived).toBeInstanceOf(publicApi.ReadonlyRxRelays);
+      expect(publicApi).not.toHaveProperty("RelayUrls");
       expect([...relays]).toEqual(["wss://relay.example"]);
       relays.dispose();
     });
