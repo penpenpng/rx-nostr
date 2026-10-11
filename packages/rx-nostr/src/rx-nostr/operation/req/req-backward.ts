@@ -1,4 +1,4 @@
-import { finalize, map, mergeAll, Subject, type Observable, type Subscription } from "rxjs";
+import { EMPTY, finalize, map, mergeAll, Subject, type Observable, type Subscription } from "rxjs";
 
 import { emitDiagnostic } from "../../../diagnostics/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
@@ -37,8 +37,14 @@ export function reqBackward({
     });
 
   return source$.pipe(
-    map((packet) =>
-      req({
+    map((packet) => {
+      if (packet.filters.length === 0) {
+        relays.forEach(defaultRelays, (relay) => connectionDemand.releasePrewarm(relay));
+
+        return EMPTY;
+      }
+
+      return req({
         connectionDemand,
         relays,
         defaultRelays,
@@ -48,8 +54,8 @@ export function reqBackward({
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
         eoseTimeout: config.timeout,
-      }),
-    ),
+      });
+    }),
     // BackwardReq: New coming req doesn't affect the previous one.
     mergeAll(),
     finalize(() => {

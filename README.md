@@ -22,7 +22,7 @@ You can exchange data in a very familiar way (as you see [NIP-01](https://github
 - REQ queue respecting NIP-11
   - Based on NIP-11, queuing requests if they exceed the limit of subscriptions that can run concurrently.
 - Reactive relay pool
-  - On updating "default relays", the subscriptions on default relays is reconstructed on new default relays.
+  - Queries follow changes to their RxRelays destinations, adding and removing relay subscriptions.
 - Monitoring WebSocket connection
   - For example, it helps you show relay status to users.
 - Lazy connection
@@ -34,31 +34,31 @@ Under the hood, rx-nostr makes use of [RxJS](https://rxjs.dev/), but you don't n
 
 ## Quickstart
 
+v4 supports Node.js 24+ and browsers with `DisposableStack`, `Promise.withResolvers`, modern Set methods, and `Array.prototype.toSorted` (or polyfills loaded before importing rx-nostr). See the [runtime requirements](https://penpenpng.github.io/rx-nostr/ja/v4/installation) for the full setup, including WebSocket injection.
+
 ```
 npm install rx-nostr @rx-nostr/crypto
 ```
 
-```ts
-import { RxForwardReq, RxNostr } from "rx-nostr";
-import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
+<!-- typecheck-example: root-readme-quickstart -->
 
-import WebSocket from "ws";
+```ts
+import { RxNostr } from "rx-nostr";
+import { SimpleVerifier } from "@rx-nostr/crypto";
 
 const rxNostr = new RxNostr({
-  signer: new SeckeySigner("nsec1..."), // If omitted, rx-nostr uses NIP-07.
   verifier: new SimpleVerifier(),
-  WebSocket, // You need this if `globalThis.WebSocket` doesn't exist (e.g. Node.js runtime).
 });
 
-const rxReq = new RxForwardReq();
+const subscription = rxNostr
+  .forward(["wss://nostr.example.com"], [{ kinds: [1] }])
+  .subscribe(({ event }) => {
+    console.log(event);
+  });
 
-// Define a listener.
-rxNostr.req(["wss://nostr.example.com"], rxReq).subscribe(({ event }) => {
-  console.log(event);
-});
-
-// Emit a filter to start subscription.
-rxReq.emit([{ kinds: [1] }]);
+// When finished:
+subscription.unsubscribe();
+rxNostr.dispose();
 ```
 
 ## For more information

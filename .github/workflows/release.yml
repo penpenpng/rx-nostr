@@ -29,11 +29,14 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm test
-      - run: pnpm build
-      - uses: changesets/action@v1
+      - name: Create release pull request or publish
+        uses: changesets/action@v1
         with:
           version: pnpm version-packages
           publish: pnpm release
+          createGithubReleases: true
+          title: "chore: release packages"
+          commit: "chore: release packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

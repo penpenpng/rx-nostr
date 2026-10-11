@@ -63,13 +63,12 @@ export interface RxNostrConfig {
   /** Additional detectors that may report a ready connection as dropped. */
   dropDetectors?: Iterable<ConnectionDropDetector>;
   /** Shared relay metadata and health directory. */
+  /** A RelayDirectory instance (or subclass calling super), shared or isolated. IRelayDirectory alone is not injectable. */
   relayDirectory?: RelayDirectory;
   /** Numeric options or a custom suppression strategy. false disables health suppression. */
   relayHealthPolicy?: RelayHealthPolicyInput;
   /** Maximum duration of one WebSocket connection attempt in milliseconds. Defaults to 30 seconds. */
   connectionTimeout?: number;
-  /** Maximum time to wait for automatic NIP-11 retrieval. Defaults to 30 seconds. */
-  nip11Timeout?: number;
   /**
    * If true, skip automatic fetching NIP-11 relay information.
    */
@@ -100,7 +99,6 @@ export interface RxNostrStaticDefaultConfig {
   relayDirectory: RelayDirectory;
   relayHealthPolicy: RelayHealthPolicyInput;
   connectionTimeout: number;
-  nip11Timeout: number;
   skipFetchNip11: boolean;
   WebSocket: WebSocketConstructor | undefined;
 }

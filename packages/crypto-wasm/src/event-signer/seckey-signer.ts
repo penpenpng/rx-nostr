@@ -7,10 +7,7 @@ export class SeckeySigner implements EventSigner {
   #seckey: string;
   #pubhex: string;
 
-  constructor(
-    seckey: string,
-    private options?: { tags?: Nostr.Tag.Any[] },
-  ) {
+  constructor(seckey: string) {
     this.#seckey = seckey;
     this.#pubhex = getPublicKey(seckey);
   }
@@ -20,7 +17,7 @@ export class SeckeySigner implements EventSigner {
       {
         ...params,
         pubkey: params.pubkey ?? this.#pubhex,
-        tags: [...(params.tags ?? []), ...(this.options?.tags ?? [])],
+        tags: params.tags ?? [],
         created_at: params.created_at ?? Math.floor(Date.now() / 1000),
       },
       this.#seckey,

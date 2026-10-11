@@ -2,17 +2,19 @@ import type { EventVerifier } from "../../../event-verifier/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RxReq } from "../../../rx-req/index.ts";
 
+/** Empty filters and unsatisfiable branches match nothing; only `[{}]` matches all. */
 export type RxNostrReqInput = RxReq | readonly LazyFilter[];
 
 export interface RxNostrReqOptions {
   defer?: boolean;
+  /** Connection-demand retention in ms; 0 releases immediately, Infinity lasts until disposal. */
   linger?: number;
   weak?: boolean;
   /**
    * Specify how long rx-nostr waits for EOSE messages when following backward strategy (milliseconds).
    *
    * If EOSE doesn't come after waiting for this amount of time,
-   * rx-nostr is considered to get EOSE.
+   * rx-nostr is considered to get EOSE. 0 is immediate; Infinity disables the deadline.
    */
   timeout?: number;
   /**

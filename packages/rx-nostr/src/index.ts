@@ -57,11 +57,11 @@ export {
   RxNostrLogicError,
   RxNostrNip11Error,
   RxNostrPublicationError,
-  RelayDirectorySnapshotError,
+  RxNostrRelayDirectorySnapshotError,
   type RxNostrCallbackKind,
   type RxNostrPublicationErrorCode,
   type RxNostrNip11ErrorCode,
-  type RelayDirectorySnapshotErrorCode,
+  type RxNostrRelayDirectorySnapshotErrorCode,
 } from "./libs/error.ts";
 export type { RelayUrl } from "./libs/relay-urls.ts";
 export type {

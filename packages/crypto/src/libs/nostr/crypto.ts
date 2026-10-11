@@ -39,6 +39,10 @@ export function signEvent<K extends number>(
     created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
 
+  if (!Number.isSafeInteger(event.created_at) || event.created_at < 0) {
+    throw new RangeError("created_at must be a non-negative safe integer.");
+  }
+
   if (ensureEventFields(event)) {
     return event;
   }
@@ -77,10 +81,21 @@ export function getSignature(eventHash: string, seckey: string): string {
   return schnorr.sign(eventHash, seckey);
 }
 
-/** Verify the given event and return true if it is valid. */
+/** Verify the advertised ID against NIP-01 serialization and its Schnorr signature. */
 export function verifyEvent(event: Nostr.Event): boolean {
+  if (
+    !ensureEventFields(event) ||
+    !/^[0-9a-f]{64}$/.test(event.id) ||
+    !/^[0-9a-f]{64}$/.test(event.pubkey) ||
+    !/^[0-9a-f]{128}$/.test(event.sig)
+  ) {
+    return false;
+  }
+
   try {
-    return schnorr.verify(event.sig, getEventHash(event), event.pubkey);
+    const hash = getEventHash(event);
+
+    return event.id === hash && schnorr.verify(event.sig, hash, event.pubkey);
   } catch {
     return false;
   }

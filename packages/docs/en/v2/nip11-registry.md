@@ -14,7 +14,7 @@ The NIP-11 information handled by rx-nostr is aggregated in `Nip11Registry`. The
 
 ## Fetch NIP-11 info manually
 
-You can maually fetch NIP-11 information by `Nip11Registry.fetch()`. Once NIP-11 fetched like this, rx-nostr can use the information to optimize its behavior even if `skipFetchNip11` is set.
+You can manually fetch NIP-11 information by `Nip11Registry.fetch()`. Once NIP-11 fetched like this, rx-nostr can use the information to optimize its behavior even if `skipFetchNip11` is set.
 
 ## Set Default NIP-11 info
 

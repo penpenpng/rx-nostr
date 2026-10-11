@@ -88,6 +88,15 @@ describe("public entry point", () => {
 
       expectTypeOf<string>().toMatchTypeOf<RelayInput>();
       expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
+      expectTypeOf<readonly string[]>().toMatchTypeOf<RelayInput>();
+      expectTypeOf<ReadonlySet<string>>().toMatchTypeOf<RelayInput>();
+      expectTypeOf<Generator<string>>().not.toMatchTypeOf<RelayInput>();
+      expectTypeOf<RxNostrConfig>().not.toHaveProperty("nip11Timeout");
+      expectTypeOf<publicApi.FetchNip11Options>().not.toHaveProperty("timeout");
+      expectTypeOf<publicApi.RelayDirectoryOptions["timeout"]>().toEqualTypeOf<
+        number | undefined
+      >();
+      expectTypeOf<ConstructorParameters<typeof publicApi.Nip07Signer>>().toEqualTypeOf<[]>();
       expectTypeOf<"ws://relay.example">().toMatchTypeOf<RelayUrl>();
     });
 
@@ -158,7 +167,6 @@ describe("public entry point", () => {
       expect(defaults.reconnector).toBeInstanceOf(publicApi.ExponentialBackoffReconnector);
       expect(defaults.dropDetectors).toEqual([]);
       expect(defaults.relayDirectory).toBe(publicApi.GlobalRelayDirectory);
-      expect(defaults.nip11Timeout).toBe(30_000);
       expect(defaults.skipFetchNip11).toBe(false);
     });
   });

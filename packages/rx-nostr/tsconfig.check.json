@@ -2,7 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["vitest/importMeta", "vitest/globals"]
+    "types": ["vitest/importMeta", "vitest/globals"],
+    "paths": {
+      "rx-nostr": ["./src/index.ts"],
+      "rx-nostr/operators": ["./src/operators.ts"],
+      "rx-nostr/utils": ["./src/utils.ts"],
+      "@rx-nostr/crypto": ["../crypto/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts", "vitest.setup.ts"],
   "exclude": []

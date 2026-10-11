@@ -23,6 +23,10 @@ export function signEvent<K extends number>(
     created_at: params.created_at ?? Math.floor(Date.now() / 1000),
   };
 
+  if (!Number.isSafeInteger(filledParams.created_at) || filledParams.created_at < 0) {
+    throw new RangeError("created_at must be a non-negative safe integer.");
+  }
+
   if (ensureEventFields(filledParams)) {
     return filledParams;
   }
@@ -48,7 +52,17 @@ export function signEvent<K extends number>(
   return signedEvent;
 }
 
+/** Apply the same NIP-01 ID and signature contract as the non-WASM verifier. */
 export function verifyEvent(event: Nostr.Event): boolean {
+  if (
+    !ensureEventFields(event) ||
+    !/^[0-9a-f]{64}$/.test(event.id) ||
+    !/^[0-9a-f]{64}$/.test(event.pubkey) ||
+    !/^[0-9a-f]{128}$/.test(event.sig)
+  ) {
+    return false;
+  }
+
   try {
     return Event.fromJson(JSON.stringify(event)).verify();
   } catch {

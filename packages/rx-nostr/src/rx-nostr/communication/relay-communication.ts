@@ -31,7 +31,7 @@ export interface RelayCommunicationOptions {
   readonly relayHealthPolicy?: RelayHealthPolicyInput;
   readonly connectionTimeout?: number;
   readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
-  readonly nip11Timeout?: number;
+  readonly fetchNip11?: boolean;
   /** @internal Seam for future REQ planning. */
   readonly vreqPlanner?: RelayVreqPlanner;
 }
@@ -57,7 +57,7 @@ export class RelayCommunication implements IRelayCommunication {
       () => this.#reqScheduler.waitForMaxSubscriptions(),
     );
 
-    if (options.nip11Timeout === undefined) {
+    if (!options.fetchNip11) {
       this.#directory.useAvailableNip11();
     }
 
@@ -79,8 +79,8 @@ export class RelayCommunication implements IRelayCommunication {
     });
     this.#leases = new ConnectionLeaseController({
       onFirstLease: () => {
-        if (options.nip11Timeout !== undefined) {
-          void this.#directory.acquireNip11(options.nip11Timeout).catch((cause) => {
+        if (options.fetchNip11) {
+          void this.#directory.acquireNip11().catch((cause) => {
             options.onDiagnostic?.({
               level: "warning",
               event: "relay/nip11-retrieval-failed",
@@ -129,6 +129,16 @@ export class RelayCommunication implements IRelayCommunication {
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
   }
 
+  castEvent(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<void> {
+    if (this.#leases.count === 0) {
+      return EMPTY;
+    }
+
+    return this.#executor
+      .castEvent(event, options)
+      .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
+  }
+
   monitorConnectionState(): Observable<ConnectionState> {
     return this.#executor.monitorConnectionState();
   }
@@ -148,7 +158,7 @@ export class RelayCommunication implements IRelayCommunication {
 
 function communicationErrorFrom(error: unknown): unknown {
   if (error instanceof NostrTransportOperationError) {
-    return new RelayCommunicationError(error.reason);
+    return new RelayCommunicationError(error.reason, { cause: error });
   }
 
   return error;

@@ -1,4 +1,4 @@
-import { finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
+import { EMPTY, finalize, map, Subject, switchAll, type Observable, type Subscription } from "rxjs";
 
 import { emitDiagnostic } from "../../../diagnostics/index.ts";
 import type { LazyFilter } from "../../../lazy-filter/index.ts";
@@ -39,8 +39,14 @@ export function reqForward({
   let cleanupLast: () => void = noop;
 
   return source$.pipe(
-    map((packet) =>
-      req({
+    map((packet) => {
+      if (packet.filters.length === 0) {
+        relays.forEach(defaultRelays, (relay) => connectionDemand.releasePrewarm(relay));
+
+        return EMPTY;
+      }
+
+      return req({
         connectionDemand,
         relays,
         defaultRelays,
@@ -49,8 +55,8 @@ export function reqForward({
         linger: packet.linger ?? config.linger,
         traceTag: packet.traceTag,
         skipValidateFilterMatching: config.skipValidateFilterMatching,
-      }),
-    ),
+      });
+    }),
     // Forward: To keep the lease, subscribe to the next stream before the previous one ends.
     map((obs) => {
       const stream = new Subject<EventPacket>();

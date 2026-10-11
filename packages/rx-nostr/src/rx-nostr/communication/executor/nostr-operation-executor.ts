@@ -5,12 +5,13 @@ import type { AuthenticatorInput } from "../../../authenticator/index.ts";
 import type { ConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../../../lazy-filter/index.ts";
+import { normalizeFilters } from "../../../lazy-filter/normalize-filters.ts";
 import { RxNostrCallbackError } from "../../../libs/error.ts";
 import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import type { EventMessagePacket, EventPacket, OkPacket } from "../../../packets/index.ts";
 import type { ReqScheduler } from "../scheduler/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "../transport/index.ts";
-import { AuthenticationFailure, AuthCoordinator } from "./auth/index.ts";
+import { AuthenticationError, AuthCoordinator } from "./auth/index.ts";
 
 /** Owns relay-local Nostr protocol operations over one transport session. */
 export class NostrOperationExecutor implements Disposable {
@@ -141,9 +142,14 @@ export class NostrOperationExecutor implements Disposable {
       const packets = this.transport.subscribe({
         query: () => {
           try {
-            evaluatedFilters = evalFilters(plan.filters);
+            // Re-evaluate lazy bounds for every send/resend, then reject invalid ranges.
+            evaluatedFilters = normalizeFilters(evalFilters(plan.filters)) as Nostr.Filter[];
           } catch (cause) {
             throw new RxNostrCallbackError("filter", cause);
+          }
+
+          if (evaluatedFilters.length === 0) {
+            throw new NoMatchingFiltersError();
           }
 
           queryEvaluated = true;
@@ -155,6 +161,10 @@ export class NostrOperationExecutor implements Disposable {
           const terminal =
             (packet.type === "CLOSED" && packet.subId === subId) ||
             (plan.strategy === "backward" && packet.type === "EOSE" && packet.subId === subId);
+
+          if (terminal && packet.type === "CLOSED") {
+            remoteTerminated = true;
+          }
 
           terminalAuthRequired =
             terminal && packet.type === "CLOSED" && packet.noticeType === "auth-required";
@@ -181,8 +191,6 @@ export class NostrOperationExecutor implements Disposable {
         .subscribe({
           next: (packet) => subscriber.next(packet),
           complete: () => {
-            remoteTerminated = true;
-
             onRemoteTerminated(terminalAuthRequired);
             subscriber.complete();
           },
@@ -261,6 +269,30 @@ export class NostrOperationExecutor implements Disposable {
     });
   }
 
+  /** Complete only after the EVENT frame has actually been sent. */
+  castEvent(event: Nostr.Event, options: Readonly<{ timeout?: number }> = {}): Observable<void> {
+    return new Observable((subscriber) => {
+      const controller = new AbortController();
+
+      void this.transport
+        .castAfterAuth(["EVENT", event], { ...options, signal: controller.signal })
+        .then(
+          () => {
+            if (!subscriber.closed) {
+              subscriber.complete();
+            }
+          },
+          (error: unknown) => {
+            if (!subscriber.closed) {
+              subscriber.error(error);
+            }
+          },
+        );
+
+      return () => controller.abort();
+    });
+  }
+
   [Symbol.dispose] = once(() => {
     this.#auth.dispose();
     void this.transport.dispose().catch(() => {});
@@ -286,6 +318,10 @@ export interface NostrOperationExecutorOptions {
 
 const defaultVreqPlanner: RelayVreqPlanner = (strategy, filters) => [{ strategy, filters }];
 
+class NoMatchingFiltersError extends Error {
+  override readonly name = "NoMatchingFiltersError";
+}
+
 function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
   if (error instanceof RxNostrCallbackError) {
     return error;
@@ -309,7 +345,7 @@ function finishAfterAuthentication(
   }
   if (error instanceof RxNostrCallbackError) {
     subscriber.error(error);
-  } else if (error instanceof AuthenticationFailure) {
+  } else if (error instanceof AuthenticationError) {
     subscriber.complete();
   } else {
     subscriber.complete();

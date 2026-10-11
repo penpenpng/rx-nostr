@@ -1,6 +1,14 @@
 packages:
   - packages/*
 
+engineStrict: true
+
+# crypto peers on rx-nostr, whose tests use crypto as a dev dependency.
+ignoreWorkspaceCycles: true
+
+# Resolve unreleased workspace peers during Changesets versioning.
+linkWorkspacePackages: true
+
 catalog:
   typescript: 6.0.2
 
@@ -10,8 +18,9 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - unipls
 
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
+  msw: false
 
 # Vite+ is intentionally scoped to pack/lint/fmt while package tests retain
 # their current Vitest majors. These peers are not used by the node-mode tests.

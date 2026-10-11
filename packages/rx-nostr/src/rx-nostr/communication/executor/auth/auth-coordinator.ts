@@ -5,21 +5,22 @@ import { DEFAULT_AUTH_TIMEOUT } from "../../../../authenticator/authenticator.de
 import type { Authenticator, AuthenticatorInput } from "../../../../authenticator/index.ts";
 import { RxNostrCallbackError } from "../../../../libs/error.ts";
 import type { RelayUrl } from "../../../../libs/index.ts";
+import { assertTimerDuration } from "../../../../libs/timing.ts";
 import type { OkPacket } from "../../../../packets/index.ts";
 import type { NostrTransport } from "../../transport/index.ts";
 
-export type AuthenticationFailureReason =
+export type AuthenticationErrorReason =
   | "disabled"
   | "no-challenge"
   | "rejected"
   | "stale"
   | "transport";
 
-export class AuthenticationFailure extends Error {
-  override readonly name = "AuthenticationFailure";
+export class AuthenticationError extends Error {
+  override readonly name = "AuthenticationError";
 
   constructor(
-    public readonly reason: AuthenticationFailureReason,
+    public readonly reason: AuthenticationErrorReason,
     options?: ErrorOptions,
   ) {
     super(`Relay authentication failed (${reason}).`, options);
@@ -66,13 +67,13 @@ export class AuthCoordinator {
 
   #start(): Promise<void> {
     if (this.#disposed || this.input === undefined) {
-      return Promise.reject(new AuthenticationFailure("disabled"));
+      return Promise.reject(new AuthenticationError("disabled"));
     }
 
     const challenge = this.#challenge;
 
     if (!challenge) {
-      return Promise.reject(new AuthenticationFailure("no-challenge"));
+      return Promise.reject(new AuthenticationError("no-challenge"));
     }
     if (this.#status === "authenticated") {
       return Promise.resolve();
@@ -100,7 +101,7 @@ export class AuthCoordinator {
         }
 
         if (!authenticator) {
-          throw new AuthenticationFailure("disabled");
+          throw new AuthenticationError("disabled");
         }
 
         return abortable(this.#run(authenticator, challenge, controller.signal), controller.signal);
@@ -138,13 +139,13 @@ export class AuthCoordinator {
         await abortable(this.#result!, signal);
       } catch {
         if (signal.aborted) {
-          throw new AuthenticationFailure("stale");
+          throw new AuthenticationError("stale");
         }
       }
     }
 
     if (signal.aborted) {
-      throw new AuthenticationFailure("stale");
+      throw new AuthenticationError("stale");
     }
   }
 
@@ -174,6 +175,9 @@ export class AuthCoordinator {
     signal: AbortSignal,
   ): Promise<void> {
     const timeout = authenticator.authTimeout ?? DEFAULT_AUTH_TIMEOUT;
+
+    assertTimerDuration(timeout, "authTimeout", { allowZero: true, allowInfinity: true });
+
     let event;
 
     try {
@@ -205,12 +209,12 @@ export class AuthCoordinator {
           ),
       );
     } catch (cause) {
-      throw new AuthenticationFailure("transport", { cause });
+      throw new AuthenticationError("transport", { cause });
     }
     this.#assertCurrent(challenge, signal);
 
     if (!packet.ok) {
-      throw new AuthenticationFailure("rejected");
+      throw new AuthenticationError("rejected");
     }
   }
 
@@ -219,7 +223,7 @@ export class AuthCoordinator {
     signal: AbortSignal,
   ): void {
     if (signal.aborted || this.#disposed || this.#challenge?.version !== challenge.version) {
-      throw new AuthenticationFailure("stale");
+      throw new AuthenticationError("stale");
     }
   }
 
@@ -255,11 +259,11 @@ function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
     return promise;
   }
   if (signal.aborted) {
-    return Promise.reject(new AuthenticationFailure("stale"));
+    return Promise.reject(new AuthenticationError("stale"));
   }
 
   return new Promise((resolve, reject) => {
-    const abort = () => reject(new AuthenticationFailure("stale"));
+    const abort = () => reject(new AuthenticationError("stale"));
 
     signal.addEventListener("abort", abort, { once: true });
     void promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));

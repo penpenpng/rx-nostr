@@ -89,6 +89,30 @@ describe("RelayDirectory health reporter", () => {
     mutatingSub.unsubscribe();
     sub.unsubscribe();
   });
+
+  test("detaches nested NIP-11 data for each observer and read", () => {
+    const url = "wss://relay.example.com";
+    const directory = new RelayDirectory();
+
+    directory.setNip11(url, { name: "relay", limitation: { max_subscriptions: 3 } });
+
+    const seen: number[] = [];
+    const stream = directory.observe(url);
+    const first = stream.subscribe((entry) => {
+      if (entry.nip11?.limitation) {
+        entry.nip11.limitation.max_subscriptions = 100;
+      }
+    });
+    const second = stream.subscribe((entry) => {
+      seen.push(entry.nip11?.limitation?.max_subscriptions ?? -1);
+    });
+
+    expect(seen).toEqual([3]);
+    expect(directory.get(url)?.nip11?.limitation?.max_subscriptions).toBe(3);
+
+    first.unsubscribe();
+    second.unsubscribe();
+  });
 });
 
 describe("RelayDirectory snapshots", () => {
@@ -227,14 +251,25 @@ describe("RelayDirectory snapshots", () => {
   test("times out NIP-11 fetches and records the failure", async () => {
     const directory = new RelayDirectory({
       clock: () => 3,
+      timeout: 0,
       fetcher: () => new Promise(() => {}),
     });
 
-    await expect(
-      directory.fetchNip11("wss://relay.example.com", { timeout: 0 }),
-    ).rejects.toMatchObject({ code: "timeout" });
+    await expect(directory.fetchNip11("wss://relay.example.com")).rejects.toMatchObject({
+      code: "timeout",
+    });
     expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
   });
+
+  test.each([NaN, -Infinity, -1, 2_147_483_648])(
+    "rejects invalid NIP-11 timeout before starting fetch: %s",
+    async (timeout) => {
+      const fetcher = vi.fn();
+
+      expect(() => new RelayDirectory({ fetcher, timeout })).toThrow(RangeError);
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
 });
 
 test("round trips success followed by failure at the same timestamp", () => {
@@ -252,4 +287,30 @@ test("round trips success followed by failure at the same timestamp", () => {
     lastFailureAt: 100,
     lastConnectedAt: 100,
   });
+});
+
+test("shares one directory deadline with late joiners and ignores late fetch results", async () => {
+  vi.useFakeTimers();
+  try {
+    const pending = Promise.withResolvers<{ name: string }>();
+    const fetcher = vi.fn(() => pending.promise);
+    const directory = new RelayDirectory({ timeout: 100, fetcher });
+    const url = "wss://relay.example.com";
+    const first = directory.fetchNip11(url).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(75);
+    const second = directory.fetchNip11(url, { refresh: true }).catch((error: unknown) => error);
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(25);
+    const failure = await first;
+
+    expect(failure).toMatchObject({ name: "RxNostrNip11Error", code: "timeout" });
+    expect(await second).toBe(failure);
+    pending.resolve({ name: "late" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(directory.get(url)?.nip11).toBeUndefined();
+  } finally {
+    vi.useRealTimers();
+  }
 });

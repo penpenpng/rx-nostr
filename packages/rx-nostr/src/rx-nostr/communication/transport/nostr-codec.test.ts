@@ -12,6 +12,12 @@ const relay = "wss://relay.example.com" as const;
 const event = Faker.event({ id: "event-id" });
 
 describe("Nostr relay codec", () => {
+  test("rejects an EVENT with non-string tag values before delivery", () => {
+    expect(() =>
+      decodeRelayMessage(JSON.stringify(["EVENT", "sub", { ...event, tags: [["e", 1]] }]), relay),
+    ).toThrowError(expect.objectContaining({ code: "invalid-tuple" }));
+  });
+
   test.each<[Nostr.ToClientMessage.Any, object]>([
     [["EVENT", "sub", event], { type: "EVENT", subId: "sub", event }],
     [["EOSE", "sub"], { type: "EOSE", subId: "sub" }],

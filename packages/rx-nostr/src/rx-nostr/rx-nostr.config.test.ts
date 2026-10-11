@@ -71,6 +71,33 @@ describe("rx-nostr config", () => {
     expect(publish.weak).toBe(false);
   });
 
+  test.each([NaN, -Infinity, -1, 2_147_483_648])(
+    "rejects invalid operation and default durations before use: %s",
+    (value) => {
+      expect(() => createRoot({ defaultOptions: { req: { linger: value } } })).toThrow(RangeError);
+      expect(() => createRoot({ defaultOptions: { publish: { timeout: value } } })).toThrow(
+        RangeError,
+      );
+
+      const root = createRoot();
+
+      expect(() => new FilledRxNostrReqOptions({ timeout: value }, root)).toThrow(RangeError);
+      expect(() => new FilledRxNostrPublishOptions({ linger: value }, root)).toThrow(RangeError);
+    },
+  );
+
+  test("validates static operation defaults and connection timeout", () => {
+    expect(
+      () =>
+        new FilledRxNostrConfig({}, RX_NOSTR_DEFAULT_CONFIG, {
+          ...RX_NOSTR_DEFAULT_OPTIONS,
+          req: { ...RX_NOSTR_DEFAULT_OPTIONS.req, timeout: NaN },
+        }),
+    ).toThrow(RangeError);
+    expect(() => createRoot({ connectionTimeout: 0 })).toThrow(RangeError);
+    expect(() => createRoot({ connectionTimeout: Infinity })).toThrow(RangeError);
+  });
+
   test("applies operation, instance, and static precedence", () => {
     const instanceSigner = new NoopSigner();
     const staticOptions: RxNostrStaticDefaultOptions = {
@@ -164,7 +191,6 @@ describe("rx-nostr config", () => {
     expect(root.verifier).toBe(verifier);
     expect(root.signer).toBe(signer);
     expect(root.relayDirectory).toBe(relayDirectory);
-    expect(root.nip11Timeout).toBe(30_000);
     expect(root.skipFetchNip11).toBe(true);
     expect(overridden.verifier).toBe(instanceVerifier);
     expect(overridden.skipFetchNip11).toBe(false);

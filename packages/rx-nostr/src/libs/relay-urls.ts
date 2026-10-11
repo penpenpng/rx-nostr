@@ -354,8 +354,6 @@ export function normalizeRelayUrl(url: string): RelayUrl | null {
 
   u.searchParams.sort();
 
-  u.search = tryOrDefault(() => decodeURIComponent(u.search), u.search);
-
   if (!u.hostname) {
     return null;
   }

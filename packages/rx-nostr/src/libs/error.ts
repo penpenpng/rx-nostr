@@ -1,16 +1,18 @@
-export abstract class RxNostrError extends Error {}
+/** Base of public rx-nostr errors. Causes use the native ErrorOptions contract. */
+export abstract class RxNostrError extends Error {
+  override readonly name: string = "RxNostrError";
+}
 
 export type RxNostrCallbackKind = "authenticator" | "filter" | "signer" | "verifier";
 
 /** A user-provided callback failed while an operation was running. */
 export class RxNostrCallbackError extends RxNostrError {
+  override readonly name = "RxNostrCallbackError";
   constructor(
     public readonly callback: RxNostrCallbackKind,
     cause: unknown,
   ) {
-    super(`RxNostrCallbackError: ${callback} callback failed.`, { cause });
-
-    this.name = "RxNostrCallbackError";
+    super(`${callback} callback failed.`, { cause });
   }
 }
 
@@ -22,15 +24,17 @@ export type RxNostrPublicationErrorCode =
 
 /** A publication's requested all/any success condition cannot be met. */
 export class RxNostrPublicationError extends RxNostrError {
+  override readonly name = "RxNostrPublicationError";
+  /** Detached from internal settlement state; opaque causes retain their original identity. */
   public readonly failures: import("../publication/index.ts").PublicationFailure[];
 
   constructor(
     public readonly code: RxNostrPublicationErrorCode,
     failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
+    options?: ErrorOptions,
   ) {
-    super(`RxNostrPublicationError: publication failed (${code}).`);
+    super(`Publication failed (${code}).`, options);
 
-    this.name = "RxNostrPublicationError";
     this.failures = failures.map(({ ok, ...failure }) => ({
       ...failure,
       ...(ok === undefined
@@ -52,11 +56,7 @@ export class RxNostrPublicationError extends RxNostrError {
  * Normally, you should not catch the exception.
  */
 export class RxNostrInvalidUsageError extends RxNostrError {
-  constructor(message: string) {
-    super(`RxNostrInvalidUsageError: ${message}`);
-
-    this.name = "RxNostrInvalidUsageError";
-  }
+  override readonly name = "RxNostrInvalidUsageError";
 }
 
 /**
@@ -64,11 +64,7 @@ export class RxNostrInvalidUsageError extends RxNostrError {
  * but an error occurs due to external environmental causes.
  */
 export class RxNostrEnvironmentError extends RxNostrError {
-  constructor(message: string) {
-    super(`RxNostrEnvironmentError: ${message}`);
-
-    this.name = "RxNostrEnvironmentError";
-  }
+  override readonly name = "RxNostrEnvironmentError";
 }
 
 export type RxNostrNip11ErrorCode =
@@ -89,25 +85,25 @@ export class RxNostrNip11Error extends RxNostrError {
     public readonly status?: number,
     options?: ErrorOptions,
   ) {
-    super(`RxNostrNip11Error: ${message}`, options);
+    super(message, options);
   }
 }
 
-export type RelayDirectorySnapshotErrorCode =
+export type RxNostrRelayDirectorySnapshotErrorCode =
   | "invalid-json"
   | "unsupported-version"
   | "invalid-schema";
 
 /** A RelayDirectory snapshot was rejected without applying any records. */
-export class RelayDirectorySnapshotError extends RxNostrError {
-  override readonly name = "RelayDirectorySnapshotError";
+export class RxNostrRelayDirectorySnapshotError extends RxNostrError {
+  override readonly name = "RxNostrRelayDirectorySnapshotError";
 
   constructor(
-    public readonly code: RelayDirectorySnapshotErrorCode,
+    public readonly code: RxNostrRelayDirectorySnapshotErrorCode,
     message: string,
     options?: ErrorOptions,
   ) {
-    super(`RelayDirectorySnapshotError: ${message}`, options);
+    super(message, options);
   }
 }
 
@@ -117,12 +113,9 @@ export class RelayDirectorySnapshotError extends RxNostrError {
  * Normally, you should not catch the exception.
  */
 export class RxNostrLogicError extends RxNostrError {
-  constructor() {
-    super(
-      "RxNostrLogicError: This is rx-nostr's internal bug. Please report to the author of the library.",
-    );
-
-    this.name = "RxNostrLogicError";
+  override readonly name = "RxNostrLogicError";
+  constructor(options?: ErrorOptions) {
+    super("This is rx-nostr's internal bug. Please report to the author of the library.", options);
   }
 }
 
@@ -132,9 +125,8 @@ export class RxNostrLogicError extends RxNostrError {
  * Normally, you should not catch the exception.
  */
 export class RxNostrAlreadyDisposedError extends RxNostrError {
-  constructor() {
-    super("RxNostrAlreadyDisposedError: Attempted to access a disposed resource.");
-
-    this.name = "RxNostrAlreadyDisposedError";
+  override readonly name = "RxNostrAlreadyDisposedError";
+  constructor(options?: ErrorOptions) {
+    super("Attempted to access a disposed resource.", options);
   }
 }

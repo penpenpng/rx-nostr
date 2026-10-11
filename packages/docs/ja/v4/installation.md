@@ -37,6 +37,8 @@ REQ を使う場合、`verifier` は instance config または `RxNostr.defaultC
 
 ## Node.js
 
+Node.js は **24 以降**をサポートします。Node 24 では下記の JavaScript 標準 API を polyfill なしで利用できます。`WebSocket` がない環境では constructor を注入してください。
+
 `globalThis.WebSocket` がない runtime では、WebSocket constructor を `WebSocket` optionへ渡します。
 
 ```sh
@@ -64,3 +66,23 @@ rx-nostr v4 は ESM package として配布されます。JavaScript と TypeScr
 ```ts
 import { RxNostr } from "rx-nostr";
 ```
+
+実行時には `DisposableStack` と `Symbol.dispose`、`Promise.withResolvers`、`Set.prototype.union/intersection/difference`、`Array.prototype.toSorted` が必要です。ブラウザのサポート下限は、これらの API と WebSocket をネイティブに備えるか、不足分をアプリケーションが **rx-nostr の import より先に** polyfill した環境です。`DisposableStack` がない場合、client の生成を待たず module の評価時に import が失敗します。WebSocket の注入だけでは JavaScript API の不足を補えません。NIP-11 の既定取得処理には `fetch` も必要です（`fetcher` option で差し替え可能）。
+
+たとえば `DisposableStack` だけが不足している環境では、次の順で起動できます。
+
+```sh
+pnpm add disposablestack
+```
+
+```ts
+import "disposablestack/auto";
+
+const { RxNostr } = await import("rx-nostr");
+const rxNostr = new RxNostr();
+rxNostr.dispose();
+```
+
+ほかの API が不足する場合も、対応する polyfill を先に読み込んでください。rx-nostr はグローバル polyfill を自動導入しません。上の手順は Node 24 で `DisposableStack` を削除した別プロセスで検証しています。ブラウザごとの互換性は、採用するブラウザと polyfill の組み合わせで確認してください。
+
+CI では Node 24.0.0 と現行 Node 24 の両方で配布 tarball を polyfill なしで import し、`DisposableStack` が不足する場合の失敗と先読み後の回復を別プロセスで検査します。Chrome では配布物から module Worker を起動し、署名検証の通信と終了まで確認します。

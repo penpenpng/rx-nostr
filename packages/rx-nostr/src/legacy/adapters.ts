@@ -7,8 +7,8 @@ export function withLegacyAuthTimeout(
   authTimeout: number,
 ): AuthenticatorInput {
   const withTimeout = (authenticator: Authenticator): Authenticator => ({
-    ...authenticator,
     authTimeout: authenticator.authTimeout ?? authTimeout,
+    challenge: (relay, challenge) => authenticator.challenge(relay, challenge),
   });
 
   if (typeof input !== "function") {

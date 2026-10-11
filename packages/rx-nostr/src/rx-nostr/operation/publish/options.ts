@@ -1,4 +1,5 @@
 import type { EventSigner } from "../../../event-signer/index.ts";
+import { assertTimerDuration } from "../../../libs/timing.ts";
 import type { RxNostrPublishConfig, RxNostrPublishOptions } from "./rx-nostr-publish.interface.ts";
 
 export interface RxNostrPublishOptionsContext {
@@ -20,8 +21,22 @@ export class FilledRxNostrPublishOptions {
     const staticBase = rootConfig.staticDefaultOptions.publish;
 
     this.signer = config.signer ?? base?.signer ?? rootConfig.signer;
-    this.linger = config.linger ?? base?.linger ?? staticBase.linger;
+    this.linger = assertTimerDuration(
+      config.linger ?? base?.linger ?? staticBase.linger,
+      "publish linger",
+      {
+        allowZero: true,
+        allowInfinity: true,
+      },
+    );
     this.weak = config.weak ?? base?.weak ?? staticBase.weak;
-    this.timeout = config.timeout ?? base?.timeout ?? staticBase.timeout;
+    this.timeout = assertTimerDuration(
+      config.timeout ?? base?.timeout ?? staticBase.timeout,
+      "publish timeout",
+      {
+        allowZero: true,
+        allowInfinity: true,
+      },
+    );
   }
 }

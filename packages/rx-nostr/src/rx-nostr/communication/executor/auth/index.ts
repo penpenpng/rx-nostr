@@ -1,5 +1,5 @@
 export {
-  AuthenticationFailure,
+  AuthenticationError,
   AuthCoordinator,
-  type AuthenticationFailureReason,
+  type AuthenticationErrorReason,
 } from "./auth-coordinator.ts";

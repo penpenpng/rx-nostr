@@ -51,6 +51,7 @@
   },
   "scripts": {
     "build": "pnpm typecheck && vp pack",
+    "prepack": "pnpm build",
     "test": "vitest run",
     "test:contract": "vitest run --project contract",
     "test:dev": "vitest --ui",
@@ -62,6 +63,7 @@
     "unipls": "^0.2.0"
   },
   "devDependencies": {
+    "@rx-nostr/crypto": "workspace:*",
     "@types/node": "^26.6.2",
     "@vitest/ui": "^5.0.1",
     "disposablestack": "^1.1.8",
@@ -71,5 +73,8 @@
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

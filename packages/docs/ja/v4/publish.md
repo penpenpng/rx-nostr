@@ -2,6 +2,7 @@
 
 `rxNostr.publish()` は EVENT の署名と複数リレーへの送信を管理し、ひとつの hot operation である `Publication` を返します。
 
+<!-- typecheck-example: publish-basic -->
 ```ts
 const publication = rxNostr.publish(
   ["wss://relay.example.com"],
@@ -32,6 +33,8 @@ const observer = publication.subscribe({
 
 受信済みの OK は、あとから subscribe した observer にも replay されます。observer の unsubscribe は観測をやめるだけで、送信処理を取り消しません。
 
+各 observer は、replay を含め独立した変更可能な `OkPacket` を受け取ります。packet や `message` tuple を変更しても、送信の成功判定や他の observer には影響しません。
+
 ## 成功条件を待つ
 
 `waitFor()` は application が必要とする集約条件を Promise として表します。
@@ -43,7 +46,7 @@ await publication.waitFor("any"); // いずれかの宛先で OK true
 
 `"any"` が成功しても、残りのリレーへの送信は継続します。不要なら明示的に `cancel()` してください。
 
-条件を満たせない場合は `RxNostrPublicationError` で reject されます。
+relay の結果や取消によって条件を満たせない場合は `RxNostrPublicationError` で reject されます。署名 callback の失敗は `waitFor()` でも `RxNostrCallbackError` になります。
 
 | `code` | 意味 |
 | --- | --- |
@@ -55,13 +58,17 @@ await publication.waitFor("any"); // いずれかの宛先で OK true
 `error.failures` には、relay ごとの `rejected`、`timeout`、`dropped`、`retry-exhausted`、`cancelled`、`auth`、`failed` が格納されます。
 
 ```ts
-import { RxNostrPublicationError } from "rx-nostr";
+import { RxNostrCallbackError, RxNostrPublicationError } from "rx-nostr";
 
 try {
   await publication.waitFor("all");
 } catch (error) {
   if (error instanceof RxNostrPublicationError) {
     console.error(error.code, error.failures);
+  } else if (error instanceof RxNostrCallbackError) {
+    console.error(error.callback, error.cause);
+  } else {
+    throw error;
   }
 }
 ```
@@ -75,7 +82,7 @@ const event = await publication.event;
 console.log(event.id);
 ```
 
-署名に失敗した場合、`event` と OK stream は `RxNostrCallbackError` で失敗します。
+署名に失敗した場合、`event`・`waitFor()` と OK stream は `RxNostrCallbackError` で失敗します。
 
 ## 取り消す
 

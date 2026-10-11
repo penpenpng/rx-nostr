@@ -9,6 +9,7 @@ export * from "./nostr/nip11.ts";
 export * from "./nostr/nip40.ts";
 export * from "./once.ts";
 export * from "./relay-urls.ts";
+export * from "./timing.ts";
 export * from "./rxjs/pipeable.ts";
 export * from "./rxjs/rx-disposable-stack.ts";
 export * from "./try.ts";

@@ -6,15 +6,21 @@ import type { RelayDirectoryEntry, RelayDirectorySnapshotV1 } from "./relay.inte
 export interface FetchNip11Options {
   /** Ignore cached metadata. Concurrent refreshes are still deduplicated. */
   readonly refresh?: boolean;
-  /** Maximum time to wait for metadata, in milliseconds. Infinity disables the timeout. */
-  readonly timeout?: number;
 }
 
 export interface RelayDirectoryOptions {
+  /** Shared fetch deadline in ms. Defaults to 30000; 0 is immediate and Infinity disables it. */
+  readonly timeout?: number;
   readonly clock?: () => number;
   readonly fetcher?: (url: string) => Promise<Nostr.Nip11.RelayInfo>;
 }
 
+/**
+ * Public read/cache contract for consumers of directory data. RxNostr's
+ * relayDirectory option accepts RelayDirectory instances, not arbitrary
+ * implementations of this interface: connection health and probe coordination
+ * use an internal reporter registered by that class's constructor.
+ */
 export interface IRelayDirectory extends Iterable<RelayDirectoryEntry> {
   get(url: string): RelayDirectoryEntry | undefined;
   getOrCreate(url: string): RelayDirectoryEntry;

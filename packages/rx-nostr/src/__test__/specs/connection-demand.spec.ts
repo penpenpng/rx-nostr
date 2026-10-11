@@ -118,7 +118,10 @@ describe("connection demand public contract", () => {
 
           socket.open();
           await settleProtocol();
-          socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+          const completedId = (await socket.inbox.waitNext("REQ"))[1];
+
+          socket.message(["EOSE", completedId]);
+          await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", completedId]);
           await vi.advanceTimersByTimeAsync(50);
           const secondInspector = new SubscriptionInspector<EventPacket>();
           const weak = rxNostr[strategy](b, [{}], { weak: true, linger: Infinity }).subscribe(
@@ -127,7 +130,7 @@ describe("connection demand public contract", () => {
 
           await settleProtocol();
           await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
-          expect(socket.inbox.length).toBe(2);
+          expect(socket.inbox.length).toBe(3);
           await vi.advanceTimersByTimeAsync(49);
           expect(socket.isCloseRequested).toBe(false);
           await vi.advanceTimersByTimeAsync(1);
@@ -155,7 +158,10 @@ describe("connection demand public contract", () => {
             await settleProtocol();
           }
           if (state === "lingering") {
-            socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+            const completedId = (await socket.inbox.waitNext("REQ"))[1];
+
+            socket.message(["EOSE", completedId]);
+            await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", completedId]);
             await settleProtocol();
           }
 
@@ -179,7 +185,7 @@ describe("connection demand public contract", () => {
 
           const [, id] = await socket.inbox.waitNext("REQ");
 
-          expect(socket.inbox.length).toBe(2);
+          expect(socket.inbox.length).toBe(state === "lingering" ? 3 : 2);
           socket.message(["EVENT", id, Faker.event({ id: "weak-result" })]);
           await settleProtocol();
           await expect(firstInspector.waitNext()).resolves.toMatchObject({
@@ -323,7 +329,7 @@ describe("connection demand public contract", () => {
         await vi.advanceTimersByTimeAsync(1);
         expect(socket.isCloseRequested).toBe(true);
 
-        if (["unsubscribe", "remove", "timeout"].includes(ending)) {
+        if (["unsubscribe", "remove", "timeout", "eose", "source-dispose"].includes(ending)) {
           await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", id]);
           expect(socket.inbox.length).toBe(2);
         } else {
@@ -343,7 +349,10 @@ describe("connection demand public contract", () => {
 
         socket.open();
         await settleProtocol();
-        socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+        const completedId = (await socket.inbox.waitNext("REQ"))[1];
+
+        socket.message(["EOSE", completedId]);
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", completedId]);
         await vi.advanceTimersByTimeAsync(50);
 
         const secondInspector = new SubscriptionInspector<EventPacket>();

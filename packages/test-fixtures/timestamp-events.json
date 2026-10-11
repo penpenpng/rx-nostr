@@ -1,0 +1,93 @@
+[
+  {
+    "name": "signed timestamp -9007199254740991",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": -9007199254740991,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "a796ceb9d98b77b1e07a6d1be634eccc2ac01b7204c4e4d4802b7e1908951ac4",
+      "sig": "260319c34632ee9fec2fd53b6d634ba83085f3c72c5b00c6d14cf4762e71d0af6e1c40ddc1fc5279a26354cde122756e7c393d0f065cc50d0eb8ba65fe521df2"
+    },
+    "valid": false
+  },
+  {
+    "name": "signed timestamp -1",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": -1,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "f59ebf7e22ed4ca45e9c98420fffb01e586c0f85d0f4c5a7b3b925d46d48f383",
+      "sig": "f6b33cf3310aa217f6754181b7efd31d81cecca7df783c05a7f791d21e00beb83cf384cdb57b3d88ff4301da430bc33197088261efe8292843a91cc99d921aab"
+    },
+    "valid": false
+  },
+  {
+    "name": "signed timestamp 0",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": 0,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "33bbdf9d3bdf4037bd0a6c263b83fc65ac8685818dab8f58063a6b2ec5cd21ce",
+      "sig": "09347a1dda1d1a7bf88d81637f38c0405dac509063dc6633c55c988c0c8cb789c42e0619fb3860d84d866a310e5b9fe6e4ec67141faf3f10bf4da417b8aab43d"
+    },
+    "valid": true
+  },
+  {
+    "name": "signed timestamp 1",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": 1,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "09d3c5f8f20dd19b3bc6f18ceaecc5a88db9e7c91b8eaa475be561cddd3923cb",
+      "sig": "b3981ee4dde1230e01b7fcda29d01cd1fba43ab571feb2b2f35c339762e40838ddf59b6d530ceded75f4c44c55750069eda11ccb1de44cae76626d3fc65decb1"
+    },
+    "valid": true
+  },
+  {
+    "name": "signed timestamp 1.5",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": 1.5,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "154136af37f7008e02d0729c2514c817c23ae2e5658baa0b0e4f7cdeee8a79db",
+      "sig": "d2b0dd11badaa3892b4941f2ba8042432e41ff9953426b0699bfd54469b491d03a4ee654b4c5ab6cbbe773d3e640bb098ef5fdf74b0ddd5480ba253b804f612b"
+    },
+    "valid": false
+  },
+  {
+    "name": "signed timestamp 9007199254740991",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": 9007199254740991,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "17e62889a2f23564801da4d950443af1e871080b266dcebb01fd1c592c0aa196",
+      "sig": "64fee2fe55946594ff82bad7cd5a0445f9de561ac03f22e9749b80aa434f70f120cd2a06f1340e7368176057d8c49bf4b1fa9d97bdc40f6367685885c82af5da"
+    },
+    "valid": true
+  },
+  {
+    "name": "signed timestamp 9007199254740992",
+    "event": {
+      "kind": 1,
+      "content": "timestamp boundary",
+      "tags": [],
+      "created_at": 9007199254740992,
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "id": "56ad11fd0d2124f97bbf52628be0b92e3eff13a0b9038ad8e4023003f6693313",
+      "sig": "bd8cb477fa76fcccc0bbcc7d8f1891d594a5554ad0e4bdf8f3a8c3b0c798bc1dd6fda1ad562a254c5559ddba8b32e8814fac3bdffb818be73cee003c6ed9cda4"
+    },
+    "valid": false
+  }
+]

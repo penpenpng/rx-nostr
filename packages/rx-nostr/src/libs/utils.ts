@@ -7,14 +7,20 @@ export namespace u {
     }
 
     export function intersection<T>(...sets: Set<T>[]): Set<T> {
-      return sets.reduce((acc, set) => acc.intersection(set), new Set<T>());
+      const [first, ...rest] = sets;
+
+      return first
+        ? rest.reduce((acc, set) => acc.intersection(set), new Set(first))
+        : new Set<T>();
     }
   }
 
   export namespace Promise {
     const Promise = globalThis.Promise;
 
-    export class TimeoutError extends Error {}
+    export class TimeoutError extends Error {
+      override readonly name = "TimeoutError";
+    }
 
     export function timeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
       const ret = Promise.withResolvers<T>();

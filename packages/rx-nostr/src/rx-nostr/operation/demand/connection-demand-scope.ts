@@ -1,4 +1,5 @@
 import { Deferrer, once, RelayMap } from "../../../libs/index.ts";
+import { assertTimerDuration } from "../../../libs/timing.ts";
 import type { IRelayCommunication } from "../../communication/index.ts";
 
 /** The time-bounded connection demand for one relay-local vreq. */
@@ -58,6 +59,8 @@ export class ConnectionDemandScope {
   }
 
   openDemandWindow(relay: IRelayCommunication, linger: number): RelayDemandWindow {
+    assertTimerDuration(linger, "linger", { allowZero: true, allowInfinity: true });
+
     if (this.weak) {
       return { close: once(() => {}) };
     }
@@ -67,6 +70,7 @@ export class ConnectionDemandScope {
     return { close: once(close) };
   }
 
+  /** Release every owned lease now; transport close acknowledgement is asynchronous. */
   [Symbol.dispose] = once(() => {
     this.finished = true;
 
@@ -149,17 +153,19 @@ class RelayDemand {
 
     this.nextLeaseId++;
 
-    this.activeLeases.set(id, release);
-
-    return () => {
+    const releaseOnce = once(() => {
       this.activeLeases.delete(id);
       release();
       this.onRelease();
-    };
+    });
+
+    this.activeLeases.set(id, releaseOnce);
+
+    return releaseOnce;
   }
 
   private releaseAfterLinger(release: () => void, linger: number): () => void {
-    if (!Number.isFinite(linger)) {
+    if (linger === Infinity) {
       return () => {
         // never release the lease
       };
