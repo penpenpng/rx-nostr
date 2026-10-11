@@ -1,23 +1,17 @@
-import path from "path";
-import { type PluginOption } from "vite";
-import dts from "vite-plugin-dts";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
-  define: {
-    "import.meta.vitest": "undefined",
-  },
-  build: {
-    minify: false,
-    lib: {
-      name: "RxNostr",
-      entry: path.resolve(__dirname, "src/index.ts"),
-      formats: ["es", "cjs", "umd"],
+  pack: {
+    entry: ["src/index.ts", "src/operators.ts", "src/utils.ts", "src/legacy.ts"],
+    target: "es2022",
+    dts: true,
+    deps: {
+      neverBundle: true,
     },
+    platform: "neutral",
     sourcemap: true,
-  },
-  plugins: [dts() as PluginOption],
-  test: {
-    hookTimeout: 1000,
+    clean: true,
+    outDir: "dist",
+    format: ["esm"],
   },
 });

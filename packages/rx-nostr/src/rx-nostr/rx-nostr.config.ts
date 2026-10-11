@@ -1,0 +1,157 @@
+import type { AuthenticatorInput } from "../authenticator/index.ts";
+import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
+import {
+  type RelayHealthPolicyInput,
+  ExponentialBackoffReconnector,
+  type ConnectionReconnector,
+} from "../connection-reconnector/index.ts";
+import { copyRelayHealthPolicy } from "../connection-reconnector/relay-health-policy.ts";
+import { Nip07Signer, type EventSigner } from "../event-signer/index.ts";
+import { type EventVerifier, UnconfiguredVerifier } from "../event-verifier/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
+import { GlobalRelayDirectory, type RelayDirectory } from "../relay-directory/index.ts";
+import type { WebSocketConstructor } from "../types/index.ts";
+import type {
+  RxNostrConfig,
+  RxNostrDefaultOptions,
+  RxNostrStaticDefaultConfig,
+  RxNostrStaticDefaultOptions,
+} from "./rx-nostr.interface.ts";
+
+export const RX_NOSTR_DEFAULT_OPTIONS: RxNostrStaticDefaultOptions = Object.freeze({
+  req: Object.freeze({
+    defer: true,
+    linger: 10_000,
+    weak: false,
+    timeout: 30_000,
+    skipExpirationCheck: false,
+    skipValidateFilterMatching: false,
+  }),
+  publish: Object.freeze({
+    linger: 10_000,
+    weak: false,
+    timeout: 30_000,
+  }),
+});
+
+export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze({
+  verifier: new UnconfiguredVerifier(),
+  signer: new Nip07Signer(),
+  authenticator: undefined,
+  reconnector: new ExponentialBackoffReconnector({ maxRetries: Infinity }),
+  dropDetectors: [],
+  relayDirectory: GlobalRelayDirectory,
+  relayHealthPolicy: Object.freeze({}),
+  connectionTimeout: 30_000,
+  skipFetchNip11: false,
+  WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
+});
+
+export class FilledRxNostrConfig {
+  readonly verifier: EventVerifier;
+  readonly signer: EventSigner;
+  readonly authenticator: AuthenticatorInput | undefined;
+  readonly reconnector: ConnectionReconnector;
+  readonly dropDetectors: readonly ConnectionDropDetector[];
+  readonly relayDirectory: RelayDirectory;
+  readonly relayHealthPolicy: RelayHealthPolicyInput;
+  readonly connectionTimeout: number;
+  readonly skipFetchNip11: boolean;
+  readonly WebSocket: WebSocketConstructor | undefined;
+  readonly defaultOptions: Readonly<RxNostrDefaultOptions>;
+  readonly staticDefaultOptions: Readonly<RxNostrStaticDefaultOptions>;
+
+  constructor(
+    config: RxNostrConfig,
+    staticDefaultConfig: RxNostrStaticDefaultConfig,
+    staticDefaultOptions: RxNostrStaticDefaultOptions,
+  ) {
+    this.verifier = config.verifier ?? staticDefaultConfig.verifier;
+    this.staticDefaultOptions = freezeStaticDefaultOptions(staticDefaultOptions);
+    this.signer = config.signer ?? staticDefaultConfig.signer;
+    this.authenticator =
+      config.authenticator === false
+        ? undefined
+        : (config.authenticator ?? staticDefaultConfig.authenticator);
+    this.reconnector = config.reconnector ?? staticDefaultConfig.reconnector;
+    this.dropDetectors = Object.freeze([
+      ...(config.dropDetectors ?? staticDefaultConfig.dropDetectors),
+    ]);
+    this.relayDirectory = config.relayDirectory ?? staticDefaultConfig.relayDirectory;
+
+    const healthPolicy = config.relayHealthPolicy ?? staticDefaultConfig.relayHealthPolicy;
+
+    this.relayHealthPolicy = copyRelayHealthPolicy(healthPolicy);
+    this.connectionTimeout = config.connectionTimeout ?? staticDefaultConfig.connectionTimeout;
+
+    assertTimerDuration(this.connectionTimeout, "connectionTimeout");
+
+    this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
+    this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
+    this.defaultOptions = freezeDefaultOptions(config.defaultOptions);
+  }
+}
+
+export function cloneStaticDefaultConfig(
+  config: RxNostrStaticDefaultConfig,
+): RxNostrStaticDefaultConfig {
+  return {
+    ...config,
+    dropDetectors: [...config.dropDetectors],
+    relayHealthPolicy: copyRelayHealthPolicy(config.relayHealthPolicy),
+  };
+}
+
+function freezeDefaultOptions(
+  options: RxNostrDefaultOptions | undefined,
+): Readonly<RxNostrDefaultOptions> {
+  validateOperationDurations(options);
+
+  return Object.freeze({
+    req: options?.req ? Object.freeze({ ...options.req }) : undefined,
+    publish: options?.publish ? Object.freeze({ ...options.publish }) : undefined,
+  });
+}
+
+export function cloneStaticDefaultOptions(
+  options: RxNostrStaticDefaultOptions,
+): RxNostrStaticDefaultOptions {
+  return {
+    req: { ...options.req },
+    publish: { ...options.publish },
+  };
+}
+
+function freezeStaticDefaultOptions(
+  options: RxNostrStaticDefaultOptions,
+): Readonly<RxNostrStaticDefaultOptions> {
+  const clone = cloneStaticDefaultOptions(options);
+
+  validateOperationDurations(clone);
+
+  return Object.freeze({
+    req: Object.freeze(clone.req),
+    publish: Object.freeze(clone.publish),
+  });
+}
+
+function validateOperationDurations(
+  options: RxNostrDefaultOptions | RxNostrStaticDefaultOptions | undefined,
+) {
+  for (const kind of ["req", "publish"] as const) {
+    const values = options?.[kind];
+
+    if (values?.linger !== undefined) {
+      assertTimerDuration(values.linger, `${kind} linger`, {
+        allowZero: true,
+        allowInfinity: true,
+      });
+    }
+    if (values?.timeout !== undefined) {
+      assertTimerDuration(values.timeout, `${kind} timeout`, {
+        allowZero: true,
+        allowInfinity: true,
+      });
+    }
+  }
+}

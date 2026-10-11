@@ -1,25 +1,34 @@
 {
-  "description": "rx-nostr's workspace root. This is private.",
   "private": true,
-  "scripts": {
-    "lint": "npm run lint --workspaces --if-present",
-    "lint:fix": "npm run lint:fix --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "build": "npm run build -w packages/rx-nostr -w packages/crypto",
-    "docs:dev": "npm run dev -w packages/docs",
-    "docs:build": "npm run build -w packages/docs"
-  },
   "author": "penpenpng",
-  "workspaces": [
-    "packages/*"
-  ],
+  "scripts": {
+    "build": "pnpm --recursive --if-present build",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "check": "vp check .",
+    "fix": "vp check --fix",
+    "docs:build": "pnpm --filter @rx-nostr/docs docs:build",
+    "docs:examples": "node scripts/typecheck-docs-examples.mjs",
+    "docs:dev": "pnpm --filter @rx-nostr/docs docs:dev",
+    "format": "vp fmt . --write",
+    "format:check": "vp fmt . --check",
+    "lint": "vp lint .",
+    "lint:fix": "vp lint . --fix",
+    "release": "pnpm exec changeset publish",
+    "test": "pnpm --recursive --if-present test",
+    "test:packed": "node scripts/test-packed-consumers.mjs",
+    "test:worker-browser": "node scripts/test-worker-browser.mjs",
+    "version-packages": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile"
+  },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.9.0",
-    "@typescript-eslint/parser": "^7.9.0",
-    "eslint": "^8.5.6",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-simple-import-sort": "^10.0.0",
-    "prettier": "^3.2.5"
-  }
+    "@changesets/cli": "^2.29.7",
+    "@rx-nostr/crypto": "workspace:*",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "nostr-typedef": "^0.13.0",
+    "rx-nostr": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "^8.3.0",
+    "vite-plus": "0.3.3"
+  },
+  "packageManager": "pnpm@12.11.2"
 }

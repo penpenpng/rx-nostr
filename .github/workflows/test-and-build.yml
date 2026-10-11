@@ -1,0 +1,39 @@
+name: test / build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, v4]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.0.0"
+      - run: echo "CONSUMER_NODE_BIN=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - uses: crate-ci/typos@master
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - uses: browser-actions/setup-chrome@v2
+        id: chrome
+      - run: pnpm test:worker-browser
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+      - run: pnpm test:packed
+      - run: pnpm docs:examples
+      - run: pnpm docs:build

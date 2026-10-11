@@ -1,0 +1,444 @@
+import { defer, finalize, Subject, throwError, TimeoutError, type Subscription } from "rxjs";
+
+import { NoopVerifier } from "../event-verifier/index.ts";
+import type { EventVerifier } from "../index.ts";
+import { RxNostrPublicationError } from "../libs/error.ts";
+import type { Publication } from "../publication/index.ts";
+import { RxNostr } from "../rx-nostr/index.ts";
+import { legacyPublishSent } from "../rx-nostr/rx-nostr.ts";
+import { RxRelays } from "../rx-relays/index.ts";
+import { toLegacyConnectionState, withLegacyAuthTimeout } from "./adapters.ts";
+import { legacyRetryReconnector } from "./reconnector.ts";
+import type {
+  ILegacyRxNostr,
+  LegacyConnectionState,
+  LegacyConnectionStatePacket,
+  LegacyOkPacket,
+  LegacyRelay,
+  LegacyRelayInput,
+  LegacyRxNostrConfig,
+} from "./types.ts";
+
+function entriesOf(input: LegacyRelayInput): LegacyRelay[] {
+  if (input instanceof RxRelays) {
+    return [...input];
+  }
+  if (typeof input === "string") {
+    return [input];
+  }
+  if (Array.isArray(input)) {
+    return [...input];
+  }
+  if (Symbol.iterator in input) {
+    return [...input];
+  }
+  if ("url" in input) {
+    return [input as LegacyRelay];
+  }
+
+  return Object.entries(input).map(([url, permissions]) => ({ url, ...permissions }));
+}
+
+function combine(a: RxRelays, b: RxRelays): RxRelays {
+  return RxRelays.union(a, b);
+}
+
+/** Create a v3-shaped facade backed by the v4 RxNostr implementation. */
+export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRxNostr {
+  const {
+    verifier,
+    skipVerify,
+    skipValidateFilterMatching,
+    skipExpirationCheck,
+    eoseTimeout,
+    okTimeout,
+    disconnectTimeout,
+    websocketCtor,
+    authTimeout,
+    connectionStrategy,
+    retry,
+    reconnector,
+    defaultOptions,
+    ...v4Config
+  } = config;
+  const adaptedVerifier: EventVerifier | undefined =
+    typeof verifier === "function" ? { verifyEvent: verifier } : verifier;
+  let effectiveVerifier: EventVerifier | undefined;
+
+  if (skipVerify) {
+    effectiveVerifier = new NoopVerifier();
+  } else {
+    effectiveVerifier = adaptedVerifier;
+  }
+
+  let effectiveReconnector = reconnector;
+
+  if (!effectiveReconnector && retry) {
+    effectiveReconnector = legacyRetryReconnector(retry);
+  }
+
+  const effectiveAuthenticator =
+    authTimeout === undefined ||
+    v4Config.authenticator === undefined ||
+    v4Config.authenticator === false
+      ? undefined
+      : withLegacyAuthTimeout(v4Config.authenticator, authTimeout);
+  const client = new RxNostr({
+    ...v4Config,
+    ...(effectiveVerifier ? { verifier: effectiveVerifier } : {}),
+    ...(effectiveAuthenticator ? { authenticator: effectiveAuthenticator } : {}),
+    ...(effectiveReconnector ? { reconnector: effectiveReconnector } : {}),
+    ...(websocketCtor && !v4Config.WebSocket ? { WebSocket: websocketCtor } : {}),
+    defaultOptions: {
+      ...defaultOptions,
+      req: {
+        ...defaultOptions?.req,
+        ...(eoseTimeout === undefined ? {} : { timeout: eoseTimeout }),
+        ...(disconnectTimeout === undefined ? {} : { linger: disconnectTimeout }),
+        ...(skipValidateFilterMatching === undefined ? {} : { skipValidateFilterMatching }),
+        ...(skipExpirationCheck === undefined ? {} : { skipExpirationCheck }),
+      },
+      publish: {
+        ...defaultOptions?.publish,
+        ...(okTimeout === undefined ? {} : { timeout: okTimeout }),
+        ...(disconnectTimeout === undefined ? {} : { linger: disconnectTimeout }),
+      },
+    },
+  });
+  const defaultRelays = new RxRelays();
+  const readable = new RxRelays();
+  const writable = new RxRelays();
+  const additional = new RxRelays();
+  const additionalReadable = new RxRelays();
+  const additionalWritable = new RxRelays();
+  const retained = new RxRelays();
+
+  if (connectionStrategy === "lazy-keep") {
+    client.setHotRelays(retained);
+  }
+
+  const relayStates = new Map<string, LegacyConnectionState>();
+  const connectionStates = new Subject<LegacyConnectionStatePacket>();
+  const connectionStateSubscription = client
+    .monitorConnectionState()
+    .subscribe(({ from, state }) => {
+      const packet = { from, state: toLegacyConnectionState(state) };
+
+      relayStates.set(from, packet.state);
+      connectionStates.next(packet);
+    });
+
+  const set = (input: LegacyRelayInput, all: RxRelays, read: RxRelays, write: RxRelays) => {
+    const entries = entriesOf(input);
+    const urls = entries.map((entry) => (typeof entry === "string" ? entry : entry.url));
+
+    all.set(...urls);
+    read.set(
+      ...entries
+        .filter((entry) => typeof entry === "string" || entry.read !== false)
+        .map((entry) => (typeof entry === "string" ? entry : entry.url)),
+    );
+    write.set(
+      ...entries
+        .filter((entry) => typeof entry === "string" || entry.write !== false)
+        .map((entry) => (typeof entry === "string" ? entry : entry.url)),
+    );
+  };
+
+  return {
+    defaultRelays,
+    getDefaultRelays(options) {
+      const urls = new Set(defaultRelays);
+      const result: Record<string, { url: string; read: boolean; write: boolean }> = {};
+
+      for (const url of urls) {
+        const read = readable.has(url);
+        const write = writable.has(url);
+        const filter = options?.filter;
+
+        let include = true;
+
+        switch (filter) {
+          case "read-only":
+            include = read && !write;
+
+            break;
+          case "write-only":
+            include = !read && write;
+
+            break;
+          case "read-all":
+            include = read;
+
+            break;
+          case "write-all":
+            include = write;
+
+            break;
+        }
+
+        if (!include) {
+          continue;
+        }
+
+        result[url] = { url, read, write };
+      }
+
+      return result;
+    },
+    getDefaultRelay(url) {
+      const relays = this.getDefaultRelays();
+      const normalizedUrl = RxRelays.array([url])[0];
+
+      return normalizedUrl ? relays[normalizedUrl] : undefined;
+    },
+    getAllRelayStatus() {
+      return Object.fromEntries([...relayStates].map(([url, connection]) => [url, { connection }]));
+    },
+    getRelayStatus(url) {
+      const normalizedUrl = RxRelays.array([url])[0];
+      const connection = normalizedUrl ? relayStates.get(normalizedUrl) : undefined;
+
+      return connection === undefined ? undefined : { connection };
+    },
+    setDefaultRelays(relays) {
+      set(relays, defaultRelays, readable, writable);
+
+      for (const url of defaultRelays) {
+        relayStates.set(url, relayStates.get(url) ?? "initialized");
+      }
+
+      if (connectionStrategy === "aggressive") {
+        client.setHotRelays(defaultRelays);
+      }
+    },
+    addDefaultRelays(relays) {
+      const current = this.getDefaultRelays();
+
+      for (const entry of entriesOf(relays)) {
+        const url = typeof entry === "string" ? entry : entry.url;
+        const normalized = new RxRelays([url]);
+        const key = [...normalized][0] ?? url;
+
+        normalized.dispose();
+        const read = typeof entry === "string" ? true : (entry.read ?? true);
+        const write = typeof entry === "string" ? true : (entry.write ?? true);
+
+        current[key] = { url: key, read, write };
+      }
+
+      this.setDefaultRelays(Object.values(current));
+    },
+    removeDefaultRelays(urls) {
+      const remove = new Set<string>(RxRelays.array(Array.isArray(urls) ? urls : [urls]));
+      const current = Object.values(this.getDefaultRelays()).filter(
+        (relay) => !remove.has(relay.url),
+      );
+
+      this.setDefaultRelays(current);
+    },
+    setAdditionalRelays(relays) {
+      set(relays, additional, additionalReadable, additionalWritable);
+    },
+    use(request, options = {}) {
+      const explicitRelays = options.on?.relays ?? options.relays;
+      let stableExplicitRelays: RxRelays | string[] | undefined;
+
+      if (explicitRelays instanceof RxRelays) {
+        stableExplicitRelays = explicitRelays;
+      } else if (explicitRelays) {
+        stableExplicitRelays = RxRelays.array(explicitRelays);
+      }
+
+      return defer(() => {
+        const base =
+          options.on?.defaultReadRelays === false
+            ? new RxRelays()
+            : combine(readable, additionalReadable);
+        const explicit = stableExplicitRelays ? RxRelays.from(stableExplicitRelays) : undefined;
+        const relays = explicit ? combine(base, explicit) : base;
+        let keepSubscription: Subscription | undefined;
+
+        const dispose = () => {
+          keepSubscription?.unsubscribe();
+
+          if (relays !== base) {
+            relays.dispose();
+          }
+
+          explicit?.dispose();
+          base.dispose();
+        };
+
+        try {
+          const query = client.forward(relays, request, options);
+
+          if (connectionStrategy === "lazy-keep") {
+            keepSubscription = relays.asObservable().subscribe((urls) => {
+              retained.append(...urls);
+            });
+          }
+
+          return query.pipe(finalize(dispose));
+        } catch (error) {
+          dispose();
+
+          throw error;
+        }
+      });
+    },
+    send(event, options = {}) {
+      const base =
+        options.on?.defaultWriteRelays === false
+          ? new RxRelays()
+          : combine(writable, additionalWritable);
+      const explicitRelays = options.on?.relays ?? options.relays;
+      const explicit = explicitRelays ? RxRelays.from(explicitRelays) : undefined;
+      const relays = explicit ? combine(base, explicit) : base;
+      const releaseRelays = () => {
+        if (relays !== base) {
+          relays.dispose();
+        }
+
+        explicit?.dispose();
+        base.dispose();
+      };
+
+      if (RxRelays.array(relays).length === 0) {
+        releaseRelays();
+
+        return throwError(() => new RxNostrPublicationError("no-relays"));
+      }
+
+      const completeOn = options.completeOn ?? "all-ok";
+      const publishOptions = {
+        ...(options.signer ? { signer: options.signer } : {}),
+        ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
+      };
+      let publication: Publication;
+
+      try {
+        publication =
+          completeOn === "sent"
+            ? client[legacyPublishSent](relays, event, publishOptions)
+            : client.publish(relays, event, publishOptions);
+      } catch (error) {
+        releaseRelays();
+
+        throw error;
+      }
+
+      if (connectionStrategy === "lazy-keep") {
+        retained.append(...RxRelays.array(relays));
+      }
+
+      const packets = new Subject<LegacyOkPacket>();
+      let finished = false;
+      let okSubscription: Subscription | undefined;
+      const finish = (error?: unknown) => {
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+
+        okSubscription?.unsubscribe();
+
+        if (error !== undefined) {
+          packets.error(error);
+        } else {
+          packets.complete();
+        }
+
+        publication.cancel();
+        releaseRelays();
+      };
+
+      okSubscription = publication.subscribe({
+        next(packet) {
+          packets.next({ ...packet, done: true });
+
+          if (completeOn === "any-ok" && packet.ok) {
+            finish();
+          }
+        },
+        error: (error) => finish(error),
+        complete() {
+          if (completeOn === "sent") {
+            return;
+          }
+
+          if (completeOn === "any-ok" || options.errorOnTimeout) {
+            void publication.waitFor(completeOn === "any-ok" ? "any" : "all").then(
+              () => finish(),
+              (error: unknown) => {
+                const failures =
+                  error instanceof Error && "failures" in error
+                    ? (error as { failures?: Array<{ kind?: string }> }).failures
+                    : undefined;
+
+                if (options.errorOnTimeout && failures?.some(({ kind }) => kind === "timeout")) {
+                  finish(new TimeoutError());
+                } else if (completeOn === "any-ok") {
+                  finish(error);
+                } else {
+                  finish();
+                }
+              },
+            );
+          } else {
+            finish();
+          }
+        },
+      });
+
+      if (completeOn === "sent") {
+        void publication.waitFor("any").then(
+          () => finish(),
+          (error) => finish(error),
+        );
+
+        void publication.event.catch(() => {});
+      } else {
+        // Keep a rejection handler attached even when no consumer subscribes.
+        void publication.event.catch(() => {});
+      }
+
+      return packets.asObservable();
+    },
+    cast(event, options = {}) {
+      return new Promise<void>((resolve, reject) => {
+        this.send(event, { ...options, completeOn: "sent" }).subscribe({
+          error: reject,
+          complete: resolve,
+        });
+      });
+    },
+    createConnectionStateObservable: () => connectionStates.asObservable(),
+    dispose() {
+      connectionStateSubscription.unsubscribe();
+
+      for (const [from, state] of relayStates) {
+        if (state === "terminated") {
+          continue;
+        }
+
+        relayStates.set(from, "terminated");
+        connectionStates.next({ from, state: "terminated" });
+      }
+
+      client.dispose();
+      connectionStates.complete();
+      defaultRelays.dispose();
+      readable.dispose();
+      writable.dispose();
+      additional.dispose();
+      additionalReadable.dispose();
+      additionalWritable.dispose();
+      retained.dispose();
+    },
+    [Symbol.dispose]() {
+      this.dispose();
+    },
+  };
+}

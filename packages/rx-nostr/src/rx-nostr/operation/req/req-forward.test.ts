@@ -1,0 +1,297 @@
+import "disposablestack/auto";
+import { assert, expect, test } from "vitest";
+
+import { Expect } from "../../../__test__/helper/expect.ts";
+import {
+  Faker,
+  getTestReqOptions,
+  RelayCommunicationMock,
+  SubscriptionInspector,
+} from "../../../__test__/helper/index.ts";
+import { RelayMapOperator } from "../../../libs/index.ts";
+import type { EventPacket } from "../../../packets/index.ts";
+import { RxRelays } from "../../../rx-relays/index.ts";
+import { RxReq } from "../../../rx-req/index.ts";
+import { reqForward } from "./req-forward.ts";
+
+test("single relay", async () => {
+  const rxReq = new RxReq();
+  const relayUrl = "wss://relay1.example.com";
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const relay = relays.get(relayUrl);
+
+  const observable = reqForward({
+    relays,
+    source$: rxReq.asObservable(),
+    relayInput: ["wss://relay1.example.com"],
+    config: getTestReqOptions({
+      linger: 0,
+      defer: false,
+      weak: false,
+    }),
+  });
+  const inspector = new SubscriptionInspector<EventPacket>();
+
+  assert(relay.hasActiveLease, "Relay should be prewarmed (defer=false)");
+
+  const sub = observable.subscribe(inspector);
+
+  const req1 = relay.attachNextStream();
+
+  rxReq.emit([{ kinds: [1] }], { traceTag: 1 });
+  await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
+
+  req1.next(Faker.eventPacket({ id: "1" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1", traceTag: 1 }));
+  req1.next(Faker.eventPacket({ id: "2" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "2", traceTag: 1 }));
+
+  const req2 = relay.attachNextStream();
+
+  rxReq.emit([{ kinds: [2] }], { traceTag: 2 });
+  await req2.subscribed;
+  await relay.expectFilters([{ kinds: [2] }]);
+
+  // The second subscription overrides the first one.
+  // so this is expected to be ignored.
+  req1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  req2.next(Faker.eventPacket({ id: "3" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "3", traceTag: 2 }));
+  req2.next(Faker.eventPacket({ id: "4" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "4", traceTag: 2 }));
+
+  sub.unsubscribe();
+  assert(
+    relay.connectionAttemptCount === 1,
+    "Only one attempt should be made to connect to the relay",
+  );
+  assert(!relay.hasActiveLease, "Relay should be released");
+});
+
+test("single relay, defer=true", async () => {
+  const rxReq = new RxReq();
+  const relayUrl = "wss://relay1.example.com";
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const relay = relays.get(relayUrl);
+
+  const observable = reqForward({
+    relays,
+    source$: rxReq.asObservable(),
+    relayInput: ["wss://relay1.example.com"],
+    config: getTestReqOptions({
+      linger: 0,
+      defer: true,
+      weak: false,
+    }),
+  });
+  const inspector = new SubscriptionInspector<EventPacket>();
+
+  assert(!relay.hasActiveLease, "Relay should not be prewarmed (defer=true)");
+
+  const sub = observable.subscribe(inspector);
+
+  const req1 = relay.attachNextStream();
+
+  rxReq.emit([{ kinds: [1] }]);
+  await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
+
+  assert(
+    relay.hasActiveLease,
+    "Relay should be warmed up just before a demand window (defer=true)",
+  );
+
+  req1.next(Faker.eventPacket({ id: "1" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+
+  sub.unsubscribe();
+  assert(
+    relay.connectionAttemptCount === 1,
+    "Only one attempt should be made to connect to the relay",
+  );
+  assert(!relay.hasActiveLease, "Relay should be released");
+});
+
+test("single relay, weak=true", async () => {
+  const rxReq = new RxReq();
+  const relayUrl = "wss://relay1.example.com";
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const relay = relays.get(relayUrl);
+
+  relay.isHot = true;
+
+  const observable = reqForward({
+    relays,
+    source$: rxReq.asObservable(),
+    relayInput: ["wss://relay1.example.com"],
+    config: getTestReqOptions({
+      linger: 0,
+      defer: false,
+      weak: true,
+    }),
+  });
+  const inspector = new SubscriptionInspector<EventPacket>();
+
+  assert(!relay.hasActiveLease, "Relay should be disconnected (weak=true)");
+
+  const sub = observable.subscribe(inspector);
+
+  const req1 = relay.attachNextStream();
+
+  rxReq.emit([{ kinds: [1] }]);
+  await req1.subscribed;
+  await relay.expectFilters([{ kinds: [1] }]);
+
+  assert(!relay.hasActiveLease, "Relay should be disconnected (weak=true)");
+
+  req1.next(Faker.eventPacket({ id: "1" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+
+  sub.unsubscribe();
+  assert(relay.connectionAttemptCount === 0, "No connection attempts should be made (weak=true)");
+  assert(!relay.hasActiveLease, "Relay should be released");
+});
+
+test("dynamic relays", async () => {
+  const rxReq = new RxReq();
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const defaultRelays = new RxRelays();
+
+  const observable = reqForward({
+    relays,
+    source$: rxReq.asObservable(),
+    relayInput: defaultRelays,
+    config: getTestReqOptions({
+      linger: 0,
+      defer: false,
+      weak: false,
+    }),
+  });
+  const inspector = new SubscriptionInspector<EventPacket>();
+
+  const sub = observable.subscribe(inspector);
+
+  const relayUrl1 = "wss://relay1.example.com";
+  const relay1 = relays.get(relayUrl1);
+  const relayUrl2 = "wss://relay2.example.com";
+  const relay2 = relays.get(relayUrl2);
+
+  const req1relay1 = relay1.attachNextStream();
+
+  assert(!relay1.hasActiveLease, "Relay1 should be disconnected before being added");
+  defaultRelays.append(relayUrl1);
+  assert(relay1.hasActiveLease, "Relay1 should be connected after being added");
+  assert(!relay2.hasActiveLease, "Relay2 should be disconnected");
+  rxReq.emit([{ kinds: [1] }]);
+  await req1relay1.subscribed;
+  await relay1.expectFilters([{ kinds: [1] }]);
+
+  req1relay1.next(Faker.eventPacket({ id: "1" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+
+  const req1relay2 = relay2.attachNextStream();
+
+  assert(!relay2.hasActiveLease, "Relay2 should be disconnected before being added");
+  defaultRelays.append(relayUrl2);
+  assert(relay1.hasActiveLease, "Relay1 should still be connected");
+  assert(relay2.hasActiveLease, "Relay2 should be connected after being added");
+  await req1relay2.subscribed;
+  await relay2.expectFilters([{ kinds: [1] }]);
+
+  req1relay2.next(Faker.eventPacket({ id: "2" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "2" }));
+  req1relay1.next(Faker.eventPacket({ id: "3" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "3" }));
+
+  const req2relay1 = relay1.attachNextStream();
+  const req2relay2 = relay2.attachNextStream();
+
+  rxReq.emit([{ kinds: [2] }]);
+  await req2relay1.subscribed;
+  await req2relay2.subscribed;
+  await relay1.expectFilters([{ kinds: [2] }]);
+  await relay2.expectFilters([{ kinds: [2] }]);
+
+  req1relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  req1relay2.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  req2relay1.next(Faker.eventPacket({ id: "4" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "4" }));
+  req2relay2.next(Faker.eventPacket({ id: "5" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "5" }));
+
+  defaultRelays.remove(relayUrl1);
+  assert(!relay1.hasActiveLease, "Relay1 should be disconnected after being removed");
+
+  req2relay1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  req2relay2.next(Faker.eventPacket({ id: "6" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "6" }));
+
+  sub.unsubscribe();
+  assert(!relay1.hasActiveLease, "Relay1 should be released");
+  assert(!relay2.hasActiveLease, "Relay2 should be released");
+});
+
+test("request-specific relays", async () => {
+  const rxReq = new RxReq();
+  const relays = new RelayMapOperator((url) => new RelayCommunicationMock(url));
+  const defaultRelays = new RxRelays();
+
+  const observable = reqForward({
+    relays,
+    source$: rxReq.asObservable(),
+    relayInput: defaultRelays,
+    config: getTestReqOptions({
+      linger: 0,
+      defer: false,
+      weak: false,
+    }),
+  });
+  const inspector = new SubscriptionInspector<EventPacket>();
+
+  const sub = observable.subscribe(inspector);
+
+  const relayUrl1 = "wss://relay1.example.com";
+  const relay1 = relays.get(relayUrl1);
+  const relayUrl2 = "wss://relay2.example.com";
+  const relay2 = relays.get(relayUrl2);
+  const relayUrl3 = "wss://relay3.example.com";
+  const relay3 = relays.get(relayUrl3);
+
+  defaultRelays.append(relayUrl1);
+
+  const requestRelays = new RxRelays();
+
+  requestRelays.append(relayUrl2);
+
+  const stream1 = relay1.attachNextStream();
+  const stream2 = relay2.attachNextStream();
+  const stream3 = relay3.attachNextStream();
+
+  rxReq.emit({ kinds: [1] }, { relays: requestRelays });
+  await stream2.subscribed;
+  await relay2.expectFilters([{ kinds: [1] }]);
+  assert(relay1.hasActiveLease, "Relay1 should be connected (query defaults)");
+  assert(relay2.hasActiveLease, "Relay2 should be connected (request destinations)");
+
+  stream1.next(Faker.eventPacket({ id: "expect-to-be-ignored" }));
+  stream2.next(Faker.eventPacket({ id: "1" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "1" }));
+
+  requestRelays.append(relayUrl3);
+  await stream3.subscribed;
+  await relay3.expectFilters([{ kinds: [1] }]);
+  assert(relay3.hasActiveLease, "Relay3 should be connected (request destinations)");
+
+  stream3.next(Faker.eventPacket({ id: "2" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "2" }));
+
+  rxReq.emit({ kinds: [2] });
+  await stream1.subscribed;
+  await relay1.expectFilters([{ kinds: [2] }]);
+
+  stream1.next(Faker.eventPacket({ id: "3" }));
+  await expect(inspector.waitNext()).resolves.toEqual(Expect.eventPacket({ id: "3" }));
+
+  sub.unsubscribe();
+});

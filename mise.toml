@@ -1,0 +1,10 @@
+[tools]
+node = "24.21.0"
+pnpm = { version = "12.11.2", allow_builds = ["pnpm"] }
+
+[tool_alias.pnpm]
+backend = "npm:pnpm"
+
+# pnpm's npm package needs its install script to set up the native executable.
+[settings.npm]
+package_manager = "npm"

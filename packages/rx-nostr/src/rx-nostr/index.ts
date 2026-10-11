@@ -1,10 +1,15 @@
 export type {
-  AcceptableDefaultRelaysConfig,
-  DefaultRelayConfig,
-  RxNostr,
-  RxNostrOnParams,
-  RxNostrSendOptions,
-  RxNostrUseOptions,
-} from "./interface.js";
-export * from "./rx-nostr.js";
-export * from "./rx-req.js";
+  IRxNostr,
+  RxNostrConfig,
+  RxNostrDefaultOptions,
+  RxNostrStaticDefaultConfig,
+  RxNostrStaticDefaultOptions,
+} from "./rx-nostr.interface.ts";
+export { RxNostr } from "./rx-nostr.ts";
+export type {
+  RxNostrPublishConfig,
+  RxNostrPublishOptions,
+  RxNostrReqConfig,
+  RxNostrReqInput,
+  RxNostrReqOptions,
+} from "./operation/index.ts";

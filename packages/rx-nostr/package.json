@@ -1,64 +1,80 @@
 {
   "name": "rx-nostr",
-  "version": "3.7.8",
+  "version": "3.6.1",
   "description": "A library based on RxJS, which allows Nostr applications to easily communicate with relays.",
-  "author": "penpenpng",
   "keywords": [
+    "nostr",
     "rxjs",
-    "rxjs7",
-    "nostr"
+    "rxjs7"
   ],
   "homepage": "https://github.com/penpenpng/rx-nostr",
   "bugs": {
     "url": "https://github.com/penpenpng/rx-nostr/issues"
   },
   "license": "MIT",
-  "type": "module",
-  "main": "./index.cjs",
-  "module": "./dist/rx-nostr.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/rx-nostr.js"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "node": "./dist/rx-nostr.cjs",
-        "default": "./dist/rx-nostr.umd.cjs"
-      }
-    },
-    "./src": "./src/index.ts",
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "src",
-    "dist",
-    "!src/__test__"
-  ],
+  "author": "penpenpng",
   "repository": {
     "type": "git",
     "url": "https://github.com/penpenpng/rx-nostr.git"
   },
-  "scripts": {
-    "build": "vite build",
-    "lint": "eslint ./src && prettier --check ./src",
-    "lint:fix": "eslint --fix ./src && prettier --write ./src",
-    "test": "vitest --run",
-    "test:watch": "vitest"
+  "files": [
+    "src",
+    "dist",
+    "!src/__test__",
+    "!src/**/*.spec.ts",
+    "!src/**/*.test.ts"
+  ],
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "@rx-nostr/development": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./operators": {
+      "types": "./dist/operators.d.ts",
+      "@rx-nostr/development": "./src/operators.ts",
+      "import": "./dist/operators.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "@rx-nostr/development": "./src/utils.ts",
+      "import": "./dist/utils.js"
+    },
+    "./legacy": {
+      "types": "./dist/legacy.d.ts",
+      "@rx-nostr/development": "./src/legacy.ts",
+      "import": "./dist/legacy.js"
+    },
+    "./package.json": "./package.json"
   },
-  "devDependencies": {
-    "typescript": "^5.4.5",
-    "vite": "^4.2.0",
-    "vite-plugin-dts": "^4.0.0",
-    "vitest": "^1.6.0",
-    "vitest-nostr": "^0.4.1",
-    "vitest-websocket-mock": "^0.2.1"
+  "scripts": {
+    "build": "pnpm typecheck && vp pack",
+    "prepack": "pnpm build",
+    "test": "vitest run",
+    "test:contract": "vitest run --project contract",
+    "test:dev": "vitest --ui",
+    "test:unit": "vitest run --project unit",
+    "typecheck": "tsc --project tsconfig.check.json"
   },
   "dependencies": {
-    "@types/node": "^25.6.0",
+    "rxjs": "^7.8.2",
+    "unipls": "^0.2.0"
+  },
+  "devDependencies": {
+    "@rx-nostr/crypto": "workspace:*",
+    "@types/node": "^26.6.2",
+    "@vitest/ui": "^5.0.1",
+    "disposablestack": "^1.1.8",
     "nostr-typedef": "^0.13.0",
-    "rxjs": "^7.8.0"
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
+  },
+  "peerDependencies": {
+    "nostr-typedef": "^0.13.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

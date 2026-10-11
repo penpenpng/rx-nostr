@@ -1,17 +1,17 @@
-import path from "path";
-import { type PluginOption } from "vite";
-import dts from "vite-plugin-dts";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
-  build: {
-    minify: false,
-    lib: {
-      name: "RxNostrCrypto",
-      entry: path.resolve(__dirname, "src/index.ts"),
-      formats: ["es", "cjs", "umd"],
+  pack: {
+    entry: ["src/index.ts"],
+    target: "es2022",
+    dts: true,
+    deps: {
+      neverBundle: true,
     },
+    platform: "neutral",
     sourcemap: true,
+    clean: true,
+    outDir: "dist",
+    format: ["esm"],
   },
-  plugins: [dts() as PluginOption],
 });

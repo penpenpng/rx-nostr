@@ -22,7 +22,7 @@ You can exchange data in a very familiar way (as you see [NIP-01](https://github
 - REQ queue respecting NIP-11
   - Based on NIP-11, queuing requests if they exceed the limit of subscriptions that can run concurrently.
 - Reactive relay pool
-  - On updating "default relays", the subscriptions on default relays is reconstructed on new default relays.
+  - Queries follow changes to their RxRelays destinations, adding and removing relay subscriptions.
 - Monitoring WebSocket connection
   - For example, it helps you show relay status to users.
 - Lazy connection
@@ -34,39 +34,53 @@ Under the hood, rx-nostr makes use of [RxJS](https://rxjs.dev/), but you don't n
 
 ## Quickstart
 
+v4 supports Node.js 24+ and browsers with `DisposableStack`, `Promise.withResolvers`, modern Set methods, and `Array.prototype.toSorted` (or polyfills loaded before importing rx-nostr). See the [runtime requirements](https://penpenpng.github.io/rx-nostr/ja/v4/installation) for the full setup, including WebSocket injection.
+
 ```
 npm install rx-nostr @rx-nostr/crypto
 ```
 
+<!-- typecheck-example: root-readme-quickstart -->
+
 ```ts
-import { createRxNostr, createRxForwardReq } from "rx-nostr";
-import { verifier, seckeySigner } from "@rx-nostr/crypto";
+import { RxNostr } from "rx-nostr";
+import { SimpleVerifier } from "@rx-nostr/crypto";
 
-import WebSocket from "ws";
-
-const rxNostr = createRxNostr({
-  signer: seckeySigner("nsec1..."), // If omitted, rx-nostr uses NIP-07.
-  verifier,
-  websocketCtor: WebSocket, // You need this if `globalThis.WebSocket` doesn't exist (e.g. Node.js runtime).
+const rxNostr = new RxNostr({
+  verifier: new SimpleVerifier(),
 });
 
-rxNostr.setDefaultRelays(["wss://nostr.example.com"]);
+const subscription = rxNostr
+  .forward(["wss://nostr.example.com"], [{ kinds: [1] }])
+  .subscribe(({ event }) => {
+    console.log(event);
+  });
 
-const rxReq = createRxForwardReq();
-
-// Define a listener.
-rxNostr.use(rxReq).subscribe(({ event }) => {
-  console.log(event);
-});
-
-// Emit a filter to start subscription.
-rxReq.emit({ kinds: [1] });
+// When finished:
+subscription.unsubscribe();
+rxNostr.dispose();
 ```
 
 ## For more information
 
 - Documentation: https://penpenpng.github.io/rx-nostr/
 - Release notes: https://github.com/penpenpng/rx-nostr/releases
+
+## Development
+
+This repository uses the pnpm version declared in `package.json` and the
+workspace defined in `pnpm-workspace.yaml`.
+
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+```
+
+The workspace rejects dependency releases newer than one day by default. Add
+an exception only for an urgent security fix. User-visible changes must include
+a Changesets entry created with `pnpm changeset`.
 
 ## License
 

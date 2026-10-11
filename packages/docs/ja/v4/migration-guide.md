@@ -1,0 +1,255 @@
+# Migration from v3
+
+v4 は operation、connection、metadata の責務を分け直した major release です。v3 API 名の alias はありません。`rx-nostr/legacy` には移行を補助する v3 形式の facade があり、利用可能な範囲はその公開型に従います。
+
+## Package
+
+`nostr-typedef` は peer dependency です。application の直接依存として追加してください。
+
+```sh
+pnpm add rx-nostr @rx-nostr/crypto nostr-typedef
+```
+
+`@rx-nostr/crypto` の signer/verifier は factory function から class へ変わっています。
+
+```ts
+// v3
+import { seckeySigner, verifier } from "@rx-nostr/crypto";
+
+// v4
+import { SeckeySigner, SimpleVerifier } from "@rx-nostr/crypto";
+
+const signer = new SeckeySigner("nsec1...");
+const verifier = new SimpleVerifier();
+```
+
+rx-nostr 本体の `nip07Signer()`、`noopSigner()`、`noopVerifier` も、それぞれ `Nip07Signer`、`NoopSigner`、`NoopVerifier` の instance に置き換えます。
+
+## Client の作成
+
+`createRxNostr()` factory は廃止され、公開された `RxNostr` class を直接構築します。引数は省略できますが、既定の verifier は EVENT の検証時にエラーとなるため、REQ を使う場合は instance config または `RxNostr.defaultConfig` に実際の verifier を指定します。Node.js 用 WebSocket option の名前は `websocketCtor` から `WebSocket` へ変わりました。
+
+```ts
+// v3
+const rxNostr = createRxNostr({
+  verifier,
+  websocketCtor: WebSocket,
+});
+
+// v4
+const rxNostr = new RxNostr({
+  verifier: new SimpleVerifier(),
+  WebSocket,
+});
+```
+
+## Default relay を operation の宛先へ移す
+
+v4 の `RxNostr` は default relay を持ちません。`setDefaultRelays()`、`setAdditionalRelays()`、read/write flag は削除されました。すべての `forward()`、`backward()`、`publish()` で宛先を指定します。
+
+```ts
+// v3
+rxNostr.setDefaultRelays(["wss://relay.example.com"]);
+rxNostr.use(request);
+
+// v4
+rxNostr.forward(["wss://relay.example.com"], request);
+```
+
+一時的な relay と default relay の区別もありません。ReqPacket ごとの宛先変更は `emit()` の option で行います。
+
+```ts
+request.emit(filters, {
+  relays: ["wss://temporary.example.com"],
+});
+```
+
+## `use()` を `forward()` / `backward()` へ移す
+
+v4 では継続的な問い合わせと過去の取得に共通の `RxReq` を使い、操作側で `forward()` または `backward()` を選びます。
+
+```ts
+// v3
+const request = createRxForwardReq();
+const events$ = rxNostr.use(request);
+
+// v4
+const request = new RxReq();
+const events$ = rxNostr.forward(relays, request);
+```
+
+簡単な backward query では `RxReq` を作らず、filter の配列を渡せます。
+
+```ts
+rxNostr.backward(relays, [{ kinds: [1], limit: 20 }]);
+```
+
+forward は新しい ReqPacket が直前の REQ を置き換え、backward は各 REQ を並行して EOSE まで維持する契約を保ちます。
+
+### EventPacket
+
+v4 の query 結果は次の形です。
+
+```ts
+interface EventPacket {
+  from: RelayUrl;
+  type: "EVENT";
+  event: Nostr.Event;
+  traceTag?: string | number;
+}
+```
+
+物理的な `subId`、logical `vreqId`、raw protocol tuple は公開されません。問い合わせとの対応付けが必要なら `emit(filters, { traceTag })` を使います。
+
+## `send()` を `publish()` へ移す
+
+v3 の `send()` が返す Observable は、v4 では `Publication` に置き換わります。
+
+```ts
+// v3
+rxNostr.send(params).subscribe(onOk);
+
+// v4
+const publication = rxNostr.publish(relays, params);
+publication.subscribe(onOk);
+await publication.waitFor("all");
+```
+
+v3 の `completeOn: "all-ok"` / `"any-ok"` に相当する受理条件は `waitFor("all")` または `waitFor("any")` で明示します。`cast()` の送信完了とは異なります。
+
+移行用の `rx-nostr/legacy` facade では、default / additional relay を URL、`Set`、generator、URL を key とする permission map で指定できます。`read: false` の relay は `use()` の宛先から、`write: false` の relay は `send()` / `cast()` の宛先から除外されます。`use()` は cold Observable で、同じ戻り値を複数回 subscribe しても各 subscription の宛先追従と解除は独立します。`send()` は呼び出し時に始まる hot operation です。`cast()` は少なくともひとつの relay へ EVENT を送信してから resolve し、OK は待ちません。
+
+legacy の `send()` / `cast()` は書き込み先が空なら `no-relays` で失敗します。`completeOn: "any-ok"` はいずれかの `OK true` で完了し、全宛先で受理されなければ `all-failed` で失敗します。`completeOn: "all-ok"` は v3 と同じく全宛先の最終応答を待つ方式で、`OK false` 自体は stream の error に変換しません。各 `LegacyOkPacket.ok` を確認してください。`errorOnTimeout: true` のときは timeout を `TimeoutError` として通知します。
+
+- OK observer の unsubscribe は送信を止めない
+- 送信を止める場合は `publication.cancel()`
+- 署名された EVENT は `await publication.event`。この Promise は送信完了の通知ではありません
+- 宛先は `publish()` 呼び出し時の snapshot
+
+## Connection strategy
+
+v3 の `lazy`、`lazy-keep`、`aggressive` と default relay の接続維持は、次の option に分解されました。
+
+| v4 mechanism | 内容 |
+| --- | --- |
+| `defer` | ReqPacket が来るまで query 接続を遅延する |
+| `weak` | operation 自身は接続需要を作らない |
+| `linger` | operation 終了後に接続需要を維持する時間 |
+| `setHotRelays()` | operation がなくても接続を維持する |
+
+既定では `defer: true`、`weak: false`、`linger: 10_000` です。
+
+`rx-nostr/legacy` facade の `lazy` は需要終了後に切断し、`lazy-keep` は最初に `use()` を subscribe するか `send()` / `cast()` で選んだ relay を dispose まで維持します。`aggressive` は default relay の設定時に接続を温めます。`disconnectTimeout` は操作終了後の linger を指定します。
+
+hot relay は宛先ではありません。v3 の default relay と同様に使う場合でも、operation の `relays` は別に指定してください。
+
+## Connection state と retry
+
+`createConnectionStateObservable()` は `monitorConnectionState()` へ変わりました。state 名と構造も v4 独自の union です。通知される state は内部状態から切り離された変更可能な copy です。
+
+```ts
+rxNostr.monitorConnectionState().subscribe(({ from, state }) => {
+  console.log(from, state.state);
+});
+```
+
+手動 `reconnect()` は削除されました。再接続の回数、遅延、打ち切りは `ConnectionReconnector` で制御します。
+
+## `createAllErrorObservable()` を log sink へ移す
+
+v3 で `createAllErrorObservable()` が通知していた relay message の解析失敗、WebSocket send の失敗、予期しない WebSocket close は、v4 では全 instance 共通の `RxNostr.logSink` で受け取れます。
+
+```ts
+// v3
+rxNostr.createAllErrorObservable().subscribe(({ from, reason }) => {
+  console.debug(from, reason);
+});
+
+// v4: callback はログ発生箇所から同期的に呼ばれます
+RxNostr.logSink = (log) => {
+  console.debug(log.context?.relay, log.event, log.message, log.cause);
+};
+```
+
+log はデバッグ／記録用です。application が処理すべき失敗は operation の戻り値または例外、connection の状態は `monitorConnectionState()` を使ってください。static callback にはすべての `RxNostr` instance の log が届きます。callback を解除するには `RxNostr.logSink = undefined` とします。
+
+`setLogLevel()` は削除されました。v4 は library から console へ直接出力しません。出力先や filtering は application 側で選択してください。
+
+## AUTH は明示的に有効化する
+
+v3 の `authenticator: "auto"` は削除されました。signer から `SimpleAuthenticator` を作ります。
+
+```ts
+// v3
+const rxNostr = createRxNostr({
+  signer,
+  verifier,
+  authenticator: "auto",
+});
+
+// v4
+const rxNostr = new RxNostr({
+  signer,
+  verifier,
+  authenticator: new SimpleAuthenticator(signer),
+});
+```
+
+signer を指定しても AUTH は暗黙に有効になりません。AUTH は接続単位で共有されるため、operation ごとの `authenticator` オプションは削除されました。インスタンスの `authenticator: false` で static default を無効化できます。challenge の受信時に認証を開始し、認証中は通常送信・再送を待機します。同じ challenge の失敗結果は保持され、再試行しません。
+
+## `Nip11Registry` を `RelayDirectory` へ移す
+
+static registry は、process-global または injectable な Directory に変わりました。
+
+```ts
+// v3
+Nip11Registry.get(url);
+await Nip11Registry.fetch(url);
+
+// v4
+GlobalRelayDirectory.get(url);
+await GlobalRelayDirectory.fetchNip11(url);
+```
+
+application 固有の store を使う場合:
+
+```ts
+const directory = new RelayDirectory();
+const rxNostr = new RxNostr({ verifier, relayDirectory: directory });
+```
+
+v4 は Directory を自動永続化しません。`exportSnapshot()` / `importSnapshot()` と application の storage を組み合わせてください。
+
+## Dispose
+
+`RxNostr`、`RxReq`、`RxRelays`、Worker verifier は不要になった時点で dispose してください。v4 の dispose は operation、linger、retry、AUTH、transport の順にすべての resource を終了します。
+
+```ts
+publication.cancel();
+subscription.unsubscribe();
+request.dispose();
+relays.dispose();
+rxNostr.dispose();
+```
+
+## 削除された公開能力
+
+- v3 API 名の compatibility alias
+- `createRxNostr()` factory（`new RxNostr()` に置換）
+- default/additional relay と read/write flag
+- transport の raw message/outgoing-message Observable
+- instance ごとの error Observable（process-wide な `RxNostr.logSink` に置換）
+- query result の physical subscription identifier
+- signer から暗黙に AUTH を有効化する挙動
+- `reconnect()` と `polite` retry option
+- `Nip11Registry` による自動永続化
+
+これらの transport detail に依存していた場合は、operation result、connection state、`RelayDirectory`、custom retry policy のいずれに責務が属するかを分けて移行してください。
+
+
+## v4 公開 API の追加整理
+
+- signer constructor の `tags` option はありません。tags は署名前の EVENT parameters に指定します。
+- v4 の `RelayInput` は URL 文字列・readonly 配列・Set・RxRelays に限ります。generator は配列へ展開して渡してください。legacy の default / additional relay 設定は従来どおり iterable を受け取り、設定時に消費します。
+- NIP-11 の deadline は `new RelayDirectory({ timeout })` で統一します。RxNostr の `nip11Timeout` と `fetchNip11()` ごとの `timeout` はありません。
+- snapshot の error 型は `RxNostrRelayDirectorySnapshotError` / `RxNostrRelayDirectorySnapshotErrorCode` です。

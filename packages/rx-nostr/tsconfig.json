@@ -1,11 +1,16 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "types": ["vitest/importMeta"],
     "moduleResolution": "bundler",
+    "paths": {
+      "rx-nostr": ["./src/index.ts"],
+      "rx-nostr/operators": ["./src/operators.ts"],
+      "rx-nostr/utils": ["./src/utils.ts"]
+    },
     "strict": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -17,8 +22,9 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/__test__/**/*.ts"]
+  "exclude": ["src/__test__/**", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

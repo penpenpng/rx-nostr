@@ -1,0 +1,1 @@
+export const DEFAULT_AUTH_TIMEOUT = 30_000;

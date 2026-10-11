@@ -1,0 +1,305 @@
+// Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.
+/* eslint-disable unicorn/require-post-message-target-origin */
+import type * as Nostr from "nostr-typedef";
+
+import { RxNostrAlreadyDisposedError, RxNostrEnvironmentError } from "../libs/error.ts";
+import { once } from "../libs/index.ts";
+import { assertTimerDuration } from "../libs/timing.ts";
+import type { EventVerifier } from "./event-verifier.interface.ts";
+
+export class VerificationHost {
+  #disposed = false;
+  constructor(private verifier: EventVerifier) {}
+
+  start() {
+    if (this.#disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
+    if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
+      throw new RxNostrEnvironmentError(".start() must be called in a Worker context.");
+    }
+
+    self.addEventListener("message", this.#handler);
+  }
+
+  #handler = async (ev: MessageEvent<VerificationRequest | PingMessage>) => {
+    if (this.#disposed) {
+      return;
+    }
+    if (ev.data === "ping") {
+      self.postMessage("pong" satisfies PongMessage);
+
+      return;
+    }
+
+    if (typeof ev.data !== "object" || ev.data === null || !Number.isInteger(ev.data.reqId)) {
+      return;
+    }
+
+    const { reqId, event } = ev.data;
+
+    try {
+      const ok = await this.verifier.verifyEvent(event);
+
+      if (this.#disposed) {
+        return;
+      }
+
+      self.postMessage({
+        reqId,
+        ok,
+      } satisfies VerificationResponse);
+    } catch (err) {
+      if (this.#disposed) {
+        return;
+      }
+
+      self.postMessage({
+        reqId,
+        ok: false,
+        error: errorMessage(err),
+      } satisfies VerificationResponse);
+    }
+  };
+
+  [Symbol.dispose] = once(() => {
+    if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
+      throw new RxNostrEnvironmentError(".dispose() must be called in a Worker context.");
+    }
+
+    this.#disposed = true;
+
+    self.removeEventListener("message", this.#handler);
+  });
+  dispose = this[Symbol.dispose];
+}
+
+/** Worker-backed verifier; all requests have a deadline and reject on client disposal. */
+export class VerificationClient implements EventVerifier {
+  #status: VerificationServiceStatus = "prepared";
+  #nextReqId = 1;
+  #pending = new Map<
+    number,
+    {
+      backend: "worker" | "fallback";
+      resolve: (ok: boolean) => void;
+      reject: (error: unknown) => void;
+      cancelTimeout: () => void;
+    }
+  >();
+  readonly #timeout: number;
+
+  constructor(private config: VerificationClientConfig) {
+    const timeout = config.timeout ?? 10_000;
+
+    this.#timeout = assertTimerDuration(timeout, "Verification timeout", {
+      allowZero: true,
+      allowInfinity: true,
+    });
+  }
+
+  get status() {
+    return this.#status;
+  }
+
+  start() {
+    if (this.#status === "prepared") {
+      this.#status = "booting";
+
+      const worker = this.config.worker;
+
+      worker.addEventListener("message", this.#onmessage);
+      worker.addEventListener("error", this.#onerror);
+      worker.addEventListener("messageerror", this.#onerror);
+      try {
+        worker.postMessage("ping" as PingMessage);
+      } catch {
+        this.#onerror();
+      }
+    }
+  }
+
+  #onmessage = (ev: MessageEvent<VerificationResponse | PongMessage>) => {
+    if (this.#status === "terminated") {
+      return;
+    }
+
+    if (ev.data === "pong") {
+      if (this.#status === "booting") {
+        this.#status = "active";
+      }
+
+      return;
+    }
+
+    if (typeof ev.data !== "object" || ev.data === null || !Number.isInteger(ev.data.reqId)) {
+      return;
+    }
+
+    const { reqId, ok, error } = ev.data;
+
+    if (this.#pending.get(reqId)?.backend !== "worker") {
+      return;
+    }
+
+    if (typeof error === "string") {
+      this.#settle(reqId, { error: new Error(error) });
+    } else if ("error" in ev.data || typeof ok !== "boolean") {
+      this.#settle(reqId, { error: new Error("Invalid Worker verification response.") });
+    } else {
+      this.#settle(reqId, { ok });
+    }
+  };
+
+  #onerror = () => {
+    if (this.#status === "terminated") {
+      return;
+    }
+
+    this.#status = "error";
+
+    this.#rejectPending(new Error("Verification worker failed."), "worker");
+  };
+
+  verifyEvent(event: Nostr.Event): Promise<boolean> {
+    switch (this.#status) {
+      case "prepared":
+        throw new Error("VerificationClient is not started yet.");
+      case "booting":
+      case "error":
+        return this.#verifyByFallback(event);
+      case "active":
+        return this.#verifyByWorker(event);
+      case "terminated":
+        throw new Error("VerificationClient is already disposed.");
+    }
+  }
+
+  #createRequest(backend: "worker" | "fallback") {
+    const reqId = this.#nextReqId++;
+
+    const result = new Promise<boolean>((resolve, reject) => {
+      const timer = Number.isFinite(this.#timeout)
+        ? setTimeout(() => {
+            this.#settle(reqId, { error: new Error("Verification request was timed out.") });
+          }, this.#timeout)
+        : undefined;
+      const cancelTimeout = () => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+      };
+
+      this.#pending.set(reqId, { backend, resolve, reject, cancelTimeout });
+    });
+
+    return { reqId, result };
+  }
+
+  #verifyByWorker(event: Nostr.Event): Promise<boolean> {
+    const { reqId, result } = this.#createRequest("worker");
+
+    try {
+      this.config.worker.postMessage({ reqId, event } satisfies VerificationRequest);
+    } catch (error) {
+      this.#settle(reqId, { error });
+      this.#onerror();
+    }
+
+    return result;
+  }
+
+  #settle(reqId: number, result: { ok: boolean } | { error: unknown }): void {
+    const pending = this.#pending.get(reqId);
+
+    if (!pending) {
+      return;
+    }
+
+    this.#pending.delete(reqId);
+    pending.cancelTimeout();
+
+    if ("error" in result) {
+      pending.reject(result.error);
+    } else {
+      pending.resolve(result.ok);
+    }
+  }
+
+  #rejectPending(error: unknown, backend?: "worker"): void {
+    for (const [reqId, pending] of this.#pending) {
+      if (backend === undefined || pending.backend === backend) {
+        this.#settle(reqId, { error });
+      }
+    }
+  }
+
+  #verifyByFallback(event: Nostr.Event): Promise<boolean> {
+    const verifier = this.config.fallback;
+
+    if (!verifier) {
+      throw new Error("VerificationHost is not working but no fallback verifier is provided.");
+    }
+
+    const { reqId, result } = this.#createRequest("fallback");
+
+    try {
+      void Promise.resolve(verifier.verifyEvent(event)).then(
+        (ok) => this.#settle(reqId, { ok }),
+        (error) => this.#settle(reqId, { error }),
+      );
+    } catch (error) {
+      this.#settle(reqId, { error });
+    }
+
+    return result;
+  }
+
+  [Symbol.dispose] = once(() => {
+    this.#status = "terminated";
+
+    this.#rejectPending(new Error("VerificationClient was disposed."));
+
+    const worker = this.config.worker;
+
+    worker.removeEventListener("message", this.#onmessage);
+    worker.removeEventListener("error", this.#onerror);
+    worker.removeEventListener("messageerror", this.#onerror);
+    worker.terminate();
+  });
+  dispose = this[Symbol.dispose];
+}
+
+type PingMessage = "ping";
+type PongMessage = "pong";
+
+export interface VerificationRequest {
+  reqId: number;
+  event: Nostr.Event;
+}
+
+export interface VerificationResponse {
+  reqId: number;
+  ok: boolean;
+  /** Present only when verification failed to run; the client rejects the request. */
+  error?: string;
+}
+
+export type VerificationServiceStatus = "prepared" | "booting" | "active" | "error" | "terminated";
+
+export interface VerificationClientConfig {
+  worker: Worker;
+  fallback?: EventVerifier;
+  /** Worker and fallback deadline in milliseconds; 0 is immediate, Infinity disables it. Defaults to 10000. */
+  timeout?: number;
+}
+
+function errorMessage(error: unknown): string {
+  try {
+    return String(error);
+  } catch {
+    return "Worker verification failed.";
+  }
+}
+// Worker.postMessage has no targetOrigin parameter; that argument only applies to Window.
+// oxlint-disable unicorn(require-post-message-target-origin)
