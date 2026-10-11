@@ -42,6 +42,40 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    test.each(["forward", "backward"] as const)(
+      "%s accepts a single filter and evaluates lazy bounds at send time",
+      async (strategy) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        let since = 1;
+        const subscription = rxNostr[strategy](relay, { since: () => since }).subscribe();
+
+        since = 2;
+
+        const socket = server.sockets.latest;
+
+        socket.open();
+        const [, , sent] = await socket.inbox.waitNext("REQ");
+
+        expect(sent).toEqual({ since: 2 });
+        subscription.unsubscribe();
+        rxNostr.dispose();
+      },
+    );
+
+    test.each(["forward", "backward"] as const)(
+      "%s accepts a single empty filter as match all",
+      async (strategy) => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const subscription = rxNostr[strategy](relay, {}).subscribe();
+        const socket = server.sockets.latest;
+
+        socket.open();
+        expect(await socket.inbox.waitNext("REQ")).toEqual(["REQ", expect.any(String), {}]);
+        subscription.unsubscribe();
+        rxNostr.dispose();
+      },
+    );
+
     test("rejects invalid operation timeout before opening a connection", () => {
       const { server, rxNostr } = createRxNostrScenario();
 
@@ -65,7 +99,7 @@ describe("REQ public contract", () => {
       rxNostr.dispose();
     });
 
-    test.each(["static", "emitted", "piped"] as const)(
+    test.each(["single", "static", "emitted", "piped"] as const)(
       "%s filter snapshots condition arrays before later caller mutation",
       async (input) => {
         const { server, rxNostr } = createRxNostrScenario();
@@ -73,7 +107,9 @@ describe("REQ public contract", () => {
         const filter: LazyFilter = { authors: ["first"] };
         let request: RxNostrReqInput = source;
 
-        if (input === "static") {
+        if (input === "single") {
+          request = filter;
+        } else if (input === "static") {
           request = [filter];
         } else if (input === "piped") {
           request = source.pipe(map((packet) => ({ ...packet, filters: [filter] })));
@@ -83,7 +119,7 @@ describe("REQ public contract", () => {
 
         rxNostr.backward(relay, request).subscribe(inspector);
 
-        if (input !== "static") {
+        if (input !== "static" && input !== "single") {
           source.emit(input === "piped" ? [{}] : filter);
           source.dispose();
         }
@@ -116,7 +152,11 @@ describe("REQ public contract", () => {
         { name: "unknown field", filter: { unexpected: true } as unknown as LazyFilter },
       ];
       const cases = invalidCases.flatMap(({ name, filter }) =>
-        (["static", "emitted", "piped"] as const).map((input) => ({ name, filter, input })),
+        (["single", "static", "emitted", "piped"] as const).map((input) => ({
+          name,
+          filter,
+          input,
+        })),
       );
 
       test.each(cases)("$input $name completes without sending REQ", async ({ input, filter }) => {
@@ -125,7 +165,9 @@ describe("REQ public contract", () => {
         const source = new RxReq();
         let request: RxNostrReqInput = source;
 
-        if (input === "static") {
+        if (input === "single") {
+          request = filter;
+        } else if (input === "static") {
           request = [filter];
         } else if (input === "piped") {
           request = source.pipe(map((packet) => ({ ...packet, filters: [filter] })));
@@ -133,7 +175,7 @@ describe("REQ public contract", () => {
 
         rxNostr[strategy](relay, request).subscribe(inspector);
 
-        if (input !== "static") {
+        if (input !== "static" && input !== "single") {
           source.emit(input === "piped" ? [{}] : filter);
           source.dispose();
         }

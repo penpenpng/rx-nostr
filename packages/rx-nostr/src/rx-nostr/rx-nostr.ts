@@ -137,7 +137,7 @@ export class RxNostr implements IRxNostr {
         }),
       );
     } else {
-      // Static caller-owned arrays are snapshotted when forward/backward is called.
+      // Static caller-owned filters are snapshotted when forward/backward is called.
       const filters = normalizeFilters(request);
 
       source$ = filters.length === 0 ? EMPTY : of({ filters });
