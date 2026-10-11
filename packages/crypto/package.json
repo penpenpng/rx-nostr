@@ -48,7 +48,7 @@
   "devDependencies": {
     "nostr-typedef": "^0.13.0",
     "typescript": "catalog:",
-    "vitest": "^5.0.1"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0"

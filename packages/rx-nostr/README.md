@@ -43,8 +43,8 @@ npm install rx-nostr @rx-nostr/crypto
 <!-- typecheck-example: package-readme-quickstart -->
 
 ```ts
-import { RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
+import { RxNostr } from "rx-nostr";
 
 const rxNostr = new RxNostr({
   verifier: new SimpleVerifier(),

@@ -65,11 +65,11 @@
   "devDependencies": {
     "@rx-nostr/crypto": "workspace:*",
     "@types/node": "^26.6.2",
-    "@vitest/ui": "^5.0.1",
+    "@vitest/ui": "catalog:",
     "disposablestack": "^1.1.8",
     "nostr-typedef": "^0.13.0",
     "typescript": "catalog:",
-    "vitest": "^5.0.1"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "nostr-typedef": "^0.13.0"

@@ -7,7 +7,9 @@ engineStrict: true
 linkWorkspacePackages: true
 
 catalog:
+  "@vitest/ui": 5.0.3
   typescript: 6.0.2
+  vitest: 5.0.3
 
 # New releases must age for one day before they are eligible for installation.
 # Add narrowly scoped exceptions only when an urgent security fix cannot wait.
@@ -17,12 +19,8 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   esbuild: true
-  msw: false
 
-# Vite+ is intentionally scoped to pack/lint/fmt while package tests retain
-# their current Vitest majors. These peers are not used by the node-mode tests.
+# Vite+ uses its own version number for the bundled Vite alias.
 peerDependencyRules:
   allowedVersions:
-    "@vitest/browser-preview": "4.1.11"
-    "@vitest/ui": "4.1.11"
-    vite: "0.3.3"
+    vite: "1.1.0"

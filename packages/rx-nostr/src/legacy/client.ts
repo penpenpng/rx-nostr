@@ -43,6 +43,23 @@ function combine(a: RxRelays, b: RxRelays): RxRelays {
   return RxRelays.union(a, b);
 }
 
+function setRelayGroups(input: LegacyRelayInput, all: RxRelays, read: RxRelays, write: RxRelays) {
+  const entries = entriesOf(input);
+  const urls = entries.map((entry) => (typeof entry === "string" ? entry : entry.url));
+
+  all.set(...urls);
+  read.set(
+    ...entries
+      .filter((entry) => typeof entry === "string" || entry.read !== false)
+      .map((entry) => (typeof entry === "string" ? entry : entry.url)),
+  );
+  write.set(
+    ...entries
+      .filter((entry) => typeof entry === "string" || entry.write !== false)
+      .map((entry) => (typeof entry === "string" ? entry : entry.url)),
+  );
+}
+
 /** Create a v3-shaped facade backed by the v4 RxNostr implementation. */
 export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRxNostr {
   const {
@@ -128,23 +145,6 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       connectionStates.next(packet);
     });
 
-  const set = (input: LegacyRelayInput, all: RxRelays, read: RxRelays, write: RxRelays) => {
-    const entries = entriesOf(input);
-    const urls = entries.map((entry) => (typeof entry === "string" ? entry : entry.url));
-
-    all.set(...urls);
-    read.set(
-      ...entries
-        .filter((entry) => typeof entry === "string" || entry.read !== false)
-        .map((entry) => (typeof entry === "string" ? entry : entry.url)),
-    );
-    write.set(
-      ...entries
-        .filter((entry) => typeof entry === "string" || entry.write !== false)
-        .map((entry) => (typeof entry === "string" ? entry : entry.url)),
-    );
-  };
-
   return {
     defaultRelays,
     getDefaultRelays(options) {
@@ -202,7 +202,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       return connection === undefined ? undefined : { connection };
     },
     setDefaultRelays(relays) {
-      set(relays, defaultRelays, readable, writable);
+      setRelayGroups(relays, defaultRelays, readable, writable);
 
       for (const url of defaultRelays) {
         relayStates.set(url, relayStates.get(url) ?? "initialized");
@@ -238,7 +238,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
       this.setDefaultRelays(current);
     },
     setAdditionalRelays(relays) {
-      set(relays, additional, additionalReadable, additionalWritable);
+      setRelayGroups(relays, additional, additionalReadable, additionalWritable);
     },
     use(request, options = {}) {
       const explicitRelays = options.on?.relays ?? options.relays;
