@@ -19,7 +19,7 @@
     "test": "pnpm --recursive --if-present test",
     "test:packed": "node scripts/test-packed-consumers.mjs",
     "test:worker-browser": "node scripts/test-worker-browser.mjs",
-    "version-packages": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile"
+    "version-packages": "changeset version && vp fmt .changeset --write && pnpm install --lockfile-only --no-frozen-lockfile"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
