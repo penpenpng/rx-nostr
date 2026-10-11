@@ -35,8 +35,8 @@ jobs:
           version: pnpm version-packages
           publish: pnpm release:beta
           createGithubReleases: true
-          title: "chore: release v4 packages"
-          commit: "chore: release v4 packages"
+          title: "chore: release packages"
+          commit: "chore: release packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
