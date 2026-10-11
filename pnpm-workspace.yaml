@@ -19,6 +19,7 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   esbuild: true
+  msw: false # remove after unipls 0.3.0
 
 # Vite+ uses its own version number for the bundled Vite alias.
 peerDependencyRules:
