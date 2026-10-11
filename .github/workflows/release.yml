@@ -33,7 +33,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
-          publish: pnpm release:beta
+          publish: pnpm release
           createGithubReleases: true
           title: "chore: release packages"
           commit: "chore: release packages"
