@@ -29,7 +29,8 @@ if (pre.changesets.length === 0) {
     }
   }
 
-  const result = spawnSync("pnpm", ["exec", "changeset", "publish", "--tag", "beta"], {
+  // Changesets reads the dist tag from pre.json; --tag is rejected in pre mode.
+  const result = spawnSync("pnpm", ["exec", "changeset", "publish"], {
     cwd: root,
     stdio: "inherit",
   });

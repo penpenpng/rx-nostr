@@ -21,8 +21,9 @@ on every CI run or remove previously consumed changesets during the beta cycle.
 Before the first version PR is merged, `release:beta` skips publication so the
 stable version baselines, including the unpublished WASM placeholder, stay local.
 
-The beta release command uses `changeset publish --tag beta` to publish only unpublished package
-versions and create their Git tags. Each public package builds through its
+The beta release command uses `changeset publish` with the `beta` tag from
+`.changeset/pre.json` to publish only unpublished package versions and create their Git tags.
+Each public package builds through its
 `prepack` script, so packing or publishing it also prepares its distribution files.
 Keep `@changesets/cli` on v2 while the workflow uses `changesets/action@v1`.
 
