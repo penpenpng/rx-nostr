@@ -6,11 +6,11 @@ hero:
   tagline: Supports high quality and flexible communication with multiple Nostr relays.
   actions:
     - theme: brand
+      text: Document v4.x
+      link: /en/v4/
+    - theme: alt
       text: Document v3.x
       link: /en/v3/
-    - theme: alt
-      text: Document v2.x
-      link: /en/v2/
 
 features:
   - title: REQ Queuing

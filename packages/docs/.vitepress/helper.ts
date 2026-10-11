@@ -24,7 +24,9 @@ export const defineContent =
     const sidebarMulti: DefaultTheme.SidebarMulti = {};
 
     for (const [version, sidebar] of Object.entries(def)) {
-      navItems.push(navItem(version));
+      if (version !== "2") {
+        navItems.push(navItem(version));
+      }
       sidebarMulti[sidebarKey(version)] = sidebarValue(version, sidebar);
     }
 

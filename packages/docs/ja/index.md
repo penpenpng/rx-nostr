@@ -11,9 +11,6 @@ hero:
     - theme: alt
       text: ドキュメント v3.x
       link: /ja/v3/
-    - theme: alt
-      text: ドキュメント v2.x
-      link: /ja/v2/
 
 features:
   - title: REQ Queuing
