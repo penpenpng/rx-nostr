@@ -1,7 +1,7 @@
 import type * as Nostr from "nostr-typedef";
 import { map, type Observable } from "rxjs";
 
-import { RelayDirectorySnapshotError } from "../libs/error.ts";
+import { RxNostrRelayDirectorySnapshotError } from "../libs/error.ts";
 import { RelayMap, normalizeRelayUrl, type RelayUrl } from "../libs/index.ts";
 import { fetchRelayInfo } from "../libs/nostr/nip11.ts";
 import { assertTimerDuration } from "../libs/timing.ts";
@@ -29,10 +29,15 @@ const reporters = new WeakMap<RelayDirectory, RelayDirectoryReporter>();
 /** Owns NIP-11 cache and shared health/probe state for one or more RxNostr instances. */
 export class RelayDirectory implements IRelayDirectory {
   readonly #relays = new RelayMap<RelayRecord>();
+  readonly #timeout: number;
   readonly #clock: () => number;
   readonly #fetcher: (url: string) => Promise<Nostr.Nip11.RelayInfo>;
 
   constructor(options: RelayDirectoryOptions = {}) {
+    this.#timeout = assertTimerDuration(options.timeout ?? 30_000, "RelayDirectory timeout", {
+      allowZero: true,
+      allowInfinity: true,
+    });
     this.#clock = options.clock ?? Date.now;
     this.#fetcher = options.fetcher ?? fetchRelayInfo;
 
@@ -92,19 +97,8 @@ export class RelayDirectory implements IRelayDirectory {
   }
 
   fetchNip11(url: string, options: FetchNip11Options = {}): Promise<Nostr.Nip11.RelayInfo> {
-    if (options.timeout !== undefined) {
-      try {
-        assertTimerDuration(options.timeout, "NIP-11 timeout", {
-          allowZero: true,
-          allowInfinity: true,
-        });
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    }
-
     return this.#getOrCreate(url)
-      .fetchNip11(options.refresh ?? false, options.timeout)
+      .fetchNip11(options.refresh ?? false, this.#timeout)
       .then(copyRelayInfo);
   }
 
@@ -173,7 +167,9 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
   try {
     value = JSON.parse(data);
   } catch (cause) {
-    throw new RelayDirectorySnapshotError("invalid-json", "Snapshot is not valid JSON.", { cause });
+    throw new RxNostrRelayDirectorySnapshotError("invalid-json", "Snapshot is not valid JSON.", {
+      cause,
+    });
   }
 
   if (!isObject(value)) {
@@ -184,7 +180,7 @@ function parseSnapshot(data: string): RelayDirectorySnapshotEntry[] {
 
   if (value.version !== 1) {
     if (typeof value.version === "number") {
-      throw new RelayDirectorySnapshotError(
+      throw new RxNostrRelayDirectorySnapshotError(
         "unsupported-version",
         `Unsupported snapshot version: ${value.version}.`,
       );
@@ -324,7 +320,7 @@ function assertOnlyKeys(object: Record<string, unknown>, allowed: readonly strin
 }
 
 function invalidSchema(message: string): never {
-  throw new RelayDirectorySnapshotError("invalid-schema", message);
+  throw new RxNostrRelayDirectorySnapshotError("invalid-schema", message);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

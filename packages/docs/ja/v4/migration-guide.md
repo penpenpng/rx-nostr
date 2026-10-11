@@ -245,3 +245,11 @@ rxNostr.dispose();
 - `Nip11Registry` による自動永続化
 
 これらの transport detail に依存していた場合は、operation result、connection state、`RelayDirectory`、custom retry policy のいずれに責務が属するかを分けて移行してください。
+
+
+## v4 公開 API の追加整理
+
+- signer constructor の `tags` option はありません。tags は署名前の EVENT parameters に指定します。
+- v4 の `RelayInput` は URL 文字列・readonly 配列・Set・RxRelays に限ります。generator は配列へ展開して渡してください。legacy の default / additional relay 設定は従来どおり iterable を受け取り、設定時に消費します。
+- NIP-11 の deadline は `new RelayDirectory({ timeout })` で統一します。RxNostr の `nip11Timeout` と `fetchNip11()` ごとの `timeout` はありません。
+- snapshot の error 型は `RxNostrRelayDirectorySnapshotError` / `RxNostrRelayDirectorySnapshotErrorCode` です。

@@ -4,16 +4,14 @@ import { ensureEventFields, raise, RxNostrEnvironmentError } from "../libs/index
 import type { EventSigner } from "./event-signer.interface.ts";
 
 export class Nip07Signer implements EventSigner {
-  constructor(private options?: { tags?: Nostr.Tag.Any[] }) {}
-
   async signEvent<K extends number>(params: Nostr.EventParameters<K>): Promise<Nostr.Event<K>> {
     const event = {
       ...params,
       pubkey:
         params.pubkey ??
-        (await window?.nostr?.getPublicKey()) ??
+        (await globalThis.window?.nostr?.getPublicKey()) ??
         raise(new RxNostrEnvironmentError("window.nostr.getPublicKey() is not found")),
-      tags: [...(params.tags ?? []), ...(this.options?.tags ?? [])],
+      tags: params.tags ?? [],
       created_at: params.created_at ?? Math.floor(Date.now() / 1000),
     };
 
@@ -22,13 +20,13 @@ export class Nip07Signer implements EventSigner {
     }
 
     return (
-      (await window?.nostr?.signEvent(event)) ??
+      (await globalThis.window?.nostr?.signEvent(event)) ??
       raise(new RxNostrEnvironmentError("window.nostr.signEvent() is not found"))
     );
   }
-  getPublicKey() {
+  async getPublicKey(): Promise<string> {
     return (
-      window?.nostr?.getPublicKey() ??
+      globalThis.window?.nostr?.getPublicKey() ??
       raise(new RxNostrEnvironmentError("window.nostr.getPublicKey() is not found"))
     );
   }

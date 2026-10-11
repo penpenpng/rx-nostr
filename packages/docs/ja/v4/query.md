@@ -4,7 +4,7 @@
 
 ## 一度だけ過去イベントを取得する
 
-`backward()` に filter 配列を渡します。全リレーで EOSE、CLOSED、timeout などによって処理が終わると Observable が complete します。
+`backward()` に filter 配列を渡します。全リレーで EOSE、CLOSED、timeout などによって通信処理が終わり、受信済み EVENT の検証も完了すると Observable が complete します。backward の EOSE では CLOSE を送ってリレー側の購読を終了し、次の REQ の枠を空けます。CLOSED はリレー側で既に終了しているため追加の CLOSE は不要です。
 
 <!-- typecheck-example: query-backward -->
 ```ts
@@ -36,7 +36,7 @@ const subscription = rxNostr
 subscription.unsubscribe();
 ```
 
-実行中に filter を差し替える場合は `RxReq` を使います。`forward()` では次の `emit()` が直前の REQ を置き換え、古い REQ には CLOSE が送られます。
+実行中に filter を差し替える場合は `RxReq` を使います。`forward()` では次の `emit()` が直前の REQ を置き換え、古い REQ には CLOSE が送られます。置換前に受信済みで署名検証を待っている EVENT は、検証成功後に古い `traceTag` のまま通知され得ます。置換後に古い REQ ID で到着した wire message は無視します。
 
 ```ts
 import { RxReq } from "rx-nostr";

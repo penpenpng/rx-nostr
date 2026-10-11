@@ -387,7 +387,8 @@ describe("REQ public contract", () => {
         event: res,
         traceTag: "timeline",
       });
-      expect(socket.inbox.length).toBe(1);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
+      expect(socket.inbox.length).toBe(2);
       expect(inspector.completed).toBe(false);
 
       rxReq.dispose();
@@ -788,7 +789,10 @@ describe("REQ public contract", () => {
 
         socket.open();
         await settleProtocol();
-        socket.message(["EOSE", (await socket.inbox.waitNext("REQ"))[1]]);
+        const firstId = (await socket.inbox.waitNext("REQ"))[1];
+
+        socket.message(["EOSE", firstId]);
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", firstId]);
         await settleProtocol();
 
         source.dispose();
@@ -812,10 +816,11 @@ describe("REQ public contract", () => {
             traceTag,
           });
           socket.message(["EOSE", id]);
+          await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", id]);
           await settleProtocol();
         }
 
-        expect(socket.inbox.length).toBe(4);
+        expect(socket.inbox.length).toBe(8);
         expect(firstInspector.completed).toBe(true);
         expect(secondInspector.completed).toBe(true);
         expect(socket.isCloseRequested).toBe(true);
@@ -1323,6 +1328,7 @@ describe("REQ public contract", () => {
 
         evaluate.mockReturnValue(7);
         socket.message(["EOSE", first[1]]);
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
         await settleProtocol();
         const queued = await socket.inbox.waitNext("REQ");
 
@@ -1362,6 +1368,7 @@ describe("REQ public contract", () => {
       await expect(inspector.waitNext()).resolves.toMatchObject({ event: { id: "second" } });
 
       socket.message(["EOSE", first[1]]);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
       socket.message(["EOSE", second[1]]);
       expect(inspector.completed).toBe(false);
 
@@ -1406,6 +1413,7 @@ describe("REQ public contract", () => {
       expect(socket.inbox.length).toBe(3);
 
       socket.message(["EOSE", first[1]]);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
 
       const fourth = await socket.inbox.waitNext("REQ");
 
@@ -1444,6 +1452,7 @@ describe("REQ public contract", () => {
 
       expect(first[2]).toEqual({ kinds: [1] });
       socket.message(["EOSE", first[1]]);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
 
       const second = await socket.inbox.waitNext("REQ");
 
@@ -1511,6 +1520,7 @@ describe("REQ public contract", () => {
         expect(socket.inbox.length).toBe(1);
 
         socket.message(["EOSE", blockerId]);
+        await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", blockerId]);
         await settleProtocol();
         await expect(socket.inbox.waitNext()).resolves.toEqual([
           "REQ",
@@ -1552,7 +1562,8 @@ describe("REQ public contract", () => {
         second.message(["EVENT", secondId, Faker.event()]);
         second.message(["EOSE", secondId]);
         await settleProtocol();
-        expect(first.inbox.length).toBe(1);
+        expect(first.inbox.length).toBe(2);
+        await expect(first.inbox.waitNext()).resolves.toEqual(["CLOSE", expect.any(String)]);
         await expect(secondInspector.waitNext()).resolves.toMatchObject({ from: b });
         expect(secondInspector.completed).toBe(true);
         blocker.unsubscribe();
@@ -1795,5 +1806,80 @@ test.each(["forward", "backward"] as const)(
       parent.dispose();
       rxNostr.dispose();
     }
+  },
+);
+
+scenarioTest(
+  "closes EOSE subscriptions before reusing capacity on a hot relay",
+  async ({ createScenario }) => {
+    const directory = new RelayDirectory();
+
+    directory.setNip11(a, { limitation: { max_subscriptions: 1 } });
+    const { rxNostr, server } = createScenario({ relayDirectory: directory });
+
+    rxNostr.setHotRelays(a);
+    const socket = server.sockets.latest;
+
+    socket.open();
+    using request = new RxReq();
+    const subscription = rxNostr.backward(a, request).subscribe();
+
+    request.emit([{ kinds: [1] }]);
+    request.emit([{ kinds: [2] }]);
+    request.dispose();
+    await settleProtocol();
+    const first = await socket.inbox.waitNext("REQ");
+
+    socket.message(["EOSE", first[1]]);
+    await settleProtocol();
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
+    const second = await socket.inbox.waitNext("REQ");
+
+    socket.message(["EOSE", second[1]]);
+    await settleProtocol();
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
+
+    const active = new Set<string>();
+
+    for (const message of socket.inbox) {
+      if (message[0] === "REQ") {
+        active.add(message[1]);
+      }
+      if (message[0] === "CLOSE") {
+        active.delete(message[1]);
+      }
+
+      expect(active.size).toBeLessThanOrEqual(1);
+    }
+
+    expect(active.size).toBe(0);
+    expect(subscription.closed).toBe(true);
+    expect(socket.isCloseRequested).toBe(false);
+  },
+);
+
+scenarioTest(
+  "uses the directory deadline when an automatic fetch joins a manual fetch",
+  async ({ createScenario }) => {
+    const fetcher = vi.fn(() => new Promise<never>(() => {}));
+    const directory = new RelayDirectory({ timeout: 100, fetcher });
+    const manual = directory.fetchNip11(a).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(75);
+    const { rxNostr, server } = createScenario({
+      relayDirectory: directory,
+      skipFetchNip11: false,
+    });
+    const query = rxNostr.backward(a, [{}]).subscribe();
+    const socket = server.sockets.latest;
+
+    socket.open();
+    await settleProtocol();
+    expect(socket.inbox.length).toBe(0);
+    await vi.advanceTimersByTimeAsync(25);
+    expect(await manual).toMatchObject({ code: "timeout" });
+    expect(fetcher).toHaveBeenCalledOnce();
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["REQ", expect.any(String), {}]);
+    query.unsubscribe();
   },
 );

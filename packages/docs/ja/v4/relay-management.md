@@ -13,8 +13,10 @@ hot relay は宛先ではありません。hot に設定しただけでは REQ �
 `forward()`、`backward()`、`publish()`、`setHotRelays()` は次の値を受け取ります。
 
 ```ts
-type RelayInput = string | Iterable<string> | RxRelays;
+type RelayInput = string | readonly string[] | ReadonlySet<string> | RxRelays;
 ```
+
+固定宛先は配列または Set に限ります。generator・iterator・任意の iterable は受け付けません。必要なら呼び出し側で `[...generator]` に変換してください。`RxReq.emit()` の `relays` option と RxRelays の変換メソッドも同じ入力型です。
 
 URL は正規化され、alias と重複がまとめられます。不正な URL は除外されます。
 

@@ -16,7 +16,7 @@ const rxNostr = new RxNostr({
 });
 ```
 
-`new RelayDirectory({ clock, fetcher })` では時刻と NIP-11 取得処理を差し替えられます。subclass は `super()` を呼ぶ場合に限り利用できますが、`observe()` や health に関わるメソッドの override は接続状態との整合性を保証しません。内部 reporter は接続・失敗・probe の競合調整を担当し、公開 interface から変更できません。独自 Directory 実装の注入にはこの reporter と所有権を含む新しい契約が必要なため、現行 API には含めていません。
+`new RelayDirectory({ clock, fetcher, timeout })` では時刻と NIP-11 取得処理を差し替えられます。subclass は `super()` を呼ぶ場合に限り利用できますが、`observe()` や health に関わるメソッドの override は接続状態との整合性を保証しません。内部 reporter は接続・失敗・probe の競合調整を担当し、公開 interface から変更できません。独自 Directory 実装の注入にはこの reporter と所有権を含む新しい契約が必要なため、現行 API には含めていません。
 
 ## Entry を読む
 
@@ -55,7 +55,7 @@ const subscription = directory
 
 RxNostr は relay への接続需要が初めて発生したとき、NIP-11 cache を確認し、cache がなければ取得を開始します。REQ は取得が完了するまで NIP-11 queue で待機します。
 
-取得は `nip11Timeout`（既定値30,000 ms）まで待機します。取得に失敗した場合、その事実を Directory に記録したうえで、最新の cache または空の metadata を利用します。取得失敗自体は operation を失敗させません。
+取得は Directory の `timeout`（既定値30,000 ms）まで待機します。`new RelayDirectory({ timeout: 10_000 })` のように構築時に設定し、RxNostr ごと・`fetchNip11()` 呼び出しごとの timeout は指定しません。同じ URL の進行中 fetch に後から参加した場合も、最初の fetch 開始時からの期限と結果を共有します。後からの参加で期限は延長されません。`0` は次の timer 実行時に timeout、`Infinity` は無期限です。取得に失敗した場合、その事実を Directory に記録したうえで、最新の cache または空の metadata を利用します。取得失敗自体は operation を失敗させません。
 
 手動取得、refresh、手動設定も可能です。
 
@@ -103,7 +103,7 @@ if (saved !== null) {
 
 snapshot は version 1 の JSON です。NIP-11 と health の時刻、連続失敗の開始時刻、失敗数を保存しますが、live connection と確認接続の実行権は保存しません。抑止期限は保存した health と設定から再計算します。`firstFailureAt` がない旧 snapshot も読み込めます。その場合、最後の失敗時刻から失敗期間を測り始めます。
 
-`importSnapshot()` は入力全体を検証してから既存値と merge します。不正な JSON、未知の version、不正な schema は `RelayDirectorySnapshotError` になり、途中まで適用されることはありません。
+`importSnapshot()` は入力全体を検証してから既存値と merge します。不正な JSON、未知の version、不正な schema は `RxNostrRelayDirectorySnapshotError` になり、途中まで適用されることはありません。
 
 ## Entry を忘れる
 

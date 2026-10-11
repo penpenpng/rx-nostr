@@ -17,7 +17,7 @@ describe("RelayCommunication transport integration", () => {
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
       relayDirectory: directory,
-      nip11Timeout: 1_000,
+      fetchNip11: true,
     });
 
     expect(fetcher).not.toHaveBeenCalled();
@@ -42,10 +42,12 @@ describe("RelayCommunication transport integration", () => {
     expect(first[2]).toMatchObject({ kinds: [1] });
     expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
     const second = await socket.inbox.waitNext("REQ");
 
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
 
     release();
     await expect(socket.closeRequested).resolves.toBeDefined();
@@ -59,7 +61,7 @@ describe("RelayCommunication transport integration", () => {
     const relay = new RelayCommunication("wss://relay.example.com", {
       WebSocket: server.WebSocket,
       relayDirectory: directory,
-      nip11Timeout: 1_000,
+      fetchNip11: true,
       onDiagnostic: diagnostic,
     });
     const release = relay.hold();
@@ -77,6 +79,7 @@ describe("RelayCommunication transport integration", () => {
       expect.objectContaining({ message: "Automatic NIP-11 relay information retrieval failed." }),
     );
     socket.message(["EOSE", req[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", req[1]]);
     release();
     await expect(socket.closeRequested).resolves.toBeDefined();
     socket.acknowledgeClose();
@@ -207,6 +210,7 @@ describe("RelayCommunication transport integration", () => {
 
     socket.message(["EVENT", subId, Faker.event({ id: "event" })]);
     socket.message(["EOSE", subId]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", subId]);
 
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
     await expect(inspector.waitNext()).resolves.toEqual({
@@ -281,7 +285,7 @@ describe("RelayCommunication transport integration", () => {
 
     socket.message(["EVENT", subId, Faker.event({ id: "wrong", kind: 2 })]);
     socket.message(["EVENT", subId, Faker.event({ id: "right", kind: 1 })]);
-    socket.message(["EOSE", subId]);
+    socket.message(["CLOSED", subId, "blocked: finished"]);
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
     await expect(inspector.waitNext()).resolves.toEqual("right");
     expect(socket.inbox.length).toBe(1);
@@ -345,13 +349,16 @@ describe("RelayCommunication transport integration", () => {
 
     socket.message(["EOSE", first[1]]);
 
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
+
     const second = await socket.inbox.waitNext("REQ");
 
     expect(firstInspector.completed).toBe(true);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
-    expect(socket.inbox.length).toBe(2);
+    expect(socket.inbox.length).toBe(4);
 
     release();
     await expect(socket.closeRequested).resolves.toBeDefined();
@@ -390,6 +397,8 @@ describe("RelayCommunication transport integration", () => {
     expect(socket.inbox.length).toBe(1);
 
     socket.message(["EOSE", first[1]]);
+
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
     const second = await socket.inbox.waitNext("REQ");
 
     expect(second[2]).toMatchObject({ kinds: [2] });
@@ -398,8 +407,9 @@ describe("RelayCommunication transport integration", () => {
     const third = await socket.inbox.waitNext("REQ");
 
     expect(third[2]).toMatchObject({ kinds: [3] });
-    expect(socket.inbox.length).toBe(4);
+    expect(socket.inbox.length).toBe(5);
     socket.message(["EOSE", third[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", third[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
 
     release();
@@ -444,11 +454,13 @@ describe("RelayCommunication transport integration", () => {
     expect(resent[2]).toMatchObject({ kinds: [1] });
     expect(socket2.inbox.length).toBe(1);
     socket2.message(["EOSE", resent[1]]);
+    await expect(socket2.inbox.waitNext()).resolves.toEqual(["CLOSE", resent[1]]);
 
     const second = await socket2.inbox.waitNext("REQ");
 
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket2.message(["EOSE", second[1]]);
+    await expect(socket2.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
     await vi.waitFor(() => expect(secondInspector.completed).toBe(true));
     expect(firstInspector.completed).toBe(true);
 

@@ -22,7 +22,7 @@ You can exchange data in a very familiar way (as you see [NIP-01](https://github
 - REQ queue respecting NIP-11
   - Based on NIP-11, queuing requests if they exceed the limit of subscriptions that can run concurrently.
 - Reactive relay pool
-  - On updating "default relays", the subscriptions on default relays is reconstructed on new default relays.
+  - Queries follow changes to their RxRelays destinations, adding and removing relay subscriptions.
 - Monitoring WebSocket connection
   - For example, it helps you show relay status to users.
 - Lazy connection

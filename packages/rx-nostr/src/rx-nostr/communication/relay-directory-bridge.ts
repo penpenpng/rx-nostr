@@ -95,7 +95,7 @@ export class RelayDirectoryBridge implements Disposable {
     this.#onMaxSubscriptions(this.#directory?.get(this.#url)?.maxSubscriptions);
   }
 
-  async acquireNip11(timeout: number): Promise<void> {
+  async acquireNip11(): Promise<void> {
     const directory = this.#directory;
 
     if (!directory) {
@@ -112,7 +112,7 @@ export class RelayDirectoryBridge implements Disposable {
 
     this.#onMaxSubscriptionsPending();
     try {
-      await directory.fetchNip11(this.#url, { timeout });
+      await directory.fetchNip11(this.#url);
     } finally {
       this.#onMaxSubscriptions(directory.get(this.#url)?.maxSubscriptions);
     }

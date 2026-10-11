@@ -74,7 +74,7 @@ rxNostr.forward(relays, batched).subscribe(console.log);
 
 `batch()` は正規化した relay URL 集合ごとに filter を結合します。`RxRelays` は同じ内容でも別 instance なら別 group です。group の `relays`、`traceTag`、`linger` などの option は先頭 packet の値を採用し、既定の filter 結合は入力順の連結です。独自の merge 関数は各 filter 配列を順に畳み込みます。空の配列からは packet を出しません。
 
-固定の relay iterable は group 化時に配列へ snapshot するため、generator を使っても出力 packet の宛先は失われません。動的な `RxRelays` は同じ instance を保持します。
+固定の relay 配列・Set は group 化時に配列へ snapshot します。generator は宛先に指定できません。動的な `RxRelays` は同じ instance を保持します。
 
 `chunk()` は predicate が false なら元 packet を通し、true なら split が返した filter 配列ごとに packet を出します。`relays`、`traceTag`、`linger` は各 packet へ保持され、空の split 結果は packet を出しません。predicate / split が投げた例外は stream の error になります。
 
@@ -97,6 +97,17 @@ rxNostr.forward(relays, batched).subscribe(console.log);
 
 `timeoutWith(value)` は `TimeoutError` のとき指定値を1件通知して complete します。`0`、`false`、空文字も指定値として通知します。引数を省略すると値を出さずに complete し、timeout 以外の error はそのまま伝えます。
 
-`setDiff({ seed })` は初期 Set を呼び出し時に snapshot し、subscription ごとに独立した比較状態を持ちます。入力 Set や通知された `current` をあとから変更しても、次の差分や別 subscriber の結果は変わりません。
+`setDiff({ seed })` は初期 Set を呼び出し時に snapshot し、その operator instance が比較状態を保持します。入力 Set や通知された `current` をあとから変更しても、内部の比較状態は変わりません。
 
-`uniq()` は subscription ごとに重複判定を持ちます。`createUniq()` と `createTie()` の cache / memo は factory が返した operator instance に属するため、別 stream でその instance を共有すると観測履歴も共有します。`tie()` も呼び出しごとに memo を作ります。同じ operator instance を独立した stream で意図せず共有しないでください。
+### Operator instance の所有権
+
+`createUniq()` / `createTie()` など create 系を除き、operator は各 `pipe()` の中で個別に作ってください。同じ operator instance を異なる stream に共有したり、再購読時に新しい状態へ戻ることを期待したりしないでください。`sort()` / `sortEvents()` の buffer、`tie()` の memo、`setDiff()` の比較状態は factory の呼び出しに属します。
+
+```ts
+const first$ = firstSource$.pipe(sortEvents(50));
+const second$ = secondSource$.pipe(sortEvents(50));
+```
+
+create 系の cache / memo は返された operator に属し、明示的に共有・消去できます。RxJS の `distinct` / `scan` などに委譲する operator は RxJS 由来の購読状態を持ちますが、instance 再利用時の共通保証ではありません。
+
+`filterAsync()` と `verify()` は非同期処理の解決順で通知し、入力順を保証しません。source の完了後も進行中の検証が終わるまで待機します。unsubscribe 後の検証結果は通知しません。

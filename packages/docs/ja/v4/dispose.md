@@ -1,6 +1,6 @@
 # Dispose
 
-rx-nostr の lifecycle を持つ object は `dispose()` と `Symbol.dispose` に対応します。使い終えた object は明示的に破棄してください。
+`RxNostr`・`RxReq`・`RxRelays`・Worker verifier は `dispose()` と `Symbol.dispose` に対応します。公開 `Publication` は `cancel()` で終了します。使い終えた object は明示的に破棄してください。
 
 ## `RxNostr`
 
@@ -54,6 +54,8 @@ request.dispose();
 relays.dispose();
 ```
 
+`RxRelays` の dispose 後に `set()`・`append()`・`remove()`・`clear()` を呼ぶと `RxNostrAlreadyDisposedError` になります。既存 snapshot の読み取りは可能ですが、変更通知は完了しています。
+
 `RxReq.dispose()` は source の完了を通知します。`backward()` の進行中・queue 中の segment は終わるまで継続し、`forward()` の最後の segment は継続します。通信を即時に止めるには query の subscription を unsubscribe してください。
 
 `RxReq.pipe()` で作った派生 request の dispose は、その派生と子孫の observer・operator だけを終了します。親や兄弟の request は継続します。親の dispose は派生にも伝わります。
@@ -80,7 +82,7 @@ operation は relay ごとの需要 lease を、executor は REQ / EVENT / AUTH 
 client.dispose();
 ```
 
-Worker 側の `VerificationHost` も dispose に対応します。
+Worker 側の `VerificationHost` も dispose に対応します。dispose 後の `start()` は `RxNostrAlreadyDisposedError` になり、検証中だった処理が遅れて完了しても応答を送信しません。dispose は冪等です。
 
 ## `using`
 

@@ -11,7 +11,7 @@ import { isFiltered, once, type RelayUrl } from "../../../libs/index.ts";
 import type { EventMessagePacket, EventPacket, OkPacket } from "../../../packets/index.ts";
 import type { ReqScheduler } from "../scheduler/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "../transport/index.ts";
-import { AuthenticationFailure, AuthCoordinator } from "./auth/index.ts";
+import { AuthenticationError, AuthCoordinator } from "./auth/index.ts";
 
 /** Owns relay-local Nostr protocol operations over one transport session. */
 export class NostrOperationExecutor implements Disposable {
@@ -149,7 +149,7 @@ export class NostrOperationExecutor implements Disposable {
           }
 
           if (evaluatedFilters.length === 0) {
-            throw new NoMatchingFilters();
+            throw new NoMatchingFiltersError();
           }
 
           queryEvaluated = true;
@@ -161,6 +161,10 @@ export class NostrOperationExecutor implements Disposable {
           const terminal =
             (packet.type === "CLOSED" && packet.subId === subId) ||
             (plan.strategy === "backward" && packet.type === "EOSE" && packet.subId === subId);
+
+          if (terminal && packet.type === "CLOSED") {
+            remoteTerminated = true;
+          }
 
           terminalAuthRequired =
             terminal && packet.type === "CLOSED" && packet.noticeType === "auth-required";
@@ -187,8 +191,6 @@ export class NostrOperationExecutor implements Disposable {
         .subscribe({
           next: (packet) => subscriber.next(packet),
           complete: () => {
-            remoteTerminated = true;
-
             onRemoteTerminated(terminalAuthRequired);
             subscriber.complete();
           },
@@ -316,7 +318,9 @@ export interface NostrOperationExecutorOptions {
 
 const defaultVreqPlanner: RelayVreqPlanner = (strategy, filters) => [{ strategy, filters }];
 
-class NoMatchingFilters extends Error {}
+class NoMatchingFiltersError extends Error {
+  override readonly name = "NoMatchingFiltersError";
+}
 
 function callbackErrorFrom(error: unknown): RxNostrCallbackError | undefined {
   if (error instanceof RxNostrCallbackError) {
@@ -341,7 +345,7 @@ function finishAfterAuthentication(
   }
   if (error instanceof RxNostrCallbackError) {
     subscriber.error(error);
-  } else if (error instanceof AuthenticationFailure) {
+  } else if (error instanceof AuthenticationError) {
     subscriber.complete();
   } else {
     subscriber.complete();

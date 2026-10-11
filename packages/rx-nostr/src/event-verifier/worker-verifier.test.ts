@@ -1,4 +1,4 @@
-import { VerificationClient, VerificationHost } from "rx-nostr";
+import { RxNostrAlreadyDisposedError, VerificationClient, VerificationHost } from "rx-nostr";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { Faker } from "../__test__/helper/faker.ts";
@@ -561,3 +561,46 @@ describe.each(["booting", "error"] as const)("fallback while %s", (status) => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+test.each(["resolve", "reject"] as const)(
+  "Host disposal prevents restart and late %s responses",
+  async (ending) => {
+    class WorkerContext {
+      handlers = new Set<(event: MessageEvent) => Promise<void>>();
+      postMessage = vi.fn();
+      addEventListener(_type: string, handler: (event: MessageEvent) => Promise<void>) {
+        this.handlers.add(handler);
+      }
+      removeEventListener(_type: string, handler: (event: MessageEvent) => Promise<void>) {
+        this.handlers.delete(handler);
+      }
+    }
+    const scope = new WorkerContext();
+
+    vi.stubGlobal("WorkerGlobalScope", WorkerContext);
+    vi.stubGlobal("self", scope);
+    const deferred = Promise.withResolvers<boolean>();
+    const host = new VerificationHost({ verifyEvent: () => deferred.promise });
+
+    host.start();
+    host.start();
+    expect(scope.handlers.size).toBe(1);
+    const pending = [...scope.handlers][0]!({
+      data: { reqId: 1, event: Faker.event() },
+    } as MessageEvent);
+
+    host.dispose();
+    expect(() => host.start()).toThrow(RxNostrAlreadyDisposedError);
+    expect(() => host.dispose()).not.toThrow();
+
+    if (ending === "resolve") {
+      deferred.resolve(true);
+    } else {
+      deferred.reject(new Error("late failure"));
+    }
+
+    await pending;
+    expect(scope.handlers.size).toBe(0);
+    expect(scope.postMessage).not.toHaveBeenCalled();
+  },
+);

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 
 import signedEvent from "../../../test-fixtures/signed-event.json";
 import { verifyEvent } from "../libs/nostr/crypto.ts";
@@ -10,6 +10,9 @@ const keys = [
 ];
 
 describe(SeckeySigner.name, () => {
+  test("accepts only the secret key as constructor input", () => {
+    expectTypeOf<ConstructorParameters<typeof SeckeySigner>>().toEqualTypeOf<[seckey: string]>();
+  });
   test.each(keys)("signs the fixed NIP-01 vector with %s", async (key) => {
     const signer = new SeckeySigner(key);
 
@@ -46,22 +49,12 @@ describe(SeckeySigner.name, () => {
     }
   });
 
-  test("preserves a signed input without extra tags and re-signs appended tags", async () => {
+  test("preserves a signed input", async () => {
     const passthrough = await new SeckeySigner(keys[1]!).signEvent(signedEvent);
 
     expect(passthrough.id).toBe(signedEvent.id);
     expect(passthrough.sig).toBe(signedEvent.sig);
     expect(verifyEvent(passthrough)).toBe(true);
-
-    const augmented = await new SeckeySigner(keys[1]!, {
-      tags: [["client", "test"]],
-    }).signEvent(signedEvent);
-
-    expect(augmented.tags).toEqual([["client", "test"]]);
-    expect(augmented.id).not.toBe(signedEvent.id);
-    expect(augmented.pubkey).toBe(signedEvent.pubkey);
-    expect(verifyEvent(augmented)).toBe(true);
-    expect(signedEvent.tags).toEqual([]);
   });
 });
 

@@ -251,12 +251,13 @@ describe("RelayDirectory snapshots", () => {
   test("times out NIP-11 fetches and records the failure", async () => {
     const directory = new RelayDirectory({
       clock: () => 3,
+      timeout: 0,
       fetcher: () => new Promise(() => {}),
     });
 
-    await expect(
-      directory.fetchNip11("wss://relay.example.com", { timeout: 0 }),
-    ).rejects.toMatchObject({ code: "timeout" });
+    await expect(directory.fetchNip11("wss://relay.example.com")).rejects.toMatchObject({
+      code: "timeout",
+    });
     expect(directory.get("wss://relay.example.com")).toMatchObject({ nip11FailedAt: 3 });
   });
 
@@ -264,13 +265,9 @@ describe("RelayDirectory snapshots", () => {
     "rejects invalid NIP-11 timeout before starting fetch: %s",
     async (timeout) => {
       const fetcher = vi.fn();
-      const directory = new RelayDirectory({ fetcher });
 
-      await expect(directory.fetchNip11("wss://relay.example.com", { timeout })).rejects.toThrow(
-        RangeError,
-      );
+      expect(() => new RelayDirectory({ fetcher, timeout })).toThrow(RangeError);
       expect(fetcher).not.toHaveBeenCalled();
-      expect(directory.get("wss://relay.example.com")).toBeUndefined();
     },
   );
 });
@@ -290,4 +287,30 @@ test("round trips success followed by failure at the same timestamp", () => {
     lastFailureAt: 100,
     lastConnectedAt: 100,
   });
+});
+
+test("shares one directory deadline with late joiners and ignores late fetch results", async () => {
+  vi.useFakeTimers();
+  try {
+    const pending = Promise.withResolvers<{ name: string }>();
+    const fetcher = vi.fn(() => pending.promise);
+    const directory = new RelayDirectory({ timeout: 100, fetcher });
+    const url = "wss://relay.example.com";
+    const first = directory.fetchNip11(url).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(75);
+    const second = directory.fetchNip11(url, { refresh: true }).catch((error: unknown) => error);
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(25);
+    const failure = await first;
+
+    expect(failure).toMatchObject({ name: "RxNostrNip11Error", code: "timeout" });
+    expect(await second).toBe(failure);
+    pending.resolve({ name: "late" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(directory.get(url)?.nip11).toBeUndefined();
+  } finally {
+    vi.useRealTimers();
+  }
 });

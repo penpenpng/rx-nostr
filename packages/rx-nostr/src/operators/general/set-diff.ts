@@ -1,24 +1,17 @@
-import { defer, map, type OperatorFunction } from "rxjs";
+import { map, type OperatorFunction } from "rxjs";
 
 export function setDiff<T>(options?: { seed?: Set<T> }): OperatorFunction<Set<T>, SetDiff<T>> {
-  const seed = new Set(options?.seed);
+  let previous = new Set(options?.seed);
 
-  return (source) =>
-    defer(() => {
-      let previous = new Set(seed);
+  return map((values) => {
+    const current = new Set(values);
+    const appended = current.difference(previous);
+    const outdated = previous.difference(current);
 
-      return source.pipe(
-        map((values) => {
-          const current = new Set(values);
-          const appended = current.difference(previous);
-          const outdated = previous.difference(current);
+    previous = current;
 
-          previous = current;
-
-          return { appended, outdated, current: new Set(current) };
-        }),
-      );
-    });
+    return { appended, outdated, current: new Set(current) };
+  });
 }
 
 export interface SetDiff<T> {

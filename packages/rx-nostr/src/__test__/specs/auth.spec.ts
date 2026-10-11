@@ -356,8 +356,9 @@ describe("NIP-42 AUTH public contract", () => {
       const [, retryId] = await socket.inbox.waitNext("REQ");
 
       socket.message(["EOSE", retryId]);
+      await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", retryId]);
       await expect(inspector.waitComplete()).resolves.toBeUndefined();
-      expect(socket.inbox.length).toBe(3);
+      expect(socket.inbox.length).toBe(4);
       rxNostr.dispose();
     });
 

@@ -69,8 +69,6 @@ export interface RxNostrConfig {
   relayHealthPolicy?: RelayHealthPolicyInput;
   /** Maximum duration of one WebSocket connection attempt in milliseconds. Defaults to 30 seconds. */
   connectionTimeout?: number;
-  /** Maximum time to wait for automatic NIP-11 retrieval. Defaults to 30 seconds. */
-  nip11Timeout?: number;
   /**
    * If true, skip automatic fetching NIP-11 relay information.
    */
@@ -101,7 +99,6 @@ export interface RxNostrStaticDefaultConfig {
   relayDirectory: RelayDirectory;
   relayHealthPolicy: RelayHealthPolicyInput;
   connectionTimeout: number;
-  nip11Timeout: number;
   skipFetchNip11: boolean;
   WebSocket: WebSocketConstructor | undefined;
 }

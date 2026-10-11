@@ -1,7 +1,7 @@
 import { SimpleVerifier } from "@rx-nostr/crypto";
 import {
   RelayDirectory,
-  RelayDirectorySnapshotError,
+  RxNostrRelayDirectorySnapshotError,
   RxNostr,
   type IRelayDirectory,
   type RxNostrConfig,
@@ -171,7 +171,7 @@ describe("RelayDirectory public contract", () => {
       ).toThrowError(expect.objectContaining({ code: "invalid-schema" }));
 
       expect(directory.exportSnapshot()).toBe(before);
-      expectTypeOf<RelayDirectorySnapshotError>().toHaveProperty("code");
+      expectTypeOf<RxNostrRelayDirectorySnapshotError>().toHaveProperty("code");
     });
   });
 

@@ -18,7 +18,9 @@ export namespace u {
   export namespace Promise {
     const Promise = globalThis.Promise;
 
-    export class TimeoutError extends Error {}
+    export class TimeoutError extends Error {
+      override readonly name = "TimeoutError";
+    }
 
     export function timeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
       const ret = Promise.withResolvers<T>();

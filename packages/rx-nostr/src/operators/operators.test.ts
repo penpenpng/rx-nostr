@@ -194,8 +194,8 @@ describe("operators", () => {
       expect(result[0]?.relays).toEqual(first.relays);
     });
 
-    test("batch preserves a one-shot relay iterable for the output packet", async () => {
-      const input: ReqPacket = { relays: oneShotRelay(), filters: [{ kinds: [1] }] };
+    test("batch snapshots a fixed relay Set for the output packet", async () => {
+      const input: ReqPacket = { relays: new Set(oneShotRelay()), filters: [{ kinds: [1] }] };
       const result = await lastValueFrom(of([input]).pipe(batch(), toArray()));
 
       expect([...RxRelays.set(result[0]?.relays)]).toEqual(["wss://a.example.com"]);
@@ -307,12 +307,11 @@ describe("operators", () => {
       },
     );
 
-    test("uniq starts a fresh cache for each subscription, while createUniq shares its cache", async () => {
+    test("separately created uniq operators are independent while createUniq shares its cache", async () => {
       const packet = Faker.eventPacket({ id: "same" });
-      const reusableUniq = uniq();
       const [sharedUniq, cache] = createUniq((value: typeof packet) => value.event.id);
-      const first = await lastValueFrom(of(packet).pipe(reusableUniq, toArray()));
-      const second = await lastValueFrom(of(packet).pipe(reusableUniq, toArray()));
+      const first = await lastValueFrom(of(packet).pipe(uniq(), toArray()));
+      const second = await lastValueFrom(of(packet).pipe(uniq(), toArray()));
       const sharedFirst = await lastValueFrom(of(packet).pipe(sharedUniq, toArray()));
       const sharedSecond = await lastValueFrom(of(packet).pipe(sharedUniq, toArray()));
 
@@ -326,10 +325,9 @@ describe("operators", () => {
       expect(await lastValueFrom(of(packet).pipe(sharedUniq, toArray()))).toEqual([packet]);
     });
 
-    test("setDiff snapshots inputs and isolates state across subscribers", () => {
+    test("setDiff snapshots inputs and isolates separately created operators", () => {
       const seed = new Set([0]);
       const source = new Subject<Set<number>>();
-      const operator = setDiff<number>({ seed });
       const first: Array<{ appended?: Set<number>; outdated?: Set<number>; current: Set<number> }> =
         [];
       const second: Array<{
@@ -337,11 +335,13 @@ describe("operators", () => {
         outdated?: Set<number>;
         current: Set<number>;
       }> = [];
-      const firstSubscription = source.pipe(operator).subscribe((change) => {
+      const firstSubscription = source.pipe(setDiff<number>({ seed })).subscribe((change) => {
         first.push(change);
         change.current.clear();
       });
-      const secondSubscription = source.pipe(operator).subscribe((change) => second.push(change));
+      const secondSubscription = source
+        .pipe(setDiff<number>({ seed }))
+        .subscribe((change) => second.push(change));
       const input = new Set([1]);
 
       source.next(input);

@@ -54,12 +54,14 @@ describe("NostrOperationExecutor", () => {
     expect(first[2]).toMatchObject({ kinds: [1] });
     expect(socket.inbox.length).toBe(1);
     socket.message(["EOSE", first[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", first[1]]);
 
     const second = await socket.inbox.waitNext("REQ");
 
     expect(second[1]).not.toBe(first[1]);
     expect(second[2]).toMatchObject({ kinds: [2] });
     socket.message(["EOSE", second[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
     await vi.waitFor(() => expect(inspector.completed).toBe(true));
 
     dispose(harness);
@@ -104,11 +106,14 @@ describe("NostrOperationExecutor", () => {
     expect(second[2]).toMatchObject({ kinds: [2] });
 
     socket.message(["EOSE", second[1]]);
+
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", second[1]]);
     const retried = await socket.inbox.waitNext("REQ");
 
     expect(retried[1]).not.toBe(first[1]);
     expect(retried[2]).toMatchObject({ kinds: [1] });
     socket.message(["EOSE", retried[1]]);
+    await expect(socket.inbox.waitNext()).resolves.toEqual(["CLOSE", retried[1]]);
 
     await vi.waitFor(() => expect(firstInspector.completed).toBe(true));
     expect(secondInspector.completed).toBe(true);

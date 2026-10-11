@@ -6,11 +6,11 @@ import type { RelayDirectoryEntry, RelayDirectorySnapshotV1 } from "./relay.inte
 export interface FetchNip11Options {
   /** Ignore cached metadata. Concurrent refreshes are still deduplicated. */
   readonly refresh?: boolean;
-  /** Maximum metadata wait in ms; 0 is immediate and Infinity disables the timeout. */
-  readonly timeout?: number;
 }
 
 export interface RelayDirectoryOptions {
+  /** Shared fetch deadline in ms. Defaults to 30000; 0 is immediate and Infinity disables it. */
+  readonly timeout?: number;
   readonly clock?: () => number;
   readonly fetcher?: (url: string) => Promise<Nostr.Nip11.RelayInfo>;
 }

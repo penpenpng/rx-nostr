@@ -43,7 +43,6 @@ export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze
   relayDirectory: GlobalRelayDirectory,
   relayHealthPolicy: Object.freeze({}),
   connectionTimeout: 30_000,
-  nip11Timeout: 30_000,
   skipFetchNip11: false,
   WebSocket: globalThis.WebSocket as WebSocketConstructor | undefined,
 });
@@ -57,7 +56,6 @@ export class FilledRxNostrConfig {
   readonly relayDirectory: RelayDirectory;
   readonly relayHealthPolicy: RelayHealthPolicyInput;
   readonly connectionTimeout: number;
-  readonly nip11Timeout: number;
   readonly skipFetchNip11: boolean;
   readonly WebSocket: WebSocketConstructor | undefined;
   readonly defaultOptions: Readonly<RxNostrDefaultOptions>;
@@ -88,11 +86,6 @@ export class FilledRxNostrConfig {
 
     assertTimerDuration(this.connectionTimeout, "connectionTimeout");
 
-    this.nip11Timeout = assertTimerDuration(
-      config.nip11Timeout ?? staticDefaultConfig.nip11Timeout,
-      "nip11Timeout",
-      { allowZero: true, allowInfinity: true },
-    );
     this.skipFetchNip11 = config.skipFetchNip11 ?? staticDefaultConfig.skipFetchNip11;
     this.WebSocket = config.WebSocket ?? staticDefaultConfig.WebSocket;
     this.defaultOptions = freezeDefaultOptions(config.defaultOptions);

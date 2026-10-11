@@ -381,6 +381,44 @@ describe("Publication public contract", () => {
   });
 
   describe("cancellation and subscriptions", () => {
+    for (const immediate of [true, false]) {
+      scenarioTest(
+        `closes a publication disposed during construction with ${immediate ? "immediate" : "pending"} signing`,
+        async ({ createScenario }) => {
+          const { server, rxNostr } = createScenario();
+          const signing = createDeferred<Nostr.Event>();
+          const signedEvent = event();
+          const publication = rxNostr.publish(relay1, signedEvent, {
+            signer: {
+              getPublicKey: async () => signedEvent.pubkey,
+              signEvent: <K extends number>() => {
+                rxNostr.dispose();
+
+                return (immediate ? Promise.resolve(signedEvent) : signing.promise) as Promise<
+                  Nostr.Event<K>
+                >;
+              },
+            },
+          });
+          const inspector = new SubscriptionInspector<OkPacket>();
+
+          publication.subscribe(inspector);
+          expect(inspector.completed).toBe(true);
+          await expect(publication.waitFor("all")).rejects.toMatchObject({ code: "cancelled" });
+          await expect(publication.waitFor("any")).rejects.toMatchObject({ code: "cancelled" });
+
+          // Signing may still finish after cancellation, but must never resume delivery.
+          signing.resolve(signedEvent);
+          await expect(publication.event).resolves.toEqual(signedEvent);
+          await settleProtocol();
+          expect(inspector.values).toEqual([]);
+          expect(server.connections).toHaveLength(1);
+          expect(socket(server, relay1).inbox.length).toBe(0);
+          expect(socket(server, relay1).isCloseRequested).toBe(true);
+        },
+      );
+    }
+
     scenarioTest(
       "cancels synchronously from an OK observer without settling twice",
       async ({ createScenario }) => {

@@ -2,6 +2,7 @@ import "disposablestack/auto";
 import { expect, test } from "vitest";
 
 import { SubscriptionInspector } from "../__test__/helper/index.ts";
+import { RxNostrAlreadyDisposedError } from "../libs/error.ts";
 import type { RelayUrl } from "../libs/index.ts";
 import { RxRelays } from "./rx-relays.ts";
 
@@ -106,4 +107,35 @@ test("RxRelays.intersection follows common relays as sources change", () => {
   common.dispose();
   first.dispose();
   second.dispose();
+});
+
+test("rejects every mutation after disposal without changing the snapshot", () => {
+  const relays = new RxRelays(["wss://original.example"]);
+
+  relays.dispose();
+
+  for (const mutate of [
+    () => relays.set("wss://other.example"),
+    () => relays.append("wss://other.example"),
+    () => relays.remove("wss://original.example"),
+    () => relays.clear(),
+  ]) {
+    expect(mutate).toThrow(RxNostrAlreadyDisposedError);
+  }
+
+  expect(relays.get()).toEqual(new Set(["wss://original.example"]));
+  expect(() => relays.dispose()).not.toThrow();
+});
+
+test("rejects one-shot relay inputs without consuming them", () => {
+  const input = ["wss://relay.example"].values();
+
+  for (const convert of [RxRelays.from, RxRelays.array, RxRelays.set, RxRelays.observable]) {
+    // @ts-expect-error Iterator is intentionally outside RelayInput.
+    expect(() => convert(input)).toThrow(TypeError);
+  }
+
+  // @ts-expect-error Iterator is intentionally outside RelayInput.
+  expect(() => new RxRelays(input)).toThrow(TypeError);
+  expect(input.next().value).toBe("wss://relay.example");
 });

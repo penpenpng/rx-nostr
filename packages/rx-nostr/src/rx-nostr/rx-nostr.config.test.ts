@@ -83,7 +83,6 @@ describe("rx-nostr config", () => {
 
       expect(() => new FilledRxNostrReqOptions({ timeout: value }, root)).toThrow(RangeError);
       expect(() => new FilledRxNostrPublishOptions({ linger: value }, root)).toThrow(RangeError);
-      expect(() => createRoot({ nip11Timeout: value })).toThrow(RangeError);
     },
   );
 
@@ -97,7 +96,6 @@ describe("rx-nostr config", () => {
     ).toThrow(RangeError);
     expect(() => createRoot({ connectionTimeout: 0 })).toThrow(RangeError);
     expect(() => createRoot({ connectionTimeout: Infinity })).toThrow(RangeError);
-    expect(createRoot({ nip11Timeout: Infinity }).nip11Timeout).toBe(Infinity);
   });
 
   test("applies operation, instance, and static precedence", () => {
@@ -193,7 +191,6 @@ describe("rx-nostr config", () => {
     expect(root.verifier).toBe(verifier);
     expect(root.signer).toBe(signer);
     expect(root.relayDirectory).toBe(relayDirectory);
-    expect(root.nip11Timeout).toBe(30_000);
     expect(root.skipFetchNip11).toBe(true);
     expect(overridden.verifier).toBe(instanceVerifier);
     expect(overridden.skipFetchNip11).toBe(false);

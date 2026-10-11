@@ -2,22 +2,30 @@
 /* eslint-disable unicorn/require-post-message-target-origin */
 import type * as Nostr from "nostr-typedef";
 
+import { RxNostrAlreadyDisposedError, RxNostrEnvironmentError } from "../libs/error.ts";
 import { once } from "../libs/index.ts";
 import { assertTimerDuration } from "../libs/timing.ts";
 import type { EventVerifier } from "./event-verifier.interface.ts";
 
 export class VerificationHost {
+  #disposed = false;
   constructor(private verifier: EventVerifier) {}
 
   start() {
+    if (this.#disposed) {
+      throw new RxNostrAlreadyDisposedError();
+    }
     if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
-      throw new Error(".start() must be called in a Worker context.");
+      throw new RxNostrEnvironmentError(".start() must be called in a Worker context.");
     }
 
     self.addEventListener("message", this.#handler);
   }
 
   #handler = async (ev: MessageEvent<VerificationRequest | PingMessage>) => {
+    if (this.#disposed) {
+      return;
+    }
     if (ev.data === "ping") {
       self.postMessage("pong" satisfies PongMessage);
 
@@ -33,11 +41,19 @@ export class VerificationHost {
     try {
       const ok = await this.verifier.verifyEvent(event);
 
+      if (this.#disposed) {
+        return;
+      }
+
       self.postMessage({
         reqId,
         ok,
       } satisfies VerificationResponse);
     } catch (err) {
+      if (this.#disposed) {
+        return;
+      }
+
       self.postMessage({
         reqId,
         ok: false,
@@ -48,8 +64,10 @@ export class VerificationHost {
 
   [Symbol.dispose] = once(() => {
     if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope)) {
-      throw new Error(".stop() must be called in a Worker context.");
+      throw new RxNostrEnvironmentError(".dispose() must be called in a Worker context.");
     }
+
+    this.#disposed = true;
 
     self.removeEventListener("message", this.#handler);
   });

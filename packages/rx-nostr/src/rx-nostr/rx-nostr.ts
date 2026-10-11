@@ -85,7 +85,7 @@ export class RxNostr implements IRxNostr {
         relayDirectory: this.#config.relayDirectory,
         relayHealthPolicy: this.#config.relayHealthPolicy,
         connectionTimeout: this.#config.connectionTimeout,
-        ...(this.#config.skipFetchNip11 ? {} : { nip11Timeout: this.#config.nip11Timeout }),
+        fetchNip11: !this.#config.skipFetchNip11,
         onDiagnostic: emitDiagnostic,
       });
     });
@@ -209,6 +209,13 @@ export class RxNostr implements IRxNostr {
       relays: this.#relays,
       mode,
     });
+
+    // The signer can dispose the root synchronously while publish constructs the operation.
+    if (this.#disposed) {
+      publication.cancel();
+
+      return publication;
+    }
 
     this.#publications.add(publication);
     void publication.closed.then(() => this.#publications.delete(publication));

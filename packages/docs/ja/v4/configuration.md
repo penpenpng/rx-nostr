@@ -10,7 +10,8 @@ const rxNostr = new RxNostr({
   reconnector,
   dropDetectors,
   relayDirectory,
-  nip11Timeout: 30_000,
+  connectionTimeout: 30_000,
+  relayHealthPolicy: {},
   skipFetchNip11: false,
   WebSocket,
   defaultOptions: {
@@ -28,7 +29,8 @@ const rxNostr = new RxNostr({
 | `reconnector` | no | 再接続 policy |
 | `dropDetectors` | no | 接続異常を検出する detector の iterable |
 | `relayDirectory` | no | metadata/health store |
-| `nip11Timeout` | no | 自動 NIP-11 fetch の待機時間。既定値は30,000 ms |
+| `connectionTimeout` | no | 1回の WebSocket 接続試行の期限。既定値30,000 ms |
+| `relayHealthPolicy` | no | health による抑止設定・戦略。`false` で無効化 |
 | `skipFetchNip11` | no | 接続需要発生時の自動 NIP-11 fetch を止める |
 | `WebSocket` | no | runtime に注入する WebSocket constructor |
 | `defaultOptions` | no | REQ / publish operation の既定値 |
@@ -64,7 +66,8 @@ const secondary = new RxNostr({
 | `reconnector` | `ExponentialBackoffReconnector` |
 | `dropDetectors` | `[]` |
 | `relayDirectory` | `GlobalRelayDirectory` |
-| `nip11Timeout` | `30_000` ms |
+| `connectionTimeout` | `30_000` ms |
+| `relayHealthPolicy` | `{}`（既定の指数的抑止戦略） |
 | `skipFetchNip11` | `false` |
 | `WebSocket` | `globalThis.WebSocket` |
 
@@ -114,10 +117,10 @@ REQ の `timeout` は backward segment が EOSE を待つ時間です。publish 
 | option | `0` | 正の有限値 | `Infinity` |
 | --- | --- | --- | --- |
 | `connectionTimeout` | 不可 | 接続試行の期限 | 不可 |
-| `nip11Timeout`、REQ / publish `timeout`、Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
+| RelayDirectory `timeout`、REQ / publish `timeout`、Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
 | REQ / publish / ReqPacket `linger` | 即時解放 | 終了後の保持時間 | dispose まで保持 |
 
-`connectionTimeout`、`nip11Timeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory.fetchNip11()` に不正な `timeout` を渡すと fetch を始めず Promise が reject します。`SimpleAuthenticator` と `VerificationClient` は構築時に検査し、独自 Authenticator の `authTimeout` は AUTH 開始前に検査します。
+`connectionTimeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory` の `timeout` は Directory の構築時に検査し、不正なら同期的に `RangeError` を throw します。fetch の期限は Directory 全体で統一され、RxNostr と `fetchNip11()` の option では上書きしません。`SimpleAuthenticator` と `VerificationClient` は構築時に検査し、独自 Authenticator の `authTimeout` は AUTH 開始前に検査します。
 
 reconnector の retry `delay` と relay health policy の `suppressedUntil` は有限の非負数を要求します。これらは接続待機の内部処理で、長い deadline は timer 上限ごとに分割して待ちます。
 
@@ -210,3 +213,8 @@ if (error instanceof RxNostrCallbackError) {
 | `RxNostrPublicationError.failures` | Error 作成時に内部結果から分離。各 failure の OK tuple も copy |
 
 `RxNostrCallbackError.cause`、publication failure の `cause`、diagnostic の `cause` は任意のユーザー値や `Error` を含む不透明な参照で、identity を保ちます。diagnostic の `context` は浅い copy を freeze して渡し、その中の任意 object は不透明な参照として扱います。注入した verifier、reconnector、directory などの class instance も所有者側で管理してください。reconnector と relay health policy に渡す health は個別の snapshot です。
+
+
+## Error の識別
+
+library 独自の公開 error は `RxNostrError` を継承し、`RxNostr…Error` の名前に揃えています。snapshot 読み込みエラーは `RxNostrRelayDirectorySnapshotError`、その code 型は `RxNostrRelayDirectorySnapshotErrorCode` です。`name` はクラス名、`message` は名前を重複させない説明です。原因がある場合は標準の `cause` に保持します。分岐には message の文字列解析ではなく `instanceof`、`code`、`callback` を使ってください。引数の型・範囲の不正には標準の `TypeError` / `RangeError` を使います。

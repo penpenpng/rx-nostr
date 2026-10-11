@@ -1016,6 +1016,7 @@ function retryHealth(context: ReconnectionContext): ConnectionReconnectorContext
 }
 
 class ConnectionPolicyError extends Error {
+  override readonly name = "ConnectionPolicyError";
   constructor(cause: unknown) {
     super(cause instanceof Error ? cause.message : "Connection policy failed.", { cause });
   }
