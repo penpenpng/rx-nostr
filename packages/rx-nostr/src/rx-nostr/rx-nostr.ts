@@ -1,4 +1,15 @@
-import { defer, EMPTY, identity, map, mergeMap, Observable, of, Subject, takeUntil } from "rxjs";
+import {
+  defer,
+  EMPTY,
+  identity,
+  map,
+  merge,
+  mergeMap,
+  Observable,
+  of,
+  Subject,
+  takeUntil,
+} from "rxjs";
 
 import { copySuppressionReasons } from "../connection-state.ts";
 import {
@@ -8,6 +19,7 @@ import {
   type RxNostrDiagnosticSink,
 } from "../diagnostics/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
+import type { LazyFilter } from "../lazy-filter/index.ts";
 import { normalizeFilters } from "../lazy-filter/normalize-filters.ts";
 import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error.ts";
 import { once, RxDisposableStack } from "../libs/index.ts";
@@ -46,6 +58,10 @@ import type {
 
 /** @internal Bridge for the legacy adapter; absent from the package entry point. */
 export const legacyPublishSent = Symbol("rx-nostr.legacy-publish-sent");
+
+function isFilterGroups(request: RxNostrReqInput): request is readonly (readonly LazyFilter[])[] {
+  return Array.isArray(request) && request.length > 0 && request.every(Array.isArray);
+}
 
 export class RxNostr implements IRxNostr {
   /** Process-wide synchronous log callback for every RxNostr instance. */
@@ -119,6 +135,11 @@ export class RxNostr implements IRxNostr {
     request: RxNostrReqInput,
     options: RxNostrReqConfig,
   ): Observable<EventPacket> {
+    if (isFilterGroups(request)) {
+      // Keep each static REQ active independently, including with the forward strategy.
+      return merge(...request.map((filters) => this.#req(req, relays, filters, options)));
+    }
+
     const config = new FilledRxNostrReqOptions(options, this.#config);
     let source$: Observable<ReqPacket>;
 

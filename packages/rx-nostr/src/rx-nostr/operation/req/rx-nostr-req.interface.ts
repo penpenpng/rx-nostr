@@ -3,7 +3,11 @@ import type { LazyFilter } from "../../../lazy-filter/index.ts";
 import type { RxReq } from "../../../rx-req/index.ts";
 
 /** Empty filter arrays and unsatisfiable branches match nothing; `{}` or `[{}]` matches all. */
-export type RxNostrReqInput = RxReq | LazyFilter | readonly LazyFilter[];
+export type RxNostrReqInput =
+  | RxReq
+  | LazyFilter
+  | readonly LazyFilter[]
+  | readonly (readonly LazyFilter[])[];
 
 export interface RxNostrReqOptions {
   defer?: boolean;
