@@ -1,15 +1,4 @@
-import {
-  defer,
-  EMPTY,
-  identity,
-  map,
-  merge,
-  mergeMap,
-  Observable,
-  of,
-  Subject,
-  takeUntil,
-} from "rxjs";
+import { defer, EMPTY, from, identity, map, mergeMap, Observable, Subject, takeUntil } from "rxjs";
 
 import { copySuppressionReasons } from "../connection-state.ts";
 import {
@@ -40,7 +29,8 @@ import {
   reqForward,
   type RxNostrPublishConfig,
   type RxNostrReqConfig,
-  type RxNostrReqInput,
+  type RxNostrForwardReqInput,
+  type RxNostrBackwardReqInput,
 } from "./operation/index.ts";
 import {
   cloneStaticDefaultConfig,
@@ -59,7 +49,9 @@ import type {
 /** @internal Bridge for the legacy adapter; absent from the package entry point. */
 export const legacyPublishSent = Symbol("rx-nostr.legacy-publish-sent");
 
-function isFilterGroups(request: RxNostrReqInput): request is readonly (readonly LazyFilter[])[] {
+function isFilterGroups(
+  request: RxNostrBackwardReqInput,
+): request is readonly (readonly LazyFilter[])[] {
   return Array.isArray(request) && request.length > 0 && request.every(Array.isArray);
 }
 
@@ -115,7 +107,7 @@ export class RxNostr implements IRxNostr {
 
   forward(
     relays: RelayInput,
-    request: RxNostrReqInput,
+    request: RxNostrForwardReqInput,
     options: RxNostrReqConfig = {},
   ): Observable<EventPacket> {
     return this.#req(reqForward, relays, request, options);
@@ -123,7 +115,7 @@ export class RxNostr implements IRxNostr {
 
   backward(
     relays: RelayInput,
-    request: RxNostrReqInput,
+    request: RxNostrBackwardReqInput,
     options: RxNostrReqConfig = {},
   ): Observable<EventPacket> {
     return this.#req(reqBackward, relays, request, options);
@@ -132,14 +124,9 @@ export class RxNostr implements IRxNostr {
   #req(
     req: typeof reqForward | typeof reqBackward,
     relays: RelayInput,
-    request: RxNostrReqInput,
+    request: RxNostrBackwardReqInput,
     options: RxNostrReqConfig,
   ): Observable<EventPacket> {
-    if (isFilterGroups(request)) {
-      // Keep each static REQ active independently, including with the forward strategy.
-      return merge(...request.map((filters) => this.#req(req, relays, filters, options)));
-    }
-
     const config = new FilledRxNostrReqOptions(options, this.#config);
     let source$: Observable<ReqPacket>;
 
@@ -159,9 +146,11 @@ export class RxNostr implements IRxNostr {
       );
     } else {
       // Static caller-owned filters are snapshotted when forward/backward is called.
-      const filters = normalizeFilters(request);
+      const groups = isFilterGroups(request) ? request : [request];
+      const packets = groups.map((filters) => ({ filters: normalizeFilters(filters) }));
 
-      source$ = filters.length === 0 ? EMPTY : of({ filters });
+      // Feed static segments through the same query strategy as RxReq, then complete.
+      source$ = packets.every(({ filters }) => filters.length === 0) ? EMPTY : from(packets);
     }
 
     return defer(() => {

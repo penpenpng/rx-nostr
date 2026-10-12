@@ -2,4 +2,4 @@
 "rx-nostr": minor
 ---
 
-Accept nested filter arrays in forward and backward to register independent REQs and merge their events.
+Separate forward and backward request input types, and accept nested filter arrays in backward as a finite sequence of REQ segments. Backward merges their events and completes once all segments finish.

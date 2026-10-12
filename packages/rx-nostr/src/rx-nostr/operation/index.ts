@@ -4,6 +4,8 @@ export {
   reqForward,
   type RxNostrReqConfig,
   type RxNostrReqInput,
+  type RxNostrForwardReqInput,
+  type RxNostrBackwardReqInput,
   type RxNostrReqOptions,
 } from "./req/index.ts";
 export {

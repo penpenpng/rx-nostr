@@ -42,9 +42,9 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
-    describe.each(["forward", "backward"] as const)("%s filter groups", (strategy) => {
+    describe("backward filter groups", () => {
       scenarioTest(
-        "keeps separate REQs active and merges their events",
+        "merges segments and completes after every REQ finishes",
         async ({ createScenario }) => {
           const { server, rxNostr } = createScenario();
           const inspector = new SubscriptionInspector<EventPacket>();
@@ -52,7 +52,8 @@ describe("REQ public contract", () => {
             [{ kinds: [1] }, { kinds: [2] }],
             [{ kinds: [3] }],
           ];
-          const subscription = rxNostr[strategy](relay, request).subscribe(inspector);
+
+          rxNostr.backward(relay, request).subscribe(inspector);
           const socket = server.sockets.latest;
 
           socket.open();
@@ -74,13 +75,7 @@ describe("REQ public contract", () => {
           expect(inspector.completed).toBe(false);
           socket.message(["EOSE", second[1]]);
 
-          if (strategy === "backward") {
-            await inspector.waitComplete();
-          } else {
-            await settleProtocol();
-            expect(inspector.completed).toBe(false);
-            subscription.unsubscribe();
-          }
+          await inspector.waitComplete();
 
           const closes = [
             await socket.inbox.waitNext("CLOSE"),
@@ -96,16 +91,16 @@ describe("REQ public contract", () => {
         },
       );
 
-      test("snapshots groups and skips empty or unsatisfiable groups", async () => {
+      test("snapshots groups and preserves lazy bounds", async () => {
         const { server, rxNostr } = createRxNostrScenario();
         let since = 1;
         const filter: LazyFilter = { kinds: [1], since: () => since };
-        const request: LazyFilter[][] = [[], [{ authors: [] }], [filter], [{}]];
-        const observable = rxNostr[strategy](relay, request);
+        const request: LazyFilter[][] = [[{}], [], [{ authors: [] }], [filter]];
+        const observable = rxNostr.backward(relay, request);
 
         filter.kinds![0] = 2;
 
-        request[2].push({ kinds: [3] });
+        request[3].push({ kinds: [3] });
         request.splice(0);
 
         since = 4;
@@ -114,9 +109,15 @@ describe("REQ public contract", () => {
         const socket = server.sockets.latest;
 
         socket.open();
-        expect((await socket.inbox.waitNext("REQ")).slice(2)).toEqual([{ kinds: [1], since: 4 }]);
         expect((await socket.inbox.waitNext("REQ")).slice(2)).toEqual([{}]);
+        expect((await socket.inbox.waitNext("REQ")).slice(2)).toEqual([{ kinds: [1], since: 4 }]);
         subscription.unsubscribe();
+        const firstClose = await socket.inbox.waitNext("CLOSE");
+        const secondClose = await socket.inbox.waitNext("CLOSE");
+
+        expect(firstClose[1]).not.toBe(secondClose[1]);
+        await expect(socket.closeRequested).resolves.toBeDefined();
+        socket.acknowledgeClose();
         rxNostr.dispose();
       });
 
@@ -124,7 +125,7 @@ describe("REQ public contract", () => {
         const { server, rxNostr } = createRxNostrScenario();
         const inspector = new SubscriptionInspector<EventPacket>();
 
-        rxNostr[strategy](relay, [[], [{ kinds: [] }]], { defer: false }).subscribe(inspector);
+        rxNostr.backward(relay, [[], [{ kinds: [] }]], { defer: false }).subscribe(inspector);
 
         await inspector.waitComplete();
         expect(server.connections).toHaveLength(0);
