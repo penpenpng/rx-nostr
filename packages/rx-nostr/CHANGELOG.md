@@ -1,5 +1,11 @@
 # rx-nostr
 
+## 4.0.0-beta.2
+
+### Minor Changes
+
+- 32966a5: Separate forward and backward request input types, and accept nested filter arrays in backward as a finite sequence of REQ segments. Backward merges their events and completes once all segments finish.
+
 ## 4.0.0-beta.1
 
 ### Major Changes
