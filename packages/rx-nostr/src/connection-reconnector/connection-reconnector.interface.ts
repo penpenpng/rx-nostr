@@ -1,5 +1,5 @@
 import type {
-  ConnectionFailure,
+  RelayConnectionFailure,
   ConnectionWaitInfo,
   ConnectionSuppressionReason,
 } from "../connection-state.ts";
@@ -17,7 +17,7 @@ export interface ConnectionReconnectorContext {
   phase: "initial" | "recovery";
   /** One-based number of the retry that is being considered. */
   attempt: number;
-  reason: ConnectionFailure;
+  reason: RelayConnectionFailure;
   signal: AbortSignal;
   health: RelayHealth;
   /** Reports an implementation-owned asynchronous wait; does not schedule a retry. */

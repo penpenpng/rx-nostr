@@ -1,13 +1,13 @@
 import type * as Nostr from "nostr-typedef";
 import { EMPTY, Observable, catchError, throwError } from "rxjs";
 
-import type { AuthenticatorInput } from "../../authenticator/index.ts";
+import type { Nip42AuthenticatorInput } from "../../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../../connection-drop-detector/index.ts";
 import type {
   RelayHealthPolicyInput,
   ConnectionReconnector,
 } from "../../connection-reconnector/index.ts";
-import type { ConnectionState } from "../../connection-state.ts";
+import type { RelayConnectionState } from "../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../diagnostics/index.ts";
 import type { LazyFilter } from "../../lazy-filter/index.ts";
 import { once, type RelayUrl } from "../../libs/index.ts";
@@ -23,7 +23,7 @@ import { RelayReqScheduler } from "./scheduler/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "./transport/index.ts";
 
 export interface RelayCommunicationOptions {
-  readonly authenticator?: AuthenticatorInput;
+  readonly authenticator?: Nip42AuthenticatorInput;
   readonly WebSocket?: WebSocketConstructor;
   readonly reconnector?: ConnectionReconnector;
   readonly dropDetectors?: readonly ConnectionDropDetector[];
@@ -139,7 +139,7 @@ export class RelayCommunication implements IRelayCommunication {
       .pipe(catchError((error) => throwError(() => communicationErrorFrom(error))));
   }
 
-  monitorConnectionState(): Observable<ConnectionState> {
+  monitorConnectionState(): Observable<RelayConnectionState> {
     return this.#executor.monitorConnectionState();
   }
 

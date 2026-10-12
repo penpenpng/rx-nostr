@@ -111,9 +111,9 @@ try {
   );
   await writeFile(
     join(source, "worker.ts"),
-    `import { VerificationHost } from "rx-nostr";
+    `import { WorkerEventVerifierHost } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
-const host = new VerificationHost(new SimpleVerifier());
+const host = new WorkerEventVerifierHost(new SimpleVerifier());
 host.start();
 self.addEventListener("message", (event) => {
   if (event.data === "stop") {
@@ -125,9 +125,9 @@ self.addEventListener("message", (event) => {
   );
   await writeFile(
     join(source, "page.ts"),
-    `import { VerificationClient } from "rx-nostr";
+    `import { WorkerEventVerifierClient } from "rx-nostr";
 const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-const client = new VerificationClient({ worker, timeout: 5000 });
+const client = new WorkerEventVerifierClient({ worker, timeout: 5000 });
 const waitFor = (expected) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error("Timed out waiting for " + expected)), 5000);
   worker.addEventListener("message", function onMessage(event) {

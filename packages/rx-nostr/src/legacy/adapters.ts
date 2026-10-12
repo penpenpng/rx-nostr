@@ -1,12 +1,12 @@
-import type { Authenticator, AuthenticatorInput } from "../authenticator/index.ts";
-import type { ConnectionStatePacket } from "../index.ts";
+import type { Nip42Authenticator, Nip42AuthenticatorInput } from "../authenticator/index.ts";
+import type { RelayConnectionStatePacket } from "../index.ts";
 import type { LegacyConnectionState } from "./types.ts";
 
 export function withLegacyAuthTimeout(
-  input: AuthenticatorInput,
+  input: Nip42AuthenticatorInput,
   authTimeout: number,
-): AuthenticatorInput {
-  const withTimeout = (authenticator: Authenticator): Authenticator => ({
+): Nip42AuthenticatorInput {
+  const withTimeout = (authenticator: Nip42Authenticator): Nip42Authenticator => ({
     authTimeout: authenticator.authTimeout ?? authTimeout,
     challenge: (relay, challenge) => authenticator.challenge(relay, challenge),
   });
@@ -23,7 +23,7 @@ export function withLegacyAuthTimeout(
 }
 
 export function toLegacyConnectionState(
-  state: ConnectionStatePacket["state"],
+  state: RelayConnectionStatePacket["state"],
 ): LegacyConnectionState {
   switch (state.state) {
     case "dormant":

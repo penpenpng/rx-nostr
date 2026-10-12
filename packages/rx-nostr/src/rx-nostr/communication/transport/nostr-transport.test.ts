@@ -8,7 +8,7 @@ import type {
   ConnectionReconnector,
   ConnectionReconnectorContext,
 } from "../../../connection-reconnector/index.ts";
-import type { ConnectionState } from "../../../connection-state.ts";
+import type { RelayConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { NostrTransport, NostrTransportOperationError } from "./nostr-transport.ts";
 
@@ -67,7 +67,7 @@ describe("NostrTransport", () => {
       WebSocket: server.WebSocket,
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
-    const inspector = new SubscriptionInspector<ConnectionState>();
+    const inspector = new SubscriptionInspector<RelayConnectionState>();
 
     transport.state$.subscribe(inspector);
 
@@ -103,7 +103,7 @@ describe("NostrTransport", () => {
       WebSocket: server.WebSocket,
       reconnector: { reconnect: () => ({ action: "retry", delay: 100 }) },
     });
-    const firstInspector = new SubscriptionInspector<ConnectionState>();
+    const firstInspector = new SubscriptionInspector<RelayConnectionState>();
 
     transport.state$.subscribe(firstInspector);
 
@@ -132,7 +132,7 @@ describe("NostrTransport", () => {
       WebSocket: terminalServer.WebSocket,
       reconnector: { reconnect: () => ({ action: "exhaust" }) },
     });
-    const secondInspector = new SubscriptionInspector<ConnectionState>();
+    const secondInspector = new SubscriptionInspector<RelayConnectionState>();
 
     terminal.state$.subscribe(secondInspector);
     const terminalOpen = terminal.open();

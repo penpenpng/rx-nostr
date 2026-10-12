@@ -1,6 +1,6 @@
 import type { Observable } from "rxjs";
 
-import type { AuthenticatorInput } from "../authenticator/index.ts";
+import type { Nip42AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import type {
   RelayHealthPolicyInput,
@@ -8,8 +8,8 @@ import type {
 } from "../connection-reconnector/index.ts";
 import type { EventSigner } from "../event-signer/index.ts";
 import type { EventVerifier } from "../event-verifier/index.ts";
-import type { ConnectionStatePacket, EventPacket } from "../packets/index.ts";
-import type { Publication, PublishEventParameters } from "../publication/index.ts";
+import type { RelayConnectionStatePacket, EventPacket } from "../packets/index.ts";
+import type { RxNostrPublication, PublishEventParameters } from "../publication/index.ts";
 import type { RelayDirectory } from "../relay-directory/index.ts";
 import type { RelayInput, WebSocketConstructor } from "../types/index.ts";
 import type {
@@ -36,10 +36,10 @@ export interface IRxNostr {
     relays: RelayInput,
     params: PublishEventParameters,
     options?: RxNostrPublishConfig,
-  ): Publication;
+  ): RxNostrPublication;
   setHotRelays(relays: RelayInput): void;
   unsetHotRelays(): void;
-  monitorConnectionState(): Observable<ConnectionStatePacket>;
+  monitorConnectionState(): Observable<RelayConnectionStatePacket>;
   [Symbol.dispose](): void;
   dispose(): void;
 }
@@ -54,7 +54,7 @@ export interface RxNostrConfig {
    */
   signer?: EventSigner;
   /** Override the process-wide authenticator, or disable AUTH for this instance. */
-  authenticator?: AuthenticatorInput | false;
+  authenticator?: Nip42AuthenticatorInput | false;
   /** Defaults applied to REQ and publish operations owned by this instance. */
   defaultOptions?: RxNostrDefaultOptions;
   /**
@@ -94,7 +94,7 @@ export interface RxNostrStaticDefaultOptions {
 export interface RxNostrStaticDefaultConfig {
   verifier: EventVerifier;
   signer: EventSigner;
-  authenticator: AuthenticatorInput | undefined;
+  authenticator: Nip42AuthenticatorInput | undefined;
   reconnector: ConnectionReconnector;
   dropDetectors: ConnectionDropDetector[];
   relayDirectory: RelayDirectory;

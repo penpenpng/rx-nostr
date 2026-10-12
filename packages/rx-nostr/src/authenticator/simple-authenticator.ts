@@ -3,9 +3,9 @@ import type * as Nostr from "nostr-typedef";
 import type { EventSigner } from "../event-signer/index.ts";
 import { assertTimerDuration } from "../libs/timing.ts";
 import { DEFAULT_AUTH_TIMEOUT } from "./authenticator.defaults.ts";
-import type { Authenticator } from "./authenticator.interface.ts";
+import type { Nip42Authenticator } from "./authenticator.interface.ts";
 
-export class SimpleAuthenticator implements Authenticator {
+export class SimpleAuthenticator implements Nip42Authenticator {
   readonly authTimeout: number;
 
   constructor(

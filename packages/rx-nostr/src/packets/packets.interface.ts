@@ -1,6 +1,6 @@
 import * as Nostr from "nostr-typedef";
 
-import type { ConnectionState } from "../connection-state.ts";
+import type { RelayConnectionState } from "../connection-state.ts";
 import type { LazyFilter } from "../lazy-filter/index.ts";
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import type { RelayInput } from "../types/index.ts";
@@ -109,7 +109,7 @@ export interface ErrorPacket {
 /**
  * Packets emitted when WebSocket connection state is changed.
  */
-export interface ConnectionStatePacket {
+export interface RelayConnectionStatePacket {
   from: RelayUrl;
-  state: ConnectionState;
+  state: RelayConnectionState;
 }

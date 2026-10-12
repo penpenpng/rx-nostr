@@ -1,4 +1,8 @@
-import { RxNostrAlreadyDisposedError, VerificationClient, VerificationHost } from "rx-nostr";
+import {
+  RxNostrAlreadyDisposedError,
+  WorkerEventVerifierClient,
+  WorkerEventVerifierHost,
+} from "rx-nostr";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { Faker } from "../__test__/helper/faker.ts";
@@ -35,11 +39,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("VerificationClient pending requests", () => {
+describe("WorkerEventVerifierClient pending requests", () => {
   test("uses fallback during booting and error without reviving after a late pong", async () => {
     const controlled = controlledWorker();
     const fallback = { verifyEvent: vi.fn(async () => false) };
-    const client = new VerificationClient({ worker: controlled.worker, fallback });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, fallback });
 
     expect(client.status).toBe("prepared");
     expect(() => client.verifyEvent(Faker.event())).toThrow("not started");
@@ -61,7 +65,7 @@ describe("VerificationClient pending requests", () => {
   test("enters fallback state if the startup ping cannot be posted", async () => {
     const controlled = controlledWorker();
     const fallback = { verifyEvent: vi.fn(async () => true) };
-    const client = new VerificationClient({ worker: controlled.worker, fallback });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, fallback });
 
     controlled.postMessage.mockImplementationOnce(() => {
       throw new Error("startup post failed");
@@ -75,7 +79,7 @@ describe("VerificationClient pending requests", () => {
 
   test("ignores malformed messages without disturbing an unrelated pending request", async () => {
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker });
 
     client.start();
     controlled.emit("message", "pong");
@@ -90,7 +94,7 @@ describe("VerificationClient pending requests", () => {
 
   test("distinguishes a valid false result from a Worker error", async () => {
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker });
 
     client.start();
     controlled.emit("message", "pong");
@@ -115,7 +119,7 @@ describe("VerificationClient pending requests", () => {
   test.each([0, 37])("times out exactly 100ms after a request started at +%ims", async (offset) => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, timeout: 100 });
 
     client.start();
     controlled.emit("message", "pong");
@@ -148,7 +152,7 @@ describe("VerificationClient pending requests", () => {
   test("independent requests have independent deadlines", async () => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, timeout: 100 });
 
     client.start();
     controlled.emit("message", "pong");
@@ -182,7 +186,7 @@ describe("VerificationClient pending requests", () => {
   test("a response at the deadline settles once and cancels its timer", async () => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, timeout: 100 });
 
     client.start();
     controlled.emit("message", "pong");
@@ -202,12 +206,13 @@ describe("VerificationClient pending requests", () => {
 
     for (const invalid of [-1, NaN, -Infinity, 2_147_483_648]) {
       expect(
-        () => new VerificationClient({ worker: controlledWorker().worker, timeout: invalid }),
+        () =>
+          new WorkerEventVerifierClient({ worker: controlledWorker().worker, timeout: invalid }),
       ).toThrow(RangeError);
     }
 
     const zeroWorker = controlledWorker();
-    const zero = new VerificationClient({ worker: zeroWorker.worker, timeout: 0 });
+    const zero = new WorkerEventVerifierClient({ worker: zeroWorker.worker, timeout: 0 });
 
     zero.start();
     zeroWorker.emit("message", "pong");
@@ -223,7 +228,10 @@ describe("VerificationClient pending requests", () => {
     zero.dispose();
 
     const infiniteWorker = controlledWorker();
-    const infinite = new VerificationClient({ worker: infiniteWorker.worker, timeout: Infinity });
+    const infinite = new WorkerEventVerifierClient({
+      worker: infiniteWorker.worker,
+      timeout: Infinity,
+    });
 
     infinite.start();
     infiniteWorker.emit("message", "pong");
@@ -235,13 +243,15 @@ describe("VerificationClient pending requests", () => {
     expect(vi.getTimerCount()).toBe(0);
     vi.advanceTimersByTime(1_000_000);
     infinite.dispose();
-    await expect(pending).resolves.toMatchObject({ message: "VerificationClient was disposed." });
+    await expect(pending).resolves.toMatchObject({
+      message: "WorkerEventVerifierClient was disposed.",
+    });
   });
 
   test("dispose rejects every request immediately and releases the worker and timer", async () => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker, timeout: 1_000 });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, timeout: 1_000 });
 
     client.start();
     controlled.emit("message", "pong");
@@ -257,8 +267,12 @@ describe("VerificationClient pending requests", () => {
 
     client.dispose();
 
-    await expect(first).resolves.toMatchObject({ message: "VerificationClient was disposed." });
-    await expect(second).resolves.toMatchObject({ message: "VerificationClient was disposed." });
+    await expect(first).resolves.toMatchObject({
+      message: "WorkerEventVerifierClient was disposed.",
+    });
+    await expect(second).resolves.toMatchObject({
+      message: "WorkerEventVerifierClient was disposed.",
+    });
     expect(controlled.terminate).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
     expect([...controlled.listeners.values()].every((handlers) => handlers.size === 0)).toBe(true);
@@ -272,7 +286,7 @@ describe("VerificationClient pending requests", () => {
 
   test("a response before dispose settles once while a late response is ignored", async () => {
     const controlled = controlledWorker();
-    const client = new VerificationClient({ worker: controlled.worker });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker });
 
     client.start();
     controlled.emit("message", "pong");
@@ -287,7 +301,9 @@ describe("VerificationClient pending requests", () => {
     controlled.emit("message", { reqId: 2, ok: true });
 
     await expect(accepted).resolves.toBe(true);
-    await expect(rejected).resolves.toMatchObject({ message: "VerificationClient was disposed." });
+    await expect(rejected).resolves.toMatchObject({
+      message: "WorkerEventVerifierClient was disposed.",
+    });
   });
 
   test.each(["error", "messageerror"] as const)(
@@ -295,7 +311,7 @@ describe("VerificationClient pending requests", () => {
     async (type) => {
       const controlled = controlledWorker();
       const fallback = { verifyEvent: vi.fn(async () => true) };
-      const client = new VerificationClient({ worker: controlled.worker, fallback });
+      const client = new WorkerEventVerifierClient({ worker: controlled.worker, fallback });
 
       client.start();
       controlled.emit("message", "pong");
@@ -314,7 +330,7 @@ describe("VerificationClient pending requests", () => {
   test("a synchronous postMessage failure rejects the request", async () => {
     const controlled = controlledWorker();
     const fallback = { verifyEvent: vi.fn(async () => true) };
-    const client = new VerificationClient({ worker: controlled.worker, fallback });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, fallback });
 
     client.start();
     controlled.emit("message", "pong");
@@ -330,7 +346,7 @@ describe("VerificationClient pending requests", () => {
   });
 });
 
-describe("VerificationHost responses", () => {
+describe("WorkerEventVerifierHost responses", () => {
   test("connects the public Host and Client protocol for concurrent results and errors", async () => {
     vi.useFakeTimers();
     const controlled = controlledWorker();
@@ -366,8 +382,8 @@ describe("VerificationHost responses", () => {
 
       return event.id === "valid";
     });
-    const host = new VerificationHost({ verifyEvent });
-    const client = new VerificationClient({ worker: controlled.worker, timeout: 100 });
+    const host = new WorkerEventVerifierHost({ verifyEvent });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, timeout: 100 });
 
     expect(() => host.start()).not.toThrow();
     client.start();
@@ -390,7 +406,7 @@ describe("VerificationHost responses", () => {
   });
 
   test("requires a Worker context for start and dispose", () => {
-    const host = new VerificationHost({ verifyEvent: vi.fn(async () => true) });
+    const host = new WorkerEventVerifierHost({ verifyEvent: vi.fn(async () => true) });
 
     expect(() => host.start()).toThrow("Worker context");
     expect(() => host.dispose()).toThrow("Worker context");
@@ -426,7 +442,7 @@ describe("VerificationHost responses", () => {
           throw new Error("unsafe stringification");
         },
       });
-    const host = new VerificationHost({ verifyEvent });
+    const host = new WorkerEventVerifierHost({ verifyEvent });
 
     host.start();
     await scope.request(1);
@@ -450,7 +466,7 @@ describe.each(["booting", "error"] as const)("fallback while %s", (status) => {
     const controlled = controlledWorker();
     const deferred = Promise.withResolvers<boolean>();
     const fallback = { verifyEvent: vi.fn(() => deferred.promise) };
-    const client = new VerificationClient({ worker: controlled.worker, fallback, timeout });
+    const client = new WorkerEventVerifierClient({ worker: controlled.worker, fallback, timeout });
 
     client.start();
 
@@ -521,7 +537,7 @@ describe.each(["booting", "error"] as const)("fallback while %s", (status) => {
       vi.useFakeTimers();
       const controlled = controlledWorker();
       const error = new Error("fallback failed");
-      const client = new VerificationClient({
+      const client = new WorkerEventVerifierClient({
         worker: controlled.worker,
         fallback: {
           verifyEvent: () => {
@@ -580,7 +596,7 @@ test.each(["resolve", "reject"] as const)(
     vi.stubGlobal("WorkerGlobalScope", WorkerContext);
     vi.stubGlobal("self", scope);
     const deferred = Promise.withResolvers<boolean>();
-    const host = new VerificationHost({ verifyEvent: () => deferred.promise });
+    const host = new WorkerEventVerifierHost({ verifyEvent: () => deferred.promise });
 
     host.start();
     host.start();

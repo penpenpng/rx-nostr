@@ -6,8 +6,8 @@ import {
   NoopSigner,
   type EventSigner,
   type OkPacket,
-  type Publication,
-  type PublicationFailure,
+  type RxNostrPublication,
+  type RxNostrPublicationFailure,
 } from "rx-nostr";
 import { describe, expect, expectTypeOf, test, vi } from "vitest";
 
@@ -23,7 +23,7 @@ import {
 import { scenarioTest, settleProtocol } from "../helper/protocol-scenario.ts";
 import { SubscriptionInspector } from "../helper/subscription-inspector.ts";
 
-describe("Publication public contract", () => {
+describe("RxNostrPublication public contract", () => {
   scenarioTest(
     "publishes a real signed EVENT and settles on the relay OK",
     async ({ createScenario }) => {
@@ -118,13 +118,15 @@ describe("Publication public contract", () => {
     });
 
     test("exposes the signed event as a mutable event", () => {
-      expectTypeOf<Publication["event"]>().toEqualTypeOf<Promise<Nostr.Event>>();
+      expectTypeOf<RxNostrPublication["event"]>().toEqualTypeOf<Promise<Nostr.Event>>();
     });
 
     test("exposes mutable detached publication failures", () => {
-      expectTypeOf<RxNostrPublicationError["failures"]>().toEqualTypeOf<PublicationFailure[]>();
+      expectTypeOf<RxNostrPublicationError["failures"]>().toEqualTypeOf<
+        RxNostrPublicationFailure[]
+      >();
 
-      const source: PublicationFailure[] = [
+      const source: RxNostrPublicationFailure[] = [
         {
           relay: relay1,
           kind: "rejected",
@@ -492,7 +494,7 @@ describe("Publication public contract", () => {
         const firstPublication = rxNostr.publish(relay1, event({ id: "first" }));
         const firstAll = firstPublication.waitFor("all");
         const connection = socket(server, relay1);
-        let secondPublication: Publication | undefined;
+        let secondPublication: RxNostrPublication | undefined;
         let secondAll: Promise<void> | undefined;
         let reenteredAny: Promise<void> | undefined;
 
