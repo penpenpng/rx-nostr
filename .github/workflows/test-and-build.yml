@@ -35,5 +35,4 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
       - run: pnpm test:packed
-      - run: pnpm docs:examples
       - run: pnpm docs:build
