@@ -96,7 +96,7 @@ segment 終了後も接続需要を保持する時間です。既定値は 10,00
 
 正の有限値は最大 2,147,483,647 ms です。不正な値は [時間値の許容範囲](./configuration.md#時間値の許容範囲) の規則で拒否します。
 
-`RxNostr.dispose()` と `Publication.cancel()` は linger を待たずにリソースを解放します。
+`RxNostr.dispose()` と `RxNostrPublication.cancel()` は linger を待たずにリソースを解放します。
 
 ## 集合演算
 

@@ -13,8 +13,8 @@ import { RxNostrAlreadyDisposedError, RxNostrCallbackError } from "../libs/error
 import { once, RxDisposableStack } from "../libs/index.ts";
 import { assertTimerDuration } from "../libs/timing.ts";
 import { dropExpiredEvents, verify } from "../operators/index.ts";
-import type { ConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
-import type { Publication, PublishEventParameters } from "../publication/index.ts";
+import type { RelayConnectionStatePacket, EventPacket, ReqPacket } from "../packets/index.ts";
+import type { RxNostrPublication, PublishEventParameters } from "../publication/index.ts";
 import { RxReq } from "../rx-req/index.ts";
 import type { RelayInput } from "../types/index.ts";
 import { RelayCommunication, RelayCommunicationCollection } from "./communication/index.ts";
@@ -180,7 +180,7 @@ export class RxNostr implements IRxNostr {
     relays: RelayInput,
     params: PublishEventParameters,
     options: RxNostrPublishConfig = {},
-  ): Publication {
+  ): RxNostrPublication {
     return this.#publish(relays, params, options, "acknowledged");
   }
 
@@ -189,7 +189,7 @@ export class RxNostr implements IRxNostr {
     relays: RelayInput,
     params: PublishEventParameters,
     options: RxNostrPublishConfig = {},
-  ): Publication {
+  ): RxNostrPublication {
     return this.#publish(relays, params, options, "sent");
   }
 
@@ -198,7 +198,7 @@ export class RxNostr implements IRxNostr {
     params: PublishEventParameters,
     options: RxNostrPublishConfig,
     mode: "acknowledged" | "sent",
-  ): Publication {
+  ): RxNostrPublication {
     this.#assertActive();
     const config = new FilledRxNostrPublishOptions(options, this.#config);
 
@@ -233,7 +233,7 @@ export class RxNostr implements IRxNostr {
     this.#warmer.unsetHotRelays();
   }
 
-  monitorConnectionState(): Observable<ConnectionStatePacket> {
+  monitorConnectionState(): Observable<RelayConnectionStatePacket> {
     return defer(() => {
       this.#assertActive();
 
@@ -278,8 +278,8 @@ export class RxNostr implements IRxNostr {
 }
 
 function copyConnectionState(
-  state: ConnectionStatePacket["state"],
-): ConnectionStatePacket["state"] {
+  state: RelayConnectionStatePacket["state"],
+): RelayConnectionStatePacket["state"] {
   if (state.state === "failed") {
     return {
       ...state,

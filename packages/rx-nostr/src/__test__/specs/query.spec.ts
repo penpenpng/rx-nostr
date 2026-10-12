@@ -4,7 +4,7 @@ import {
   RelayDirectory,
   RxRelays,
   RxReq,
-  VerificationClient,
+  WorkerEventVerifierClient,
   type EventPacket,
   type LazyFilter,
   type RxNostrReqInput,
@@ -640,7 +640,7 @@ describe("REQ public contract", () => {
         },
         terminate() {},
       } as unknown as Worker;
-      const verifier = new VerificationClient({ worker });
+      const verifier = new WorkerEventVerifierClient({ worker });
 
       verifier.start();
       onMessage?.({ data: "pong" } as MessageEvent);

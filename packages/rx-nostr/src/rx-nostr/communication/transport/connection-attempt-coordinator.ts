@@ -7,8 +7,8 @@ import type {
 import { resolveRelaySuppressionStrategy } from "../../../connection-reconnector/relay-health-policy.ts";
 import {
   copySuppressionReasons,
-  type ConnectionFailure,
-  type ConnectionState,
+  type RelayConnectionFailure,
+  type RelayConnectionState,
   type ConnectionSuppressionReason,
   type ConnectionWaitInfo,
 } from "../../../connection-state.ts";
@@ -34,7 +34,7 @@ export class ConnectionAttemptCoordinator {
 
   constructor(
     readonly options: ConnectionAttemptCoordinatorOptions,
-    readonly emitState: (state: ConnectionState) => void,
+    readonly emitState: (state: RelayConnectionState) => void,
   ) {
     this.#strategy = resolveRelaySuppressionStrategy(options.relayHealthPolicy);
   }
@@ -50,7 +50,7 @@ export class ConnectionAttemptCoordinator {
   prepare(
     signal: AbortSignal,
     attempt: number,
-    reason?: ConnectionFailure,
+    reason?: RelayConnectionFailure,
     decide?: Decide,
     fallbackHealth?: () => RelayHealth,
   ): Decision | Promise<Decision> {

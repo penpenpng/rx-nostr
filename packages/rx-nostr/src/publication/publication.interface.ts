@@ -4,14 +4,14 @@ import type { Observer, Subscription } from "rxjs";
 import type { RelayUrl } from "../libs/relay-urls.ts";
 import type { OkPacket } from "../packets/index.ts";
 
-export type PublicationSettlePolicy = "all" | "any";
+export type RxNostrPublicationSettlePolicy = "all" | "any";
 
 /** Event parameters accepted by publish(). Omitted content is published as an empty string. */
 export type PublishEventParameters = Omit<Nostr.EventParameters, "content"> & {
   content?: string;
 };
 
-export type PublicationFailure = {
+export type RxNostrPublicationFailure = {
   relay: RelayUrl;
   kind: "rejected" | "timeout" | "dropped" | "retry-exhausted" | "cancelled" | "auth" | "failed";
   ok?: OkPacket;
@@ -19,7 +19,7 @@ export type PublicationFailure = {
 };
 
 /** A publish operation that starts when `RxNostr.publish()` is called. */
-export interface Publication {
+export interface RxNostrPublication {
   /** One detached copy of the signed event, shared by every await of this Promise. */
   readonly event: Promise<Nostr.Event>;
 
@@ -39,5 +39,5 @@ export interface Publication {
    * rx-nostr error when it can no longer succeed. Settlement does not stop
    * other relay efforts or wait for linger cleanup.
    */
-  waitFor(policy: PublicationSettlePolicy): Promise<void>;
+  waitFor(policy: RxNostrPublicationSettlePolicy): Promise<void>;
 }

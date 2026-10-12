@@ -24,7 +24,10 @@ import type {
   ConnectionReconnectorContext,
   ConnectionReconnector,
 } from "../../../connection-reconnector/index.ts";
-import { type ConnectionFailure, type ConnectionState } from "../../../connection-state.ts";
+import {
+  type RelayConnectionFailure,
+  type RelayConnectionState,
+} from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import type { RelayUrl } from "../../../libs/relay-urls.ts";
 import type { MessagePacket } from "../../../packets/index.ts";
@@ -32,7 +35,7 @@ import type { WebSocketConstructor } from "../../../types/index.ts";
 import { ConnectionAttemptCoordinator } from "./connection-attempt-coordinator.ts";
 import { decodeRelayMessage, serializeNostrMessage } from "./nostr-codec.ts";
 
-export type NostrTransportState = ConnectionState;
+export type NostrTransportState = RelayConnectionState;
 
 export type NostrTransportDiagnostic = RxNostrDiagnostic;
 
@@ -713,7 +716,7 @@ function createStreamObservable(
 function createUniplsReconnector(
   relay: RelayUrl,
   reconnector: ConnectionReconnector,
-  emitState: (state: ConnectionState) => void,
+  emitState: (state: RelayConnectionState) => void,
   getConnectionHealth: (() => ConnectionReconnectorContext["health"]) | undefined,
   attemptCoordinator: ConnectionAttemptCoordinator,
   onPolicyError: (cause: unknown) => void,
@@ -838,7 +841,7 @@ function createUniplsDropDetector(
   };
 }
 
-function stateFromLifecycle(snapshot: UniplsLifecycleSnapshot): ConnectionState | undefined {
+function stateFromLifecycle(snapshot: UniplsLifecycleSnapshot): RelayConnectionState | undefined {
   switch (snapshot.phase) {
     case "open":
       return Object.freeze({ state: "connected" });
@@ -903,7 +906,7 @@ function terminalFailure(
     UniplsLifecycleSnapshot,
     { phase: "closed"; reason: "open-failed" | "dropped" }
   >,
-): ConnectionFailure {
+): RelayConnectionFailure {
   if (snapshot.cause instanceof ConnectionPolicyError) {
     return failureFromCause("policy-error", snapshot.cause);
   }
@@ -936,7 +939,7 @@ function latestFailureAttempt(attempts: readonly ConnectionAttemptSnapshot[]): n
   );
 }
 
-function sameConnectionState(left: ConnectionState, right: ConnectionState): boolean {
+function sameConnectionState(left: RelayConnectionState, right: RelayConnectionState): boolean {
   if (left.state !== right.state) {
     return false;
   }
@@ -970,7 +973,7 @@ function sameConnectionState(left: ConnectionState, right: ConnectionState): boo
   return left.state === right.state;
 }
 
-function sameFailure(left: ConnectionFailure, right: ConnectionFailure): boolean {
+function sameFailure(left: RelayConnectionFailure, right: RelayConnectionFailure): boolean {
   return (
     left.kind === right.kind &&
     left.message === right.message &&
@@ -1028,7 +1031,7 @@ function ignoresRelayHealth(drop: UniplsDrop | undefined): boolean {
   );
 }
 
-function failureFromDrop(drop: UniplsDrop): ConnectionFailure {
+function failureFromDrop(drop: UniplsDrop): RelayConnectionFailure {
   return Object.freeze({
     kind: "connection-dropped",
     ...(drop.source.type === "detector"
@@ -1044,7 +1047,10 @@ function failureFromDrop(drop: UniplsDrop): ConnectionFailure {
   });
 }
 
-function failureFromCause(kind: ConnectionFailure["kind"], cause: unknown): ConnectionFailure {
+function failureFromCause(
+  kind: RelayConnectionFailure["kind"],
+  cause: unknown,
+): RelayConnectionFailure {
   return Object.freeze({
     kind,
     ...(cause instanceof Error ? { message: cause.message } : {}),

@@ -7,7 +7,7 @@ import { once } from "../libs/index.ts";
 import { assertTimerDuration } from "../libs/timing.ts";
 import type { EventVerifier } from "./event-verifier.interface.ts";
 
-export class VerificationHost {
+export class WorkerEventVerifierHost {
   #disposed = false;
   constructor(private verifier: EventVerifier) {}
 
@@ -22,7 +22,7 @@ export class VerificationHost {
     self.addEventListener("message", this.#handler);
   }
 
-  #handler = async (ev: MessageEvent<VerificationRequest | PingMessage>) => {
+  #handler = async (ev: MessageEvent<WorkerEventVerifierRequest | PingMessage>) => {
     if (this.#disposed) {
       return;
     }
@@ -48,7 +48,7 @@ export class VerificationHost {
       self.postMessage({
         reqId,
         ok,
-      } satisfies VerificationResponse);
+      } satisfies WorkerEventVerifierResponse);
     } catch (err) {
       if (this.#disposed) {
         return;
@@ -58,7 +58,7 @@ export class VerificationHost {
         reqId,
         ok: false,
         error: errorMessage(err),
-      } satisfies VerificationResponse);
+      } satisfies WorkerEventVerifierResponse);
     }
   };
 
@@ -75,8 +75,8 @@ export class VerificationHost {
 }
 
 /** Worker-backed verifier; all requests have a deadline and reject on client disposal. */
-export class VerificationClient implements EventVerifier {
-  #status: VerificationServiceStatus = "prepared";
+export class WorkerEventVerifierClient implements EventVerifier {
+  #status: WorkerEventVerifierServiceStatus = "prepared";
   #nextReqId = 1;
   #pending = new Map<
     number,
@@ -89,7 +89,7 @@ export class VerificationClient implements EventVerifier {
   >();
   readonly #timeout: number;
 
-  constructor(private config: VerificationClientConfig) {
+  constructor(private config: WorkerEventVerifierClientConfig) {
     const timeout = config.timeout ?? 10_000;
 
     this.#timeout = assertTimerDuration(timeout, "Verification timeout", {
@@ -119,7 +119,7 @@ export class VerificationClient implements EventVerifier {
     }
   }
 
-  #onmessage = (ev: MessageEvent<VerificationResponse | PongMessage>) => {
+  #onmessage = (ev: MessageEvent<WorkerEventVerifierResponse | PongMessage>) => {
     if (this.#status === "terminated") {
       return;
     }
@@ -164,14 +164,14 @@ export class VerificationClient implements EventVerifier {
   verifyEvent(event: Nostr.Event): Promise<boolean> {
     switch (this.#status) {
       case "prepared":
-        throw new Error("VerificationClient is not started yet.");
+        throw new Error("WorkerEventVerifierClient is not started yet.");
       case "booting":
       case "error":
         return this.#verifyByFallback(event);
       case "active":
         return this.#verifyByWorker(event);
       case "terminated":
-        throw new Error("VerificationClient is already disposed.");
+        throw new Error("WorkerEventVerifierClient is already disposed.");
     }
   }
 
@@ -200,7 +200,7 @@ export class VerificationClient implements EventVerifier {
     const { reqId, result } = this.#createRequest("worker");
 
     try {
-      this.config.worker.postMessage({ reqId, event } satisfies VerificationRequest);
+      this.config.worker.postMessage({ reqId, event } satisfies WorkerEventVerifierRequest);
     } catch (error) {
       this.#settle(reqId, { error });
       this.#onerror();
@@ -238,7 +238,9 @@ export class VerificationClient implements EventVerifier {
     const verifier = this.config.fallback;
 
     if (!verifier) {
-      throw new Error("VerificationHost is not working but no fallback verifier is provided.");
+      throw new Error(
+        "WorkerEventVerifierHost is not working but no fallback verifier is provided.",
+      );
     }
 
     const { reqId, result } = this.#createRequest("fallback");
@@ -258,7 +260,7 @@ export class VerificationClient implements EventVerifier {
   [Symbol.dispose] = once(() => {
     this.#status = "terminated";
 
-    this.#rejectPending(new Error("VerificationClient was disposed."));
+    this.#rejectPending(new Error("WorkerEventVerifierClient was disposed."));
 
     const worker = this.config.worker;
 
@@ -273,21 +275,26 @@ export class VerificationClient implements EventVerifier {
 type PingMessage = "ping";
 type PongMessage = "pong";
 
-export interface VerificationRequest {
+export interface WorkerEventVerifierRequest {
   reqId: number;
   event: Nostr.Event;
 }
 
-export interface VerificationResponse {
+export interface WorkerEventVerifierResponse {
   reqId: number;
   ok: boolean;
   /** Present only when verification failed to run; the client rejects the request. */
   error?: string;
 }
 
-export type VerificationServiceStatus = "prepared" | "booting" | "active" | "error" | "terminated";
+export type WorkerEventVerifierServiceStatus =
+  | "prepared"
+  | "booting"
+  | "active"
+  | "error"
+  | "terminated";
 
-export interface VerificationClientConfig {
+export interface WorkerEventVerifierClientConfig {
   worker: Worker;
   fallback?: EventVerifier;
   /** Worker and fallback deadline in milliseconds; 0 is immediate, Infinity disables it. Defaults to 10000. */

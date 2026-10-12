@@ -25,7 +25,7 @@ const rxNostr = new RxNostr({
 | --- | --- | --- |
 | `verifier` | no | 受信 EVENT の既定 verifier。省略時は検証時にエラー |
 | `signer` | no | publish の既定 signer。省略時は `Nip07Signer` |
-| `authenticator` | no | root の Authenticator / relay factory。`false` で static default を無効化 |
+| `authenticator` | no | root の Nip42Authenticator / relay factory。`false` で static default を無効化 |
 | `reconnector` | no | 再接続 policy |
 | `dropDetectors` | no | 接続異常を検出する detector の iterable |
 | `relayDirectory` | no | metadata/health store |
@@ -106,7 +106,7 @@ process-wide な可変設定なので、library module 内ではなく applicati
 | `weak` | `false` | `false` |
 | `timeout` | `30_000` ms | `30_000` ms |
 
-Authenticator の `authTimeout` は省略時 30,000 ms、NIP-11 自動取得は有効です。
+Nip42Authenticator の `authTimeout` は省略時 30,000 ms、NIP-11 自動取得は有効です。
 
 REQ の `timeout` は backward segment が EOSE を待つ時間です。publish の `timeout` は relay ごとの OK を待つ時間です。
 
@@ -117,10 +117,10 @@ REQ の `timeout` は backward segment が EOSE を待つ時間です。publish 
 | option | `0` | 正の有限値 | `Infinity` |
 | --- | --- | --- | --- |
 | `connectionTimeout` | 不可 | 接続試行の期限 | 不可 |
-| RelayDirectory `timeout`、REQ / publish `timeout`、Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
+| RelayDirectory `timeout`、REQ / publish `timeout`、Nip42Authenticator `authTimeout`、Worker 検証 `timeout` | 即時 timeout | 各処理の期限 | timeout なし |
 | REQ / publish / ReqPacket `linger` | 即時解放 | 終了後の保持時間 | dispose まで保持 |
 
-`connectionTimeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory` の `timeout` は Directory の構築時に検査し、不正なら同期的に `RangeError` を throw します。fetch の期限は Directory 全体で統一され、RxNostr と `fetchNip11()` の option では上書きしません。`SimpleAuthenticator` と `VerificationClient` は構築時に検査し、独自 Authenticator の `authTimeout` は AUTH 開始前に検査します。
+`connectionTimeout`、instance / static default の不正値は新しい `RxNostr` の構築時に同期的に throw します。REQ / publish の operation option は呼び出し時、`RxReq.emit()` の `linger` は emit 時に同期的に throw します。`pipe()` が不正な `linger` を作った場合はその query の Observable error になります。`RelayDirectory` の `timeout` は Directory の構築時に検査し、不正なら同期的に `RangeError` を throw します。fetch の期限は Directory 全体で統一され、RxNostr と `fetchNip11()` の option では上書きしません。`SimpleAuthenticator` と `WorkerEventVerifierClient` は構築時に検査し、独自 Nip42Authenticator の `authTimeout` は AUTH 開始前に検査します。
 
 reconnector の retry `delay` と relay health policy の `suppressedUntil` は有限の非負数を要求します。これらは接続待機の内部処理で、長い deadline は timer 上限ごとに分割して待ちます。
 
@@ -208,8 +208,8 @@ if (error instanceof RxNostrCallbackError) {
 | 出力 | copy の単位 |
 | --- | --- |
 | `RxRelays.get()`、`RelayDirectory.get()` / `getOrCreate()` / `values()` | 呼び出し・反復ごと。Directory の NIP-11 metadata もネストした配列・object ごと copy |
-| `RxRelays`、`RelayDirectory.observe()`、`monitorConnectionState()`、`Publication.subscribe()` | observer ごと。replay の値も新しい copy |
-| `Publication.event` | Promise が解決する時に 1 回。複数回 `await` しても同じ event object |
+| `RxRelays`、`RelayDirectory.observe()`、`monitorConnectionState()`、`RxNostrPublication.subscribe()` | observer ごと。replay の値も新しい copy |
+| `RxNostrPublication.event` | Promise が解決する時に 1 回。複数回 `await` しても同じ event object |
 | `RxNostrPublicationError.failures` | Error 作成時に内部結果から分離。各 failure の OK tuple も copy |
 
 `RxNostrCallbackError.cause`、publication failure の `cause`、diagnostic の `cause` は任意のユーザー値や `Error` を含む不透明な参照で、identity を保ちます。diagnostic の `context` は浅い copy を freeze して渡し、その中の任意 object は不透明な参照として扱います。注入した verifier、reconnector、directory などの class instance も所有者側で管理してください。reconnector と relay health policy に渡す health は個別の snapshot です。

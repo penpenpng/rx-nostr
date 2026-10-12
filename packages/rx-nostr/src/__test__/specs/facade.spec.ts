@@ -7,7 +7,7 @@ import {
   RxNostr,
   RxNostrAlreadyDisposedError,
   RxReq,
-  type ConnectionStatePacket,
+  type RelayConnectionStatePacket,
   type EventPacket,
   type RxNostrStaticDefaultConfig,
   type RxNostrStaticDefaultOptions,
@@ -149,7 +149,7 @@ describe("RxNostr public contract", () => {
         skipFetchNip11: true,
         WebSocket: server.WebSocket,
       });
-      const firstInspector = new SubscriptionInspector<ConnectionStatePacket>();
+      const firstInspector = new SubscriptionInspector<RelayConnectionStatePacket>();
 
       rxNostr.monitorConnectionState().subscribe(firstInspector);
 
@@ -202,7 +202,7 @@ describe("RxNostr public contract", () => {
         expect.any(RxNostrAlreadyDisposedError),
       );
 
-      const sixthInspector = new SubscriptionInspector<ConnectionStatePacket>();
+      const sixthInspector = new SubscriptionInspector<RelayConnectionStatePacket>();
 
       delayedMonitor.subscribe(sixthInspector);
       await expect(sixthInspector.waitError()).resolves.toEqual(

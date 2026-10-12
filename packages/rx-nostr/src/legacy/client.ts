@@ -3,7 +3,7 @@ import { defer, finalize, Subject, throwError, TimeoutError, type Subscription }
 import { NoopVerifier } from "../event-verifier/index.ts";
 import type { EventVerifier } from "../index.ts";
 import { RxNostrPublicationError } from "../libs/error.ts";
-import type { Publication } from "../publication/index.ts";
+import type { RxNostrPublication } from "../publication/index.ts";
 import { RxNostr } from "../rx-nostr/index.ts";
 import { legacyPublishSent } from "../rx-nostr/rx-nostr.ts";
 import { RxRelays, ReadonlyRxRelays } from "../rx-relays/index.ts";
@@ -316,7 +316,7 @@ export function createLegacyRxNostr(config: LegacyRxNostrConfig = {}): ILegacyRx
         ...(options.signer ? { signer: options.signer } : {}),
         ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
       };
-      let publication: Publication;
+      let publication: RxNostrPublication;
 
       try {
         publication =

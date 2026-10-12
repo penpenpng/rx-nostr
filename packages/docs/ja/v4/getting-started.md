@@ -58,7 +58,7 @@ interface EventPacket {
 
 ## EVENT を発行する
 
-`publish()` は呼び出した時点で署名と送信を開始し、`Publication` を返します。`waitFor("any")` は、いずれかひとつのリレーが `OK true` を返すまで待ちます。
+`publish()` は呼び出した時点で署名と送信を開始し、`RxNostrPublication` を返します。`waitFor("any")` は、いずれかひとつのリレーが `OK true` を返すまで待ちます。
 
 ```ts
 const publication = rxNostr.publish(

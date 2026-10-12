@@ -5,9 +5,9 @@ import { RxNostrCallbackError, RxNostrPublicationError } from "../../../libs/err
 import { ensureEventFields, type RelayUrl } from "../../../libs/index.ts";
 import type { OkPacket } from "../../../packets/index.ts";
 import type {
-  Publication,
-  PublicationFailure,
-  PublicationSettlePolicy,
+  RxNostrPublication,
+  RxNostrPublicationFailure,
+  RxNostrPublicationSettlePolicy,
 } from "../../../publication/index.ts";
 import { RelayUrls } from "../../../rx-relays/relay-urls.ts";
 import type { RelayInput } from "../../../types/index.ts";
@@ -38,18 +38,18 @@ interface RelayDelivery {
   readonly relay: RelayUrl;
   state: "pending" | "accepted" | "failed";
   lastOk?: OkPacket;
-  failure?: PublicationFailure;
+  failure?: RxNostrPublicationFailure;
   demandWindow?: RelayDemandWindow;
   subscription?: Subscription;
 }
 
 interface SettlementWaiter {
-  readonly policy: PublicationSettlePolicy;
+  readonly policy: RxNostrPublicationSettlePolicy;
   readonly resolve: () => void;
   readonly reject: (reason: unknown) => void;
 }
 
-export class PublicationOperation implements Publication, Disposable {
+export class PublicationOperation implements RxNostrPublication, Disposable {
   readonly event: Promise<Nostr.Event>;
   /** Internal cleanup signal: after linger leases are released, or immediately on cancel. */
   readonly closed: Promise<void>;
@@ -149,7 +149,7 @@ export class PublicationOperation implements Publication, Disposable {
     return packets.subscribe(observerOrNext);
   }
 
-  waitFor(policy: PublicationSettlePolicy): Promise<void> {
+  waitFor(policy: RxNostrPublicationSettlePolicy): Promise<void> {
     return new Promise((resolve, reject) => {
       const waiter = { policy, resolve, reject } satisfies SettlementWaiter;
 
@@ -166,7 +166,7 @@ export class PublicationOperation implements Publication, Disposable {
 
     this.#cancelled = true;
 
-    const failures: PublicationFailure[] = [];
+    const failures: RxNostrPublicationFailure[] = [];
 
     for (const delivery of this.#deliveries.values()) {
       if (delivery.state !== "pending") {
@@ -278,7 +278,7 @@ export class PublicationOperation implements Publication, Disposable {
     );
   }
 
-  #failRelay(delivery: RelayDelivery, failure: PublicationFailure): void {
+  #failRelay(delivery: RelayDelivery, failure: RxNostrPublicationFailure): void {
     if (delivery.state !== "pending") {
       return;
     }
@@ -441,7 +441,7 @@ function cloneEvent(event: Readonly<Nostr.Event>): Nostr.Event {
   };
 }
 
-function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailure {
+function failureFrom(error: unknown, delivery: RelayDelivery): RxNostrPublicationFailure {
   if (error instanceof RxNostrCallbackError) {
     return Object.freeze({
       relay: delivery.relay,
@@ -451,7 +451,7 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
     });
   }
   if (error instanceof RelayCommunicationError) {
-    let kind: PublicationFailure["kind"];
+    let kind: RxNostrPublicationFailure["kind"];
 
     switch (error.reason) {
       case "timeout":
@@ -476,7 +476,7 @@ function failureFrom(error: unknown, delivery: RelayDelivery): PublicationFailur
   });
 }
 
-function failures(deliveries: readonly RelayDelivery[]): PublicationFailure[] {
+function failures(deliveries: readonly RelayDelivery[]): RxNostrPublicationFailure[] {
   return deliveries.flatMap((delivery) => (delivery.failure ? [delivery.failure] : []));
 }
 

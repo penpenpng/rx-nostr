@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { SimpleAuthenticator, type Authenticator } from "../authenticator/index.ts";
+import { SimpleAuthenticator, type Nip42Authenticator } from "../authenticator/index.ts";
 import { NoopSigner } from "../event-signer/index.ts";
 import { withLegacyAuthTimeout } from "./adapters.ts";
 
@@ -9,7 +9,7 @@ const relay = "wss://relay.example.com";
 describe("withLegacyAuthTimeout", () => {
   test("keeps prototype methods and the original receiver", async () => {
     const authenticator = new SimpleAuthenticator(new NoopSigner());
-    const adapted = withLegacyAuthTimeout(authenticator, 100) as Authenticator;
+    const adapted = withLegacyAuthTimeout(authenticator, 100) as Nip42Authenticator;
 
     await expect(adapted.challenge(relay, "test")).resolves.toMatchObject({
       kind: 22242,
@@ -20,7 +20,7 @@ describe("withLegacyAuthTimeout", () => {
     });
     expect(adapted.authTimeout).toBe(authenticator.authTimeout);
 
-    class PrivateAuthenticator implements Authenticator {
+    class PrivateAuthenticator implements Nip42Authenticator {
       readonly #value = "private";
 
       challenge() {
@@ -28,11 +28,16 @@ describe("withLegacyAuthTimeout", () => {
           throw new Error("wrong receiver");
         }
 
-        return Promise.resolve({ kind: 22242 } as Awaited<ReturnType<Authenticator["challenge"]>>);
+        return Promise.resolve({ kind: 22242 } as Awaited<
+          ReturnType<Nip42Authenticator["challenge"]>
+        >);
       }
     }
 
-    const privateAdapter = withLegacyAuthTimeout(new PrivateAuthenticator(), 20) as Authenticator;
+    const privateAdapter = withLegacyAuthTimeout(
+      new PrivateAuthenticator(),
+      20,
+    ) as Nip42Authenticator;
 
     await expect(privateAdapter.challenge(relay, "test")).resolves.toHaveProperty("kind", 22242);
     expect(privateAdapter.authTimeout).toBe(20);
@@ -40,11 +45,12 @@ describe("withLegacyAuthTimeout", () => {
 
   test("preserves explicit zero and Infinity timeouts without mutating originals", () => {
     for (const value of [0, Infinity]) {
-      const authenticator: Authenticator = {
+      const authenticator: Nip42Authenticator = {
         authTimeout: value,
-        challenge: async () => ({ kind: 22242 }) as Awaited<ReturnType<Authenticator["challenge"]>>,
+        challenge: async () =>
+          ({ kind: 22242 }) as Awaited<ReturnType<Nip42Authenticator["challenge"]>>,
       };
-      const adapted = withLegacyAuthTimeout(authenticator, 10) as Authenticator;
+      const adapted = withLegacyAuthTimeout(authenticator, 10) as Nip42Authenticator;
 
       expect(adapted.authTimeout).toBe(value);
       expect(authenticator.authTimeout).toBe(value);
@@ -53,7 +59,7 @@ describe("withLegacyAuthTimeout", () => {
   });
 
   test("supports a class factory and its undefined opt-out", async () => {
-    class PrivateAuthenticator implements Authenticator {
+    class PrivateAuthenticator implements Nip42Authenticator {
       readonly #relay: string;
 
       constructor(relayUrl: string) {
@@ -64,7 +70,7 @@ describe("withLegacyAuthTimeout", () => {
         return Promise.resolve({
           kind: 22242,
           tags: [["relay", this.#relay]],
-        } as Awaited<ReturnType<Authenticator["challenge"]>>);
+        } as Awaited<ReturnType<Nip42Authenticator["challenge"]>>);
       }
     }
 

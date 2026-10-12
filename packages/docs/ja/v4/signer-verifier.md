@@ -111,16 +111,16 @@ verifier が `false` を返した EVENT は通知されません。verifier が�
 
 ## Worker で検証する
 
-大量の EVENT を扱う UI では、`VerificationHost` と `VerificationClient` を使って検証を Worker へ移せます。
+大量の EVENT を扱う UI では、`WorkerEventVerifierHost` と `WorkerEventVerifierClient` を使って検証を Worker へ移せます。
 
 Worker 側:
 
 <!-- typecheck-example: worker-host -->
 ```ts
-import { VerificationHost } from "rx-nostr";
+import { WorkerEventVerifierHost } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 
-const host = new VerificationHost(new SimpleVerifier());
+const host = new WorkerEventVerifierHost(new SimpleVerifier());
 host.start();
 ```
 
@@ -128,10 +128,10 @@ Application 側:
 
 <!-- typecheck-example: worker-client -->
 ```ts
-import { VerificationClient, RxNostr } from "rx-nostr";
+import { WorkerEventVerifierClient, RxNostr } from "rx-nostr";
 import { SimpleVerifier } from "@rx-nostr/crypto";
 
-const client = new VerificationClient({
+const client = new WorkerEventVerifierClient({
   worker: new Worker(new URL("./verification-worker.ts", import.meta.url), {
     type: "module",
   }),

@@ -1,6 +1,6 @@
 # Publish
 
-`rxNostr.publish()` は EVENT の署名と複数リレーへの送信を管理し、ひとつの hot operation である `Publication` を返します。
+`rxNostr.publish()` は EVENT の署名と複数リレーへの送信を管理し、ひとつの hot operation である `RxNostrPublication` を返します。
 
 <!-- typecheck-example: publish-basic -->
 ```ts
@@ -18,7 +18,7 @@ query と異なり、publish は `subscribe()` を待たず、呼び出された
 
 ## OK を観測する
 
-`Publication.subscribe()` はリレーから届いた個々の `OkPacket` を通知します。
+`RxNostrPublication.subscribe()` はリレーから届いた個々の `OkPacket` を通知します。
 
 ```ts
 const observer = publication.subscribe({

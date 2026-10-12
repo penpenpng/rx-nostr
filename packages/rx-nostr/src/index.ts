@@ -1,8 +1,8 @@
 export {
   SimpleAuthenticator,
-  type Authenticator,
-  type AuthenticatorFactory,
-  type AuthenticatorInput,
+  type Nip42Authenticator,
+  type Nip42AuthenticatorFactory,
+  type Nip42AuthenticatorInput,
 } from "./authenticator/index.ts";
 export type {
   ConnectionDropDetector,
@@ -31,21 +31,21 @@ export {
 export type {
   ConnectionSuppressionReason,
   ConnectionWaitInfo,
-  ConnectionFailure,
-  ConnectionState,
-  ConnectionStateSymbol,
+  RelayConnectionFailure,
+  RelayConnectionState,
+  RelayConnectionStateSymbol,
 } from "./connection-state.ts";
 export type { RxNostrDiagnostic, RxNostrDiagnosticSink } from "./diagnostics/index.ts";
 export { Nip07Signer, NoopSigner, type EventSigner } from "./event-signer/index.ts";
 export {
   NoopVerifier,
-  VerificationClient,
-  VerificationHost,
+  WorkerEventVerifierClient,
+  WorkerEventVerifierHost,
   type EventVerifier,
-  type VerificationClientConfig,
-  type VerificationRequest,
-  type VerificationResponse,
-  type VerificationServiceStatus,
+  type WorkerEventVerifierClientConfig,
+  type WorkerEventVerifierRequest,
+  type WorkerEventVerifierResponse,
+  type WorkerEventVerifierServiceStatus,
 } from "./event-verifier/index.ts";
 export type { LazyFilter } from "./lazy-filter/index.ts";
 export {
@@ -65,16 +65,16 @@ export {
 } from "./libs/error.ts";
 export type { RelayUrl } from "./libs/relay-urls.ts";
 export type {
-  ConnectionStatePacket,
+  RelayConnectionStatePacket,
   EventPacket,
   OkPacket,
   ReqOptions,
   ReqPacket,
 } from "./packets/index.ts";
 export type {
-  Publication,
-  PublicationFailure,
-  PublicationSettlePolicy,
+  RxNostrPublication,
+  RxNostrPublicationFailure,
+  RxNostrPublicationSettlePolicy,
   PublishEventParameters,
 } from "./publication/index.ts";
 export {
