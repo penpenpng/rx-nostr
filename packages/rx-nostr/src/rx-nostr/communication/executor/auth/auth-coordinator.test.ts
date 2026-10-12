@@ -3,8 +3,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ControlledWebSocketServer, Faker } from "../../../../__test__/helper/index.ts";
 import { SubscriptionInspector } from "../../../../__test__/helper/subscription-inspector.ts";
-import type { AuthenticatorInput } from "../../../../authenticator/index.ts";
-import type { ConnectionState } from "../../../../connection-state.ts";
+import type { Nip42AuthenticatorInput } from "../../../../authenticator/index.ts";
+import type { RelayConnectionState } from "../../../../connection-state.ts";
 import type { OkPacket } from "../../../../packets/packets.interface.ts";
 import { NostrTransport } from "../../transport/index.ts";
 import { NostrOperationExecutor } from "../nostr-operation-executor.ts";
@@ -18,7 +18,7 @@ afterEach(() => {
     cleanup();
   }
 });
-async function setup(authenticator?: AuthenticatorInput) {
+async function setup(authenticator?: Nip42AuthenticatorInput) {
   const server = new ControlledWebSocketServer();
   const transport = new NostrTransport({
     url: relay,
@@ -176,7 +176,7 @@ describe("connection AUTH lifecycle", () => {
     oldSocket.peerClose(1006, "offline");
     await expect(server.connections.wait(1)).resolves.toBeDefined();
     const socket = server.sockets.latest;
-    const connectionInspector = new SubscriptionInspector<ConnectionState>();
+    const connectionInspector = new SubscriptionInspector<RelayConnectionState>();
     const notify = transport.state$
       .pipe(
         tap((state) => {

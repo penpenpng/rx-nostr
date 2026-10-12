@@ -2,7 +2,10 @@ import type { Subscription } from "rxjs";
 import { filter, firstValueFrom, take } from "rxjs";
 
 import { DEFAULT_AUTH_TIMEOUT } from "../../../../authenticator/authenticator.defaults.ts";
-import type { Authenticator, AuthenticatorInput } from "../../../../authenticator/index.ts";
+import type {
+  Nip42Authenticator,
+  Nip42AuthenticatorInput,
+} from "../../../../authenticator/index.ts";
 import { RxNostrCallbackError } from "../../../../libs/error.ts";
 import type { RelayUrl } from "../../../../libs/index.ts";
 import { assertTimerDuration } from "../../../../libs/timing.ts";
@@ -41,7 +44,7 @@ export class AuthCoordinator {
   constructor(
     private readonly relay: RelayUrl,
     private readonly transport: NostrTransport,
-    private readonly input?: AuthenticatorInput,
+    private readonly input?: Nip42AuthenticatorInput,
   ) {
     this.#subscriptions.push(
       transport.messages$.subscribe((packet) => {
@@ -92,7 +95,7 @@ export class AuthCoordinator {
     this.#result = Promise.resolve()
       .then(() => {
         this.#assertCurrent(challenge, controller.signal);
-        let authenticator: Authenticator | undefined;
+        let authenticator: Nip42Authenticator | undefined;
 
         try {
           authenticator = typeof this.input === "function" ? this.input(this.relay) : this.input;
@@ -170,7 +173,7 @@ export class AuthCoordinator {
   }
 
   async #run(
-    authenticator: Authenticator,
+    authenticator: Nip42Authenticator,
     challenge: Readonly<{ value: string; version: number }>,
     signal: AbortSignal,
   ): Promise<void> {

@@ -10,7 +10,7 @@ export {
 export type {
   AuthPacket,
   ClosedPacket,
-  ConnectionStatePacket,
+  RelayConnectionStatePacket,
   CountPacket,
   EosePacket,
   ErrorPacket,

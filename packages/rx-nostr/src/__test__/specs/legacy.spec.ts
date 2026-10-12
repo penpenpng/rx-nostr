@@ -1,4 +1,10 @@
-import { NoopReconnector, NoopSigner, NoopVerifier, RxReq, type Authenticator } from "rx-nostr";
+import {
+  NoopReconnector,
+  NoopSigner,
+  NoopVerifier,
+  RxReq,
+  type Nip42Authenticator,
+} from "rx-nostr";
 import { filter, firstValueFrom, TimeoutError } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
@@ -752,7 +758,7 @@ describe("createLegacyRxNostr", () => {
     const server = new ControlledWebSocketServer();
     const relay = "wss://auth.example.com";
 
-    class LegacyAuthenticator implements Authenticator {
+    class LegacyAuthenticator implements Nip42Authenticator {
       readonly #id = "auth-event";
 
       async challenge(relayUrl: string, challenge: string) {

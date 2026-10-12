@@ -1,6 +1,6 @@
 export type {
-  Publication,
-  PublicationFailure,
-  PublicationSettlePolicy,
+  RxNostrPublication,
+  RxNostrPublicationFailure,
+  RxNostrPublicationSettlePolicy,
   PublishEventParameters,
 } from "./publication.interface.ts";

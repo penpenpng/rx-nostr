@@ -3,7 +3,7 @@ import {
   NoopVerifier,
   RxNostr,
   type ConnectionDropDetectorContext,
-  type ConnectionStatePacket,
+  type RelayConnectionStatePacket,
 } from "rx-nostr";
 import { map, tap } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
@@ -61,9 +61,9 @@ describe("connection state public contract", () => {
       skipFetchNip11: true,
       WebSocket: server.WebSocket,
     });
-    const inspector = new SubscriptionInspector<ConnectionStatePacket>();
+    const inspector = new SubscriptionInspector<RelayConnectionStatePacket>();
     const states = rxNostr.monitorConnectionState();
-    const mutatingInspector = new SubscriptionInspector<ConnectionStatePacket>();
+    const mutatingInspector = new SubscriptionInspector<RelayConnectionStatePacket>();
 
     states
       .pipe(

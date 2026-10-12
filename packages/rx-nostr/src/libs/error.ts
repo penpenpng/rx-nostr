@@ -26,11 +26,11 @@ export type RxNostrPublicationErrorCode =
 export class RxNostrPublicationError extends RxNostrError {
   override readonly name = "RxNostrPublicationError";
   /** Detached from internal settlement state; opaque causes retain their original identity. */
-  public readonly failures: import("../publication/index.ts").PublicationFailure[];
+  public readonly failures: import("../publication/index.ts").RxNostrPublicationFailure[];
 
   constructor(
     public readonly code: RxNostrPublicationErrorCode,
-    failures: readonly import("../publication/index.ts").PublicationFailure[] = [],
+    failures: readonly import("../publication/index.ts").RxNostrPublicationFailure[] = [],
     options?: ErrorOptions,
   ) {
     super(`Publication failed (${code}).`, options);

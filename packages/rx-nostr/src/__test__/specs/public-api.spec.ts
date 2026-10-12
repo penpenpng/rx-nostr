@@ -1,16 +1,16 @@
 import type {
-  Authenticator,
-  ConnectionFailure,
+  Nip42Authenticator,
+  RelayConnectionFailure,
   ConnectionSuppressionReason,
-  ConnectionState,
-  ConnectionStatePacket,
+  RelayConnectionState,
+  RelayConnectionStatePacket,
   ConnectionDropDetector,
   ConnectionDropDetectorContext,
   ConnectionReconnector,
   EventPacket,
   IRxNostr,
   OkPacket,
-  Publication,
+  RxNostrPublication,
   RelayInput,
   RelayUrl,
   RxNostr,
@@ -52,7 +52,7 @@ describe("public entry point", () => {
       >();
       expectTypeOf<RxNostrDiagnostic["message"]>().toEqualTypeOf<string>();
 
-      expectTypeOf<Authenticator>().toHaveProperty("authTimeout");
+      expectTypeOf<Nip42Authenticator>().toHaveProperty("authTimeout");
     });
 
     test("exposes constructor and connection policy types", () => {
@@ -95,8 +95,8 @@ describe("public entry point", () => {
       expectTypeOf<Parameters<IRxNostr["publish"]>[2]>().toEqualTypeOf<
         RxNostrPublishConfig | undefined
       >();
-      expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<Publication>();
-      expectTypeOf<Publication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
+      expectTypeOf<IRxNostr["publish"]>().returns.toEqualTypeOf<RxNostrPublication>();
+      expectTypeOf<RxNostrPublication["waitFor"]>().returns.toEqualTypeOf<Promise<void>>();
 
       expectTypeOf<string>().toMatchTypeOf<RelayInput>();
       expectTypeOf<string[]>().toMatchTypeOf<RelayInput>();
@@ -114,26 +114,26 @@ describe("public entry point", () => {
 
     test("exposes connection state monitoring and snapshot types", () => {
       expectTypeOf<IRxNostr["monitorConnectionState"]>().returns.toEqualTypeOf<
-        Observable<ConnectionStatePacket>
+        Observable<RelayConnectionStatePacket>
       >();
 
-      expectTypeOf<ConnectionState>().toMatchTypeOf<
+      expectTypeOf<RelayConnectionState>().toMatchTypeOf<
         | { state: "dormant" }
         | {
             state: "waiting-for-connection";
             attempt: number;
-            reason?: ConnectionFailure;
+            reason?: RelayConnectionFailure;
             suppressionReasons?: readonly ConnectionSuppressionReason[];
           }
         | { state: "connecting"; attempt: number }
         | { state: "connected" }
         | { state: "retrying"; attempt: number }
-        | { state: "failed"; attempt: number; reason: ConnectionFailure }
+        | { state: "failed"; attempt: number; reason: RelayConnectionFailure }
         | { state: "disposed" }
       >();
 
-      expectTypeOf<ConnectionStatePacket>().toHaveProperty("from");
-      expectTypeOf<ConnectionStatePacket>().toHaveProperty("state");
+      expectTypeOf<RelayConnectionStatePacket>().toHaveProperty("from");
+      expectTypeOf<RelayConnectionStatePacket>().toHaveProperty("state");
     });
   });
 

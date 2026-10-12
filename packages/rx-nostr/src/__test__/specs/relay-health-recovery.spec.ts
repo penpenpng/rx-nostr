@@ -2,7 +2,7 @@ import {
   NoopVerifier,
   RelayDirectory,
   RxNostr,
-  type ConnectionState,
+  type RelayConnectionState,
   type RelayHealthPolicy,
   type RelaySuppressionStrategy,
   type RelaySuppressionContext,
@@ -79,7 +79,7 @@ describe("relay health recovery public contract", () => {
         maxRetryDelay: 2_000,
       },
     });
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
 
     try {
       rxNostr.monitorConnectionState().subscribe(({ state }) => states.push(state));
@@ -137,7 +137,7 @@ describe("relay health recovery public contract", () => {
         skipFetchNip11: true,
         reconnector: { reconnect },
       });
-      const states: ConnectionState[] = [];
+      const states: RelayConnectionState[] = [];
 
       rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
       rxNostr.setHotRelays(relay);
@@ -184,7 +184,7 @@ describe("relay health recovery public contract", () => {
     };
     const first = new RxNostr(config);
     const second = new RxNostr(config);
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
 
     first.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     first.setHotRelays(relay);
@@ -234,7 +234,7 @@ describe("relay health recovery public contract", () => {
       skipFetchNip11: true,
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
 
     rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     const events: string[] = [];
@@ -327,7 +327,7 @@ describe("relay health recovery public contract", () => {
     };
     const first = new RxNostr(config);
     const second = new RxNostr(config);
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
 
     second.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     first.setHotRelays(relay);
@@ -409,7 +409,7 @@ describe("relay health recovery public contract", () => {
       skipFetchNip11: true,
       reconnector: { reconnect: () => ({ action: "retry", delay: 0 }) },
     });
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
 
     rxNostr.monitorConnectionState().subscribe((packet) => states.push(packet.state));
     rxNostr.setHotRelays(relay);
@@ -463,7 +463,7 @@ describe("suppression ownership and asynchronous decisions", () => {
       vi.setSystemTime(100);
       const directory = new RelayDirectory();
       const server = new ControlledWebSocketServer();
-      const states: ConnectionState[] = [];
+      const states: RelayConnectionState[] = [];
       const client = new RxNostr({
         verifier: new NoopVerifier(),
         WebSocket: server.WebSocket,
@@ -498,7 +498,7 @@ describe("suppression ownership and asynchronous decisions", () => {
     const directory = downDirectory();
     const server = new ControlledWebSocketServer();
     let resolve!: (value: { action: "retry"; delay: number }) => void;
-    const states: ConnectionState[] = [];
+    const states: RelayConnectionState[] = [];
     const client = new RxNostr({
       verifier: new NoopVerifier(),
       WebSocket: server.WebSocket,
@@ -669,7 +669,7 @@ test("a failing recovery strategy terminates with policy-error, not relay failur
   vi.setSystemTime(100);
   const directory = new RelayDirectory(),
     server = new ControlledWebSocketServer();
-  const states: ConnectionState[] = [];
+  const states: RelayConnectionState[] = [];
   let broken = false;
   const client = new RxNostr({
     verifier: new NoopVerifier(),
@@ -752,7 +752,7 @@ test("a reported wait remains pending until the reconnector decides", async () =
   vi.useFakeTimers();
   vi.setSystemTime(100);
   const server = new ControlledWebSocketServer(),
-    states: ConnectionState[] = [];
+    states: RelayConnectionState[] = [];
   let resolve!: (value: { action: "retry"; delay: number }) => void;
   const client = new RxNostr({
     verifier: new NoopVerifier(),

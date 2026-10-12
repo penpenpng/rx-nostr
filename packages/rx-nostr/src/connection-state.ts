@@ -1,5 +1,5 @@
 /** Transport-independent failure information exposed by rx-nostr. */
-export interface ConnectionFailure {
+export interface RelayConnectionFailure {
   kind:
     | "connection-failed"
     | "connection-dropped"
@@ -36,7 +36,7 @@ export function copySuppressionReasons(
 }
 
 /** A snapshot of one relay connection's rx-nostr lifecycle state. */
-export type ConnectionState =
+export type RelayConnectionState =
   | { state: "dormant" }
   | {
       state: "waiting-for-connection";
@@ -44,7 +44,7 @@ export type ConnectionState =
       attempt: number;
       suppressionReasons?: readonly ConnectionSuppressionReason[];
       /** Most recent failure or drop, if any. */
-      reason?: ConnectionFailure;
+      reason?: RelayConnectionFailure;
     }
   | { state: "connecting"; attempt: number }
   | { state: "connected" }
@@ -52,8 +52,8 @@ export type ConnectionState =
   | {
       state: "failed";
       attempt: number;
-      reason: ConnectionFailure;
+      reason: RelayConnectionFailure;
     }
   | { state: "disposed" };
 
-export type ConnectionStateSymbol = ConnectionState["state"];
+export type RelayConnectionStateSymbol = RelayConnectionState["state"];

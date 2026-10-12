@@ -1,4 +1,4 @@
-import type { AuthenticatorInput } from "../authenticator/index.ts";
+import type { Nip42AuthenticatorInput } from "../authenticator/index.ts";
 import type { ConnectionDropDetector } from "../connection-drop-detector/index.ts";
 import {
   type RelayHealthPolicyInput,
@@ -50,7 +50,7 @@ export const RX_NOSTR_DEFAULT_CONFIG: RxNostrStaticDefaultConfig = Object.freeze
 export class FilledRxNostrConfig {
   readonly verifier: EventVerifier;
   readonly signer: EventSigner;
-  readonly authenticator: AuthenticatorInput | undefined;
+  readonly authenticator: Nip42AuthenticatorInput | undefined;
   readonly reconnector: ConnectionReconnector;
   readonly dropDetectors: readonly ConnectionDropDetector[];
   readonly relayDirectory: RelayDirectory;

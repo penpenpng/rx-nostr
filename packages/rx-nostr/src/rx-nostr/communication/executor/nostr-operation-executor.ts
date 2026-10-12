@@ -1,8 +1,8 @@
 import type * as Nostr from "nostr-typedef";
 import { Observable, type Subscription, filter, map, merge } from "rxjs";
 
-import type { AuthenticatorInput } from "../../../authenticator/index.ts";
-import type { ConnectionState } from "../../../connection-state.ts";
+import type { Nip42AuthenticatorInput } from "../../../authenticator/index.ts";
+import type { RelayConnectionState } from "../../../connection-state.ts";
 import type { RxNostrDiagnostic } from "../../../diagnostics/index.ts";
 import { evalFilters, type LazyFilter } from "../../../lazy-filter/index.ts";
 import { normalizeFilters } from "../../../lazy-filter/normalize-filters.ts";
@@ -37,7 +37,7 @@ export class NostrOperationExecutor implements Disposable {
     return this.transport.close();
   }
 
-  monitorConnectionState(): Observable<ConnectionState> {
+  monitorConnectionState(): Observable<RelayConnectionState> {
     return this.transport.state$.asObservable();
   }
 
@@ -311,7 +311,7 @@ export type RelayVreqPlanner = (
 ) => ReqPlan[];
 
 export interface NostrOperationExecutorOptions {
-  readonly authenticator?: AuthenticatorInput;
+  readonly authenticator?: Nip42AuthenticatorInput;
   readonly onDiagnostic?: (diagnostic: RxNostrDiagnostic) => void;
   readonly vreqPlanner?: RelayVreqPlanner;
 }
