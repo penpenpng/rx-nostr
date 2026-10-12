@@ -16,19 +16,20 @@ import type {
   RxNostrPublishConfig,
   RxNostrPublishOptions,
   RxNostrReqConfig,
-  RxNostrReqInput,
+  RxNostrForwardReqInput,
+  RxNostrBackwardReqInput,
   RxNostrReqOptions,
 } from "./operation/index.ts";
 
 export interface IRxNostr {
   forward(
     relays: RelayInput,
-    request: RxNostrReqInput,
+    request: RxNostrForwardReqInput,
     options?: RxNostrReqConfig,
   ): Observable<EventPacket>;
   backward(
     relays: RelayInput,
-    request: RxNostrReqInput,
+    request: RxNostrBackwardReqInput,
     options?: RxNostrReqConfig,
   ): Observable<EventPacket>;
   publish(

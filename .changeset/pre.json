@@ -6,5 +6,10 @@
     "@rx-nostr/crypto-wasm": "3.0.0",
     "rx-nostr": "3.7.8"
   },
-  "changesets": ["initial-v4-beta"]
+  "changesets": [
+    "initial-v4-beta",
+    "nested-filter-requests",
+    "readonly-rx-relays",
+    "single-lazy-filter"
+  ]
 }
