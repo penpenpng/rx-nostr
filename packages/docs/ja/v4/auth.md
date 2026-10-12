@@ -57,13 +57,13 @@ challenge を受信すると、authenticator が設定されている接続で�
 
 同じ接続・challenge に対する複数 operation は、ひとつの AUTH 送信と成功・失敗結果を共有します。同じ challenge で失敗した AUTH は再試行しません。新しい challenge が届くと、一度の新しい認証を開始できます。
 
-元の EVENT に対する `auth-required` の `OK false` は `RxNostrPublication.subscribe()` で観測できますが、認証後の再送が残っている間は最終的な publication failure ではありません。
+元の EVENT に対する `auth-required` の `OK false` は `Publication.subscribe()` で観測できますが、認証後の再送が残っている間は最終的な publication failure ではありません。
 
 operation のキャンセルはその operation の待機と再送を取り消します。接続が維持されている間は、共有 AUTH は継続します。
 
 ## Timeout と stale challenge
 
-AUTH の OK 待機時間は Nip42Authenticator の `authTimeout` で指定します。省略時は 30 秒です。署名 callback の完了待ちはこの timeout に含まれません。Nip42Authenticator factory を使えば、relay ごとに異なる値を設定できます。
+AUTH の OK 待機時間は Authenticator の `authTimeout` で指定します。省略時は 30 秒です。署名 callback の完了待ちはこの timeout に含まれません。Authenticator factory を使えば、relay ごとに異なる値を設定できます。
 
 ```ts
 const authenticator = new SimpleAuthenticator(signer, {
@@ -81,7 +81,7 @@ const rxNostr = new RxNostr({
 Custom authenticator は次の interface を実装します。
 
 ```ts
-interface Nip42Authenticator {
+interface Authenticator {
   readonly authTimeout?: number;
   challenge(
     relay: RelayUrl,

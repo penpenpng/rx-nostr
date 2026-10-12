@@ -251,6 +251,6 @@ RxNostr.logSink = (log) => {
 
 値は unipls と同じく `level`、`event`、`message`、任意の `context` と `cause` を持ちます。relay 固有の log では normalized relay URL が `context.relay` にあります。ログと context は callback に渡す前に freeze されます。callback が投げた例外は無視され、operation へ伝播しません。message は人向けの説明なので、filter には machine-readable な `event` を使います。
 
-log はデバッグや記録に役立つ補助情報です。operation の成否、callback 例外、connection の現在状態の代わりにはなりません。これらはそれぞれ `RxNostrPublication`／REQ の error、`RxNostrCallbackError`、`monitorConnectionState()` で扱います。
+log はデバッグや記録に役立つ補助情報です。operation の成否、callback 例外、connection の現在状態の代わりにはなりません。これらはそれぞれ `Publication`／REQ の error、`RxNostrCallbackError`、`monitorConnectionState()` で扱います。
 
 unipls の structured log を転送し、rx-nostr 固有の接続失敗、NIP-11 自動取得失敗、宛先のない REQ なども同じ形式で記録します。ログには timestamp を付けないため、必要なら callback 内で追加してください。

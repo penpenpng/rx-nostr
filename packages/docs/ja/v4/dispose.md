@@ -1,6 +1,6 @@
 # Dispose
 
-`RxNostr`・`RxReq`・`RxRelays`・Worker verifier は `dispose()` と `Symbol.dispose` に対応します。公開 `RxNostrPublication` は `cancel()` で終了します。使い終えた object は明示的に破棄してください。
+`RxNostr`・`RxReq`・`RxRelays`・Worker verifier は `dispose()` と `Symbol.dispose` に対応します。公開 `Publication` は `cancel()` で終了します。使い終えた object は明示的に破棄してください。
 
 ## `RxNostr`
 
@@ -35,7 +35,7 @@ subscription.unsubscribe();
 
 unsubscribe は、その query の観測と通信を終了します。
 
-一方、`RxNostrPublication.subscribe()` の Subscription は OK の観測だけを所有します。unsubscribe しても publication 自体は継続します。
+一方、`Publication.subscribe()` の Subscription は OK の観測だけを所有します。unsubscribe しても publication 自体は継続します。
 
 ```ts
 const publication = rxNostr.publish(relays, params);
@@ -64,10 +64,10 @@ relays.dispose();
 
 | 通知・操作 | 所有者と確定する時点 |
 | --- | --- |
-| `RxNostrPublication.event` | publication の signer が EVENT を返した時。送信完了や OK 受理を表さず、取消後に署名が完了しても resolve し得る |
+| `Publication.event` | publication の signer が EVENT を返した時。送信完了や OK 受理を表さず、取消後に署名が完了しても resolve し得る |
 | legacy `cast()` の完了 | legacy facade が宛先の少なくとも 1 リレーへ EVENT を実際に送信した時。署名だけでは完了しない |
-| `RxNostrPublication.waitFor("any" / "all")` | publication が各宛先の結果から指定の成功条件を判定した時。ほかの送信や linger は継続し得る |
-| `RxNostrPublication.subscribe()` の complete | publication の全 relay effort が終わった時、または取消時。observer の unsubscribe は自身の観測だけを終了 |
+| `Publication.waitFor("any" / "all")` | publication が各宛先の結果から指定の成功条件を判定した時。ほかの送信や linger は継続し得る |
+| `Publication.subscribe()` の complete | publication の全 relay effort が終わった時、または取消時。observer の unsubscribe は自身の観測だけを終了 |
 | `RxReq.dispose()` | source（または派生 view）からの新しい filter 通知を終了。forward の最後の segment、backward の処理中・queue 中の segment は継続 |
 | query の subscription unsubscribe | その query の通信需要と protocol 作業を終了。必要なら CLOSE を送る |
 | 内部 `PublicationOperation.closed` | linger 後の lease 解放と cleanup、または cancel による即時 cleanup が済んだ時。公開の成功通知ではない |
@@ -76,13 +76,13 @@ operation は relay ごとの需要 lease を、executor は REQ / EVENT / AUTH 
 
 ## Worker verifier
 
-`WorkerEventVerifierClient.dispose()` は listener、timer、Worker を終了し、進行中の `verifyEvent()` の Promise を reject します。dispose は冪等で、以後の検証には再利用できません。
+`VerificationClient.dispose()` は listener、timer、Worker を終了し、進行中の `verifyEvent()` の Promise を reject します。dispose は冪等で、以後の検証には再利用できません。
 
 ```ts
 client.dispose();
 ```
 
-Worker 側の `WorkerEventVerifierHost` も dispose に対応します。dispose 後の `start()` は `RxNostrAlreadyDisposedError` になり、検証中だった処理が遅れて完了しても応答を送信しません。dispose は冪等です。
+Worker 側の `VerificationHost` も dispose に対応します。dispose 後の `start()` は `RxNostrAlreadyDisposedError` になり、検証中だった処理が遅れて完了しても応答を送信しません。dispose は冪等です。
 
 ## `using`
 

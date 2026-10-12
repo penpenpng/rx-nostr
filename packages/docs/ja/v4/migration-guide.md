@@ -103,7 +103,7 @@ interface EventPacket {
 
 ## `send()` を `publish()` へ移す
 
-v3 の `send()` が返す Observable は、v4 では `RxNostrPublication` に置き換わります。
+v3 の `send()` が返す Observable は、v4 では `Publication` に置き換わります。
 
 ```ts
 // v3
