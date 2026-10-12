@@ -1,4 +1,4 @@
-# Publish
+# Write Events
 
 `rxNostr.publish()` は EVENT の署名と複数リレーへの送信を管理し、ひとつの hot operation である `Publication` を返します。
 

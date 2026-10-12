@@ -46,11 +46,11 @@ function startTimeline(client: IRxNostr) {
 
 ### Operation
 
-v4 では REQ と publish を独立した operation として扱います。operation ごとに宛先、timeout、AUTH、接続維持時間などを指定できます。あるリレーの失敗は、同じ operation に含まれる別のリレーを原則として停止させません。
+v4 では REQ と publish を独立した operation として扱います。operation ごとに宛先、timeout、接続維持時間などを指定できます。AUTH はインスタンスの接続単位で設定します。あるリレーの失敗は、同じ operation に含まれる別のリレーを原則として停止させません。
 
 ### `RelayInput`
 
-宛先には、ひとつの URL、URL の iterable、または動的な `RxRelays` を渡せます。
+宛先には、ひとつの URL、URL の readonly 配列・Set、または動的な `RxRelays` を渡せます。
 
 ```ts
 rxNostr.backward("wss://relay.example.com", [{}]);
@@ -73,7 +73,7 @@ URL は境界で正規化、重複排除されます。query と hot relay に�
 - signer が存在しても AUTH は暗黙に有効化せず、`authenticator` で明示的に opt-in
 - query の結果から物理的な `subId` を削除し、利用者指定の `traceTag` を提供
 
-詳しくは[Migration from v3](./migration-guide)を参照してください。
+詳しくは[Migration Guide](./migration-guide)を参照してください。
 
 ## RxJS との関係
 

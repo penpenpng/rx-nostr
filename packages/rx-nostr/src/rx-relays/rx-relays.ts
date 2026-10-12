@@ -101,7 +101,6 @@ export class RxRelays extends ReadonlyRxRelays {
     return this.derive(this.combine(rxRelaysX, rxRelaysY).pipe(map(([x, y]) => x.difference(y))));
   }
 
-  // TODO: { move: boolean } で dispose されたときに親も dispose する
   static intersection(...rxRelays: ReadonlyRxRelays[]): ReadonlyRxRelays {
     return this.derive(this.combine(...rxRelays).pipe(map((sets) => u.Set.intersection(...sets))));
   }

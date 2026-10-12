@@ -1,4 +1,4 @@
-# NIP-42 AUTH
+# Authenticator
 
 AUTH は opt-in です。通常の signer を指定しただけでは有効になりません。wallet の署名 prompt が意図せず表示されることを避けるため、`authenticator` を明示します。
 

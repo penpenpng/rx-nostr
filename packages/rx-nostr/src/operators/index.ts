@@ -17,7 +17,6 @@ export { finalizeWithLast } from "./general/finalize-with-last.ts";
 export { setDiff, type SetDiff } from "./general/set-diff.ts";
 export { sort } from "./general/sort.ts";
 export { timeoutWith } from "./general/timeout-with.ts";
-export { withPrevious } from "./general/with-previous.ts";
 export { filterByType } from "./message-packet/filter-by-type.ts";
 export { filterByEventId } from "./ok-packet/filter-by-event-id.ts";
 export { batch, type MergeFilterFunction } from "./req-packet/batch.ts";
