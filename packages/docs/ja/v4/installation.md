@@ -1,88 +1,70 @@
 # Installation
 
-rx-nostr 本体、型定義、暗号実装をインストールします。
+rx-nostr の動作のためには少なくとも `nostr-typedef` が必須です。
+
+また、署名とその検証のための処理は rx-nostr 本体には含まれていません。ほとんどの場合はこれらが必要で、別途導入する必要があります。利用者自身で自由に実装できますが、通常は `@rx-nostr/crypto` で十分なはずです。
+
 
 ::: code-group
 
-```sh [pnpm]
-pnpm add rx-nostr @rx-nostr/crypto nostr-typedef
+```sh [npm]
+npm install rx-nostr nostr-typedef @rx-nostr/crypto
 ```
 
-```sh [npm]
-npm install rx-nostr @rx-nostr/crypto nostr-typedef
+```sh [pnpm]
+pnpm add rx-nostr nostr-typedef @rx-nostr/crypto
 ```
 
 ```sh [yarn]
-yarn add rx-nostr @rx-nostr/crypto nostr-typedef
+yarn add rx-nostr nostr-typedef @rx-nostr/crypto
 ```
 
 :::
 
-`nostr-typedef` は rx-nostr の peer dependency です。`@rx-nostr/crypto` は必須ではありませんが、通常は同パッケージの `SimpleVerifier` と `SeckeySigner` を利用できます。
+rx-nostr は内部で [DisposableStack](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DisposableStack) を利用しています。2026年10月現在、この API のブラウザサポートは限定的なので、クライアントサイドの利用では polyfill の導入をおすすめします。
 
-## Browser
+::: code-group
 
-ブラウザでは、通常は `globalThis.WebSocket` がそのまま使われます。署名を NIP-07 provider に任せる場合、既定の `Nip07Signer` を利用できるため signer の指定は不要です。
-
-```ts
-import { RxNostr } from "rx-nostr";
-import { SimpleVerifier } from "@rx-nostr/crypto";
-
-const rxNostr = new RxNostr({
-  verifier: new SimpleVerifier(),
-});
+```sh [npm]
+npm install diposablestack
 ```
 
-REQ を使う場合、`verifier` は instance config または `RxNostr.defaultConfig.verifier` に指定します。省略時の verifier は EVENT の検証時にエラーとなります。意図的に署名検証を省略する場合も、`new NoopVerifier()` を明示してください。
-
-## Node.js
-
-Node.js は **24 以降**をサポートします。Node 24 では下記の JavaScript 標準 API を polyfill なしで利用できます。`WebSocket` がない環境では constructor を注入してください。
-
-`globalThis.WebSocket` がない runtime では、WebSocket constructor を `WebSocket` optionへ渡します。
-
-```sh
-pnpm add ws
-pnpm add -D @types/ws
+```sh [pnpm]
+pnpm add diposablestack
 ```
 
-```ts
-import { RxNostr } from "rx-nostr";
-import { SimpleVerifier } from "@rx-nostr/crypto";
-import WebSocket from "ws";
-
-const rxNostr = new RxNostr({
-  verifier: new SimpleVerifier(),
-  WebSocket,
-});
+```sh [yarn]
+yarn add diposablestack
 ```
 
-`WebSocket` option は rx-nostr 独自の構造的な型を受け取ります。内部 transport の型を import する必要はありません。
+:::
 
-## Runtime と module format
-
-rx-nostr v4 は ESM package として配布されます。JavaScript と TypeScript のいずれからも package root を importしてください。
-
-```ts
-import { RxNostr } from "rx-nostr";
-```
-
-実行時には `DisposableStack` と `Symbol.dispose`、`Promise.withResolvers`、`Set.prototype.union/intersection/difference`、`Array.prototype.toSorted` が必要です。ブラウザのサポート下限は、これらの API と WebSocket をネイティブに備えるか、不足分をアプリケーションが **rx-nostr の import より先に** polyfill した環境です。`DisposableStack` がない場合、client の生成を待たず module の評価時に import が失敗します。WebSocket の注入だけでは JavaScript API の不足を補えません。NIP-11 の既定取得処理には `fetch` も必要です（`fetcher` option で差し替え可能）。
-
-たとえば `DisposableStack` だけが不足している環境では、次の順で起動できます。
-
-```sh
-pnpm add disposablestack
-```
+polyfill は rx-nostr の初回の import よりも先に完了していなければなりません。
 
 ```ts
 import "disposablestack/auto";
 
-const { RxNostr } = await import("rx-nostr");
-const rxNostr = new RxNostr();
-rxNostr.dispose();
+import { RxNostr } from "rx-nostr";
 ```
 
-ほかの API が不足する場合も、対応する polyfill を先に読み込んでください。rx-nostr はグローバル polyfill を自動導入しません。上の手順は Node 24 で `DisposableStack` を削除した別プロセスで検証しています。ブラウザごとの互換性は、採用するブラウザと polyfill の組み合わせで確認してください。
+## WebSocket
 
-CI では Node 24.0.0 と現行 Node 24 の両方で配布 tarball を polyfill なしで import し、`DisposableStack` が不足する場合の失敗と先読み後の回復を別プロセスで検査します。Chrome では配布物から module Worker を起動し、署名検証の通信と終了まで確認します。
+WebSocket 通信のためには、通常は `globalThis.WebSocket` がそのまま使われます。古い Node.js を利用していて `globalThis.WebSocket` が存在しなかったり、何らかの事情で別の WebSocket 実装を使用したい場合は `WebSocket` オプションを設定してください。
+
+```ts
+import { RxNostr } from "rx-nostr";
+import WebSocket from "ws";
+
+const rxNostr = new RxNostr({
+  WebSocket,
+});
+```
+
+すべての `RxNostr` インスタンスで同様にする場合には代わりに `defaultConfig` が利用できます。
+
+```ts
+import { RxNostr } from "rx-nostr";
+import WebSocket from "ws";
+
+RxNostr.defaultConfig.WebSocket = WebSocket;
+```

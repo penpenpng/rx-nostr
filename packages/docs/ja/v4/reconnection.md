@@ -1,5 +1,9 @@
 # Reconnection
 
+## Lazy Filter
+
+---
+
 ## 既定の reconnector
 
 `RxNostr` の既定の reconnector は exponential backoff と jitter を使い、接続需要がある限り回復を継続します。長期間の接続失敗は、後述の relay health policy によって試行頻度を下げます。

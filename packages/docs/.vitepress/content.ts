@@ -128,9 +128,9 @@ export const content = defineContent({
     {
       text: "Client",
       items: [
+        { text: "Relay Input", link: "relay-input" },
         { text: "Read Events", link: "read-events" },
         { text: "Write Events", link: "write-events" },
-        { text: "Relay Input", link: "relay-input" },
         { text: "Hot Relays", link: "hot-relays" },
         { text: "Signer", link: "signer" },
         { text: "Verifier", link: "verifier" },
