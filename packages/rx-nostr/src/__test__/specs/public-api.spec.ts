@@ -20,6 +20,9 @@ import type {
   RxNostrPublishConfig,
   RxNostrReqConfig,
   RxNostrReqInput,
+  RxNostrForwardReqInput,
+  RxNostrBackwardReqInput,
+  LazyFilter,
   RxNostrStaticDefaultConfig,
   RxNostrStaticDefaultOptions,
 } from "rx-nostr";
@@ -75,7 +78,16 @@ describe("public entry point", () => {
         RxNostrReqConfig | undefined
       >();
       expectTypeOf<Parameters<IRxNostr["backward"]>[0]>().toEqualTypeOf<RelayInput>();
-      expectTypeOf<Parameters<IRxNostr["backward"]>[1]>().toEqualTypeOf<RxNostrReqInput>();
+      expectTypeOf<Parameters<IRxNostr["backward"]>[1]>().toEqualTypeOf<RxNostrBackwardReqInput>();
+      expectTypeOf<Parameters<IRxNostr["forward"]>[1]>().toEqualTypeOf<RxNostrForwardReqInput>();
+      expectTypeOf<LazyFilter[][]>().toExtend<RxNostrBackwardReqInput>();
+      expectTypeOf<LazyFilter[][]>().not.toExtend<RxNostrForwardReqInput>();
+      expectTypeOf<
+        Parameters<publicApi.RxNostr["forward"]>[1]
+      >().toEqualTypeOf<RxNostrForwardReqInput>();
+      expectTypeOf<
+        Parameters<publicApi.RxNostr["backward"]>[1]
+      >().toEqualTypeOf<RxNostrBackwardReqInput>();
     });
 
     test("exposes publication and relay input types", () => {

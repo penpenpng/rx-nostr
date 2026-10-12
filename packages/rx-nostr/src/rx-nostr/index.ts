@@ -11,5 +11,7 @@ export type {
   RxNostrPublishOptions,
   RxNostrReqConfig,
   RxNostrReqInput,
+  RxNostrForwardReqInput,
+  RxNostrBackwardReqInput,
   RxNostrReqOptions,
 } from "./operation/index.ts";

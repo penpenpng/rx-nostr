@@ -5,6 +5,9 @@ import type { RxReq } from "../../../rx-req/index.ts";
 /** Empty filter arrays and unsatisfiable branches match nothing; `{}` or `[{}]` matches all. */
 export type RxNostrReqInput = RxReq | LazyFilter | readonly LazyFilter[];
 
+export type RxNostrForwardReqInput = RxNostrReqInput;
+export type RxNostrBackwardReqInput = RxNostrReqInput | readonly (readonly LazyFilter[])[];
+
 export interface RxNostrReqOptions {
   defer?: boolean;
   /** Connection-demand retention in ms; 0 releases immediately, Infinity lasts until disposal. */

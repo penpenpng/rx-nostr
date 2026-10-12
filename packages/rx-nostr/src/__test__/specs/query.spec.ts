@@ -42,6 +42,97 @@ function event(overrides: Partial<Nostr.Event> = {}): Nostr.Event {
 
 describe("REQ public contract", () => {
   describe("input", () => {
+    describe("backward filter groups", () => {
+      scenarioTest(
+        "merges segments and completes after every REQ finishes",
+        async ({ createScenario }) => {
+          const { server, rxNostr } = createScenario();
+          const inspector = new SubscriptionInspector<EventPacket>();
+          const request: readonly (readonly LazyFilter[])[] = [
+            [{ kinds: [1] }, { kinds: [2] }],
+            [{ kinds: [3] }],
+          ];
+
+          rxNostr.backward(relay, request).subscribe(inspector);
+          const socket = server.sockets.latest;
+
+          socket.open();
+          const first = await socket.inbox.waitNext("REQ");
+          const second = await socket.inbox.waitNext("REQ");
+
+          expect(first.slice(2)).toEqual([{ kinds: [1] }, { kinds: [2] }]);
+          expect(second.slice(2)).toEqual([{ kinds: [3] }]);
+          expect(first[1]).not.toBe(second[1]);
+          expect(server.connections).toHaveLength(1);
+
+          socket.message(["EVENT", first[1], event({ id: "first", kind: 2 })]);
+          socket.message(["EVENT", second[1], event({ id: "second", kind: 3 })]);
+          expect((await inspector.waitNext()).event.id).toBe("first");
+          expect((await inspector.waitNext()).event.id).toBe("second");
+
+          socket.message(["EOSE", first[1]]);
+          await settleProtocol();
+          expect(inspector.completed).toBe(false);
+          socket.message(["EOSE", second[1]]);
+
+          await inspector.waitComplete();
+
+          const closes = [
+            await socket.inbox.waitNext("CLOSE"),
+            await socket.inbox.waitNext("CLOSE"),
+          ];
+
+          expect(closes.map((message) => message[1]).toSorted()).toEqual(
+            [first[1], second[1]].toSorted(),
+          );
+          await expect(socket.closeRequested).resolves.toBeDefined();
+          socket.acknowledgeClose();
+          rxNostr.dispose();
+        },
+      );
+
+      test("snapshots groups and preserves lazy bounds", async () => {
+        const { server, rxNostr } = createRxNostrScenario();
+        let since = 1;
+        const filter: LazyFilter = { kinds: [1], since: () => since };
+        const request: LazyFilter[][] = [[{}], [], [{ authors: [] }], [filter]];
+        const observable = rxNostr.backward(relay, request);
+
+        filter.kinds![0] = 2;
+
+        request[3].push({ kinds: [3] });
+        request.splice(0);
+
+        since = 4;
+
+        const subscription = observable.subscribe();
+        const socket = server.sockets.latest;
+
+        socket.open();
+        expect((await socket.inbox.waitNext("REQ")).slice(2)).toEqual([{}]);
+        expect((await socket.inbox.waitNext("REQ")).slice(2)).toEqual([{ kinds: [1], since: 4 }]);
+        subscription.unsubscribe();
+        const firstClose = await socket.inbox.waitNext("CLOSE");
+        const secondClose = await socket.inbox.waitNext("CLOSE");
+
+        expect(firstClose[1]).not.toBe(secondClose[1]);
+        await expect(socket.closeRequested).resolves.toBeDefined();
+        socket.acknowledgeClose();
+        rxNostr.dispose();
+      });
+
+      test("completes without connecting when all groups match nothing", async () => {
+        const { server, rxNostr } = createRxNostrScenario();
+        const inspector = new SubscriptionInspector<EventPacket>();
+
+        rxNostr.backward(relay, [[], [{ kinds: [] }]], { defer: false }).subscribe(inspector);
+
+        await inspector.waitComplete();
+        expect(server.connections).toHaveLength(0);
+        rxNostr.dispose();
+      });
+    });
+
     test.each(["forward", "backward"] as const)(
       "%s accepts a single filter and evaluates lazy bounds at send time",
       async (strategy) => {

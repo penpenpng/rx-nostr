@@ -97,6 +97,8 @@ export {
   type RxNostrPublishOptions,
   type RxNostrReqConfig,
   type RxNostrReqInput,
+  type RxNostrForwardReqInput,
+  type RxNostrBackwardReqInput,
   type RxNostrReqOptions,
   type RxNostrStaticDefaultConfig,
   type RxNostrStaticDefaultOptions,
