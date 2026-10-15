@@ -94,12 +94,16 @@ export class RelayConnection {
       return;
     }
 
-    this.socket = this.createSocket(retryCount ?? 0);
+    const socket = this.createSocket(retryCount ?? 0);
+    if (socket !== null) {
+      this.socket = socket;
+    }
   }
-  private createSocket(retryCount: number) {
+  private createSocket(retryCount: number): IWebSocket | null {
     const isFirstTry = this.isFirstTry;
     this.isFirstTry = false;
     let hasConnected = false;
+    let socket: IWebSocket | null = null;
 
     const isAutoRetry = retryCount > 0;
     const isManualRetry =
@@ -216,20 +220,18 @@ export class RelayConnection {
       throw new RxNostrInvalidUsageError("WebSocket constructor is missing");
     }
 
-    const socket = (() => {
-      try {
-        return new WebSocket(this.url);
-      } catch (err: unknown) {
-        // When the given URL is invalid, Deno runtime throws SyntaxError.
-        // Here, we fire the error event in a pseudo manner, just as a normal browser runtime would do.
-        onclose({
-          type: "close",
-          code: 0,
-          reason: `${err}`,
-        });
-        return null;
-      }
-    })();
+    try {
+      socket = new WebSocket(this.url);
+    } catch (err: unknown) {
+      // When the given URL is invalid, Deno runtime throws SyntaxError.
+      // Here, we fire the error event in a pseudo manner, just as a normal browser runtime would do.
+      onclose({
+        type: "close",
+        code: 0,
+        reason: `${err}`,
+      });
+      return null;
+    }
 
     socket?.addEventListener("open", onopen);
     socket?.addEventListener("message", onmessage);
